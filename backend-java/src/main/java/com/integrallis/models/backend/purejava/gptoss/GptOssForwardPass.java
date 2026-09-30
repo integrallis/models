@@ -22,7 +22,6 @@ import com.integrallis.models.backend.purejava.cache.LayeredKvCache.LayerSpec;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.tensor.TensorSource;
-import com.integrallis.vectors.core.BFloat16Matrix;
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.Arrays;
 import java.util.Objects;
@@ -54,7 +53,7 @@ public final class GptOssForwardPass {
 
     private Session(GptOssForwardPass owner) {
       this.owner = owner;
-      GptOssHuggingFaceConfig config = owner.config;
+      GptOssConfig config = owner.config;
       cache = new LayeredKvCache(owner.maxSequenceLength, owner.cacheSpecs.clone());
       rope =
           RotaryTable.yarn(
@@ -95,17 +94,17 @@ public final class GptOssForwardPass {
 
   private record LayerParameters(
       float[] attentionNorm,
-      BFloat16Matrix query,
+      GptOssProjection query,
       float[] queryBias,
-      BFloat16Matrix key,
+      GptOssProjection key,
       float[] keyBias,
-      BFloat16Matrix value,
+      GptOssProjection value,
       float[] valueBias,
-      BFloat16Matrix output,
+      GptOssProjection output,
       float[] outputBias,
       float[] sinks,
       float[] postAttentionNorm,
-      BFloat16Matrix router,
+      GptOssProjection router,
       float[] routerBias,
       GptOssMxfp4ExpertWeights experts) {
 
@@ -128,14 +127,14 @@ public final class GptOssForwardPass {
     }
   }
 
-  private final GptOssHuggingFaceConfig config;
+  private final GptOssConfig config;
   private final GptOssWeights weights;
   private final LayerParameters[] layers;
   private final LayerSpec[] cacheSpecs;
   private final float[] outputNorm;
   private final int maxSequenceLength;
 
-  GptOssForwardPass(GptOssHuggingFaceConfig config, GptOssWeights weights, int maxSequenceLength) {
+  GptOssForwardPass(GptOssConfig config, GptOssWeights weights, int maxSequenceLength) {
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     if (maxSequenceLength <= 0 || maxSequenceLength > config.maxPosition()) {
@@ -161,13 +160,27 @@ public final class GptOssForwardPass {
 
   /** Loads a complete GPT-OSS decoder graph from a mapped Safetensors source. */
   public static GptOssForwardPass load(
-      GptOssHuggingFaceConfig config, TensorSource source, int maxSequenceLength) {
+      GptOssConfig config, TensorSource source, int maxSequenceLength) {
     Objects.requireNonNull(config, "config");
     return new GptOssForwardPass(config, GptOssWeights.load(source, config), maxSequenceLength);
   }
 
+  /**
+   * Loads a complete GPT-OSS decoder graph from a mapped GGUF file.
+   *
+   * <p>The same graph as {@link #load}: only the weight layout differs, and {@link
+   * GptOssProjection} absorbs that.
+   */
+  public static GptOssForwardPass loadGguf(
+      GptOssConfig config,
+      com.integrallis.models.backend.purejava.gguf.GgufFile file,
+      int maxSequenceLength) {
+    Objects.requireNonNull(config, "config");
+    return new GptOssForwardPass(config, GptOssWeights.fromGguf(file, config), maxSequenceLength);
+  }
+
   /** Returns the validated checkpoint execution configuration. */
-  public GptOssHuggingFaceConfig config() {
+  public GptOssConfig config() {
     return config;
   }
 
@@ -352,10 +365,7 @@ public final class GptOssForwardPass {
     if (token < 0 || token >= config.vocabSize()) {
       throw new IllegalArgumentException("token is outside the vocabulary: " + token);
     }
-    BFloat16Matrix embedding = weights.tokenEmbedding();
-    for (int index = 0; index < destination.length; index++) {
-      destination[index] = embedding.value(token, index);
-    }
+    weights.tokenEmbedding().row(token, destination);
   }
 
   private void requireSession(Session session) {

@@ -344,6 +344,26 @@ public final class ActivatedLoraAdapter {
     return target;
   }
 
+  /**
+   * Whether this adapter holds a low-rank update for one layer's projection.
+   *
+   * <p>{@link #addTo} is a no-op for an absent projection, which is the right behaviour for a
+   * caller that would simply have added zero. A caller that cannot apply the update at all needs to
+   * know the difference: a routed feed-forward has no single gate matrix for an FFN adapter to
+   * update, so skipping one silently would answer as though the adapter were not loaded.
+   *
+   * @param layer the layer index
+   * @param projection the projection to test
+   * @return true when an update exists, false for an absent projection or an out-of-range layer
+   */
+  public boolean has(int layer, Projection projection) {
+    Objects.requireNonNull(projection, "projection");
+    if (layer < 0 || layer >= layers.length) {
+      return false;
+    }
+    return layers[layer][projection.ordinal()] != null;
+  }
+
   /** Adds one activated low-rank projection update to an already-computed base projection. */
   public void addTo(
       int layer,

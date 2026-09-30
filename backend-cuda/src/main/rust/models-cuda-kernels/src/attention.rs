@@ -8,26 +8,64 @@
 //!
 //! # Numeric contract, stated
 //!
-//! Attention is **not** bit-exact with the CPU path, and cannot be made so without also owning
-//! the CPU's `expf`. Everything else is:
+//! Attention **is** bit-exact with the CPU path. It was not, until 2026-09-26, and the reason is
+//! worth keeping: `expf` below was an independently written minimax polynomial, while the CPU
+//! kernel (`GroupedQueryAttentionKernel.expScalar`) uses a Taylor-coefficient polynomial with a
+//! different Cody-Waite split and a different rounding step. Two implementations of the same idea,
+//! neither wrong, that disagreed -- and the host test bounded `expf` against the *platform* `exp`
+//! rather than against the CPU path it actually has to match, so the disagreement was invisible.
+//! That is the same mistake the Q6_K fold made one layer down. `expf` is now an exact
+//! transcription of the CPU's, so every stage agrees:
 //!
 //! | stage | device order | matches CPU bit-for-bit |
 //! | --- | --- | --- |
-//! | score dot product | one thread per position, `fma` over `key_length` in index order | yes |
+//! | score dot product | one thread per position, `fma` over `key_length` in index order | **NO — see below** |
 //! | score scaling | one multiply per score | yes |
 //! | softmax maximum | parallel reduction | yes — `max` is exact and order-free |
-//! | `exp` | [`expf`] below | **no** — see below |
+//! | `exp` | [`expf`] below | yes — an exact transcription of the CPU's |
 //! | softmax sum | one thread, ascending position order | yes, given identical inputs |
 //! | normalisation | one multiply per score | yes |
 //! | value accumulation | one thread per output dimension, `fma` over positions in order | yes |
 //!
-//! The single divergence is `exp`. `core` has no floating-point transcendentals, rustc emits no
-//! libdevice linkage for `nvptx64`, and PTX's own `ex2.approx.f32` is documented at about two
-//! ulp. So [`expf`] below is our own, and it is used on **both** sides — host and device run the
-//! same polynomial, which is why the host parity test is meaningful. Its measured agreement with
-//! the platform `expf` is asserted in `tests/attention_parity.rs`
-//! ([`MAX_EXP_RELATIVE_ERROR`]), and the end-to-end head contract against the CPU reference is
-//! [`MAX_HEAD_RELATIVE_L2`]. Both are checked, not asserted.
+//! # The score dot product does not match, and this table used to claim it did
+//!
+//! Measured 2026-09-26 on an A6000 and an A40: with `expf` made bit-exact, G1 still diverges at
+//! prompt 0 token 7, and the two cards produce *different* wrong tokens (14853 and 86897) against
+//! the same control (22559). So the remaining divergence is real and order-sensitive.
+//!
+//! [`attention_dot`] accumulates sequentially: one accumulator, `fma` over `key_length` in index
+//! order. The CPU kernel does not. `GroupedQueryAttentionKernel` accumulates into a `FloatVector` —
+//! `lanes` independent partial sums, each taking every `lanes`-th element — and then folds them with
+//! `reduceAddFixedTree`, a fixed rotate-and-add tree, before a scalar tail in index order. Different
+//! summation order, different last bits, and greedy argmax does not forgive it.
+//!
+//! **`lanes` is host-dependent.** It is 8 at 256-bit, 16 at 512-bit, 4 at 128-bit, and
+//! `reduceAddFixedTree` branches on exactly those cases. So the CPU's attention score is not
+//! reproducible across vector widths either — the same hazard as the Q6_K reduction split and
+//! `MathUtil.fma`'s non-FMA fallback. Hard-coding 8 lanes here would bake a host assumption into a
+//! device kernel and silently mismatch a 512-bit host.
+//!
+//! This is the third instance of one mistake: **a device kernel written to the mathematically
+//! natural order, validated against a reference that is not the code path the gate compares it to.**
+//! Q6_K copied the scalar fallback instead of the Panama reduction; `expf` was checked against the
+//! platform `exp` instead of the CPU's polynomial; and this row simply asserted agreement that was
+//! never tested. The pattern, not any one bug, is the finding.
+//!
+//! `core` has no floating-point transcendentals, rustc emits no libdevice linkage for `nvptx64`,
+//! and PTX's own `ex2.approx.f32` is documented at about two ulp, so [`expf`] has to be ours. The
+//! requirement is not that it be accurate — it is that it be **the same function the CPU runs**.
+//! It therefore uses the CPU's clamp, magic-constant rounding, Cody-Waite split, Taylor
+//! coefficients and single-step exponent construction, in that order, with `fma` exactly where the
+//! CPU has one.
+//!
+//! One host-dependency remains, and it is not ours: `MathUtil.fma` falls back to `a * b + c` when
+//! the JVM reports no fast scalar FMA, so on such a host the CPU path changes and this kernel would
+//! no longer match it. That is the same class of hazard as the Q6_K reduction split, it belongs in
+//! `vectors`, and it is recorded rather than worked around here.
+//!
+//! [`MAX_EXP_RELATIVE_ERROR`] still bounds agreement with the platform `exp`, kept as a sanity
+//! check that the transcription is a real exponential and not merely self-consistent.
+//! [`MAX_HEAD_RELATIVE_L2`] remains the end-to-end head contract. Both are checked, not asserted.
 //!
 //! [`MAX_EXP_RELATIVE_ERROR`]: crate::attention::MAX_EXP_RELATIVE_ERROR
 //! [`MAX_HEAD_RELATIVE_L2`]: crate::attention::MAX_HEAD_RELATIVE_L2
@@ -46,11 +84,35 @@ pub const MAX_EXP_RELATIVE_ERROR: f32 = 1.0e-6;
 pub const MAX_HEAD_RELATIVE_L2: f32 = 2.0e-5;
 
 /// `log2(e)`, from `core` so the value is the platform's rather than a transcribed literal.
+// Bit-identical to Java's `1.44269504f` (both 0x3fb8aa3b), checked, so the named constant is
+// used rather than a re-spelled literal.
 const LOG2_E: f32 = core::f32::consts::LOG2_E;
 /// High part of `ln(2)`, chosen with trailing mantissa zeros so `x - n * LN2_HI` stays exact.
-const LN2_HI: f32 = 0.693_359_4_f32;
+// Java writes `0.693145752f`; this is the shortest literal with the same f32 bits (0x3f317200).
+const LN2_HI: f32 = 0.693_145_75_f32;
 /// Low part of `ln(2)`, carrying the remainder of the split.
-const LN2_LO: f32 = -2.121_944_4e-4_f32;
+// Java writes `1.42860677e-6f`; same f32 bits (0x35bfbe8e).
+const LN2_LO: f32 = 1.428_606_8e-6_f32;
+
+/// Softmax input clamp, matching the CPU kernel. An infinity is clamped to an endpoint, not
+/// mapped to 0 or infinity, and the clamp is what bounds the constructed exponent.
+const EXP_LOWER: f32 = -87.0_f32;
+/// Upper clamp; see [`EXP_LOWER`].
+const EXP_UPPER: f32 = 88.0_f32;
+/// `1.5 * 2^23`. Adding then subtracting it rounds a float to an integral value at f32
+/// precision without a rounding intrinsic.
+const ROUND_MAGIC: f32 = 12_582_912.0_f32;
+
+/// Taylor coefficients `1/720 .. 1/2`, in Horner order.
+const P0: f32 = 1.0 / 720.0;
+/// See [`P0`].
+const P1: f32 = 1.0 / 120.0;
+/// See [`P0`].
+const P2: f32 = 1.0 / 24.0;
+/// See [`P0`].
+const P3: f32 = 1.0 / 6.0;
+/// See [`P0`].
+const P4: f32 = 0.5;
 
 /// `exp` for the softmax, identical on host and device.
 ///
@@ -62,68 +124,85 @@ const LN2_LO: f32 = -2.121_944_4e-4_f32;
 /// matters and the overflow path does not; both are handled anyway.
 #[inline]
 pub fn expf(x: f32) -> f32 {
+    // NaN propagates through the Java expression too (Math.max/Math.min return NaN, and the
+    // polynomial carries it), so an early return is observably identical and cheaper.
     if x.is_nan() {
         return x;
     }
-    // exp(-104) is already below the smallest subnormal binary32.
-    if x < -104.0 {
-        return 0.0;
-    }
-    if x > 88.722_84 {
-        return f32::INFINITY;
-    }
-    // n = round(x * log2(e)), computed without a rounding intrinsic.
-    let scaled = x * LOG2_E;
-    let n = if scaled >= 0.0 {
-        (scaled + 0.5) as i32
-    } else {
-        (scaled - 0.5) as i32
-    };
-    let nf = n as f32;
-    // r = x - n*ln2, split so the subtraction stays exact in the high part.
-    let r = crate::float::fma(nf, -LN2_HI, x);
-    let r = crate::float::fma(nf, -LN2_LO, r);
-    // Minimax polynomial for exp(r) on [-ln2/2, ln2/2].
-    let mut poly = 1.986_124_5e-4_f32;
-    poly = crate::float::fma(poly, r, 1.390_073_5e-3_f32);
-    poly = crate::float::fma(poly, r, 8.333_346e-3_f32);
-    poly = crate::float::fma(poly, r, 4.166_663e-2_f32);
-    poly = crate::float::fma(poly, r, 1.666_666_6e-1_f32);
-    poly = crate::float::fma(poly, r, 5.0e-1_f32);
-    poly = crate::float::fma(poly, r * r, r + 1.0);
-    scale_by_power_of_two(poly, n)
-}
-
-/// Multiplies `value` by `2^n` without calling `ldexp`.
-///
-/// Splits the exponent in two steps so subnormal results stay representable instead of
-/// flushing through an out-of-range intermediate.
-#[inline(always)]
-fn scale_by_power_of_two(value: f32, n: i32) -> f32 {
-    if (-126..=127).contains(&n) {
-        return value * f32::from_bits(((n + 127) as u32) << 23);
-    }
-    if n > 127 {
-        return value
-            * f32::from_bits((254_u32) << 23)
-            * f32::from_bits(((n - 127 + 127) as u32) << 23);
-    }
-    // n < -126: two halves, each in range, so the product underflows gradually.
-    let half = n / 2;
-    let rest = n - half;
-    value
-        * f32::from_bits(((half.max(-126) + 127) as u32) << 23)
-        * f32::from_bits(((rest.max(-126) + 127) as u32) << 23)
+    // Java clamps FIRST, so an infinity becomes a finite endpoint rather than 0 or inf. The
+    // clamp is also what keeps `n + 127` inside [1, 254], which is why no subnormal two-step
+    // scaling is needed here and none exists on the Java side.
+    // `clamp` is exactly Java's `Math.min(Math.max(x, lower), upper)` for a non-NaN `x`, and NaN
+    // already returned above, so the panic-on-unordered-bounds case cannot arise.
+    let x = x.clamp(EXP_LOWER, EXP_UPPER);
+    // n = round(x * log2 e), via the 1.5 * 2^23 magic constant rather than a rounding
+    // intrinsic. Plain `*` and `+`, never an fma: contracting these would change the result,
+    // and Rust does not contract without fast-math.
+    let n = (x * LOG2_E + ROUND_MAGIC) - ROUND_MAGIC;
+    // r = x - n*ln2, Cody-Waite split into a high and low part.
+    let r = crate::float::fma(n, -LN2_HI, x);
+    let r = crate::float::fma(n, -LN2_LO, r);
+    // Taylor coefficients, in Horner order, ending in two fma-by-one steps. These are exact
+    // reciprocals of factorials -- not a minimax fit -- because that is what the CPU uses.
+    let mut p = P0;
+    p = crate::float::fma(p, r, P1);
+    p = crate::float::fma(p, r, P2);
+    p = crate::float::fma(p, r, P3);
+    p = crate::float::fma(p, r, P4);
+    p = crate::float::fma(p, r, 1.0);
+    p = crate::float::fma(p, r, 1.0);
+    // Single-step exponent construction. `n` is already integral, so the cast is exact.
+    p * f32::from_bits((((n as i32) + 127) as u32) << 23)
 }
 
 /// Dot product of a query head against one cached key row, in index order with `fma`.
 ///
 /// Matches `attention_dot_scalar` in the CPU kernel crate exactly.
+/// Lanes in the CPU kernel's pinned reduction shape. Not a device tuning knob: it is the CPU's
+/// `REDUCTION_SPECIES` length, and changing it here silently breaks bit-exactness.
+pub const REDUCTION_LANES: usize = 8;
+
+/// Folds eight lane accumulators exactly as the CPU's `reduceAddPinnedTree` does.
+///
+/// The CPU applies three rotate-and-add steps to the whole vector and returns lane 0. Working that
+/// out for eight lanes, with `w[i] = a[i] + a[(i+4)&7]` then `u[i] = w[i] + w[(i+2)&7]` then
+/// `z[i] = u[i] + u[(i+1)&7]`, lane 0 is:
+///
+/// ```text
+/// ((a0 + a4) + (a2 + a6)) + ((a1 + a5) + (a3 + a7))
+/// ```
+///
+/// Written as that expression rather than as a loop, because the grouping *is* the contract.
+#[inline]
+pub fn fold_pinned_tree(acc: &[f32; REDUCTION_LANES]) -> f32 {
+    ((acc[0] + acc[4]) + (acc[2] + acc[6])) + ((acc[1] + acc[5]) + (acc[3] + acc[7]))
+}
+
+/// Dot product in the CPU kernel's reduction shape, not in index order.
+///
+/// A sequential accumulation over `key_length` is the natural thing to write and it is **wrong
+/// here**: the CPU keeps eight striped partial sums and folds them with a fixed tree, so a
+/// sequential sum disagrees in the last bits and flips tokens under greedy argmax. This mirrors
+/// `GroupedQueryAttentionKernel.scoreGroup` — eight accumulators, lane `l` taking every eighth
+/// element from `l`, the tree fold, then the ragged tail added into the folded sum in index order.
 #[inline]
 pub fn attention_dot(query: &[f32], key: &[f32]) -> f32 {
-    let mut sum = 0.0_f32;
-    for index in 0..query.len() {
-        sum = crate::float::fma(query[index], key[index], sum);
+    let columns = query.len();
+    let vector_limit = columns - (columns % REDUCTION_LANES);
+    let mut acc = [0.0_f32; REDUCTION_LANES];
+    let mut column = 0;
+    while column < vector_limit {
+        for lane in 0..REDUCTION_LANES {
+            let index = column + lane;
+            acc[lane] = crate::float::fma(query[index], key[index], acc[lane]);
+        }
+        column += REDUCTION_LANES;
+    }
+    // The fold happens before the tail, exactly as the CPU orders it.
+    let mut sum = fold_pinned_tree(&acc);
+    while column < columns {
+        sum = crate::float::fma(query[column], key[column], sum);
+        column += 1;
     }
     sum
 }
@@ -146,16 +225,36 @@ pub fn score_maximum(scores: &[f32]) -> f32 {
 /// `exp`. The summation is deliberately sequential: float addition is not associative and the
 /// CPU reference sums in ascending position order.
 #[inline]
+/// Softmax in the CPU kernel's reduction shape.
+///
+/// The maximum needs no pinning — `max` is exact and order-free — and the exponential is
+/// elementwise. Only the **sum** is order-sensitive, so it uses the same eight striped accumulators
+/// and the same tree fold as [`attention_dot`], with the tail added after the fold. Note the sum
+/// accumulates with plain addition, not `fma`, because that is what the CPU does here: it adds
+/// already-computed exponentials rather than fusing a multiply into the accumulation.
 pub fn softmax(scores: &mut [f32]) {
     let maximum = score_maximum(scores);
-    let mut sum = 0.0_f32;
-    for index in 0..scores.len() {
+    let size = scores.len();
+    let vector_limit = size - (size % REDUCTION_LANES);
+    let mut acc = [0.0_f32; REDUCTION_LANES];
+    let mut index = 0;
+    while index < vector_limit {
+        for lane in 0..REDUCTION_LANES {
+            let at = index + lane;
+            scores[at] = expf(scores[at] - maximum);
+            acc[lane] += scores[at];
+        }
+        index += REDUCTION_LANES;
+    }
+    let mut sum = fold_pinned_tree(&acc);
+    while index < size {
         scores[index] = expf(scores[index] - maximum);
         sum += scores[index];
+        index += 1;
     }
     let inverse = 1.0_f32 / sum;
-    for index in 0..scores.len() {
-        scores[index] *= inverse;
+    for value in scores.iter_mut() {
+        *value *= inverse;
     }
 }
 

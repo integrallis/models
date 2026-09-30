@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava.ops;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
+import com.integrallis.models.backend.purejava.quant.Mxfp4Dequantizer;
 import com.integrallis.vectors.core.BFloat16Matrix;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
@@ -25,7 +26,13 @@ import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorShape;
 import jdk.incubator.vector.VectorSpecies;
@@ -65,7 +72,11 @@ public final class TensorOps {
   /** Offset-aware RMS normalization for attention heads stored in contiguous buffers. */
   public static void rmsNorm(
       float[] out, int outOffset, float[] x, int xOffset, float[] weight, int size, float eps) {
-    float sumSq = VectorUtil.dotProduct(x, xOffset, x, xOffset, size);
+    // Host-independent: VectorUtil.dotProduct sizes its reduction from the host (four accumulators
+    // of SPECIES_PREFERRED lanes, folded by a width switch), so this sum -- and therefore every
+    // token this model selects -- differed between a 128-bit, 256-bit and 512-bit machine. See
+    // PinnedReduction; at the 256-bit default this is bit-identical to what it replaces.
+    float sumSq = PinnedReduction.sumOfSquares(x, xOffset, size);
     float rms = (float) Math.sqrt(sumSq / size + eps);
     float scale = 1.0f / rms;
     // (x * scale) * weight lanewise, the same two roundings in the same order as the scalar
@@ -82,6 +93,26 @@ public final class TensorOps {
     }
     for (; i < size; i++) {
       out[outOffset + i] = x[xOffset + i] * scale * weight[i];
+    }
+  }
+
+  /**
+   * The bounded final-logit transform the Gemma family applies: {@code cap * tanh(logit / cap)}.
+   *
+   * <p>Shared because two architectures need the identical formula. Monotonic, so it cannot change
+   * which token a greedy decode selects -- but it decides every logit's <i>value</i>, so anything
+   * turning logits into probabilities, applying a temperature, or reporting a logprob is wrong
+   * without it. gemma3n shipped without it: its published header carries no softcapping key at all,
+   * and the reference's default of 30 applies, which was confirmed against the reference's own
+   * graph dump (raw -15.6992 becoming -14.4074, and 30*tanh(-15.6992/30) = -14.41).
+   */
+  public static void softcap(float[] logits, float cap) {
+    Objects.requireNonNull(logits, "logits");
+    if (!(cap > 0.0f) || !Float.isFinite(cap)) {
+      throw new IllegalArgumentException("cap must be finite and > 0: " + cap);
+    }
+    for (int index = 0; index < logits.length; index++) {
+      logits[index] = cap * (float) Math.tanh(logits[index] / cap);
     }
   }
 
@@ -201,6 +232,140 @@ public final class TensorOps {
   }
 
   /**
+   * Matrix-vector product against MXFP4 weights.
+   *
+   * <p>Scalar and float-activation, unlike the K-quant kernels, which quantize the activation to Q8
+   * and reduce in integer arithmetic. That is deliberate: MXFP4 arrives here to make the type
+   * multipliable at all -- before this, an MXFP4 tensor could be decoded but not multiplied, and
+   * {@code ggufMatmul} threw. Being correct first and fast second is the same order the MXFP4 and
+   * ternary decoders were written in, and a Q8-activation MXFP4 kernel has to be proven identical
+   * to this one, which needs this one to exist.
+   *
+   * <p>No per-row buffer: {@link Mxfp4Dequantizer#dotProduct} consumes the packed bytes directly,
+   * so a row of any width costs nothing but the read.
+   */
+  private static void mxfp4Matmul(
+      float[] out, float[] x, MemorySegment qWeight, int rows, int cols) {
+    if (cols % Mxfp4Dequantizer.BLOCK_SIZE != 0) {
+      throw new IllegalArgumentException(
+          "MXFP4 row length must be a multiple of "
+              + Mxfp4Dequantizer.BLOCK_SIZE
+              + ", but was "
+              + cols);
+    }
+    long rowBytes = (long) (cols / Mxfp4Dequantizer.BLOCK_SIZE) * Mxfp4Dequantizer.BLOCK_BYTES;
+    int threads = mxfp4Threads(rows, rowBytes, qWeight);
+    if (threads <= 1) {
+      mxfp4Rows(out, x, qWeight, rowBytes, cols, 0, rows);
+      return;
+    }
+    int chunk = (rows + threads - 1) / threads;
+    List<Future<?>> pending = new ArrayList<>(threads);
+    for (int first = chunk; first < rows; first += chunk) {
+      int from = first;
+      int to = Math.min(rows, first + chunk);
+      pending.add(
+          Mxfp4Threads.EXECUTOR.submit(() -> mxfp4Rows(out, x, qWeight, rowBytes, cols, from, to)));
+    }
+    // The calling thread takes the first chunk rather than waiting on all of them, so a matmul on a
+    // one-core host does the same work with no handoff at all.
+    mxfp4Rows(out, x, qWeight, rowBytes, cols, 0, Math.min(rows, chunk));
+    for (Future<?> future : pending) {
+      try {
+        future.get();
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("Interrupted during an MXFP4 projection", interrupted);
+      } catch (ExecutionException failed) {
+        Throwable cause = failed.getCause();
+        if (cause instanceof RuntimeException runtime) {
+          throw runtime;
+        }
+        if (cause instanceof Error error) {
+          throw error;
+        }
+        throw new IllegalStateException("MXFP4 projection failed", cause);
+      }
+    }
+  }
+
+  /** One contiguous band of output rows. Reads shared inputs, writes only {@code out[from..to)}. */
+  private static void mxfp4Rows(
+      float[] out, float[] x, MemorySegment qWeight, long rowBytes, int cols, int from, int to) {
+    for (int row = from; row < to; row++) {
+      out[row] = Mxfp4Dequantizer.dotProduct(qWeight, row * rowBytes, x, 0, cols);
+    }
+  }
+
+  /**
+   * How many threads to split an MXFP4 projection across, 1 meaning "stay on the calling thread".
+   *
+   * <p>Thread count cannot change the result. Each output element is its own dot product over its
+   * own row, so no two threads contribute to one reduction and {@link Mxfp4Dequantizer#dotProduct}
+   * folds each row in the same order it always did. That is what makes this safe in a backend where
+   * a float reduction's order is pinned on purpose: this splits <i>which thread</i> runs a
+   * reduction, never <i>how</i> one is folded. A test asserts the parallel and serial results are
+   * bit-identical rather than close.
+   *
+   * <p>Only above a size threshold, because handing work to another thread costs more than a small
+   * projection takes. The threshold is in weight bytes read, which is what the work actually is.
+   */
+  static int mxfp4Threads(int rows, long rowBytes, MemorySegment weight) {
+    if (rows < 2 || Math.multiplyExact(rows, rowBytes) < MXFP4_PARALLEL_MIN_BYTES) {
+      return 1;
+    }
+    // A segment from a confined arena is readable only by the thread that allocated it, and handing
+    // its rows to a pool thread throws WrongThreadException from inside the dot product rather than
+    // returning a wrong number. The probe is never started and never runs: asking whether some
+    // OTHER
+    // thread could read this segment is exactly the question, since a confined scope answers no for
+    // every thread but its owner while a shared or global one answers yes for all of them. This is
+    // the same property the execution planner already gates thread sharing on.
+    if (!weight.isAccessibleBy(Mxfp4Threads.ACCESS_PROBE)) {
+      return 1;
+    }
+    return Math.min(rows, Mxfp4Threads.COUNT);
+  }
+
+  /**
+   * Weight bytes below which an MXFP4 projection stays on the calling thread.
+   *
+   * <p>Matches vectors-core's own {@code ggufParallelThreshold} of one mebibyte, so MXFP4 and the
+   * K-quant kernels start using threads at the same amount of work rather than at two unrelated
+   * sizes.
+   */
+  private static final long MXFP4_PARALLEL_MIN_BYTES = 1L << 20;
+
+  /**
+   * The pool, created on first use by an MXFP4 model and never by any other.
+   *
+   * <p>A holder class so that a process which loads no MXFP4 weights -- every K-quant model, which
+   * is nearly all of them -- starts no threads at all. Daemon threads, so this never holds up JVM
+   * exit.
+   */
+  private static final class Mxfp4Threads {
+    static final int COUNT = Math.max(1, Runtime.getRuntime().availableProcessors());
+
+    /**
+     * A thread that is never started, used only to ask a segment whether a thread other than the
+     * caller could read it. Deliberately not one of the pool threads: this question has to be
+     * answerable before any work is submitted.
+     */
+    static final Thread ACCESS_PROBE = new Thread(() -> {}, "mxfp4-access-probe");
+
+    static final ExecutorService EXECUTOR =
+        Executors.newFixedThreadPool(
+            COUNT - 1 > 0 ? COUNT - 1 : 1,
+            runnable -> {
+              Thread thread = new Thread(runnable, "mxfp4-projection");
+              thread.setDaemon(true);
+              return thread;
+            });
+
+    private Mxfp4Threads() {}
+  }
+
+  /**
    * F32 projection with one float reduction order in every JIT tier.
    *
    * <p>Each mapped weight row is copied to a reused heap row and scored with {@link
@@ -233,7 +398,8 @@ public final class TensorOps {
     float[] row = new float[cols];
     for (int r = 0; r < rows; r++) {
       MemorySegment.copy(weight, LITTLE_ENDIAN_FLOAT, (long) r * cols * Float.BYTES, row, 0, cols);
-      out[r] = VectorUtil.dotProduct(x, 0, row, 0, cols);
+      // Pinned for the same reason as rmsNorm: an F32 row score feeds token selection.
+      out[r] = PinnedReduction.dot(x, 0, row, 0, cols);
     }
   }
 
@@ -253,6 +419,12 @@ public final class TensorOps {
     Objects.requireNonNull(q4Kernel, "q4Kernel");
     switch (type) {
       case F32 -> f32Matmul(out, x, qWeight, rows, cols);
+      // The same routine the batched path uses, at a batch of one, so the two cannot disagree. F16
+      // was reachable only in batches until Gemma 4 E4B arrived carrying per_layer_model_proj as
+      // F16
+      // where the E2B file carries it as BF16 -- and the per-layer projection runs a token at a
+      // time.
+      case F16 -> multiplyF16Batch(out, x, qWeight, 1, rows, cols);
       case BF16 -> BFloat16Matrix.of(qWeight, rows, cols).multiply(x, out);
       case Q4_0 ->
           VectorUtil.ggufQ4_0Q8_0BatchDotProduct(
@@ -294,6 +466,7 @@ public final class TensorOps {
       case Q6_K ->
           VectorUtil.ggufQ6_KQ8_KBatchDotProduct(
               x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
+      case MXFP4 -> mxfp4Matmul(out, x, qWeight, rows, cols);
       default -> throw new UnsupportedOperationException("GGUF matmul not supported for: " + type);
     }
   }
@@ -1259,7 +1432,7 @@ public final class TensorOps {
       GgufTensorValues.dequantizeRow(weights, type, row, columns, decodedWeightRow);
       for (int batch = 0; batch < batchSize; batch++) {
         output[batch * rows + row] =
-            VectorUtil.dotProduct(input, batch * columns, decodedWeightRow, 0, columns);
+            PinnedReduction.dot(input, batch * columns, decodedWeightRow, 0, columns);
       }
     }
   }
@@ -1712,7 +1885,12 @@ public final class TensorOps {
     }
   }
 
-  private static float tableTanh(float value) {
+  /**
+   * Package-private so the table's last slot can be tested at the exact input that reaches it. The
+   * boundary is one float ulp wide, so a sweep through plausible activations does not reliably land
+   * on it -- a sweep written first missed it entirely and passed against the crashing version.
+   */
+  static float tableTanh(float value) {
     if (value <= -TANH_TABLE_LIMIT) {
       return -1.0f;
     }
@@ -1721,6 +1899,21 @@ public final class TensorOps {
     }
     float tablePosition = (value + TANH_TABLE_LIMIT) * TANH_TABLE_SCALE;
     int index = (int) tablePosition;
+    // The bounds check above rejects value >= TANH_TABLE_LIMIT, but not every value below the limit
+    // scales to a position below the last slot: for value just under the limit, (value + limit) *
+    // scale
+    // rounds to exactly TANH_TABLE_SIZE in float arithmetic, so index lands on the final entry and
+    // the
+    // interpolation below reads one past it. The table holds SIZE + 1 entries, so that read is
+    // ArrayIndexOutOfBoundsException: Index 65537 out of bounds for length 65537 -- which is how
+    // this
+    // was found, crashing a gemma3n run 456 seconds in, from inside gelu.
+    //
+    // At the final slot there is nothing left to interpolate towards, and the tabulated value is
+    // tanh(limit) to within the table's own resolution, so return it.
+    if (index >= TANH_TABLE_SIZE) {
+      return TANH_TABLE[TANH_TABLE_SIZE];
+    }
     float lower = TANH_TABLE[index];
     return lower + (tablePosition - index) * (TANH_TABLE[index + 1] - lower);
   }

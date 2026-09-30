@@ -23,14 +23,31 @@
 //!   super-block order, with the same `fma` the CPU reference uses. PTX lowers
 //!   [`crate::float::fma`] to `fma.rn.f32`, the same IEEE-754 fused operation with the same
 //!   rounding, so the fold is bit-identical.
-//! * Q6_K keeps **eight** float lane accumulators. That is a determinism contract, not an
-//!   optimisation: the CPU scalar path maintains them purely so its float reduction order
-//!   matches the 8-lane SIMD order of the Vector API path. Dropping them would change the low
-//!   bits. See `dot_q6_k_q8_k_row_scalar` in the CPU crate.
 //!
 //! The consequence for a device kernel is the useful one: the expensive part (the integer
 //! products) may be spread across a warp however the hardware likes, and only the cheap tail
-//! (two `fma`s per block for Q4_K, eight for Q6_K) must be replayed in order by a single thread.
+//! (two `fma`s per block for Q4_K, one for Q6_K) must be replayed in order by a single thread.
+//!
+//! # Which CPU reduction is the reference (the 2026-09-19 G1 defect)
+//!
+//! `models` has **two** Q6_K row reductions on the CPU, and they are not bit-identical:
+//!
+//! * `PanamaVectorUtilSupport.ggufQ6_KQ8_KMatVecDot` in `vectors-core` reduces each super-block
+//!   to **one** exact `i32` and folds it with **one** `fma` into **one** `f32` accumulator;
+//! * `VectorUtilSupport.ggufQ6_KQ8_KScalarRowDot` — the `VECTOR_BITSIZE < 256` fallback,
+//!   mirrored by `dot_q6_k_q8_k_row_scalar` in `backend-native` — keeps **eight** `f32` lane
+//!   accumulators, does eight `fma`s per super-block, and adds the lanes at the end.
+//!
+//! [`Q6KRowAccumulator`] used to be a transcription of the **scalar** one. That is the G1 parity
+//! defect: `TensorOps.ggufMatmul` takes the Panama path on every host that can run these kernels
+//! (the scalar fallback needs `VECTOR_BITSIZE < 256`, and a CUDA host is x86-64 with at least
+//! AVX2), so the accelerator was being compared against a reduction it was not computing. The
+//! two folds coincide for a row of one super-block and differ by one ULP from two on — measured
+//! on an NVIDIA A40 (cc 8.6) as cpu bits `-1098673107` vs gpu bits `-1098673106`, and reproduced
+//! off-device in `tests/kquant_parity.rs`. Compounded over 30 layers that flips an argmax.
+//!
+//! So this module now transcribes the **Panama** reduction, which is also why Q4_K never had the
+//! problem: its Panama and scalar reductions are the *same* two `fma`s into one accumulator.
 
 #![allow(clippy::needless_range_loop)]
 
@@ -42,11 +59,6 @@ pub const Q8_K_SUM_BLOCK: usize = 16;
 pub const Q4_K_BLOCK_BYTES: usize = 144;
 /// Bytes in one Q6_K super-block: 128 `ql`, 64 `qh`, 16 signed scales, `d`.
 pub const Q6_K_BLOCK_BYTES: usize = 210;
-/// Float lane accumulators Q6_K must keep to stay bit-exact with the CPU path.
-pub const Q6_K_LANES: usize = 8;
-
-/// The exact integer lane sums of one Q6_K super-block.
-pub type Q6KBlockLaneSums = [i32; Q6_K_LANES];
 
 /// Converts a little-endian IEEE binary16 to `f32`.
 ///
@@ -235,23 +247,26 @@ pub fn q4k_row_dot(
     accumulator.finish()
 }
 
-/// Computes the exact integer lane sums of one Q6_K super-block.
+/// Computes the exact integer sum of one Q6_K super-block against one Q8_K activation block.
 ///
-/// The eight lanes are the determinism contract described in the module documentation: lane
-/// assignment is `index & 7`, and it must be preserved.
+/// Exact: no rounding has happened yet, so a device may compute this for the super-blocks of a
+/// row in any order and on any thread, and may accumulate the 256 products in any order.
+/// `i32` cannot overflow here — the widest term is `|scale| <= 127` times `|quant| <= 32` times
+/// `|activation| <= 127`, so 256 of them bound the sum by about 1.3e8.
 ///
-/// Transcribed from the inner block body of `dot_q6_k_q8_k_row_scalar`.
+/// Transcribed from the inner block body of `PanamaVectorUtilSupport.ggufQ6_KQ8_KMatVecDot`
+/// (`q6_KQ8_KIntegerDot` accumulated over both half-blocks).
 #[inline]
-pub fn q6k_block_lane_sums(
+pub fn q6k_block_sum(
     weights: &[u8],
     weight_offset: usize,
     quantized: &[i8],
     activation_offset: usize,
-) -> Q6KBlockLaneSums {
+) -> i32 {
     let ql = &weights[weight_offset..weight_offset + 128];
     let qh = &weights[weight_offset + 128..weight_offset + 192];
     let scales = &weights[weight_offset + 192..weight_offset + 208];
-    let mut integer_sums = [0_i32; Q6_K_LANES];
+    let mut block_sum = 0_i32;
     for super_block in 0..2 {
         let ql_base = super_block * 64;
         let qh_base = super_block * 32;
@@ -270,14 +285,13 @@ pub fn q6k_block_lane_sums(
             let s2 = scales[scale_base + scale_index + 2] as i8 as i32;
             let s3 = scales[scale_base + scale_index + 4] as i8 as i32;
             let s4 = scales[scale_base + scale_index + 6] as i8 as i32;
-            let lane = index & 7;
-            integer_sums[lane] += s1 * q1 * quantized[quant_base + index] as i32;
-            integer_sums[lane] += s2 * q2 * quantized[quant_base + index + 32] as i32;
-            integer_sums[lane] += s3 * q3 * quantized[quant_base + index + 64] as i32;
-            integer_sums[lane] += s4 * q4 * quantized[quant_base + index + 96] as i32;
+            block_sum += s1 * q1 * quantized[quant_base + index] as i32;
+            block_sum += s2 * q2 * quantized[quant_base + index + 32] as i32;
+            block_sum += s3 * q3 * quantized[quant_base + index + 64] as i32;
+            block_sum += s4 * q4 * quantized[quant_base + index + 96] as i32;
         }
     }
-    integer_sums
+    block_sum
 }
 
 /// Reads the `d` super-block scale of a Q6_K block, multiplied by the activation scale.
@@ -286,38 +300,37 @@ pub fn q6k_block_scale(weights: &[u8], weight_offset: usize, activation_scale: f
     f16_to_f32(read_u16_le(weights, weight_offset + 208)) * activation_scale
 }
 
-/// Folds Q6_K super-block lane sums into a row dot product, preserving the eight-lane contract.
+/// Folds Q6_K super-block sums into a row dot product in ascending block order.
+///
+/// One accumulator and one `fma` per super-block, which is exactly
+/// `PanamaVectorUtilSupport.ggufQ6_KQ8_KMatVecDot`'s `sum = MathUtil.fma(d, blockSum, sum)`.
+/// This is the order-sensitive tail; one thread must own it for the whole row. See the module
+/// documentation for why it is emphatically *not* the eight-lane scalar reduction.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Q6KRowAccumulator {
-    lane_sums: [f32; Q6_K_LANES],
+    sum: f32,
 }
 
 impl Q6KRowAccumulator {
     /// A zeroed accumulator.
     #[inline(always)]
     pub fn new() -> Self {
-        Self {
-            lane_sums: [0.0; Q6_K_LANES],
-        }
+        Self { sum: 0.0 }
     }
 
-    /// Applies one super-block's scale to its exact integer lane sums, in ascending block order.
+    /// Applies one super-block's scale to its exact integer sum.
+    ///
+    /// Must be called for ascending `block` with no gaps: the `fma` is not commutative with
+    /// those of the neighbouring blocks.
     #[inline(always)]
-    pub fn accumulate(&mut self, d: f32, integer_sums: Q6KBlockLaneSums) {
-        for lane in 0..Q6_K_LANES {
-            self.lane_sums[lane] =
-                crate::float::fma(d, integer_sums[lane] as f32, self.lane_sums[lane]);
-        }
+    pub fn accumulate(&mut self, d: f32, block_sum: i32) {
+        self.sum = crate::float::fma(d, block_sum as f32, self.sum);
     }
 
-    /// Reduces the eight lanes in lane order with plain adds, exactly as the CPU path does.
+    /// The finished row dot product.
     #[inline(always)]
     pub fn finish(self) -> f32 {
-        let mut sum = 0.0_f32;
-        for lane in 0..Q6_K_LANES {
-            sum += self.lane_sums[lane];
-        }
-        sum
+        self.sum
     }
 }
 
@@ -338,8 +351,8 @@ pub fn q6k_row_dot(
         let activation_offset = batch * cols + block * QK_K;
         let activation_scale = activation_scales[batch * blocks_per_row + block];
         let d = q6k_block_scale(weights, weight_offset, activation_scale);
-        let lane_sums = q6k_block_lane_sums(weights, weight_offset, quantized, activation_offset);
-        accumulator.accumulate(d, lane_sums);
+        let block_sum = q6k_block_sum(weights, weight_offset, quantized, activation_offset);
+        accumulator.accumulate(d, block_sum);
     }
     accumulator.finish()
 }

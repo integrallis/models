@@ -34,6 +34,27 @@ public final class ToolSpecRetriever {
   private final EmbeddingBackend embeddings;
   private final List<Entry> entries;
 
+  /**
+   * Optional recipe supplying the model's instruction prefixes, or null for none.
+   *
+   * <p>This class embeds <b>both</b> sides — tool descriptions when indexing and the user's query
+   * when selecting — so it is where an asymmetric embedder is most easily got wrong, and most
+   * easily got right. Nomic-embed-text expects {@code search_document: } for the indexed side and
+   * {@code search_query: } for the query; E5 expects {@code passage: } and {@code query: }.
+   * Embedding both sides identically is not an error anyone observes: selection still returns
+   * tools, just less accurately than the model allows, which shows up as an agent picking the wrong
+   * tool rather than as a failure.
+   *
+   * <p>Deliberately two strings rather than a {@code vectors} {@code EmbeddingRecipe}: this module
+   * has no dependency on the vector store and should not gain one for a pair of prefixes. A caller
+   * that does hold a recipe passes {@code recipe.documentPrefix().orElse(null)} and {@code
+   * recipe.queryPrefix().orElse(null)}.
+   */
+  private final String documentPrefix;
+
+  /** Query-side counterpart of {@link #documentPrefix}. */
+  private final String queryPrefix;
+
   /** A ranked tool match. */
   public record Match(ToolSpec tool, float score) {
     public Match {
@@ -44,15 +65,54 @@ public final class ToolSpecRetriever {
     }
   }
 
-  /** Embeds and indexes {@code tools} for later query-time selection. */
+  /**
+   * Embeds and indexes {@code tools} for later query-time selection, with no instruction prefixes.
+   *
+   * <p>Correct for a symmetric embedder such as all-MiniLM. For an asymmetric one — Nomic, E5 —
+   * prefer {@link #ToolSpecRetriever(EmbeddingBackend, List, String, String)}, or both sides are
+   * embedded with the wrong instruction and selection quality suffers silently.
+   */
   public ToolSpecRetriever(EmbeddingBackend embeddings, List<ToolSpec> tools) {
+    this(embeddings, tools, null, null);
+  }
+
+  /**
+   * Embeds and indexes {@code tools}, applying {@code documentPrefix} to each and {@code
+   * queryPrefix} at selection time.
+   *
+   * @param documentPrefix prefix for the indexed side, or null for none
+   * @param queryPrefix prefix for the query side, or null for none
+   */
+  public ToolSpecRetriever(
+      EmbeddingBackend embeddings,
+      List<ToolSpec> tools,
+      String documentPrefix,
+      String queryPrefix) {
     this.embeddings = Objects.requireNonNull(embeddings, "embeddings");
+    this.documentPrefix = documentPrefix;
+    this.queryPrefix = queryPrefix;
+    // One prefix without the other is almost always a mistake with an asymmetric model, and it is
+    // worse than neither: the two sides land in different regions of the space. Refuse rather than
+    // quietly degrade.
+    if ((documentPrefix == null) != (queryPrefix == null)) {
+      throw new IllegalArgumentException(
+          "documentPrefix and queryPrefix must be supplied together (got documentPrefix="
+              + documentPrefix
+              + ", queryPrefix="
+              + queryPrefix
+              + "): an asymmetric model needs both sides, and one alone embeds them into different"
+              + " regions of the space");
+    }
     List<ToolSpec> declared = List.copyOf(Objects.requireNonNull(tools, "tools"));
     if (declared.isEmpty()) {
       throw new IllegalArgumentException("tools must not be empty");
     }
 
-    List<String> documents = declared.stream().map(ToolSpecRetriever::document).toList();
+    List<String> documents =
+        declared.stream()
+            .map(ToolSpecRetriever::document)
+            .map(text -> documentPrefix == null ? text : documentPrefix + text)
+            .toList();
     float[][] vectors = embeddings.embedAll(documents);
     if (vectors.length != declared.size()) {
       throw new IllegalArgumentException(
@@ -76,7 +136,10 @@ public final class ToolSpecRetriever {
     if (limit <= 0) {
       throw new IllegalArgumentException("limit must be > 0: " + limit);
     }
-    float[] queryVector = normalize(embeddings.embed(query), "query");
+    // The query prefix, not the document prefix. Using the wrong one here is worse than using
+    // neither: it embeds the query into the region of the space the model reserves for passages.
+    String queryInput = queryPrefix == null ? query : queryPrefix + query;
+    float[] queryVector = normalize(embeddings.embed(queryInput), "query");
     return entries.stream()
         .map(entry -> new ScoredEntry(entry, dot(queryVector, entry.vector())))
         .sorted(

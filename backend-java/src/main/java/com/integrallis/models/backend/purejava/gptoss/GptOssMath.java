@@ -94,6 +94,50 @@ final class GptOssMath {
     }
   }
 
+  /**
+   * The same activation with the gate and the up projection in separate arrays.
+   *
+   * <p>{@link #swigluOai} reads one array in which the two interleave, {@code gateUp[2i]} and
+   * {@code gateUp[2i+1]}, because that is how the safetensors release stores {@code gate_up_proj}.
+   * The GGUF release stores {@code ffn_gate_exps} and {@code ffn_up_exps} as two tensors, so it
+   * arrives already separated and interleaving it first would be a copy for nothing.
+   *
+   * <p>The arithmetic is identical -- deliberately duplicated rather than factored behind an
+   * indexing lambda, because this is the innermost loop of every routed token and the two index
+   * patterns are the whole difference. {@code swigluOaiMatchesItsSplitForm} pins them equal.
+   */
+  static void swigluOaiSplit(
+      float[] gateValues, float[] upValues, float[] output, float alpha, float limit) {
+    Objects.requireNonNull(gateValues, "gateValues");
+    Objects.requireNonNull(upValues, "upValues");
+    Objects.requireNonNull(output, "output");
+    if (gateValues.length != output.length || upValues.length != output.length) {
+      throw new IllegalArgumentException("gate, up and output must have the same length");
+    }
+    if (output.length == 0) {
+      throw new IllegalArgumentException("activation output must not be empty");
+    }
+    if (!(alpha > 0.0f) || !Float.isFinite(alpha)) {
+      throw new IllegalArgumentException("alpha must be finite and > 0: " + alpha);
+    }
+    if (!(limit > 0.0f) || !Float.isFinite(limit)) {
+      throw new IllegalArgumentException("limit must be finite and > 0: " + limit);
+    }
+
+    for (int index = 0; index < output.length; index++) {
+      float rawGate = gateValues[index];
+      float rawUp = upValues[index];
+      if (!Float.isFinite(rawGate) || !Float.isFinite(rawUp)) {
+        throw new IllegalArgumentException(
+            "gate/up pair " + index + " must be finite: " + rawGate + ", " + rawUp);
+      }
+      float gate = Math.min(rawGate, limit);
+      float up = Math.max(-limit, Math.min(rawUp, limit));
+      float sigmoid = (float) (1.0 / (1.0 + Math.exp(-alpha * gate)));
+      output[index] = gate * sigmoid * (up + 1.0f);
+    }
+  }
+
   private static void insertCandidate(
       float logit, int expert, int[] selectedExperts, float[] selectedLogits) {
     for (int rank = 0; rank < selectedLogits.length; rank++) {

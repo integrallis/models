@@ -88,7 +88,10 @@ public final class PretrainedTaskClassifier implements TaskClassifier {
     if (query == null || query.isBlank()) {
       return null;
     }
-    float[] embedding = embedder.embed(query);
+    // The index records the prefix its exemplars were embedded with; applying it here is what keeps
+    // the two sides comparable, rather than asking every caller to know the model's convention.
+    String input = index.queryPrefix().map(prefix -> prefix + query).orElse(query);
+    float[] embedding = embedder.embed(input);
     if (embedding == null || embedding.length == 0) {
       return null;
     }

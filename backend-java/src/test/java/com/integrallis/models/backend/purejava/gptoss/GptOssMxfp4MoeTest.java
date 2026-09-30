@@ -101,6 +101,34 @@ class GptOssMxfp4MoeTest {
             sequence(HIDDEN, 0.06f, -0.003f)));
   }
 
+  /**
+   * A matrix whose rows genuinely differ, which the uniform {@link #matrix} cannot provide.
+   *
+   * <p>{@code matrix} fills every block with one byte, so every row is identical -- and then
+   * splitting the fused gate/up by row parity and splitting it into halves give the same two
+   * matrices. A test built on it passes whichever split the code does, which is what it did until
+   * this existed.
+   */
+  private static Mxfp4Matrix varyingMatrix(int rows, int columns, int seed) {
+    byte[] blocks = new byte[rows * columns / 2];
+    byte[] scales = new byte[rows * columns / 32];
+    int blockBytesPerRow = columns / 2;
+    int scaleBytesPerRow = columns / 32;
+    for (int row = 0; row < rows; row++) {
+      for (int index = 0; index < blockBytesPerRow; index++) {
+        int even = (seed + row * 5 + index * 3) % 16;
+        int odd = (seed + row * 7 + index * 11 + 4) % 16;
+        blocks[row * blockBytesPerRow + index] = (byte) ((odd << 4) | even);
+      }
+      for (int index = 0; index < scaleBytesPerRow; index++) {
+        // Around 127 (an exponent near 1.0), so the values stay in a sane range.
+        scales[row * scaleBytesPerRow + index] = (byte) (124 + ((seed + row) % 5));
+      }
+    }
+    return Mxfp4Matrix.of(
+        MemorySegment.ofArray(blocks), MemorySegment.ofArray(scales), rows, columns);
+  }
+
   private static Mxfp4Matrix matrix(
       int rows, int columns, int evenCode, int oddCode, int scaleCode) {
     byte[] blocks = new byte[rows * columns / 2];
@@ -183,5 +211,163 @@ class GptOssMxfp4MoeTest {
       maximum = Math.max(maximum, Math.abs(left[index] - right[index]));
     }
     return maximum;
+  }
+
+  /**
+   * The split (GGUF) expert shape must compute what the fused (safetensors) one does.
+   *
+   * <p>The two shapes exist because the two artifacts store the same weights differently:
+   * safetensors fuses gate and up into one tensor whose rows interleave them, GGUF ships two
+   * tensors. Converting either way would copy the largest tensors in the model, so both are read in
+   * place -- which means two code paths, which means they need a test that they agree.
+   *
+   * <p>The split weights are extracted from the fused matrix by multiplying it by basis vectors, so
+   * the numbers are exactly what MXFP4 dequantizes to rather than a second guess at the format.
+   * Rows are split by parity: even rows are the gate, odd rows the up.
+   */
+  @Test
+  void theSplitExpertShapeMatchesTheFusedOne() {
+    GptOssMxfp4ExpertWeights fused = varyingWeights();
+    GptOssMxfp4ExpertWeights split = splitEquivalent(fused);
+
+    float[] hidden = sequence(HIDDEN, -0.4f, 0.03f);
+    int[] selected = {1, 0};
+    float[] routing = {0.6f, 0.4f};
+    float[] fromFused = new float[HIDDEN];
+    float[] fromSplit = new float[HIDDEN];
+
+    new GptOssMxfp4Moe(fused, ALPHA, LIMIT).forwardExact(hidden, selected, routing, fromFused);
+    new GptOssMxfp4Moe(split, ALPHA, LIMIT).forwardExact(hidden, selected, routing, fromSplit);
+
+    for (int index = 0; index < HIDDEN; index++) {
+      assertThat(fromSplit[index])
+          .describedAs("split output %s must match the fused shape", index)
+          // 1e-4, not exact: the two paths run different kernels over the same numbers -- an MXFP4
+          // matmul and an F32 one -- so they sum in a different order. Measured difference is
+          // 1.1e-5;
+          // reading the weights with the wrong row parity moves the output by orders of magnitude
+          // more.
+          .isEqualTo(fromFused[index], within(1.0e-4f));
+    }
+    // And the output is not trivially zero, or the comparison proves nothing.
+    float largest = 0.0f;
+    for (float value : fromFused) {
+      largest = Math.max(largest, Math.abs(value));
+    }
+    assertThat(largest).isGreaterThan(1.0e-3f);
+  }
+
+  /**
+   * A mixed set -- one fused expert and one split -- is refused rather than read with one indexing.
+   */
+  @Test
+  void expertsOfDifferentStorageShapesAreRefused() {
+    GptOssMxfp4ExpertWeights fused = varyingWeights();
+    GptOssMxfp4ExpertWeights split = splitEquivalent(fused);
+    GptOssMxfp4ExpertWeights mixed = GptOssMxfp4ExpertWeights.of(fused.expert(0), split.expert(1));
+
+    assertThatThrownBy(() -> new GptOssMxfp4Moe(mixed, ALPHA, LIMIT))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("storage shape");
+  }
+
+  /** Experts whose gate and up rows differ, so a wrong split is visible. */
+  private static GptOssMxfp4ExpertWeights varyingWeights() {
+    return GptOssMxfp4ExpertWeights.of(
+        new GptOssMxfp4ExpertWeights.Expert(
+            varyingMatrix(2 * INTERMEDIATE, HIDDEN, 3),
+            sequence(2 * INTERMEDIATE, -0.16f, 0.005f),
+            varyingMatrix(HIDDEN, INTERMEDIATE, 8),
+            sequence(HIDDEN, -0.08f, 0.005f)),
+        new GptOssMxfp4ExpertWeights.Expert(
+            varyingMatrix(2 * INTERMEDIATE, HIDDEN, 5),
+            sequence(2 * INTERMEDIATE, 0.12f, -0.004f),
+            varyingMatrix(HIDDEN, INTERMEDIATE, 9),
+            sequence(HIDDEN, 0.06f, -0.003f)));
+  }
+
+  /**
+   * Proves the fused fixture's rows actually differ by parity.
+   *
+   * <p>Without this the equivalence test above can silently stop discriminating -- which it did,
+   * when it was built on the uniform fixture.
+   */
+  @Test
+  void theVaryingFixtureDistinguishesParityFromHalves() {
+    float[][] rows = rowsOf(varyingMatrix(2 * INTERMEDIATE, HIDDEN, 3), 2 * INTERMEDIATE, HIDDEN);
+
+    assertThat(rows[0]).isNotEqualTo(rows[1]);
+    // Row 1 is the first `up` row under a parity split and the second `gate` row under a halves
+    // split.
+    assertThat(rows[1]).isNotEqualTo(rows[INTERMEDIATE]);
+  }
+
+  /** Rebuilds the same experts in the split shape, reading the fused weights out exactly. */
+  private static GptOssMxfp4ExpertWeights splitEquivalent(GptOssMxfp4ExpertWeights fused) {
+    GptOssMxfp4ExpertWeights.Expert[] experts =
+        new GptOssMxfp4ExpertWeights.Expert[fused.expertCount()];
+    for (int index = 0; index < experts.length; index++) {
+      GptOssMxfp4ExpertWeights.Expert expert = fused.expert(index);
+      float[][] gateUpRows = rowsOf(expert.gateUp(), 2 * INTERMEDIATE, HIDDEN);
+      float[] gate = new float[INTERMEDIATE * HIDDEN];
+      float[] up = new float[INTERMEDIATE * HIDDEN];
+      float[] gateBias = new float[INTERMEDIATE];
+      float[] upBias = new float[INTERMEDIATE];
+      for (int row = 0; row < INTERMEDIATE; row++) {
+        System.arraycopy(gateUpRows[2 * row], 0, gate, row * HIDDEN, HIDDEN);
+        System.arraycopy(gateUpRows[2 * row + 1], 0, up, row * HIDDEN, HIDDEN);
+        gateBias[row] = expert.gateUpBias()[2 * row];
+        upBias[row] = expert.gateUpBias()[2 * row + 1];
+      }
+      float[][] downRows = rowsOf(expert.down(), HIDDEN, INTERMEDIATE);
+      float[] down = new float[HIDDEN * INTERMEDIATE];
+      for (int row = 0; row < HIDDEN; row++) {
+        System.arraycopy(downRows[row], 0, down, row * INTERMEDIATE, INTERMEDIATE);
+      }
+      experts[index] =
+          new GptOssMxfp4ExpertWeights.Expert(
+              float32(gate, INTERMEDIATE, HIDDEN),
+              gateBias,
+              float32(up, INTERMEDIATE, HIDDEN),
+              upBias,
+              float32(down, HIDDEN, INTERMEDIATE),
+              expert.downBias());
+    }
+    return GptOssMxfp4ExpertWeights.of(experts);
+  }
+
+  /**
+   * Reads a matrix out row by row by multiplying it by basis vectors.
+   *
+   * <p>So the extracted numbers are exactly what the MXFP4 reader produces, rather than a second
+   * implementation of the block format that could be wrong in the same direction as the first.
+   */
+  private static float[][] rowsOf(Mxfp4Matrix matrix, int rows, int columns) {
+    float[][] result = new float[rows][columns];
+    float[] basis = new float[columns];
+    float[] product = new float[rows];
+    for (int column = 0; column < columns; column++) {
+      Arrays.fill(basis, 0.0f);
+      basis[column] = 1.0f;
+      matrix.multiply(basis, product);
+      for (int row = 0; row < rows; row++) {
+        result[row][column] = product[row];
+      }
+    }
+    return result;
+  }
+
+  private static GptOssProjection float32(float[] values, int rows, int columns) {
+    java.nio.ByteBuffer buffer =
+        java.nio.ByteBuffer.allocate(values.length * Float.BYTES)
+            .order(java.nio.ByteOrder.LITTLE_ENDIAN);
+    for (float value : values) {
+      buffer.putFloat(value);
+    }
+    return GptOssProjection.ofGguf(
+        MemorySegment.ofArray(buffer.array()),
+        com.integrallis.models.backend.purejava.gguf.GgufTensorType.F32,
+        rows,
+        columns);
   }
 }

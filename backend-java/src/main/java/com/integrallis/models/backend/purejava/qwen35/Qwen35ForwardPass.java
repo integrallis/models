@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliff;
 import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.ops.ExpertRouting;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.plan.ModelTopology;
@@ -28,6 +29,7 @@ import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.FullAttentio
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.GatedDeltaNet;
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Layer;
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Matrix;
+import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.MoeFeedForward;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
@@ -38,7 +40,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/** Stateful pure-Java hybrid graph for dense Qwen3.5. */
+/** Stateful pure-Java hybrid graph for dense and mixture-of-experts Qwen3.5. */
 public final class Qwen35ForwardPass {
 
   /** Independent Qwen3.5 sequence state. */
@@ -113,7 +115,14 @@ public final class Qwen35ForwardPass {
     if (prefillBatchSize < 1) {
       throw new IllegalArgumentException("prefillBatchSize must be >= 1: " + prefillBatchSize);
     }
-    this.prefillBatchSize = Math.min(prefillBatchSize, config.contextLength());
+    // A routed layer holds no dense ffn_gate/ffn_up/ffn_down for the batched paths to project,
+    // and expert selection is per token, so a batch of rows does not share one weight matrix.
+    // Rather than give the batched kernels a per-row gather, a mixture-of-experts model runs a
+    // token at a time: prefill() sends batchSize == 1 straight to forwardToken, so clamping here
+    // is what keeps every routed token on the one path that implements routing. Clamping rather
+    // than rejecting because callers pass a default batch size they did not choose per model.
+    this.prefillBatchSize =
+        config.usesMixtureOfExperts() ? 1 : Math.min(prefillBatchSize, config.contextLength());
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     this.q6BatchedKernel = Objects.requireNonNull(q6BatchedKernel, "q6BatchedKernel");
     this.batchedMatrixKernel = Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
@@ -177,6 +186,15 @@ public final class Qwen35ForwardPass {
     List<ModelTopology.LayerTopology> layers = new ArrayList<>(config.numLayers());
     for (int layerIndex = 0; layerIndex < config.numLayers(); layerIndex++) {
       Layer layer = weights.layer(layerIndex);
+      // On a routed layer the dense triple is null and the expert stacks carry the types instead.
+      // Reporting expert 0 is exact rather than representative: the three stacked tensors each hold
+      // every expert, so all experts within a stack share one type by construction.
+      GgufTensorType gateType =
+          layer.moe() == null ? layer.ffnGate().type() : layer.moe().gate()[0].type();
+      GgufTensorType upType =
+          layer.moe() == null ? layer.ffnUp().type() : layer.moe().up()[0].type();
+      GgufTensorType downType =
+          layer.moe() == null ? layer.ffnDown().type() : layer.moe().down()[0].type();
       if (layer.fullAttention() != null) {
         FullAttention attention = layer.fullAttention();
         layers.add(
@@ -185,9 +203,9 @@ public final class Qwen35ForwardPass {
                 attention.key().type(),
                 attention.value().type(),
                 attention.output().type(),
-                layer.ffnGate().type(),
-                layer.ffnUp().type(),
-                layer.ffnDown().type()));
+                gateType,
+                upType,
+                downType));
       } else {
         GatedDeltaNet gdn = layer.gatedDeltaNet();
         layers.add(
@@ -196,14 +214,18 @@ public final class Qwen35ForwardPass {
                 gdn.queryKeyValue().type(),
                 gdn.queryKeyValue().type(),
                 gdn.output().type(),
-                layer.ffnGate().type(),
-                layer.ffnUp().type(),
-                layer.ffnDown().type(),
-                List.of(gdn.outputGate().type(), gdn.beta().type(), gdn.alpha().type())));
+                gateType,
+                upType,
+                downType,
+                gdn.betaAlpha() != null
+                    ? List.of(gdn.outputGate().type(), gdn.betaAlpha().type())
+                    : List.of(gdn.outputGate().type(), gdn.beta().type(), gdn.alpha().type())));
       }
     }
     return new ModelTopology(
-        "qwen35",
+        // The name the file declared, not one inferred from the feed-forward shape: Qwen3-Next is
+        // routed too, and inferring would report it as a Qwen3.5-MoE.
+        config.architecture(),
         config.attentionQueryDim(),
         config.attentionKeyDim(),
         config.attentionKeyDim(),
@@ -426,6 +448,15 @@ public final class Qwen35ForwardPass {
    * @return final-position logits for each question, in the order given
    */
   float[][] decideGrouped(Session session, int[][] suffixes, Qwen35GroupedDecision group) {
+    if (config.usesMixtureOfExperts()) {
+      // Grouping exists to run one projection over many rows at once, which a routed layer cannot
+      // do: each row selects its own experts. Refusing outright rather than silently falling back
+      // to per-question decoding, because the caller chose this entry point for its throughput and
+      // a quiet fallback would report that throughput while not delivering it.
+      throw new UnsupportedOperationException(
+          "grouped decision is not implemented for mixture-of-experts Qwen3.5; ask the questions"
+              + " one at a time");
+    }
     Session checked = requireSession(session);
     Objects.requireNonNull(suffixes, "suffixes");
     Objects.requireNonNull(group, "group");
@@ -695,7 +726,7 @@ public final class Qwen35ForwardPass {
         batch.projectionScratch);
     dualProjectBatched(
         batch.beta,
-        weights.beta(),
+        requireSeparateBetaAlpha(weights).beta(),
         batch.alpha,
         weights.alpha(),
         input,
@@ -899,6 +930,7 @@ public final class Qwen35ForwardPass {
     float[] ffnGate = new float[config.hiddenDim()];
     float[] ffnUp = new float[config.hiddenDim()];
     float[] ffn = new float[config.hiddenDim()];
+    MoeScratch moeScratch = config.usesMixtureOfExperts() ? new MoeScratch(config) : null;
     weights.embedToken(token, state);
 
     for (int layerIndex = 0; layerIndex < config.numLayers(); layerIndex++) {
@@ -925,13 +957,130 @@ public final class Qwen35ForwardPass {
           layer.postAttentionNorm(),
           embeddingDimension,
           config.rmsNormEpsilon());
-      dualProject(ffnGate, layer.ffnGate(), ffnUp, layer.ffnUp(), normalized, session.scratch);
-      VectorUtil.swiGlu(ffn, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim());
-      project(projected, ffn, layer.ffnDown(), session.scratch);
+      if (layer.moe() != null) {
+        routedFeedForward(projected, normalized, layer.moe(), moeScratch, session.scratch);
+      } else {
+        dualProject(ffnGate, layer.ffnGate(), ffnUp, layer.ffnUp(), normalized, session.scratch);
+        VectorUtil.swiGlu(ffn, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim());
+        project(projected, ffn, layer.ffnDown(), session.scratch);
+      }
       add(state, projected);
     }
 
     return state;
+  }
+
+  /**
+   * Routed feed-forward: the top-k experts this token selected, plus an always-on shared expert.
+   *
+   * <p>Follows llama.cpp's {@code build_moe_ffn} as this family configures it. Three choices there
+   * are not visible from the tensor names and are worth stating, because each has a plausible wrong
+   * reading:
+   *
+   * <ul>
+   *   <li><b>No expert-weight scale.</b> The reference multiplies the routing weights by {@code
+   *       expert_weights_scale} only under {@code if (w_scale != 0.0f && w_scale != 1.0f)}. This
+   *       family leaves the key unset, so the default 0.0 means <i>no scaling</i> rather than
+   *       multiplying everything by zero.
+   *   <li><b>The selected weights are renormalised</b> ({@code norm_w}), which {@link
+   *       ExpertRouting#selectExperts} does by softmaxing over the selected logits alone.
+   *   <li><b>The shared expert's gate is one scalar per token.</b> {@code ffn_gate_inp_shexp} is a
+   *       single row over the embedding, and its sigmoid scales the whole shared contribution --
+   *       not a per-channel gate, which a vector-shaped reading of the name would produce.
+   * </ul>
+   */
+  private void routedFeedForward(
+      float[] output,
+      float[] normalized,
+      MoeFeedForward moe,
+      MoeScratch moeScratch,
+      ProjectionScratch scratch) {
+    int dimension = config.embeddingDim();
+    project(moeScratch.routerLogits, normalized, moe.router(), scratch);
+    ExpertRouting.selectExperts(
+        moeScratch.routerLogits,
+        config.numExperts(),
+        config.numExpertsUsed(),
+        moeScratch.selected,
+        moeScratch.routingWeights);
+
+    Arrays.fill(output, 0, dimension, 0.0f);
+    for (int slot = 0; slot < config.numExpertsUsed(); slot++) {
+      int expert = moeScratch.selected[slot];
+      dualProject(
+          moeScratch.expertGate,
+          moe.gate()[expert],
+          moeScratch.expertUp,
+          moe.up()[expert],
+          normalized,
+          scratch);
+      VectorUtil.swiGlu(
+          moeScratch.expertActivated,
+          0,
+          moeScratch.expertGate,
+          0,
+          moeScratch.expertUp,
+          0,
+          config.expertHiddenDim());
+      project(moeScratch.contribution, moeScratch.expertActivated, moe.down()[expert], scratch);
+      accumulateScaled(output, moeScratch.contribution, moeScratch.routingWeights[slot], dimension);
+    }
+
+    project(moeScratch.sharedScore, normalized, moe.sharedGate(), scratch);
+    float sharedWeight = 1.0f / (1.0f + (float) Math.exp(-moeScratch.sharedScore[0]));
+    dualProject(
+        moeScratch.sharedGate,
+        moe.sharedGateProjection(),
+        moeScratch.sharedUp,
+        moe.sharedUpProjection(),
+        normalized,
+        scratch);
+    VectorUtil.swiGlu(
+        moeScratch.sharedActivated,
+        0,
+        moeScratch.sharedGate,
+        0,
+        moeScratch.sharedUp,
+        0,
+        config.sharedExpertHiddenDim());
+    project(
+        moeScratch.contribution, moeScratch.sharedActivated, moe.sharedDownProjection(), scratch);
+    accumulateScaled(output, moeScratch.contribution, sharedWeight, dimension);
+  }
+
+  private static void accumulateScaled(float[] target, float[] source, float weight, int length) {
+    for (int index = 0; index < length; index++) {
+      target[index] += weight * source[index];
+    }
+  }
+
+  /** Buffers for one routed feed-forward, allocated per token rather than per layer. */
+  private static final class MoeScratch {
+    private final float[] routerLogits;
+    private final int[] selected;
+    private final float[] routingWeights;
+    private final float[] expertGate;
+    private final float[] expertUp;
+    private final float[] expertActivated;
+    private final float[] sharedScore;
+    private final float[] sharedGate;
+    private final float[] sharedUp;
+    private final float[] sharedActivated;
+    private final float[] contribution;
+
+    private MoeScratch(Qwen35Config config) {
+      routerLogits = new float[config.numExperts()];
+      selected = new int[config.numExpertsUsed()];
+      routingWeights = new float[config.numExpertsUsed()];
+      expertGate = new float[config.expertHiddenDim()];
+      expertUp = new float[config.expertHiddenDim()];
+      expertActivated = new float[config.expertHiddenDim()];
+      sharedScore = new float[1];
+      sharedGate = new float[config.sharedExpertHiddenDim()];
+      sharedUp = new float[config.sharedExpertHiddenDim()];
+      sharedActivated = new float[config.sharedExpertHiddenDim()];
+      contribution = new float[config.embeddingDim()];
+    }
   }
 
   private void executePrefillBatch(Session session, int[] tokens, int tokenOffset, int batchSize) {
@@ -1132,7 +1281,7 @@ public final class Qwen35ForwardPass {
         batch.projectionScratch);
     dualProjectBatched(
         batch.beta,
-        weights.beta(),
+        requireSeparateBetaAlpha(weights).beta(),
         batch.alpha,
         weights.alpha(),
         input,
@@ -1345,6 +1494,58 @@ public final class Qwen35ForwardPass {
     }
   }
 
+  /**
+   * The batched paths project one matrix over many rows and have no fused split.
+   *
+   * <p>Unreachable today -- every model that fuses beta and alpha is also routed, and a routed
+   * model is clamped to the single-token path -- but a null {@code beta} would otherwise surface as
+   * a NullPointerException from inside a kernel if that ever stopped being true.
+   */
+  private static GatedDeltaNet requireSeparateBetaAlpha(GatedDeltaNet weights) {
+    if (weights.betaAlpha() != null) {
+      throw new UnsupportedOperationException(
+          "a fused ssm_ba Gated DeltaNet is implemented on the single-token path only");
+    }
+    return weights;
+  }
+
+  /**
+   * Projects the fused {@code ssm_ba} and splits it into beta and alpha.
+   *
+   * <p>The packing is <b>interleaved by key-head group</b>, not two contiguous halves, and that is
+   * the whole reason this is a method rather than two slices. The reference reshapes the {@code 2 *
+   * n_value_heads} outputs to {@code [2 * group, n_key_heads]} -- where {@code group} is the number
+   * of value heads per key head -- and then takes beta as the first {@code group} entries of each
+   * column and alpha as the next {@code group}. So for 32 value heads over 16 key heads the 64 rows
+   * read {@code [b, b, a, a]} sixteen times over, and reading the first 32 as beta would pair every
+   * value head with the wrong parameter while still producing finite, plausible output.
+   *
+   * <p>Projected through the same quantized kernel as everything else and split afterwards, rather
+   * than de-interleaved into two matrices at load time: a gather would have to dequantize the
+   * K-quant rows to do it, which would silently move this one projection onto a different precision
+   * path from the rest of the model.
+   */
+  private void projectFusedBetaAlpha(
+      float[] beta,
+      float[] alpha,
+      Matrix betaAlpha,
+      float[] input,
+      GatedDeltaNetScratch workspace,
+      ProjectionScratch scratch) {
+    float[] fused = workspace.betaAlpha;
+    project(fused, input, betaAlpha, scratch);
+    int keyHeads = config.gdnKeyHeads();
+    int group = config.gdnValueHeads() / keyHeads;
+    for (int keyHead = 0; keyHead < keyHeads; keyHead++) {
+      int source = keyHead * 2 * group;
+      int destination = keyHead * group;
+      for (int index = 0; index < group; index++) {
+        beta[destination + index] = fused[source + index];
+        alpha[destination + index] = fused[source + group + index];
+      }
+    }
+  }
+
   private void gatedDeltaNet(
       float[] output, float[] input, GatedDeltaNet weights, int layer, SessionState session) {
     int convDimension = config.gdnConvDim();
@@ -1359,7 +1560,11 @@ public final class Qwen35ForwardPass {
     float[] alpha = workspace.alpha;
     project(mixed, input, weights.queryKeyValue(), session.scratch);
     project(outputGate, input, weights.outputGate(), session.scratch);
-    dualProject(beta, weights.beta(), alpha, weights.alpha(), input, session.scratch);
+    if (weights.betaAlpha() != null) {
+      projectFusedBetaAlpha(beta, alpha, weights.betaAlpha(), input, workspace, session.scratch);
+    } else {
+      dualProject(beta, weights.beta(), alpha, weights.alpha(), input, session.scratch);
+    }
 
     int kernel = config.gdnConvKernel();
     float[] history = session.convolutionHistory[layer];
@@ -1500,7 +1705,7 @@ public final class Qwen35ForwardPass {
       values = new float[config.numLayers()][];
       convolutionHistory = new float[config.numLayers()][];
       recurrentState = new float[config.numLayers()][];
-      scratch = new ProjectionScratch(config);
+      scratch = new ProjectionScratch(weights);
       gatedDeltaNetScratch = new GatedDeltaNetScratch(config);
       batchScratch = new BatchScratch(config, weights, capacity, prefillBatchSize);
       for (int layer = 0; layer < config.numLayers(); layer++) {
@@ -1610,8 +1815,7 @@ public final class Qwen35ForwardPass {
     private final float[] q4LaneScratch;
 
     private BatchProjectionScratch(Qwen35Config config, Qwen35Weights weights, int batchSize) {
-      int maximumInput =
-          Math.max(config.hiddenDim(), Math.max(config.attentionQueryDim(), config.gdnValueDim()));
+      int maximumInput = weights.widestProjectionInput();
       int maximumRows =
           Math.max(
               Math.max(2 * config.attentionQueryDim(), config.gdnConvDim()),
@@ -1634,6 +1838,7 @@ public final class Qwen35ForwardPass {
     private final float[] outputGate;
     private final float[] beta;
     private final float[] alpha;
+    private final float[] betaAlpha;
     private final float[] query;
     private final float[] key;
     private final float[] value;
@@ -1649,6 +1854,9 @@ public final class Qwen35ForwardPass {
       outputGate = new float[config.gdnValueDim()];
       beta = new float[config.gdnValueHeads()];
       alpha = new float[config.gdnValueHeads()];
+      // Holds one fused ssm_ba projection before it is split; empty when the model has separate
+      // beta and alpha tensors, which is every Qwen3.5 file.
+      betaAlpha = new float[2 * config.gdnValueHeads()];
       query = new float[config.gdnKeyDim()];
       key = new float[config.gdnKeyDim()];
       value = new float[config.gdnValueDim()];
@@ -1667,9 +1875,10 @@ public final class Qwen35ForwardPass {
     private final int[] quantizedActivationZeroPointCorrections;
     private final short[] quantizedActivationSums;
 
-    private ProjectionScratch(Qwen35Config config) {
-      int maximumProjectionInput =
-          Math.max(config.hiddenDim(), Math.max(config.attentionQueryDim(), config.gdnValueDim()));
+    private ProjectionScratch(Qwen35Weights weights) {
+      // Asked of the weights rather than assembled from the config's widths: see
+      // Qwen35Weights.widestProjectionInput for why an enumeration here was the wrong shape.
+      int maximumProjectionInput = weights.widestProjectionInput();
       quantizedActivation = new byte[maximumProjectionInput];
       quantizedActivationScales = new float[(maximumProjectionInput + 31) / 32];
       quantizedActivationZeroPointCorrections = new int[(maximumProjectionInput + 3) / 4];

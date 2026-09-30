@@ -88,7 +88,7 @@ dependencies {
     jmhImplementation(project(":backend-native"))
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.7")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.21.4")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.21.7")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.assertj:assertj-core:3.27.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
