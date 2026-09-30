@@ -157,7 +157,17 @@ public final class RagBenchmarkCli {
             nonNegativeLong(values, "seed", 42),
             positiveFloat(values, "repetition-penalty", 1),
             stopSequences);
-    int maxTokens = positiveInteger(values, "max-tokens", 64);
+    // 256 rather than 64. At 64 the campaign of 2026-09-29 truncated most of its attempts: gpt-oss
+    // was cut off mid-word on a correct answer, before it could emit the citation the grounding
+    // policy
+    // screens for, and a thinking model spent the whole budget on its reasoning trace. A grounded
+    // answer here is one short sentence plus a bracketed source id, and a model that reasons first
+    // needs room for both -- so the old default could not express a passing answer for a whole
+    // class of
+    // models. Chosen as a floor that lets those finish, not as a tuned optimum; every report
+    // records
+    // the value it ran with, so older records stay interpretable.
+    int maxTokens = positiveInteger(values, "max-tokens", 256);
     int warmups = nonNegativeInteger(values, "warmups", 1);
     int iterations = positiveInteger(values, "iterations", 3);
     List<String> caseIds =
