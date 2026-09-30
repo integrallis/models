@@ -24,6 +24,7 @@ import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter;
 import com.integrallis.models.backend.purejava.lora.ActivatedLoraAdapter.Projection;
+import com.integrallis.models.backend.purejava.ops.ExpertRouting;
 import com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
@@ -149,6 +150,13 @@ public final class LlamaForwardPass {
   private final GgufQ4Kernel q4Kernel;
   private final GgufQ6BatchedKernel q6BatchedKernel;
   private final boolean batchedPrefill;
+
+  /**
+   * Counts hidden-state prefills that reached the batched path. Exposed so a test can prove the
+   * branch was taken instead of inferring it from how long the call took.
+   */
+  private int batchedHiddenStatePrefills;
+
   private final boolean groupedBatchedPrefill;
   private final boolean batchedSessionOutputProjection;
   private final boolean finalLayerPrefillPruning;
@@ -188,6 +196,8 @@ public final class LlamaForwardPass {
    * 0.6B on the Rust arm, measured 2026-09-16). Every other architecture keeps the head-by-head
    * path its oracles were recorded on.
    */
+  private final boolean attentionTemperatureScaling;
+
   private final boolean fusedGroupedAttention;
 
   private float[] nativeAttentionScores;
@@ -222,6 +232,14 @@ public final class LlamaForwardPass {
   private final float[] ffnUp;
   private final float[] ffnOut;
   private final float[] ffnProjected;
+  private final float[] moeRouterLogits;
+  private final float[] moeInput;
+  private final float[] moeGate;
+  private final float[] moeUp;
+  private final float[] moeActivated;
+  private final float[] moeExpertOut;
+  private final int[] moeSelected;
+  private final float[] moeRoutingWeights;
   private final float[] logits;
   private final Session[] singleSessionBatch = new Session[1];
   private final int[][] singleSessionTokens = new int[1][];
@@ -484,8 +502,23 @@ public final class LlamaForwardPass {
     this.ffnUp = new float[hiddenDim];
     this.ffnOut = new float[hiddenDim];
     this.ffnProjected = new float[dim];
+    // Zero-length on a dense model: numExperts, numExpertsUsed and expertHiddenDim are all zero
+    // together or all set together, which LlamaConfig validates.
+    int expertHiddenDim = config.expertHiddenDim();
+    this.moeRouterLogits = new float[config.numExperts()];
+    this.moeInput = new float[config.usesMixtureOfExperts() ? dim : 0];
+    this.moeGate = new float[expertHiddenDim];
+    this.moeUp = new float[expertHiddenDim];
+    this.moeActivated = new float[expertHiddenDim];
+    this.moeExpertOut = new float[config.usesMixtureOfExperts() ? dim : 0];
+    this.moeSelected = new int[config.numExpertsUsed()];
+    this.moeRoutingWeights = new float[config.numExpertsUsed()];
     this.logits = new float[vocabSize];
-    int maxProjectionInput = Math.max(Math.max(dim, hiddenDim), config.attentionOutputDim());
+    // The expert hidden width is the column count of the routed down projection, so it sizes the
+    // quantized-activation scratch alongside the dense widths. It is not bounded by hiddenDim: a
+    // routed model declares both, and Qwen3-30B-A3B declares 768 experts-wide against 6144 dense.
+    int maxProjectionInput =
+        Math.max(Math.max(Math.max(dim, hiddenDim), config.attentionOutputDim()), expertHiddenDim);
     this.quantizedActivation = new byte[maxProjectionInput];
     this.quantizedActivationScales = new float[(maxProjectionInput + 31) / 32];
     this.quantizedActivationZeroPointCorrections = new int[(maxProjectionInput + 3) / 4];
@@ -523,7 +556,30 @@ public final class LlamaForwardPass {
     // architectures stay on the Java path they were recorded with.
     this.nativeGroupedAttention =
         config.usesGraniteScaling() && loadedMatrixKernel.supportsGroupedAttention();
-    this.fusedGroupedAttention = config.usesGraniteScaling();
+    // Each architecture keeps the attention route its published records were measured on.
+    //
+    // Granite: native Rust grouped attention above, with the Java FUSED loop as its fallback for
+    // the
+    // cases the native kernel declines (more than two cache spans). That pairing is what Granite
+    // was
+    // qualified with, so the Granite term below is not redundant -- dropping it would silently move
+    // Granite's fallback to head-by-head and change a published model.
+    //
+    // Everything else: head-by-head, which is what its records were measured on.
+    //
+    // The fused kernels were never Granite-specific -- they take group size, head stride and scale
+    // as
+    // arguments -- and they agree with head-by-head to 1.4e-6 relative on the attention output,
+    // flat
+    // from 64 to 4096 cached rows. But greedy decoding is a discrete argmax, so a perturbation that
+    // small still flips tokens: swapping only the attention kernel under Granite changed 2 of 9 RAG
+    // answers from identical prompts, at unchanged correctness. A qualification record is a claim
+    // about bytes and cannot be retracted once published, so widening this is an epoch change --
+    // every pinned oracle re-run and the tier band re-derived -- not a default flip.
+    this.attentionTemperatureScaling = config.usesAttentionTemperatureScaling();
+    this.fusedGroupedAttention =
+        (executionPlan.fusedGroupedAttention() || config.usesGraniteScaling())
+            && attentionGroupSize > 1;
     reportAttentionCliffs(config, loadedMatrixKernel, attentionGroupSize);
     reportBatchedPrefillCliff(config, actualTopology);
     this.headAttentionPlan =
@@ -693,8 +749,16 @@ public final class LlamaForwardPass {
       throw new IllegalArgumentException("startPosition must be >= 0");
     }
     int finalIndex = tokens.length - 1;
-    for (int index = 0; index < finalIndex; index++) {
-      forwardInternal(tokens[index], Math.addExact(startPosition, index), Head.NONE);
+    if (batchedPrefill && finalIndex > 1) {
+      // Advance every position but the last through the batched path, then take one ordinary step
+      // for the final token so it yields a hidden state rather than a vocabulary projection. The
+      // batched call's logits are discarded; its purpose here is the key/value cache it leaves.
+      batchedHiddenStatePrefills++;
+      prefill(Arrays.copyOf(tokens, finalIndex), startPosition);
+    } else {
+      for (int index = 0; index < finalIndex; index++) {
+        forwardInternal(tokens[index], Math.addExact(startPosition, index), Head.NONE);
+      }
     }
     return forwardInternal(
         tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.HIDDEN);
@@ -867,9 +931,14 @@ public final class LlamaForwardPass {
     }
 
     int finalIndex = tokens.length - 1;
-    for (int index = 0; index < finalIndex; index++) {
-      forwardSessionInternal(
-          session, tokens[index], Math.addExact(startPosition, index), Head.NONE);
+    if (batchedPrefill && finalIndex > 1) {
+      batchedHiddenStatePrefills++;
+      prefillSessionBatched(session, Arrays.copyOf(tokens, finalIndex));
+    } else {
+      for (int index = 0; index < finalIndex; index++) {
+        forwardSessionInternal(
+            session, tokens[index], Math.addExact(startPosition, index), Head.NONE);
+      }
     }
     return forwardSessionInternal(
             session, tokens[finalIndex], Math.addExact(startPosition, finalIndex), Head.HIDDEN)
@@ -900,6 +969,21 @@ public final class LlamaForwardPass {
     }
 
     int dim = config.embeddingDim();
+    float[] finalStates = runSessionPrefillRows(sessions, tokenBatches, dim);
+    System.arraycopy(finalStates, 0, batchX, 0, finalStates.length);
+    projectIndependentSessionLogits(sessionCount, dim, vocabSize);
+    return new LogitBatch(sessionCount, vocabSize, sessionBatchLogits);
+  }
+
+  /**
+   * Runs the ragged prefill for independent sessions and returns each session's final pre-norm
+   * state, one row of {@code dim} per session.
+   *
+   * <p>Shared by the logits and hidden-state entry points so the two cannot drift apart: a batching
+   * bug that appeared in only one of them would be invisible to the other's tests.
+   */
+  private float[] runSessionPrefillRows(Session[] sessions, int[][] tokenBatches, int dim) {
+    int sessionCount = sessions.length;
     float[] finalStates = new float[Math.multiplyExact(sessionCount, dim)];
     int[] consumed = new int[sessionCount];
     int[] chunkCounts = new int[sessionCount];
@@ -948,9 +1032,42 @@ public final class LlamaForwardPass {
       }
     }
 
+    return finalStates;
+  }
+
+  /**
+   * Prefills different-length prompts for independent sessions and returns each session's final
+   * normalized hidden state, one row per session.
+   *
+   * <p>This exists because a decision head reads the hidden state and never the vocabulary. Going
+   * through {@link #prefillBatchTransient} would compute a full vocabulary projection per session
+   * and discard it, which on a narrow model costs about as much as a transformer layer.
+   *
+   * <p>The rows are freshly allocated, because a caller holding several sessions' states at once is
+   * the entire point and shared scratch would alias them together.
+   */
+  public float[][] prefillBatchHiddenStates(Session[] sessions, int[][] tokenBatches) {
+    validateSessionPrefillBatch(sessions, tokenBatches);
+    int sessionCount = sessions.length;
+    int dim = config.embeddingDim();
+
+    if (sessionCount == 1 && (!batchedPrefill || tokenBatches[0].length == 1)) {
+      // One session cannot be batched against anything, so take the path that is already tuned.
+      return new float[][] {
+        prefillHiddenState(sessions[0], tokenBatches[0], sessions[0].nextPosition)
+      };
+    }
+
+    float[] finalStates = runSessionPrefillRows(sessions, tokenBatches, dim);
     System.arraycopy(finalStates, 0, batchX, 0, finalStates.length);
-    projectIndependentSessionLogits(sessionCount, dim, vocabSize);
-    return new LogitBatch(sessionCount, vocabSize, sessionBatchLogits);
+    normalizeIndependentSessionBatch(
+        batchXNorm, batchX, sessionCount, dim, weights.outputNormWeight());
+
+    float[][] states = new float[sessionCount][dim];
+    for (int session = 0; session < sessionCount; session++) {
+      System.arraycopy(batchXNorm, session * dim, states[session], 0, dim);
+    }
+    return states;
   }
 
   /** Runs one decode token for each independent session and returns stable logits. */
@@ -1139,7 +1256,11 @@ public final class LlamaForwardPass {
           TensorOps.rmsNorm(
               batchXNorm, xOffset, batchX, xOffset, lw.ffnNorm(), dim, config.rmsNormEps());
         }
-        if (stagedQuantizedFfn
+        if (lw.moe() != null) {
+          for (int batch = 0; batch < batchSize; batch++) {
+            routedFfn(batchFfnProjected, batch * dim, batchXNorm, batch * dim, lw.moe());
+          }
+        } else if (stagedQuantizedFfn
             && stagedQuantizedPlan != null
             && stagedQuantizedPlan.supportsFfn(lw)) {
           stagedQuantizedPlan.executeFfn(lw, batchSize);
@@ -1362,6 +1483,8 @@ public final class LlamaForwardPass {
           applyRopeBatch(batchQ, offset, batch, layer);
         }
       }
+      // Independent sessions sit at different positions, so the scale is per row, not per batch.
+      scaleQueryTemperature(batchQ, queryOffset, batchPositions[batch]);
       for (int head = 0; head < config.numKvHeads(); head++) {
         int offset = keyOffset + head * config.keyLength();
         normalizeHead(batchK, offset, lw.kNorm(), config.keyLength());
@@ -1381,7 +1504,12 @@ public final class LlamaForwardPass {
       Session[] sessions, LlamaWeights.LayerWeights lw, int batchSize, int layer, int dim) {
     int hiddenDim = config.hiddenDim();
     normalizeIndependentSessionBatch(batchXNorm, batchX, batchSize, dim, lw.ffnNorm());
-    if (!hasActivatedAdapter(sessions, batchSize)
+    if (lw.moe() != null) {
+      for (int batch = 0; batch < batchSize; batch++) {
+        refuseFfnAdapter(layer, sessions[batch].adapterActive);
+        routedFfn(batchFfnProjected, batch * dim, batchXNorm, batch * dim, lw.moe());
+      }
+    } else if (!hasActivatedAdapter(sessions, batchSize)
         && stagedQuantizedFfn
         && stagedQuantizedPlan != null
         && stagedQuantizedPlan.supportsFfn(lw)) {
@@ -1732,6 +1860,7 @@ public final class LlamaForwardPass {
           applyRope(q, offset, layer);
         }
       }
+      scaleQueryTemperature(q, 0, position);
       for (int h = 0; h < numKvHeads; h++) {
         int offset = h * keyLength;
         normalizeHead(k, offset, lw.kNorm(), keyLength);
@@ -1770,30 +1899,36 @@ public final class LlamaForwardPass {
       // FFN norm
       TensorOps.rmsNorm(xNorm, x, lw.ffnNorm(), dim, config.rmsNormEps());
 
-      // FFN: SwiGLU
-      if (groupedProjections) {
-        dualMatmulDispatch(
-            ffnGate,
-            lw.ffnGate(),
-            lw.ffnGateType(),
-            config.hiddenDim(),
-            ffnUp,
-            lw.ffnUp(),
-            lw.ffnUpType(),
-            config.hiddenDim(),
-            xNorm,
-            dim);
+      // FFN: routed for a mixture-of-experts layer, dense SwiGLU otherwise
+      if (lw.moe() != null) {
+        refuseFfnAdapter(layer, adapterActive);
+        routedFfn(ffnProjected, 0, xNorm, 0, lw.moe());
       } else {
-        matmulDispatch(ffnGate, xNorm, lw.ffnGate(), lw.ffnGateType(), config.hiddenDim(), dim);
-        matmulDispatch(ffnUp, xNorm, lw.ffnUp(), lw.ffnUpType(), config.hiddenDim(), dim);
-      }
-      addActivatedAdapter(layer, Projection.FFN_GATE, ffnGate, xNorm, adapterActive);
-      addActivatedAdapter(layer, Projection.FFN_UP, ffnUp, xNorm, adapterActive);
-      activateFfn(ffnOut, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim());
+        if (groupedProjections) {
+          dualMatmulDispatch(
+              ffnGate,
+              lw.ffnGate(),
+              lw.ffnGateType(),
+              config.hiddenDim(),
+              ffnUp,
+              lw.ffnUp(),
+              lw.ffnUpType(),
+              config.hiddenDim(),
+              xNorm,
+              dim);
+        } else {
+          matmulDispatch(ffnGate, xNorm, lw.ffnGate(), lw.ffnGateType(), config.hiddenDim(), dim);
+          matmulDispatch(ffnUp, xNorm, lw.ffnUp(), lw.ffnUpType(), config.hiddenDim(), dim);
+        }
+        addActivatedAdapter(layer, Projection.FFN_GATE, ffnGate, xNorm, adapterActive);
+        addActivatedAdapter(layer, Projection.FFN_UP, ffnUp, xNorm, adapterActive);
+        activateFfn(ffnOut, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim());
 
-      // Down projection
-      matmulDispatch(ffnProjected, ffnOut, lw.ffnDown(), lw.ffnDownType(), dim, config.hiddenDim());
-      addActivatedAdapter(layer, Projection.FFN_DOWN, ffnProjected, ffnOut, adapterActive);
+        // Down projection
+        matmulDispatch(
+            ffnProjected, ffnOut, lw.ffnDown(), lw.ffnDownType(), dim, config.hiddenDim());
+        addActivatedAdapter(layer, Projection.FFN_DOWN, ffnProjected, ffnOut, adapterActive);
+      }
       normalizeProjection(ffnProjected, lw.ffnPostNorm(), dim);
 
       // Residual connection
@@ -1892,6 +2027,11 @@ public final class LlamaForwardPass {
     cache.clear();
     batchedAttentionKernel.reset();
     nextPosition = 0;
+  }
+
+  /** Returns how many hidden-state prefills have reached the batched path. */
+  int batchedHiddenStatePrefills() {
+    return batchedHiddenStatePrefills;
   }
 
   boolean usesBatchedPrefill() {
@@ -2016,6 +2156,7 @@ public final class LlamaForwardPass {
         applyRopeBatch(q, offset, finalBatch, layerIndex);
       }
     }
+    scaleQueryTemperature(q, 0, startPosition + finalBatch);
 
     attendHeads(q, 0, attnOut, 0, layerIndex, startPosition + finalBatch, cache);
     matmulDispatch(
@@ -2069,28 +2210,146 @@ public final class LlamaForwardPass {
   private void finishFinalLayerFfnRow(
       LlamaWeights.LayerWeights layer, int stateOffset, int dim, int hiddenDim) {
     TensorOps.rmsNorm(xNorm, 0, batchX, stateOffset, layer.ffnNorm(), dim, config.rmsNormEps());
-    if (groupedProjections) {
-      dualMatmulDispatch(
-          ffnGate,
-          layer.ffnGate(),
-          layer.ffnGateType(),
-          hiddenDim,
-          ffnUp,
-          layer.ffnUp(),
-          layer.ffnUpType(),
-          hiddenDim,
-          xNorm,
-          dim);
+    if (layer.moe() != null) {
+      routedFfn(ffnProjected, 0, xNorm, 0, layer.moe());
     } else {
-      matmulDispatch(ffnGate, xNorm, layer.ffnGate(), layer.ffnGateType(), hiddenDim, dim);
-      matmulDispatch(ffnUp, xNorm, layer.ffnUp(), layer.ffnUpType(), hiddenDim, dim);
+      if (groupedProjections) {
+        dualMatmulDispatch(
+            ffnGate,
+            layer.ffnGate(),
+            layer.ffnGateType(),
+            hiddenDim,
+            ffnUp,
+            layer.ffnUp(),
+            layer.ffnUpType(),
+            hiddenDim,
+            xNorm,
+            dim);
+      } else {
+        matmulDispatch(ffnGate, xNorm, layer.ffnGate(), layer.ffnGateType(), hiddenDim, dim);
+        matmulDispatch(ffnUp, xNorm, layer.ffnUp(), layer.ffnUpType(), hiddenDim, dim);
+      }
+      activateFfn(ffnOut, 0, ffnGate, 0, ffnUp, 0, hiddenDim);
+      matmulDispatch(ffnProjected, ffnOut, layer.ffnDown(), layer.ffnDownType(), dim, hiddenDim);
     }
-    activateFfn(ffnOut, 0, ffnGate, 0, ffnUp, 0, hiddenDim);
-    matmulDispatch(ffnProjected, ffnOut, layer.ffnDown(), layer.ffnDownType(), dim, hiddenDim);
     normalizeProjection(ffnProjected, layer.ffnPostNorm(), dim);
     for (int index = 0; index < dim; index++) {
       batchX[stateOffset + index] += config.residualScale() * ffnProjected[index];
     }
+  }
+
+  /**
+   * The routed feed-forward of one row: the mixture-of-experts substitute for the dense SwiGLU.
+   *
+   * <p>Only {@code numExpertsUsed} of {@code numExperts} experts run, so the cost is set by how
+   * many experts a token selects and not by how many the model holds. That is also why this is
+   * per-row rather than a batched matmul: two rows of one batch route to different experts, so
+   * there is no shared weight matrix to multiply them both by. Grouping a batch's rows by expert
+   * would recover the batching and is the obvious optimization, but it is an optimization, and this
+   * has to be right before it is fast.
+   *
+   * <p>The routing follows the reference including one detail that is easy to get wrong. Qwen3
+   * softmaxes over all experts, takes the top {@code k}, then renormalizes those {@code k} to sum
+   * to one -- {@code norm_topk_prob = true}, read from the published config rather than assumed.
+   * Softmaxing over only the selected logits is algebraically identical, because the full-width
+   * denominator is a constant that cancels in the renormalization, so that is what this does: one
+   * softmax over eight values instead of one over 128 and a division. Omitting the renormalization
+   * would instead leave the weights summing to whatever probability mass those eight experts
+   * happened to hold, which is a silent per-token scale error on the whole feed-forward.
+   *
+   * @param destination receives the routed output, which is <b>overwritten</b>, not accumulated
+   *     into
+   * @param destinationOffset first index of the row in {@code destination}
+   * @param normalized the post-norm activation to route
+   * @param normalizedOffset first index of the row in {@code normalized}
+   * @param moe the layer's routed weights
+   */
+  private void routedFfn(
+      float[] destination,
+      int destinationOffset,
+      float[] normalized,
+      int normalizedOffset,
+      LlamaWeights.MoeWeights moe) {
+    int dim = config.embeddingDim();
+    int hidden = config.expertHiddenDim();
+    int used = config.numExpertsUsed();
+
+    // matmulDispatch reads its input from index zero, so a row of a batch is copied in rather than
+    // addressed in place. One 8KB copy against six 2048x768 matmuls is not worth an offset-taking
+    // overload of every kernel in the dispatch chain.
+    System.arraycopy(normalized, normalizedOffset, moeInput, 0, dim);
+    matmulDispatch(
+        moeRouterLogits, moeInput, moe.router(), moe.routerType(), config.numExperts(), dim);
+    selectExperts(moeRouterLogits, config.numExperts(), used, moeSelected, moeRoutingWeights);
+
+    java.util.Arrays.fill(destination, destinationOffset, destinationOffset + dim, 0.0f);
+    for (int slot = 0; slot < used; slot++) {
+      int expert = moeSelected[slot];
+      float weight = moeRoutingWeights[slot];
+      matmulDispatch(moeGate, moeInput, moe.gate()[expert], moe.gateType(), hidden, dim);
+      matmulDispatch(moeUp, moeInput, moe.up()[expert], moe.upType(), hidden, dim);
+      // The same activation policy as the dense path, so a routed model honours usesGeluFfn and the
+      // Granite sigmoid rather than hardcoding SwiGLU here.
+      activateFfn(moeActivated, 0, moeGate, 0, moeUp, 0, hidden);
+      matmulDispatch(moeExpertOut, moeActivated, moe.down()[expert], moe.downType(), dim, hidden);
+      for (int index = 0; index < dim; index++) {
+        destination[destinationOffset + index] += weight * moeExpertOut[index];
+      }
+    }
+  }
+
+  /**
+   * Refuses an activated feed-forward adapter on a routed layer instead of ignoring it.
+   *
+   * <p>An FFN adapter names one gate, up or down matrix. A routed layer has {@code numExperts} of
+   * each and picks eight per token, so there is no matrix the update belongs to and no defensible
+   * choice of which experts to apply it to. Applying it to the routed result would change the
+   * arithmetic the adapter was trained against; skipping it would answer as though no adapter were
+   * loaded. Attention adapters are unaffected and keep working, so this refuses only what it must.
+   */
+  private void refuseFfnAdapter(int layer, boolean adapterActive) {
+    if (!adapterActive || activatedAdapter == null) {
+      return;
+    }
+    for (Projection projection :
+        new Projection[] {Projection.FFN_GATE, Projection.FFN_UP, Projection.FFN_DOWN}) {
+      if (activatedAdapter.has(layer, projection)) {
+        throw new UnsupportedOperationException(
+            "activated LoRA targets "
+                + projection
+                + " on layer "
+                + layer
+                + ", which is a routed mixture-of-experts feed-forward with "
+                + config.numExperts()
+                + " experts: there is no single projection for the update to apply to");
+      }
+    }
+  }
+
+  /**
+   * Picks the highest-scoring experts and turns their logits into routing weights summing to one.
+   *
+   * <p>Insertion into a descending list of {@code used} entries, not a sort of all {@code experts}:
+   * eight of 128 costs at most 1,024 comparisons, and it yields the same descending order as the
+   * reference's {@code topk} without touching the other 120.
+   *
+   * <p>Ties keep the lower expert index, matching {@code torch.topk}. Exact ties between float
+   * router logits do not arise in practice, but the tie-break has to be decided somewhere, and
+   * leaving it to whichever comparison happened to be written would make a routed model's output
+   * unreproducible for the one input that hits it.
+   *
+   * <p>Static and free of the forward pass's state so that the routing can be tested for what it
+   * claims -- top-k order, the tie-break, and weights that sum to one -- without a model.
+   *
+   * @param routerLogits one logit per expert
+   * @param experts how many experts the layer holds
+   * @param used how many of them a token selects; must not exceed {@code experts}
+   * @param selected receives the chosen expert indices, highest-scoring first
+   * @param routingWeights receives their weights, summing to one
+   */
+  static void selectExperts(
+      float[] routerLogits, int experts, int used, int[] selected, float[] routingWeights) {
+    ExpertRouting.selectExperts(routerLogits, experts, used, selected, routingWeights);
   }
 
   private void prepareBatchedAttention(
@@ -2118,6 +2377,7 @@ public final class LlamaForwardPass {
           applyRopeBatch(batchQ, offset, batch, layerIndex);
         }
       }
+      scaleQueryTemperature(batchQ, qBase, startPosition + batch);
       for (int head = 0; head < config.numKvHeads(); head++) {
         int offset = kBase + head * keyLength;
         normalizeHead(batchK, offset, layer.kNorm(), keyLength);
@@ -2544,11 +2804,15 @@ public final class LlamaForwardPass {
   }
 
   /**
-   * One grouped-query group. On Granite ({@link #fusedGroupedAttention}): scores for every head
-   * sharing {@code kvHead} in one pass over the cached keys, a vector softmax per head, then one
-   * pass over the cached values, so the K and V rows are read once instead of {@code groupSize}
-   * times. Elsewhere: the head-by-head loop (per-head scores, scalar softmax, per-head values)
-   * whose numerics the pinned greedy oracles were recorded on.
+   * One grouped-query group. Fused ({@link #fusedGroupedAttention}, the default for every model
+   * whose group size exceeds one): scores for every head sharing {@code kvHead} in one pass over
+   * the cached keys, a vector softmax per head, then one pass over the cached values, so the K and
+   * V rows are read once instead of {@code groupSize} times. That is the whole point on a decode
+   * step, which is bound by how many bytes of cache it touches rather than by arithmetic.
+   *
+   * <p>With the knob off: the head-by-head loop -- per-head scores, scalar softmax, per-head
+   * values. It is kept as the reference the fused path is measured against, not as a fallback for
+   * architectures the fused path cannot serve; there are none.
    */
   private void attendGroup(
       AttentionView view,
@@ -2602,6 +2866,7 @@ public final class LlamaForwardPass {
         scoresHeadStride);
     int count = position - firstPosition + 1;
     for (int head = 0; head < groupSize; head++) {
+      softcapAttentionScores(scores, head * scoresHeadStride + firstPosition, count);
       GroupedQueryAttentionKernel.softmax(scores, head * scoresHeadStride + firstPosition, count);
     }
     sequenceCache.addGroupedAttentionValues(
@@ -2649,6 +2914,7 @@ public final class LlamaForwardPass {
           scores,
           0,
           batchedAttentionScores);
+      softcapAttentionScores(scores, firstPosition, position - firstPosition + 1);
       TensorOps.softmax(scores, firstPosition, position - firstPosition + 1);
       sequenceCache.addAttentionValues(
           view,
@@ -2703,6 +2969,27 @@ public final class LlamaForwardPass {
     ropeTable(layer).applyBatch(vector, offset, batch, config.usesNeoxRope());
   }
 
+  /**
+   * Scales one row of the query vector by the position's attention temperature.
+   *
+   * <p>Applied after rope and before attention, matching llama.cpp's Mistral 3 graph, which does
+   * {@code Qcur = ggml_mul(Qcur, inp_attn_scale)} immediately after roping Q and K. The key is not
+   * scaled -- only the query -- so the effect is a uniform multiplier on every logit of that row,
+   * which is what tempering attention at long range means.
+   *
+   * <p>One scalar covers all heads, so this runs once per row rather than once per head.
+   */
+  private void scaleQueryTemperature(float[] query, int offset, int position) {
+    if (!attentionTemperatureScaling) {
+      return;
+    }
+    float scale = config.attentionTemperatureScale(position);
+    int end = offset + config.queryDim();
+    for (int index = offset; index < end; index++) {
+      query[index] *= scale;
+    }
+  }
+
   private void normalizeProjection(float[] projection, float[] norm, int size) {
     if (norm.length != 0) {
       TensorOps.rmsNorm(projection, projection, norm, size, config.rmsNormEps());
@@ -2751,6 +3038,28 @@ public final class LlamaForwardPass {
     }
     for (int index = 0; index < length; index++) {
       values[offset + index] *= scale;
+    }
+  }
+
+  /**
+   * Softcaps attention scores in place, before the softmax that consumes them.
+   *
+   * <p>Gemma 2 caps attention logits at 50 as well as final logits at 30; Gemma 3 dropped the
+   * attention cap. Same {@code cap * tanh(x / cap)} form as {@link #softcapLogits}. Zero means no
+   * cap, so every other architecture pays one comparison.
+   *
+   * <p>Applied at BOTH softmax sites -- the head-by-head loop and the fused grouped path. Capping
+   * one and not the other would make a model's output depend on which attention route it took,
+   * which is the asymmetry that bit the Gemma 4 dense work.
+   */
+  private void softcapAttentionScores(float[] scores, int offset, int length) {
+    float cap = config.attnLogitSoftcap();
+    if (cap == 0.0f) {
+      return;
+    }
+    int limit = Math.addExact(offset, length);
+    for (int index = offset; index < limit; index++) {
+      scores[index] = cap * (float) Math.tanh(scores[index] / cap);
     }
   }
 
@@ -3178,7 +3487,7 @@ public final class LlamaForwardPass {
       LlamaConfig config, GgufBatchedMatrixKernel loadedMatrixKernel, int attentionGroupSize) {
     if (attentionGroupSize > 1 && !fusedGroupedAttention) {
       PerformanceCliffs.report(
-          PerformanceCliff.FUSED_GROUPED_ATTENTION_NOT_WIRED,
+          PerformanceCliff.FUSED_GROUPED_ATTENTION_DISABLED,
           "architecture="
               + config.architecture().metadataId()
               + ", group-size="

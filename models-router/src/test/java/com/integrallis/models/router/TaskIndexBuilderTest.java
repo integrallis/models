@@ -15,12 +15,14 @@
  */
 package com.integrallis.models.router;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.vectors.core.MetadataValue;
 import com.integrallis.vectors.core.SimilarityFunction;
 import com.integrallis.vectors.db.IndexType;
+import com.integrallis.vectors.db.QuantizerKind;
 import com.integrallis.vectors.db.SearchRequest;
 import com.integrallis.vectors.db.SearchResult;
 import com.integrallis.vectors.db.VectorCollection;
@@ -28,6 +30,8 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -55,6 +59,98 @@ class TaskIndexBuilderTest {
         vector[0] += 0.01f; // keeps every vector non-zero so cosine stays defined
         return vector;
       };
+
+  @Test
+  void prefixesEveryExemplarAndRecordsBothSidesInTheManifest(@TempDir Path directory)
+      throws IOException {
+    List<String> embedded = new ArrayList<>();
+    TaskIndexBuilder.TaskEmbedder recording =
+        text -> {
+          embedded.add(text);
+          return EMBEDDER.embed(text);
+        };
+
+    // Deliberately awkward: ':', '=', '|' and a significant trailing space are all characters
+    // java.util.Properties would otherwise eat, and this is EmbeddingGemma's real prefix shape.
+    TaskIndexBuilder.build(
+        corpus(),
+        recording,
+        "fake-embedder-v1",
+        directory,
+        QuantizerKind.NONE,
+        "title: none | text: ",
+        "task: search result | query: ");
+
+    assertThat(embedded)
+        .isNotEmpty()
+        .allSatisfy(t -> assertThat(t).startsWith("title: none | text: "));
+
+    Properties manifest = new Properties();
+    try (var reader =
+        Files.newBufferedReader(directory.resolve(TaskIndexBuilder.MANIFEST), UTF_8)) {
+      manifest.load(reader);
+    }
+    // The trailing space is part of the prefix; losing it changes what the model is asked.
+    assertThat(manifest.getProperty("documentPrefix")).isEqualTo("title: none | text: ");
+    assertThat(manifest.getProperty("queryPrefix")).isEqualTo("task: search result | query: ");
+  }
+
+  @Test
+  void anIndexBuiltWithoutPrefixesRecordsNone(@TempDir Path directory) throws IOException {
+    TaskIndexBuilder.build(corpus(), EMBEDDER, "fake-embedder-v1", directory);
+
+    Properties manifest = new Properties();
+    try (var reader =
+        Files.newBufferedReader(directory.resolve(TaskIndexBuilder.MANIFEST), UTF_8)) {
+      manifest.load(reader);
+    }
+    assertThat(manifest.getProperty("documentPrefix")).isNull();
+    assertThat(manifest.getProperty("queryPrefix")).isNull();
+    assertThat(TaskIndex.open(directory).queryPrefix()).isEmpty();
+  }
+
+  @Test
+  void theClassifierAppliesTheQueryPrefixTheIndexRecorded(@TempDir Path directory) {
+    TaskIndexBuilder.build(
+        corpus(),
+        EMBEDDER,
+        "fake-embedder-v1",
+        directory,
+        QuantizerKind.NONE,
+        "title: none | text: ",
+        "task: search result | query: ");
+
+    List<String> queried = new ArrayList<>();
+    try (TaskIndex index = TaskIndex.open(directory)) {
+      assertThat(index.queryPrefix()).contains("task: search result | query: ");
+      PretrainedTaskClassifier.using(
+              index,
+              text -> {
+                queried.add(text);
+                return EMBEDDER.embed(text);
+              },
+              0.0)
+          .classify("sort an array in place");
+    }
+    // The point of recording it: the caller passed a bare query and the prefix was still applied.
+    assertThat(queried).containsExactly("task: search result | query: sort an array in place");
+  }
+
+  @Test
+  void refusesOnePrefixWithoutTheOther(@TempDir Path directory) {
+    assertThatThrownBy(
+            () ->
+                TaskIndexBuilder.build(
+                    corpus(),
+                    EMBEDDER,
+                    "fake-embedder-v1",
+                    directory,
+                    QuantizerKind.NONE,
+                    "title: none | text: ",
+                    null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("must be supplied together");
+  }
 
   private static TaskExemplars corpus() {
     return TaskExemplars.parse(new StringReader(CORPUS));

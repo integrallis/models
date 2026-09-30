@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliff;
 import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.ops.ExpertRouting;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.plan.ModelTopology;
@@ -28,6 +29,7 @@ import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.FullAttentio
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.GatedDeltaNet;
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Layer;
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Matrix;
+import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.MoeFeedForward;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
@@ -38,7 +40,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/** Stateful pure-Java hybrid graph for dense Qwen3.5. */
+/** Stateful pure-Java hybrid graph for dense and mixture-of-experts Qwen3.5. */
 public final class Qwen35ForwardPass {
 
   /** Independent Qwen3.5 sequence state. */
@@ -66,7 +68,7 @@ public final class Qwen35ForwardPass {
   }
 
   /** Immutable copy of one session's convolution and recurrent state at a retained prefix. */
-  static final class LinearStateSnapshot {
+  public static final class LinearStateSnapshot {
     private final Session session;
     private final int checkpoint;
     private final int[] tokenPrefix;
@@ -113,7 +115,14 @@ public final class Qwen35ForwardPass {
     if (prefillBatchSize < 1) {
       throw new IllegalArgumentException("prefillBatchSize must be >= 1: " + prefillBatchSize);
     }
-    this.prefillBatchSize = Math.min(prefillBatchSize, config.contextLength());
+    // A routed layer holds no dense ffn_gate/ffn_up/ffn_down for the batched paths to project,
+    // and expert selection is per token, so a batch of rows does not share one weight matrix.
+    // Rather than give the batched kernels a per-row gather, a mixture-of-experts model runs a
+    // token at a time: prefill() sends batchSize == 1 straight to forwardToken, so clamping here
+    // is what keeps every routed token on the one path that implements routing. Clamping rather
+    // than rejecting because callers pass a default batch size they did not choose per model.
+    this.prefillBatchSize =
+        config.usesMixtureOfExperts() ? 1 : Math.min(prefillBatchSize, config.contextLength());
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     this.q6BatchedKernel = Objects.requireNonNull(q6BatchedKernel, "q6BatchedKernel");
     this.batchedMatrixKernel = Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
@@ -177,6 +186,15 @@ public final class Qwen35ForwardPass {
     List<ModelTopology.LayerTopology> layers = new ArrayList<>(config.numLayers());
     for (int layerIndex = 0; layerIndex < config.numLayers(); layerIndex++) {
       Layer layer = weights.layer(layerIndex);
+      // On a routed layer the dense triple is null and the expert stacks carry the types instead.
+      // Reporting expert 0 is exact rather than representative: the three stacked tensors each hold
+      // every expert, so all experts within a stack share one type by construction.
+      GgufTensorType gateType =
+          layer.moe() == null ? layer.ffnGate().type() : layer.moe().gate()[0].type();
+      GgufTensorType upType =
+          layer.moe() == null ? layer.ffnUp().type() : layer.moe().up()[0].type();
+      GgufTensorType downType =
+          layer.moe() == null ? layer.ffnDown().type() : layer.moe().down()[0].type();
       if (layer.fullAttention() != null) {
         FullAttention attention = layer.fullAttention();
         layers.add(
@@ -185,9 +203,9 @@ public final class Qwen35ForwardPass {
                 attention.key().type(),
                 attention.value().type(),
                 attention.output().type(),
-                layer.ffnGate().type(),
-                layer.ffnUp().type(),
-                layer.ffnDown().type()));
+                gateType,
+                upType,
+                downType));
       } else {
         GatedDeltaNet gdn = layer.gatedDeltaNet();
         layers.add(
@@ -196,14 +214,18 @@ public final class Qwen35ForwardPass {
                 gdn.queryKeyValue().type(),
                 gdn.queryKeyValue().type(),
                 gdn.output().type(),
-                layer.ffnGate().type(),
-                layer.ffnUp().type(),
-                layer.ffnDown().type(),
-                List.of(gdn.outputGate().type(), gdn.beta().type(), gdn.alpha().type())));
+                gateType,
+                upType,
+                downType,
+                gdn.betaAlpha() != null
+                    ? List.of(gdn.outputGate().type(), gdn.betaAlpha().type())
+                    : List.of(gdn.outputGate().type(), gdn.beta().type(), gdn.alpha().type())));
       }
     }
     return new ModelTopology(
-        "qwen35",
+        // The name the file declared, not one inferred from the feed-forward shape: Qwen3-Next is
+        // routed too, and inferring would report it as a Qwen3.5-MoE.
+        config.architecture(),
         config.attentionQueryDim(),
         config.attentionKeyDim(),
         config.attentionKeyDim(),
@@ -287,27 +309,34 @@ public final class Qwen35ForwardPass {
       throw new IllegalArgumentException(
           "checkpoint must be between 0 and " + checked.checkpoint + ": " + checkpoint);
     }
-    checked.state = new SessionState(config, weights, checked.capacity, prefillBatchSize);
+    int[] retained = Arrays.copyOf(checked.tokenHistory, checkpoint);
+    checked.state.clear();
     checked.checkpoint = 0;
-    for (int index = 0; index < checkpoint; index++) {
-      advance(checked, checked.tokenHistory[index], false);
+    if (checkpoint == 0) {
+      return;
     }
+    // Replay through the batched prefill path, not one token at a time. A Gated DeltaNet state
+    // cannot be truncated the way a KV cache can, so rewinding has to re-run the retained prefix
+    // -- and re-running it at decode rate cost more than prefilling the whole prompt outright,
+    // which made a cached prefix the slowest way to answer. Measured on a 171-token RAG prompt
+    // with a 150-token reusable prefix: p95 TTFT 6371 ms token-by-token.
+    prefill(checked, retained, 0);
   }
 
   /** Clears all sequence state. */
   public void reset(Session session) {
     Session checked = requireSession(session);
-    checked.state = new SessionState(config, weights, checked.capacity, prefillBatchSize);
+    checked.state.clear();
     checked.checkpoint = 0;
   }
 
   /** Captures the Gated DeltaNet state needed to resume this session's retained token prefix. */
-  LinearStateSnapshot captureLinearState(Session session) {
+  public LinearStateSnapshot captureLinearState(Session session) {
     return new LinearStateSnapshot(requireSession(session));
   }
 
   /** Restores a snapshot without replaying its retained prefix. */
-  void restoreLinearState(Session session, LinearStateSnapshot snapshot) {
+  public void restoreLinearState(Session session, LinearStateSnapshot snapshot) {
     Session checked = requireSession(session);
     Objects.requireNonNull(snapshot, "snapshot");
     if (snapshot.session != checked) {
@@ -328,7 +357,7 @@ public final class Qwen35ForwardPass {
     return config;
   }
 
-  int prefillBatchSize() {
+  public int prefillBatchSize() {
     return prefillBatchSize;
   }
 
@@ -368,6 +397,479 @@ public final class Qwen35ForwardPass {
     float[] logits = new float[config.vocabSize()];
     project(logits, normalized, weights.output(), scratch);
     return logits;
+  }
+
+  /**
+   * Answers a group of questions against the evidence this session is positioned at.
+   *
+   * <p>The per-branch state is sized from the questions themselves, so callers outside this package
+   * never handle it.
+   *
+   * @param session a session positioned at the end of the shared evidence
+   * @param suffixes each question's tokens, the criterion and its rendered options
+   * @return final-position logits per question, in the order given
+   */
+  public float[][] decideGrouped(Session session, int[][] suffixes) {
+    Session checked = requireSession(session);
+    Objects.requireNonNull(suffixes, "suffixes");
+    if (suffixes.length == 0) {
+      throw new IllegalArgumentException("suffixes must not be empty");
+    }
+    int longest = 0;
+    for (int[] suffix : suffixes) {
+      longest = Math.max(longest, suffix.length);
+    }
+    return decideGrouped(
+        checked,
+        suffixes,
+        new Qwen35GroupedDecision(config, suffixes.length, checked.checkpoint, longest));
+  }
+
+  /**
+   * Answers a group of questions about one piece of evidence, reading the weights once per step.
+   *
+   * <p>The session must be positioned at the end of the evidence. Each question is forked from that
+   * state, and the group then walks forward in lockstep: at each step one token from every
+   * unfinished question forms a batch of rows, and every projection runs over that batch.
+   *
+   * <p>MEASURED 2026-09-24 on a Hetzner CCX33: this is worth about 4% over asking the questions one
+   * at a time, and it loses below roughly ten questions. Batched prefill on this box is compute
+   * bound at 18.5 ms per token and saturates at four threads, so the group's arithmetic is the same
+   * arithmetic either way. What grouping actually saves is the bandwidth-bound single-token step
+   * that ends each question -- one per group instead of one per question. See {@link
+   * Qwen35GroupedDecision} for the numbers.
+   *
+   * <p>Attention and the Gated DeltaNet recurrence stay per branch, because those carry sequence
+   * identity: a shared recurrent state would let one question answer having read another.
+   *
+   * @param session a session positioned at the end of the shared evidence
+   * @param suffixes each question's tokens, the criterion and its rendered options
+   * @param group per-branch state, which must hold at least as many branches as there are questions
+   * @return final-position logits for each question, in the order given
+   */
+  float[][] decideGrouped(Session session, int[][] suffixes, Qwen35GroupedDecision group) {
+    if (config.usesMixtureOfExperts()) {
+      // Grouping exists to run one projection over many rows at once, which a routed layer cannot
+      // do: each row selects its own experts. Refusing outright rather than silently falling back
+      // to per-question decoding, because the caller chose this entry point for its throughput and
+      // a quiet fallback would report that throughput while not delivering it.
+      throw new UnsupportedOperationException(
+          "grouped decision is not implemented for mixture-of-experts Qwen3.5; ask the questions"
+              + " one at a time");
+    }
+    Session checked = requireSession(session);
+    Objects.requireNonNull(suffixes, "suffixes");
+    Objects.requireNonNull(group, "group");
+    int count = suffixes.length;
+    if (count == 0) {
+      throw new IllegalArgumentException("suffixes must not be empty");
+    }
+    if (count > group.groupSize()) {
+      throw new IllegalArgumentException(
+          "group holds " + group.groupSize() + " branches, asked for " + count);
+    }
+    int prefixLength = checked.checkpoint;
+    int dimension = config.embeddingDim();
+    SessionState state = checked.state;
+    BatchScratch batch = state.batchScratch;
+    int longest = 0;
+    for (int[] suffix : suffixes) {
+      if (suffix.length == 0) {
+        throw new IllegalArgumentException("every question must carry at least one token");
+      }
+      longest = Math.max(longest, suffix.length);
+    }
+    if (longest > group.suffixCapacity()) {
+      throw new IllegalArgumentException(
+          "question of " + longest + " tokens exceeds group capacity " + group.suffixCapacity());
+    }
+
+    for (int index = 0; index < count; index++) {
+      group.forkBranch(
+          index,
+          state.recurrentState,
+          state.convolutionHistory,
+          state.keys,
+          state.values,
+          prefixLength,
+          config.attentionKeyDim());
+    }
+
+    float[][] logits = new float[count][];
+    int[] active = new int[count];
+    for (int step = 0; step < longest; step++) {
+      int rows = 0;
+      for (int index = 0; index < count; index++) {
+        if (suffixes[index].length > step) {
+          active[rows++] = index;
+        }
+      }
+      for (int row = 0; row < rows; row++) {
+        weights.embedToken(suffixes[active[row]][step], batch.rowState);
+        System.arraycopy(batch.rowState, 0, batch.state, row * dimension, dimension);
+      }
+      int position = prefixLength + step;
+
+      for (int layerIndex = 0; layerIndex < config.numLayers(); layerIndex++) {
+        Layer layer = weights.layer(layerIndex);
+        normalizeBatch(batch.normalized, batch.state, rows, dimension, layer.attentionNorm());
+        if (config.usesFullAttention(layerIndex)) {
+          groupedAttention(
+              batch.projected,
+              batch.normalized,
+              layer.fullAttention(),
+              layerIndex,
+              position,
+              rows,
+              active,
+              group,
+              state,
+              batch);
+        } else {
+          groupedDeltaNet(
+              batch.projected,
+              batch.normalized,
+              layer.gatedDeltaNet(),
+              layerIndex,
+              rows,
+              active,
+              group,
+              state,
+              batch);
+        }
+        addBatch(batch.state, batch.projected, rows * dimension);
+
+        normalizeBatch(batch.normalized, batch.state, rows, dimension, layer.postAttentionNorm());
+        dualProjectBatched(
+            batch.ffnGate,
+            layer.ffnGate(),
+            batch.ffnUp,
+            layer.ffnUp(),
+            batch.normalized,
+            rows,
+            state.scratch,
+            batch.projectionScratch);
+        for (int row = 0; row < rows; row++) {
+          int offset = row * config.hiddenDim();
+          VectorUtil.swiGlu(
+              batch.ffn, offset, batch.ffnGate, offset, batch.ffnUp, offset, config.hiddenDim());
+        }
+        projectBatched(
+            batch.projected,
+            batch.ffn,
+            layer.ffnDown(),
+            rows,
+            state.scratch,
+            batch.projectionScratch);
+        addBatch(batch.state, batch.projected, rows * dimension);
+      }
+
+      for (int row = 0; row < rows; row++) {
+        group.branch(active[row]).advance();
+        int index = active[row];
+        if (suffixes[index].length == step + 1) {
+          logits[index] = projectRowLogits(batch, row, state.scratch);
+        }
+      }
+    }
+    return logits;
+  }
+
+  /** Logits for one row of a grouped step, which is that question's final position. */
+  private float[] projectRowLogits(BatchScratch batch, int row, ProjectionScratch scratch) {
+    int dimension = config.embeddingDim();
+    float[] normalized = new float[dimension];
+    TensorOps.rmsNorm(
+        normalized,
+        0,
+        batch.state,
+        row * dimension,
+        weights.outputNorm(),
+        dimension,
+        config.rmsNormEpsilon());
+    float[] logits = new float[config.vocabSize()];
+    project(logits, normalized, weights.output(), scratch);
+    return logits;
+  }
+
+  /**
+   * Attention for a grouped step: one projection over every branch, then each branch attends over
+   * its own key and value cache, which already holds the evidence it was forked from.
+   */
+  private void groupedAttention(
+      float[] output,
+      float[] input,
+      FullAttention weights,
+      int layer,
+      int position,
+      int rows,
+      int[] active,
+      Qwen35GroupedDecision group,
+      SessionState state,
+      BatchScratch batch) {
+    int headDimension = config.attentionHeadDim();
+    int queryHeads = config.numHeads();
+    int kvHeads = config.numKvHeads();
+    int queryDimension = config.attentionQueryDim();
+    int keyDimension = config.attentionKeyDim();
+    tripleProjectBatched(
+        batch.queryGate,
+        weights.queryGate(),
+        batch.key,
+        weights.key(),
+        batch.value,
+        weights.value(),
+        input,
+        rows,
+        state.scratch,
+        batch.projectionScratch);
+
+    // Every branch sits at the same position, so one rotary slot serves the whole group.
+    rotary.prepareBatch(position, 1);
+    for (int row = 0; row < rows; row++) {
+      int queryGateBase = row * 2 * queryDimension;
+      int queryBase = row * queryDimension;
+      int keyBase = row * keyDimension;
+      for (int head = 0; head < queryHeads; head++) {
+        int source = queryGateBase + head * 2 * headDimension;
+        int destination = queryBase + head * headDimension;
+        System.arraycopy(batch.queryGate, source, batch.query, destination, headDimension);
+        TensorOps.rmsNorm(
+            batch.query,
+            destination,
+            batch.query,
+            destination,
+            weights.queryNorm(),
+            headDimension,
+            config.rmsNormEpsilon());
+        rotary.applyBatch(batch.query, destination, 0, true);
+      }
+      for (int head = 0; head < kvHeads; head++) {
+        int offset = keyBase + head * headDimension;
+        TensorOps.rmsNorm(
+            batch.key,
+            offset,
+            batch.key,
+            offset,
+            weights.keyNorm(),
+            headDimension,
+            config.rmsNormEpsilon());
+        rotary.applyBatch(batch.key, offset, 0, true);
+      }
+      Qwen35GroupedDecision.Branch branch = group.branch(active[row]);
+      System.arraycopy(
+          batch.key, keyBase, branch.suffixKeys(layer), position * keyDimension, keyDimension);
+      System.arraycopy(
+          batch.value, keyBase, branch.suffixValues(layer), position * keyDimension, keyDimension);
+    }
+
+    int queriesPerKvHead = queryHeads / kvHeads;
+    float scale = (float) (1.0 / Math.sqrt(headDimension));
+    for (int row = 0; row < rows; row++) {
+      Qwen35GroupedDecision.Branch branch = group.branch(active[row]);
+      int queryBase = row * queryDimension;
+      int queryGateBase = row * 2 * queryDimension;
+      for (int head = 0; head < queryHeads; head++) {
+        int kvHead = head / queriesPerKvHead;
+        int queryOffset = queryBase + head * headDimension;
+        int gate = queryGateBase + head * 2 * headDimension + headDimension;
+        attendHead(
+            batch.attended,
+            queryOffset,
+            batch.query,
+            queryOffset,
+            branch.suffixKeys(layer),
+            kvHead * headDimension,
+            keyDimension,
+            branch.suffixValues(layer),
+            kvHead * headDimension,
+            keyDimension,
+            batch.queryGate,
+            gate,
+            batch.attentionScores,
+            position + 1,
+            headDimension,
+            scale);
+      }
+    }
+    projectBatched(
+        output, batch.attended, weights.output(), rows, state.scratch, batch.projectionScratch);
+  }
+
+  /**
+   * Gated DeltaNet for a grouped step: one projection over every branch, then each branch advances
+   * its own recurrent state by a single token.
+   */
+  private void groupedDeltaNet(
+      float[] output,
+      float[] input,
+      GatedDeltaNet weights,
+      int layer,
+      int rows,
+      int[] active,
+      Qwen35GroupedDecision group,
+      SessionState state,
+      BatchScratch batch) {
+    int convDimension = config.gdnConvDim();
+    int keyDimension = config.gdnKeyDim();
+    int valueDimension = config.gdnValueDim();
+    int valueHeads = config.gdnValueHeads();
+    int headDimension = config.gdnHeadDim();
+    projectBatched(
+        batch.mixed, input, weights.queryKeyValue(), rows, state.scratch, batch.projectionScratch);
+    projectBatched(
+        batch.outputGate,
+        input,
+        weights.outputGate(),
+        rows,
+        state.scratch,
+        batch.projectionScratch);
+    dualProjectBatched(
+        batch.beta,
+        requireSeparateBetaAlpha(weights).beta(),
+        batch.alpha,
+        weights.alpha(),
+        input,
+        rows,
+        state.scratch,
+        batch.projectionScratch);
+
+    int kernel = config.gdnConvKernel();
+    for (int row = 0; row < rows; row++) {
+      Qwen35GroupedDecision.Branch branch = group.branch(active[row]);
+      int mixedBase = row * convDimension;
+      VectorUtil.causalDepthwiseConv1dSilu(
+          batch.mixed,
+          mixedBase,
+          branch.convolutionHistory(layer),
+          0,
+          weights.convolution(),
+          0,
+          convDimension,
+          kernel);
+      System.arraycopy(batch.mixed, mixedBase, batch.gdnQuery, row * keyDimension, keyDimension);
+      System.arraycopy(
+          batch.mixed, mixedBase + keyDimension, batch.gdnKey, row * keyDimension, keyDimension);
+      System.arraycopy(
+          batch.mixed,
+          mixedBase + 2 * keyDimension,
+          batch.gdnValue,
+          row * valueDimension,
+          valueDimension);
+      int gateBase = row * valueHeads;
+      VectorUtil.sigmoidAndScaledSoftplus(
+          batch.beta,
+          gateBase,
+          batch.alpha,
+          gateBase,
+          weights.timeStepBias(),
+          0,
+          weights.decay(),
+          0,
+          batch.logDecay,
+          gateBase,
+          valueHeads);
+    }
+
+    // One token per branch, each against its own state. The recurrence is what makes a question's
+    // answer its own, so it is the one thing the group does not share.
+    groupedRecurrence(layer, rows, active, group, batch);
+
+    for (int row = 0; row < rows; row++) {
+      int valueBase = row * valueDimension;
+      for (int head = 0; head < valueHeads; head++) {
+        int offset = valueBase + head * headDimension;
+        TensorOps.rmsNorm(
+            batch.recurrent,
+            offset,
+            batch.recurrent,
+            offset,
+            weights.outputNorm(),
+            headDimension,
+            config.rmsNormEpsilon());
+      }
+      VectorUtil.swiGlu(
+          batch.recurrent,
+          valueBase,
+          batch.outputGate,
+          valueBase,
+          batch.recurrent,
+          valueBase,
+          valueDimension);
+    }
+    projectBatched(
+        output, batch.recurrent, weights.output(), rows, state.scratch, batch.projectionScratch);
+  }
+
+  /**
+   * Advances every active branch's recurrent state by one token.
+   *
+   * <p>Issued as one call rather than one per branch. A kernel asked to advance a single sequence
+   * by a single token has nothing to spread across its threads and deliberately stays on the
+   * caller, so asking N times in a row answered N questions on one core while every projection
+   * around it used the whole machine. MEASURED 2026-09-24 on a Hetzner CCX33: twenty questions cost
+   * 12.39 s grouped that way, and 10.79 s once the whole group went in one call. Handed the whole
+   * group, the kernel has rows x heads independent recurrences.
+   *
+   * <p>{@code active} is also the row-to-slot table: questions of unequal length drop out as they
+   * finish, so the rows still advancing are a scattered subset of the group's state slots.
+   */
+  private void groupedRecurrence(
+      int layer, int rows, int[] active, Qwen35GroupedDecision group, BatchScratch batch) {
+    int keyDimension = config.gdnKeyDim();
+    int valueDimension = config.gdnValueDim();
+    int valueHeads = config.gdnValueHeads();
+    int headDimension = config.gdnHeadDim();
+    float[] groupState = group.recurrentState(layer);
+    if (batchedMatrixKernel.supportsGroupedGatedDeltaNet()) {
+      batchedMatrixKernel.groupedGatedDeltaNet(
+          batch.gdnQuery,
+          batch.gdnKey,
+          batch.gdnValue,
+          batch.logDecay,
+          batch.beta,
+          groupState,
+          batch.recurrent,
+          active,
+          rows,
+          group.groupSize(),
+          config.gdnKeyHeads(),
+          valueHeads,
+          headDimension,
+          headDimension);
+      return;
+    }
+    // No grouped kernel: step each row into its own slot of the same array the kernel would have
+    // written, so both paths address state identically and the parity test covers both.
+    int elements = group.recurrentStateElements();
+    float[] rowOutput = batch.rowRecurrent;
+    for (int row = 0; row < rows; row++) {
+      GatedDeltaNetRecurrence.forwardSlotInPlace(
+          slice(batch.gdnQuery, row * keyDimension, keyDimension),
+          slice(batch.gdnKey, row * keyDimension, keyDimension),
+          slice(batch.gdnValue, row * valueDimension, valueDimension),
+          slice(batch.logDecay, row * valueHeads, valueHeads),
+          slice(batch.beta, row * valueHeads, valueHeads),
+          groupState,
+          active[row] * elements,
+          rowOutput,
+          batch.normalizedQuery,
+          batch.normalizedKey,
+          batch.memory,
+          batch.delta,
+          config.gdnKeyHeads(),
+          valueHeads,
+          headDimension,
+          headDimension);
+      System.arraycopy(rowOutput, 0, batch.recurrent, row * valueDimension, valueDimension);
+    }
+  }
+
+  /** A copy of one row, because the recurrence entry point takes whole arrays rather than spans. */
+  private static float[] slice(float[] source, int offset, int length) {
+    float[] copy = new float[length];
+    System.arraycopy(source, offset, copy, 0, length);
+    return copy;
   }
 
   private Session requireSession(Session session) {
@@ -428,6 +930,7 @@ public final class Qwen35ForwardPass {
     float[] ffnGate = new float[config.hiddenDim()];
     float[] ffnUp = new float[config.hiddenDim()];
     float[] ffn = new float[config.hiddenDim()];
+    MoeScratch moeScratch = config.usesMixtureOfExperts() ? new MoeScratch(config) : null;
     weights.embedToken(token, state);
 
     for (int layerIndex = 0; layerIndex < config.numLayers(); layerIndex++) {
@@ -454,13 +957,130 @@ public final class Qwen35ForwardPass {
           layer.postAttentionNorm(),
           embeddingDimension,
           config.rmsNormEpsilon());
-      dualProject(ffnGate, layer.ffnGate(), ffnUp, layer.ffnUp(), normalized, session.scratch);
-      VectorUtil.swiGlu(ffn, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim());
-      project(projected, ffn, layer.ffnDown(), session.scratch);
+      if (layer.moe() != null) {
+        routedFeedForward(projected, normalized, layer.moe(), moeScratch, session.scratch);
+      } else {
+        dualProject(ffnGate, layer.ffnGate(), ffnUp, layer.ffnUp(), normalized, session.scratch);
+        VectorUtil.swiGlu(ffn, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim());
+        project(projected, ffn, layer.ffnDown(), session.scratch);
+      }
       add(state, projected);
     }
 
     return state;
+  }
+
+  /**
+   * Routed feed-forward: the top-k experts this token selected, plus an always-on shared expert.
+   *
+   * <p>Follows llama.cpp's {@code build_moe_ffn} as this family configures it. Three choices there
+   * are not visible from the tensor names and are worth stating, because each has a plausible wrong
+   * reading:
+   *
+   * <ul>
+   *   <li><b>No expert-weight scale.</b> The reference multiplies the routing weights by {@code
+   *       expert_weights_scale} only under {@code if (w_scale != 0.0f && w_scale != 1.0f)}. This
+   *       family leaves the key unset, so the default 0.0 means <i>no scaling</i> rather than
+   *       multiplying everything by zero.
+   *   <li><b>The selected weights are renormalised</b> ({@code norm_w}), which {@link
+   *       ExpertRouting#selectExperts} does by softmaxing over the selected logits alone.
+   *   <li><b>The shared expert's gate is one scalar per token.</b> {@code ffn_gate_inp_shexp} is a
+   *       single row over the embedding, and its sigmoid scales the whole shared contribution --
+   *       not a per-channel gate, which a vector-shaped reading of the name would produce.
+   * </ul>
+   */
+  private void routedFeedForward(
+      float[] output,
+      float[] normalized,
+      MoeFeedForward moe,
+      MoeScratch moeScratch,
+      ProjectionScratch scratch) {
+    int dimension = config.embeddingDim();
+    project(moeScratch.routerLogits, normalized, moe.router(), scratch);
+    ExpertRouting.selectExperts(
+        moeScratch.routerLogits,
+        config.numExperts(),
+        config.numExpertsUsed(),
+        moeScratch.selected,
+        moeScratch.routingWeights);
+
+    Arrays.fill(output, 0, dimension, 0.0f);
+    for (int slot = 0; slot < config.numExpertsUsed(); slot++) {
+      int expert = moeScratch.selected[slot];
+      dualProject(
+          moeScratch.expertGate,
+          moe.gate()[expert],
+          moeScratch.expertUp,
+          moe.up()[expert],
+          normalized,
+          scratch);
+      VectorUtil.swiGlu(
+          moeScratch.expertActivated,
+          0,
+          moeScratch.expertGate,
+          0,
+          moeScratch.expertUp,
+          0,
+          config.expertHiddenDim());
+      project(moeScratch.contribution, moeScratch.expertActivated, moe.down()[expert], scratch);
+      accumulateScaled(output, moeScratch.contribution, moeScratch.routingWeights[slot], dimension);
+    }
+
+    project(moeScratch.sharedScore, normalized, moe.sharedGate(), scratch);
+    float sharedWeight = 1.0f / (1.0f + (float) Math.exp(-moeScratch.sharedScore[0]));
+    dualProject(
+        moeScratch.sharedGate,
+        moe.sharedGateProjection(),
+        moeScratch.sharedUp,
+        moe.sharedUpProjection(),
+        normalized,
+        scratch);
+    VectorUtil.swiGlu(
+        moeScratch.sharedActivated,
+        0,
+        moeScratch.sharedGate,
+        0,
+        moeScratch.sharedUp,
+        0,
+        config.sharedExpertHiddenDim());
+    project(
+        moeScratch.contribution, moeScratch.sharedActivated, moe.sharedDownProjection(), scratch);
+    accumulateScaled(output, moeScratch.contribution, sharedWeight, dimension);
+  }
+
+  private static void accumulateScaled(float[] target, float[] source, float weight, int length) {
+    for (int index = 0; index < length; index++) {
+      target[index] += weight * source[index];
+    }
+  }
+
+  /** Buffers for one routed feed-forward, allocated per token rather than per layer. */
+  private static final class MoeScratch {
+    private final float[] routerLogits;
+    private final int[] selected;
+    private final float[] routingWeights;
+    private final float[] expertGate;
+    private final float[] expertUp;
+    private final float[] expertActivated;
+    private final float[] sharedScore;
+    private final float[] sharedGate;
+    private final float[] sharedUp;
+    private final float[] sharedActivated;
+    private final float[] contribution;
+
+    private MoeScratch(Qwen35Config config) {
+      routerLogits = new float[config.numExperts()];
+      selected = new int[config.numExpertsUsed()];
+      routingWeights = new float[config.numExpertsUsed()];
+      expertGate = new float[config.expertHiddenDim()];
+      expertUp = new float[config.expertHiddenDim()];
+      expertActivated = new float[config.expertHiddenDim()];
+      sharedScore = new float[1];
+      sharedGate = new float[config.sharedExpertHiddenDim()];
+      sharedUp = new float[config.sharedExpertHiddenDim()];
+      sharedActivated = new float[config.sharedExpertHiddenDim()];
+      contribution = new float[config.embeddingDim()];
+    }
   }
 
   private void executePrefillBatch(Session session, int[] tokens, int tokenOffset, int batchSize) {
@@ -661,7 +1281,7 @@ public final class Qwen35ForwardPass {
         batch.projectionScratch);
     dualProjectBatched(
         batch.beta,
-        weights.beta(),
+        requireSeparateBetaAlpha(weights).beta(),
         batch.alpha,
         weights.alpha(),
         input,
@@ -874,6 +1494,58 @@ public final class Qwen35ForwardPass {
     }
   }
 
+  /**
+   * The batched paths project one matrix over many rows and have no fused split.
+   *
+   * <p>Unreachable today -- every model that fuses beta and alpha is also routed, and a routed
+   * model is clamped to the single-token path -- but a null {@code beta} would otherwise surface as
+   * a NullPointerException from inside a kernel if that ever stopped being true.
+   */
+  private static GatedDeltaNet requireSeparateBetaAlpha(GatedDeltaNet weights) {
+    if (weights.betaAlpha() != null) {
+      throw new UnsupportedOperationException(
+          "a fused ssm_ba Gated DeltaNet is implemented on the single-token path only");
+    }
+    return weights;
+  }
+
+  /**
+   * Projects the fused {@code ssm_ba} and splits it into beta and alpha.
+   *
+   * <p>The packing is <b>interleaved by key-head group</b>, not two contiguous halves, and that is
+   * the whole reason this is a method rather than two slices. The reference reshapes the {@code 2 *
+   * n_value_heads} outputs to {@code [2 * group, n_key_heads]} -- where {@code group} is the number
+   * of value heads per key head -- and then takes beta as the first {@code group} entries of each
+   * column and alpha as the next {@code group}. So for 32 value heads over 16 key heads the 64 rows
+   * read {@code [b, b, a, a]} sixteen times over, and reading the first 32 as beta would pair every
+   * value head with the wrong parameter while still producing finite, plausible output.
+   *
+   * <p>Projected through the same quantized kernel as everything else and split afterwards, rather
+   * than de-interleaved into two matrices at load time: a gather would have to dequantize the
+   * K-quant rows to do it, which would silently move this one projection onto a different precision
+   * path from the rest of the model.
+   */
+  private void projectFusedBetaAlpha(
+      float[] beta,
+      float[] alpha,
+      Matrix betaAlpha,
+      float[] input,
+      GatedDeltaNetScratch workspace,
+      ProjectionScratch scratch) {
+    float[] fused = workspace.betaAlpha;
+    project(fused, input, betaAlpha, scratch);
+    int keyHeads = config.gdnKeyHeads();
+    int group = config.gdnValueHeads() / keyHeads;
+    for (int keyHead = 0; keyHead < keyHeads; keyHead++) {
+      int source = keyHead * 2 * group;
+      int destination = keyHead * group;
+      for (int index = 0; index < group; index++) {
+        beta[destination + index] = fused[source + index];
+        alpha[destination + index] = fused[source + group + index];
+      }
+    }
+  }
+
   private void gatedDeltaNet(
       float[] output, float[] input, GatedDeltaNet weights, int layer, SessionState session) {
     int convDimension = config.gdnConvDim();
@@ -888,7 +1560,11 @@ public final class Qwen35ForwardPass {
     float[] alpha = workspace.alpha;
     project(mixed, input, weights.queryKeyValue(), session.scratch);
     project(outputGate, input, weights.outputGate(), session.scratch);
-    dualProject(beta, weights.beta(), alpha, weights.alpha(), input, session.scratch);
+    if (weights.betaAlpha() != null) {
+      projectFusedBetaAlpha(beta, alpha, weights.betaAlpha(), input, workspace, session.scratch);
+    } else {
+      dualProject(beta, weights.beta(), alpha, weights.alpha(), input, session.scratch);
+    }
 
     int kernel = config.gdnConvKernel();
     float[] history = session.convolutionHistory[layer];
@@ -1029,7 +1705,7 @@ public final class Qwen35ForwardPass {
       values = new float[config.numLayers()][];
       convolutionHistory = new float[config.numLayers()][];
       recurrentState = new float[config.numLayers()][];
-      scratch = new ProjectionScratch(config);
+      scratch = new ProjectionScratch(weights);
       gatedDeltaNetScratch = new GatedDeltaNetScratch(config);
       batchScratch = new BatchScratch(config, weights, capacity, prefillBatchSize);
       for (int layer = 0; layer < config.numLayers(); layer++) {
@@ -1044,6 +1720,26 @@ public final class Qwen35ForwardPass {
                   [Math.multiplyExact(
                       Math.multiplyExact(config.gdnValueHeads(), config.gdnHeadDim()),
                       config.gdnHeadDim())];
+        }
+      }
+    }
+
+    /**
+     * Returns this state to a fresh sequence without reallocating it. Only the recurrent and
+     * convolution state carry history that a new sequence must not see; a key or value entry at or
+     * beyond the new position is never read, because attention only attends to earlier positions.
+     * Reallocating instead costs a full session's worth of arrays on every reset, which is what
+     * made a repeated decision on one model slower than the decision itself.
+     */
+    private void clear() {
+      for (float[] history : convolutionHistory) {
+        if (history != null) {
+          Arrays.fill(history, 0.0f);
+        }
+      }
+      for (float[] state : recurrentState) {
+        if (state != null) {
+          Arrays.fill(state, 0.0f);
         }
       }
     }
@@ -1072,6 +1768,7 @@ public final class Qwen35ForwardPass {
     private final float[] gdnKey;
     private final float[] gdnValue;
     private final float[] recurrent;
+    private final float[] rowRecurrent;
     private final float[] normalizedQuery;
     private final float[] normalizedKey;
     private final float[] memory;
@@ -1101,6 +1798,7 @@ public final class Qwen35ForwardPass {
       gdnKey = batchBuffer(batchSize, config.gdnKeyDim());
       gdnValue = batchBuffer(batchSize, config.gdnValueDim());
       recurrent = batchBuffer(batchSize, config.gdnValueDim());
+      rowRecurrent = new float[config.gdnValueDim()];
       normalizedQuery = new float[config.gdnHeadDim()];
       normalizedKey = new float[config.gdnHeadDim()];
       memory = new float[config.gdnHeadDim()];
@@ -1117,8 +1815,7 @@ public final class Qwen35ForwardPass {
     private final float[] q4LaneScratch;
 
     private BatchProjectionScratch(Qwen35Config config, Qwen35Weights weights, int batchSize) {
-      int maximumInput =
-          Math.max(config.hiddenDim(), Math.max(config.attentionQueryDim(), config.gdnValueDim()));
+      int maximumInput = weights.widestProjectionInput();
       int maximumRows =
           Math.max(
               Math.max(2 * config.attentionQueryDim(), config.gdnConvDim()),
@@ -1141,6 +1838,7 @@ public final class Qwen35ForwardPass {
     private final float[] outputGate;
     private final float[] beta;
     private final float[] alpha;
+    private final float[] betaAlpha;
     private final float[] query;
     private final float[] key;
     private final float[] value;
@@ -1156,6 +1854,9 @@ public final class Qwen35ForwardPass {
       outputGate = new float[config.gdnValueDim()];
       beta = new float[config.gdnValueHeads()];
       alpha = new float[config.gdnValueHeads()];
+      // Holds one fused ssm_ba projection before it is split; empty when the model has separate
+      // beta and alpha tensors, which is every Qwen3.5 file.
+      betaAlpha = new float[2 * config.gdnValueHeads()];
       query = new float[config.gdnKeyDim()];
       key = new float[config.gdnKeyDim()];
       value = new float[config.gdnValueDim()];
@@ -1174,9 +1875,10 @@ public final class Qwen35ForwardPass {
     private final int[] quantizedActivationZeroPointCorrections;
     private final short[] quantizedActivationSums;
 
-    private ProjectionScratch(Qwen35Config config) {
-      int maximumProjectionInput =
-          Math.max(config.hiddenDim(), Math.max(config.attentionQueryDim(), config.gdnValueDim()));
+    private ProjectionScratch(Qwen35Weights weights) {
+      // Asked of the weights rather than assembled from the config's widths: see
+      // Qwen35Weights.widestProjectionInput for why an enumeration here was the wrong shape.
+      int maximumProjectionInput = weights.widestProjectionInput();
       quantizedActivation = new byte[maximumProjectionInput];
       quantizedActivationScales = new float[(maximumProjectionInput + 31) / 32];
       quantizedActivationZeroPointCorrections = new int[(maximumProjectionInput + 3) / 4];

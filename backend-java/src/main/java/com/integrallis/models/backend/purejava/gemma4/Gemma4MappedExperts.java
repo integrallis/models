@@ -31,8 +31,14 @@ final class Gemma4MappedExperts implements Gemma4Experts {
       MemorySegment mappedFile, int numLayers, int numExperts, ExpertResolver resolver) {
     Objects.requireNonNull(mappedFile, "mappedFile");
     Objects.requireNonNull(resolver, "resolver");
-    if (numLayers <= 0 || numExperts <= 0) {
-      throw new IllegalArgumentException("numLayers and numExperts must be positive");
+    if (numLayers <= 0) {
+      throw new IllegalArgumentException("numLayers must be positive");
+    }
+    // numExperts == 0 is a dense Gemma 4, which has no experts to map. The lease arrays are then
+    // empty and nothing ever acquires one, because the routed half of the layer is skipped; the
+    // resolver is never invoked, so a null expert tensor layout is fine here.
+    if (numExperts < 0) {
+      throw new IllegalArgumentException("numExperts must not be negative");
     }
     this.experts = new MappedLease[numLayers][numExperts];
     for (int layer = 0; layer < numLayers; layer++) {

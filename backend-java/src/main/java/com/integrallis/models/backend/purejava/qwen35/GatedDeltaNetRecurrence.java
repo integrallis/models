@@ -56,6 +56,8 @@ final class GatedDeltaNetRecurrence {
         logDecay,
         beta,
         initialState,
+        0,
+        false,
         tokenCount,
         headCount,
         headCount,
@@ -90,6 +92,8 @@ final class GatedDeltaNetRecurrence {
         logDecay,
         beta,
         initialState,
+        0,
+        false,
         tokenCount,
         keyHeadCount,
         valueHeadCount,
@@ -124,6 +128,8 @@ final class GatedDeltaNetRecurrence {
         logDecay,
         beta,
         mutableState,
+        0,
+        false,
         tokenCount,
         headCount,
         headCount,
@@ -159,6 +165,8 @@ final class GatedDeltaNetRecurrence {
         logDecay,
         beta,
         mutableState,
+        0,
+        false,
         tokenCount,
         keyHeadCount,
         valueHeadCount,
@@ -199,6 +207,8 @@ final class GatedDeltaNetRecurrence {
         logDecay,
         beta,
         mutableState,
+        0,
+        false,
         tokenCount,
         keyHeadCount,
         valueHeadCount,
@@ -239,7 +249,56 @@ final class GatedDeltaNetRecurrence {
         logDecay,
         beta,
         mutableState,
+        0,
+        false,
         tokenCount,
+        keyHeadCount,
+        valueHeadCount,
+        keyDimension,
+        valueDimension,
+        true,
+        Objects.requireNonNull(output, "output"),
+        Objects.requireNonNull(normalizedQuery, "normalizedQuery"),
+        Objects.requireNonNull(normalizedKey, "normalizedKey"),
+        Objects.requireNonNull(memory, "memory"),
+        Objects.requireNonNull(delta, "delta"),
+        true);
+  }
+
+  /**
+   * Advances one branch of a grouped decision, whose state is one slot of a shared array.
+   *
+   * <p>The group holds every branch's recurrent state for a layer in one branch-major array so the
+   * native kernel can advance them all in a single launch. This is the path taken when no such
+   * kernel is present, and it must address the same slot the kernel would.
+   */
+  static void forwardSlotInPlace(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] groupState,
+      int stateBase,
+      float[] output,
+      float[] normalizedQuery,
+      float[] normalizedKey,
+      float[] memory,
+      float[] delta,
+      int keyHeadCount,
+      int valueHeadCount,
+      int keyDimension,
+      int valueDimension) {
+    execute(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        Objects.requireNonNull(groupState, "groupState"),
+        stateBase,
+        true,
+        1,
         keyHeadCount,
         valueHeadCount,
         keyDimension,
@@ -260,6 +319,8 @@ final class GatedDeltaNetRecurrence {
       float[] logDecay,
       float[] beta,
       float[] initialState,
+      int stateBase,
+      boolean windowedState,
       int tokenCount,
       int keyHeadCount,
       int valueHeadCount,
@@ -298,7 +359,21 @@ final class GatedDeltaNetRecurrence {
     requireLength(logDecay, tokenValueHeads, "logDecay", capacitySizedBuffers);
     requireLength(beta, tokenValueHeads, "beta", capacitySizedBuffers);
     if (initialState != null) {
-      requireLength(initialState, stateSize, "initialState");
+      if (!windowedState) {
+        requireLength(initialState, stateSize, "initialState");
+      } else if (stateBase < 0 || initialState.length - stateSize < stateBase) {
+        throw new IllegalArgumentException(
+            "initialState of "
+                + initialState.length
+                + " cannot hold "
+                + stateSize
+                + " floats at "
+                + stateBase);
+      }
+    }
+    if (windowedState && !mutateState) {
+      throw new IllegalArgumentException(
+          "a state window is only meaningful when mutating in place");
     }
 
     float[] state =
@@ -323,7 +398,7 @@ final class GatedDeltaNetRecurrence {
         }
 
         float decay = (float) Math.exp(logDecay[tokenHead]);
-        int stateOffset = head * keyDimension * valueDimension;
+        int stateOffset = stateBase + head * keyDimension * valueDimension;
         for (int index = 0; index < keyDimension * valueDimension; index++) {
           state[stateOffset + index] *= decay;
         }

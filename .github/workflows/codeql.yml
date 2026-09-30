@@ -35,6 +35,16 @@ jobs:
           distribution: temurin
           java-version: 25
 
+      # assemble reaches :backend-cuda:compilePtx, which pins its own nightly and builds with
+      # -Zbuild-std. Same installation as ci.yml; without it the CodeQL build fails before CodeQL
+      # sees any Java.
+      - name: Install pinned Rust nightly for the PTX kernels
+        run: |
+          rustup toolchain install nightly-2026-09-17 --profile minimal --no-self-update
+          rustup component add --toolchain nightly-2026-09-17 \
+            clippy rustfmt rust-src llvm-bitcode-linker llvm-tools
+          rustup target add --toolchain nightly-2026-09-17 nvptx64-nvidia-cuda
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:

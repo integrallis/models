@@ -1,0 +1,12 @@
+trainable params: 20,185,088 || all params: 616,235,008 || trainable%: 3.2756
+trained option sets ['agnews', 'spam', 'sst5']  held out ['emotion']
+train examples 2364 (dropped 0)
+batches/epoch 29 optimizer steps 24 warmup 1
+  holdout BEFORE training: 0.5250 (n=200)
+`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`.
+  step 20/24 loss 0.1063 136s
+
+  validation (trained sets) 0.7000  {'agnews': {'accuracy': 0.9107142857142857, 'n': 56}, 'spam': {'accuracy': 0.922077922077922, 'n': 77}, 'sst5': {'accuracy': 0.26865671641791045, 'n': 67}}
+  holdout BEFORE 0.5250 -> AFTER 0.5700  (n=200)
+
+  adapter written to /root/adapter-emotion-holdout

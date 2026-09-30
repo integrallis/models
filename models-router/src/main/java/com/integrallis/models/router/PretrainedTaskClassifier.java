@@ -63,6 +63,10 @@ public final class PretrainedTaskClassifier implements TaskClassifier {
    * vectors themselves, only from their width, so supplying the wrong model of the same width
    * yields confident nonsense.
    *
+   * <p>For local-only or budgeted routing, wrap the result in {@link TaskClassifier#local} only
+   * when the supplied embedder also runs entirely locally. The index alone does not establish the
+   * embedding client's data boundary.
+   *
    * @param index the index to search
    * @param embedder embeds queries with the index's embedding model
    * @param minimumSimilarity cosine similarity below which a query is left unclassified, in [-1, 1]
@@ -84,7 +88,10 @@ public final class PretrainedTaskClassifier implements TaskClassifier {
     if (query == null || query.isBlank()) {
       return null;
     }
-    float[] embedding = embedder.embed(query);
+    // The index records the prefix its exemplars were embedded with; applying it here is what keeps
+    // the two sides comparable, rather than asking every caller to know the model's convention.
+    String input = index.queryPrefix().map(prefix -> prefix + query).orElse(query);
+    float[] embedding = embedder.embed(input);
     if (embedding == null || embedding.length == 0) {
       return null;
     }

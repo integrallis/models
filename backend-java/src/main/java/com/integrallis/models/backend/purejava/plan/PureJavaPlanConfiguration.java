@@ -36,17 +36,30 @@ public record PureJavaPlanConfiguration(
     boolean finalLayerKvOnlyPrefill,
     boolean batchedAttentionScores,
     boolean batchedAttentionValues,
+    boolean fusedGroupedAttention,
     boolean stagedQuantizedFfn,
     boolean stagedQuantizedLayer,
     boolean blockMajorQ8Activations,
     GgufQ8BlockMajorKernel q8BlockMajorKernel,
-    boolean parallelQ8FfnPreparation) {
+    boolean parallelQ8FfnPreparation,
+    int maxContextLength) {
 
   public static final String GROUPED_PROJECTIONS_PROPERTY = "models.purejava.groupedProjections";
   public static final String MIXED_K_PROJECTIONS_PROPERTY = "models.purejava.mixedKProjections";
   public static final String Q4_KERNEL_PROPERTY = "models.purejava.q4Kernel";
   public static final String Q6_BATCHED_KERNEL_PROPERTY = "models.purejava.q6BatchedKernel";
   public static final String PREFILL_BATCH_SIZE_PROPERTY = "models.purejava.prefillBatchSize";
+
+  /**
+   * The context a session is sized for. Absent, a session is sized for the model's own maximum,
+   * which for a long-context model is tens of gigabytes of key and value cache that a short-prompt
+   * workload never reaches. A ModelJar that knows its prompts are short recommends a bound here.
+   */
+  public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
+
+  /** Sentinel meaning "size the session for the model's own maximum". */
+  public static final int MODEL_MAXIMUM_CONTEXT = 0;
+
   public static final String FINAL_LAYER_PREFILL_PRUNING_PROPERTY =
       "models.purejava.finalLayerPrefillPruning";
   public static final String FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY =
@@ -55,6 +68,8 @@ public record PureJavaPlanConfiguration(
       "models.purejava.batchedAttentionScores";
   public static final String BATCHED_ATTENTION_VALUES_PROPERTY =
       "models.purejava.batchedAttentionValues";
+  public static final String FUSED_GROUPED_ATTENTION_PROPERTY =
+      "models.purejava.fusedGroupedAttention";
   public static final String STAGED_QUANTIZED_FFN_PROPERTY = "models.purejava.stagedQuantizedFfn";
   public static final String STAGED_QUANTIZED_LAYER_PROPERTY =
       "models.purejava.stagedQuantizedLayer";
@@ -72,10 +87,12 @@ public record PureJavaPlanConfiguration(
           Q4_KERNEL_PROPERTY,
           Q6_BATCHED_KERNEL_PROPERTY,
           PREFILL_BATCH_SIZE_PROPERTY,
+          MAX_CONTEXT_LENGTH_PROPERTY,
           FINAL_LAYER_PREFILL_PRUNING_PROPERTY,
           FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY,
           BATCHED_ATTENTION_SCORES_PROPERTY,
           BATCHED_ATTENTION_VALUES_PROPERTY,
+          FUSED_GROUPED_ATTENTION_PROPERTY,
           STAGED_QUANTIZED_FFN_PROPERTY,
           STAGED_QUANTIZED_LAYER_PROPERTY,
           BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY,
@@ -107,8 +124,10 @@ public record PureJavaPlanConfiguration(
         false,
         false,
         false,
+        false,
         GgufQ8BlockMajorKernel.SCATTERED,
-        false);
+        false,
+        MODEL_MAXIMUM_CONTEXT);
   }
 
   /** Reads deployment overrides without running a performance probe. */
@@ -150,6 +169,8 @@ public record PureJavaPlanConfiguration(
             configured(BATCHED_ATTENTION_SCORES_PROPERTY, deployment, recommendations)),
         batchedAttentionValues(
             configured(BATCHED_ATTENTION_VALUES_PROPERTY, deployment, recommendations)),
+        fusedGroupedAttention(
+            configured(FUSED_GROUPED_ATTENTION_PROPERTY, deployment, recommendations)),
         stagedQuantizedFfn(configured(STAGED_QUANTIZED_FFN_PROPERTY, deployment, recommendations)),
         stagedQuantizedLayer(
             configured(STAGED_QUANTIZED_LAYER_PROPERTY, deployment, recommendations)),
@@ -157,7 +178,8 @@ public record PureJavaPlanConfiguration(
             configured(BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, deployment, recommendations)),
         q8BlockMajorKernel(configured(Q8_BLOCK_MAJOR_KERNEL_PROPERTY, deployment, recommendations)),
         parallelQ8FfnPreparation(
-            configured(PARALLEL_Q8_FFN_PREPARATION_PROPERTY, deployment, recommendations)));
+            configured(PARALLEL_Q8_FFN_PREPARATION_PROPERTY, deployment, recommendations)),
+        maxContextLength(configured(MAX_CONTEXT_LENGTH_PROPERTY, deployment, recommendations)));
   }
 
   private static void validateSettings(Map<String, String> settings, String source) {
@@ -232,6 +254,29 @@ public record PureJavaPlanConfiguration(
     return configured != null && booleanProperty(BATCHED_ATTENTION_VALUES_PROPERTY, configured);
   }
 
+  /**
+   * Reads {@value #FUSED_GROUPED_ATTENTION_PROPERTY}.
+   *
+   * <p><b>Unset means disabled, and that default is deliberate.</b> The fused path reads each
+   * cached K and V row once per group rather than once per query head, which is a real decode win,
+   * and it agrees with the head-by-head loop to within 1.4e-6 relative on the attention output. But
+   * greedy decoding is a discrete argmax, so a perturbation that small still flips a token whenever
+   * the top two candidates sit inside it. Measured, not assumed: swapping only the attention kernel
+   * under Granite on the RAG workload changed <b>2 of 9</b> generated answers from identical
+   * prompts, at unchanged correctness -- a comma became a semicolon, and one clause was reworded.
+   *
+   * <p>Qualification records are claims about the bytes a model produced, and a published one
+   * cannot be retracted. So this stays off until a configuration is adopted as a new measurement
+   * epoch, with every pinned greedy oracle re-run and the tier band re-derived on it. Turning it on
+   * is a choice to leave that epoch, which is why it has to be asked for by name.
+   *
+   * @param configured the raw property value, or null when unset
+   * @return whether to fuse grouped-query attention
+   */
+  static boolean fusedGroupedAttention(String configured) {
+    return configured != null && booleanProperty(FUSED_GROUPED_ATTENTION_PROPERTY, configured);
+  }
+
   static boolean stagedQuantizedFfn(String configured) {
     return configured != null && booleanProperty(STAGED_QUANTIZED_FFN_PROPERTY, configured);
   }
@@ -272,6 +317,24 @@ public record PureJavaPlanConfiguration(
       return false;
     }
     throw new IllegalArgumentException(property + " must be true or false: " + configured);
+  }
+
+  static int maxContextLength(String configured) {
+    if (configured == null) {
+      return MODEL_MAXIMUM_CONTEXT;
+    }
+    int value;
+    try {
+      value = Integer.parseInt(configured.trim());
+    } catch (NumberFormatException failure) {
+      throw new IllegalArgumentException(
+          MAX_CONTEXT_LENGTH_PROPERTY + " must be a positive integer: " + configured, failure);
+    }
+    if (value <= 0) {
+      throw new IllegalArgumentException(
+          MAX_CONTEXT_LENGTH_PROPERTY + " must be a positive integer: " + configured);
+    }
+    return value;
   }
 
   static int prefillBatchSize(String configured) {

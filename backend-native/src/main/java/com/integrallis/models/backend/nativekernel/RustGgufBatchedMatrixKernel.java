@@ -182,6 +182,45 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
         valueDimension);
   }
 
+  @Override
+  public boolean supportsGroupedGatedDeltaNet() {
+    return gatedDeltaNet && library.supportsGroupedGatedDeltaNet();
+  }
+
+  @Override
+  public synchronized void groupedGatedDeltaNet(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] state,
+      float[] output,
+      int[] rowStateSlot,
+      int rowCount,
+      int stateSlotCount,
+      int keyHeadCount,
+      int valueHeadCount,
+      int keyDimension,
+      int valueDimension) {
+    requireOpen();
+    library.groupedGatedDeltaNetF32(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        state,
+        output,
+        rowStateSlot,
+        rowCount,
+        stateSlotCount,
+        keyHeadCount,
+        valueHeadCount,
+        keyDimension,
+        valueDimension);
+  }
+
   boolean nativeDecodeEnabled() {
     return nativeDecode;
   }

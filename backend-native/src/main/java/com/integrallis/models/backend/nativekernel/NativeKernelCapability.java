@@ -39,7 +39,9 @@ public enum NativeKernelCapability {
   ACTIVE_THREADS(1L << 19),
   GROUPED_ATTENTION_F32(1L << 20),
   /** The worker pool's poll budget before parking is settable per context. */
-  POLL_BUDGET(1L << 21);
+  POLL_BUDGET(1L << 21),
+  /** Several sequences advance one token each in one launch, against one recurrent state apiece. */
+  GROUPED_GATED_DELTA_NET_F32(1L << 22);
 
   private final long mask;
 

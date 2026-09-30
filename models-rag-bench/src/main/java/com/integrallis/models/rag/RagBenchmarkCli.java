@@ -157,7 +157,17 @@ public final class RagBenchmarkCli {
             nonNegativeLong(values, "seed", 42),
             positiveFloat(values, "repetition-penalty", 1),
             stopSequences);
-    int maxTokens = positiveInteger(values, "max-tokens", 64);
+    // 256 rather than 64. At 64 the campaign of 2026-09-29 truncated most of its attempts: gpt-oss
+    // was cut off mid-word on a correct answer, before it could emit the citation the grounding
+    // policy
+    // screens for, and a thinking model spent the whole budget on its reasoning trace. A grounded
+    // answer here is one short sentence plus a bracketed source id, and a model that reasons first
+    // needs room for both -- so the old default could not express a passing answer for a whole
+    // class of
+    // models. Chosen as a floor that lets those finish, not as a tuned optimum; every report
+    // records
+    // the value it ran with, so older records stay interpretable.
+    int maxTokens = positiveInteger(values, "max-tokens", 256);
     int warmups = nonNegativeInteger(values, "warmups", 1);
     int iterations = positiveInteger(values, "iterations", 3);
     List<String> caseIds =
@@ -238,7 +248,8 @@ public final class RagBenchmarkCli {
     }
 
     int totalAttempts = cases.size() * configuration.iterations();
-    RagBenchmarkSummary summary = RagStatistics.summarize(runs, totalAttempts, casesById);
+    RagBenchmarkSummary summary =
+        RagStatistics.summarize(runs, totalAttempts, casesById, configuration.maxTokens());
     Path artifact = configuration.artifact();
     Path artifactIdentity = artifact == null ? null : artifactIdentity(artifact);
     return new RagBenchmarkReport(
@@ -249,8 +260,8 @@ public final class RagBenchmarkCli {
         configuration.backendVersion(),
         configuration.modelId(),
         configuration.model(),
-        artifactIdentity == null ? null : sha256(artifactIdentity),
-        artifactIdentity == null ? 0 : Files.size(artifactIdentity),
+        artifactIdentity == null ? null : artifactSha256(artifactIdentity),
+        artifactIdentity == null ? 0 : artifactSizeBytes(artifactIdentity),
         new RagBenchmarkSettings(
             corpus.fingerprint(),
             configuration.workload().id(),
@@ -294,8 +305,17 @@ public final class RagBenchmarkCli {
       if (Files.isRegularFile(primaryWeights)) {
         return primaryWeights;
       }
+      // Sharded bundles carry no single model.safetensors -- gpt-oss-20b ships three shards and an
+      // index -- and SafetensorsBundle already loads either shape. Rejecting them here was the only
+      // thing standing between a sharded Hugging Face model and a qualification run.
+      Path index = artifact.resolve("model.safetensors.index.json");
+      if (Files.isRegularFile(index)) {
+        return index;
+      }
       throw new IllegalArgumentException(
-          "Hugging Face model directory has no model.safetensors: " + artifact);
+          "Hugging Face model directory has neither model.safetensors nor"
+              + " model.safetensors.index.json: "
+              + artifact);
     }
     throw new IllegalArgumentException("artifact does not exist: " + artifact);
   }
@@ -382,8 +402,16 @@ public final class RagBenchmarkCli {
   private static void printSummary(RagBenchmarkReport report, Path output) {
     RagBenchmarkSummary summary = report.summary();
     System.out.printf(
+        // model= and fallback= are printed next to correct= on purpose. correct= is the pipeline's
+        // score: where a generated answer fails citation screening the grounding policy substitutes
+        // an extractive one, so correct= can read 100% for a model that contributed nothing.
+        // Printing
+        // the three together is what stops the line being read as a statement about the model.
         "%s/%s/%s: tier=%s success=%d/%d p95-retrieval=%.1fms p95-ttft=%.1fms "
-            + "p50-decode=%.2f tok/s p95-e2e=%.1fms correct=%.1f%%%nreport: %s%n",
+            + "p50-decode=%.2f tok/s p95-e2e=%.1fms correct=%.1f%% "
+            + "model-answered=%.1f%% of-those-correct=%.1f%% extractive-fallback=%.1f%% "
+            + "truncated=%.1f%%"
+            + "%nreport: %s%n",
         report.framework(),
         report.backend(),
         report.modelId(),
@@ -395,6 +423,10 @@ public final class RagBenchmarkCli {
         summary.p50DecodeTokensPerSecond(),
         summary.endToEndMillis().p95(),
         summary.correctAnswerRate() * 100,
+        summary.modelAnswerRate() * 100,
+        summary.modelAnswerCorrectRate() * 100,
+        summary.extractiveFallbackRate() * 100,
+        summary.truncatedAnswerRate() * 100,
         output.toAbsolutePath());
   }
 
@@ -539,6 +571,86 @@ public final class RagBenchmarkCli {
       case "deepseek" -> URI.create("https://api.deepseek.com");
       default -> null;
     };
+  }
+
+  /**
+   * Artifact digest, covering the weights even when they are sharded.
+   *
+   * <p>For a single file this is that file's SHA-256. For a sharded bundle the identity path is the
+   * index, and hashing the index alone would be poor provenance: it holds a tensor-name to shard
+   * map and no weight content, so two different models with the same layout could produce the same
+   * digest in a qualification record. The shards are hashed instead, in the index's own order so
+   * the result is stable.
+   */
+  private static String artifactSha256(Path identity) throws IOException {
+    List<Path> shards = shardsOf(identity);
+    if (shards.isEmpty()) {
+      return sha256(identity);
+    }
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      for (Path shard : shards) {
+        try (InputStream input = Files.newInputStream(shard);
+            DigestInputStream hashing = new DigestInputStream(input, digest)) {
+          hashing.transferTo(OutputStreamDiscarder.INSTANCE);
+        }
+      }
+      return HexFormat.of().formatHex(digest.digest());
+    } catch (NoSuchAlgorithmException impossible) {
+      throw new IllegalStateException("SHA-256 is unavailable", impossible);
+    }
+  }
+
+  /** Artifact size, summed across shards for a sharded bundle. */
+  private static long artifactSizeBytes(Path identity) throws IOException {
+    List<Path> shards = shardsOf(identity);
+    if (shards.isEmpty()) {
+      return Files.size(identity);
+    }
+    long total = 0;
+    for (Path shard : shards) {
+      total = Math.addExact(total, Files.size(shard));
+    }
+    return total;
+  }
+
+  /**
+   * The shard files an index refers to, in index order, or empty when the path is not an index.
+   *
+   * <p>Deliberately deduplicated while preserving order: an index maps every tensor to a shard, so
+   * the same shard appears once per tensor it holds.
+   */
+  private static List<Path> shardsOf(Path identity) throws IOException {
+    // getFileName() is null for a root path such as "/", which is not an index but is a legal Path.
+    Path fileName = identity.getFileName();
+    if (fileName == null || !fileName.toString().equals("model.safetensors.index.json")) {
+      return List.of();
+    }
+    // getParent() is null for a bare filename, which happens when the index is given as a relative
+    // path in the working directory. Resolving against null would be an NPE on a legitimate input.
+    Path parent = identity.getParent();
+    Path directory = parent == null ? Path.of("") : parent;
+    List<String> names =
+        new java.util.ArrayList<>(
+            new java.util.LinkedHashSet<>(
+                java.util.regex.Pattern.compile("\"([^\"]*\\.safetensors)\"")
+                    .matcher(Files.readString(identity))
+                    .results()
+                    .map(match -> match.group(1))
+                    .toList()));
+    List<Path> shards = new java.util.ArrayList<>();
+    for (String name : names) {
+      Path shard = directory.resolve(name);
+      if (!Files.isRegularFile(shard)) {
+        throw new IllegalArgumentException(
+            "safetensors index names a shard that is missing: " + shard);
+      }
+      shards.add(shard);
+    }
+    if (shards.isEmpty()) {
+      throw new IllegalArgumentException("safetensors index names no shards: " + identity);
+    }
+    return shards;
   }
 
   private static String sha256(Path path) throws IOException {

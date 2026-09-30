@@ -35,6 +35,10 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+      - name: Warm the Gradle distribution
+        uses: ./models/.github/actions/warm-gradle
+        with:
+          working-directory: models
 
       - name: Stage published production sources
         run: |

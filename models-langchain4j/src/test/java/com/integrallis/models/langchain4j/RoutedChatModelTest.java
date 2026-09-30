@@ -65,7 +65,7 @@ class RoutedChatModelTest {
   private static ChatModel model(java.util.function.Function<ChatRequest, ChatResponse> call) {
     return new ChatModel() {
       @Override
-      public ChatResponse doChat(ChatRequest request) {
+      public ChatResponse chat(ChatRequest request) {
         return call.apply(request);
       }
     };

@@ -34,7 +34,32 @@ public enum GgufTensorType {
   Q5_K(13, 256, 176),
   Q6_K(14, 256, 210),
   Q8_K(15, 256, 292),
-  BF16(30, 1, 2);
+  BF16(30, 1, 2),
+
+  /**
+   * Upstream ternary, 1.6875 bpw: 48 bytes of base-3 trits (5 per byte), 4 bytes of 4-per-byte
+   * trits, one fp16 scale, per 256 weights.
+   */
+  MXFP4(39, 32, 17),
+  TQ1_0(34, 256, 54),
+
+  /** Upstream ternary, 2.0625 bpw: 64 bytes at 2 bits per element plus one fp16 scale, per 256. */
+  TQ2_0(35, 256, 66),
+
+  /**
+   * PrismML-private 2-bit at group 128, 2.125 bpw. Not ternary despite living beside the ternary
+   * types: the four codes map to -1, 0, +1 and <b>+2</b>. The fp16 scale is the <b>first</b> field,
+   * where upstream's equivalent puts it last.
+   */
+  PQ2_0(142, 128, 34),
+
+  /**
+   * PrismML-private ternary at group 128, 1.75 bpw. The same base-3 trit packing as {@link #TQ1_0}
+   * with one fp16 scale per 128 weights instead of per 256, which is what makes it lossless for
+   * checkpoints already ternary at group 128 -- a 256-wide scale has to discard one of the two
+   * group scales it straddles.
+   */
+  PTQ1_0(143, 128, 28);
 
   private static final Map<Integer, GgufTensorType> BY_ID = new HashMap<>();
 

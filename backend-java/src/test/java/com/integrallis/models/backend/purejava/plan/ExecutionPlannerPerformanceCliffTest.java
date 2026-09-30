@@ -220,8 +220,10 @@ class ExecutionPlannerPerformanceCliffTest {
         false,
         false,
         false,
+        false,
         GgufQ8BlockMajorKernel.SCATTERED,
-        false);
+        false,
+        PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
   }
 
   private static ModelTopology uniformTopology(GgufTensorType type) {

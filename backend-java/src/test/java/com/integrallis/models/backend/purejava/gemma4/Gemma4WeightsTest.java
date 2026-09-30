@@ -88,7 +88,21 @@ class Gemma4WeightsTest {
     tensors.set(
         queryIndex,
         new GgufTensorInfo(
-            query.name(), query.nDimensions(), query.shape(), GgufTensorType.F16, query.offset()));
+            query.name(),
+            query.nDimensions(),
+            query.shape(),
+            // Q2_K: a type ggufMatmul has no case for, so it genuinely cannot be executed. This
+            // was F16 until Gemma 4 E4B turned up carrying per_layer_model_proj as F16, which made
+            // F16 a supported type and left this test asserting that a type it now runs is refused.
+            //
+            // Q2_K trips the block-size check before the accepted-type check, because this
+            // fixture's
+            // 4x4 tensors are 16 elements and every quantized block is at least 32. That is fine --
+            // both are the loader refusing a tensor it cannot execute -- but it does mean the
+            // accepted-type set itself is not what this test pins; the F16 and BF16 fixtures in
+            // Gemma4ForwardPassTest cover the types that ARE accepted.
+            GgufTensorType.Q2_K,
+            query.offset()));
     GgufFile unsupported =
         new GgufFile(
             source.header(),
@@ -99,8 +113,7 @@ class Gemma4WeightsTest {
 
     assertThatThrownBy(() -> Gemma4Weights.fromGgufFile(unsupported, config()))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("blk.0.attn_q.weight")
-        .hasMessageContaining("F16");
+        .hasMessageContaining("Q2_K");
   }
 
   private static Gemma4Config config() {

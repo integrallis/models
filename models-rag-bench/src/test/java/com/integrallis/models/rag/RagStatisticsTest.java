@@ -50,7 +50,7 @@ class RagStatisticsTest {
 
     RagBenchmarkSummary summary =
         RagStatistics.summarize(
-            List.of(knownRun, unknownRun), 3, Map.of("known", answerable, "unknown", unknown));
+            List.of(knownRun, unknownRun), 3, Map.of("known", answerable, "unknown", unknown), 0);
 
     assertThat(summary.totalAttempts()).isEqualTo(3);
     assertThat(summary.successfulAttempts()).isEqualTo(2);
@@ -68,6 +68,141 @@ class RagStatisticsTest {
     assertThat(summary.projectedApiCostPer1kRequestsUsd()).isEqualTo(1.5);
     assertThat(summary.abstentionAccuracy()).isEqualTo(1);
     assertThat(summary.policyMetrics().successfulCases()).isEqualTo(2);
+  }
+
+  /**
+   * A model that contributes nothing still reports a perfect {@code correctAnswerRate}.
+   *
+   * <p>This is the 2026-09-29 misreading as a test. Fourteen models were reported as scoring 1.000
+   * across every quality metric; 69% of all 378 attempts had actually been answered by {@code
+   * EXTRACTIVE_FALLBACK}, six models had a raw correct rate of zero, and only five passed the
+   * qualification gate. Nothing in the summary contradicted the claim, because the numbers that
+   * would have were only in {@code runs[]}.
+   *
+   * <p>So the assertion that matters is the pairing: {@code correctAnswerRate} of 1.000 sitting
+   * beside a {@code modelAnswerRate} of 1/9 and an {@code extractiveFallbackRate} of 8/9. Any
+   * consumer reading the summary now sees both, and the last assertion states the consequence --
+   * this is below the qualification gate's model-answer floor, so a report like this is not a
+   * qualification.
+   */
+  @Test
+  void aSummaryShowsWhenTheHarnessAnsweredRatherThanTheModel() {
+    RagCase answerable = new RagCase("known", "question", List.of("source"), List.of("fact"), true);
+    RagDocument source = new RagDocument("source", "Source", "fact");
+    RetrievedDocument hit = new RetrievedDocument(source, 1, 1);
+    RagEvaluation correct = new RagEvaluation(1, 1, 1, 1, 1, false, true);
+    RagEvaluation wrong = new RagEvaluation(1, 1, 0, 0, 0, false, false);
+
+    List<RagRun> runs = new java.util.ArrayList<>();
+    // Eight attempts where the model's own text failed screening and the harness substituted an
+    // extractive answer: raw wrong, grounded right.
+    for (int i = 0; i < 8; i++) {
+      runs.add(substituted(answerable, hit, GroundingDecision.EXTRACTIVE_FALLBACK, wrong, correct));
+    }
+    // One attempt the model actually answered, correctly.
+    runs.add(substituted(answerable, hit, GroundingDecision.MODEL_ANSWER, correct, correct));
+
+    RagBenchmarkSummary summary = RagStatistics.summarize(runs, 9, Map.of("known", answerable), 20);
+
+    assertThat(summary.correctAnswerRate())
+        .describedAs("the pipeline answered every attempt correctly")
+        .isEqualTo(1.0);
+    assertThat(summary.rawCorrectAnswerRate())
+        .describedAs("the model's own text was right once in nine")
+        .isEqualTo(1.0 / 9.0);
+    assertThat(summary.modelAnswerRate()).isEqualTo(1.0 / 9.0);
+    assertThat(summary.modelAnswerCorrectRate())
+        .describedAs("of the answers the model did contribute, all were correct")
+        .isEqualTo(1.0);
+    assertThat(summary.extractiveFallbackRate()).isEqualTo(8.0 / 9.0);
+    // Each fixture run reports 11 output tokens against a 20-token cap, so nothing was cut off.
+    assertThat(summary.truncatedAnswerRate())
+        .describedAs("no run hit the output cap")
+        .isEqualTo(0.0);
+
+    assertThat(summary.modelAnswerRate())
+        .describedAs(
+            "below RagProductionQualificationPolicy's model-answer floor, so a report like this"
+                + " is not a qualification however good correctAnswerRate looks")
+        .isLessThan(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_RATE);
+  }
+
+  /**
+   * An answer cut off at the output cap is reported as truncated, not merely as a failure.
+   *
+   * <p>The other way a capable model reports badly. At a 64-token cap on 2026-09-29, a thinking
+   * model spent the whole budget on its reasoning trace and gpt-oss was cut off mid-word --
+   * *"...Windshield repair has a 75 dollar deductible"* -- while answering correctly. Neither could
+   * reach the citation the grounding policy screens for, so both were replaced by an extractive
+   * answer and scored exactly like a model with nothing to say.
+   */
+  @Test
+  void aSummaryShowsWhenAnswersWereCutOffAtTheOutputCap() {
+    RagCase answerable = new RagCase("known", "question", List.of("source"), List.of("fact"), true);
+    RagDocument source = new RagDocument("source", "Source", "fact");
+    RetrievedDocument hit = new RetrievedDocument(source, 1, 1);
+    RagEvaluation wrong = new RagEvaluation(1, 1, 0, 0, 0, false, false);
+    RagEvaluation correct = new RagEvaluation(1, 1, 1, 1, 1, false, true);
+
+    // Three attempts that ran to the 64-token cap, one that stopped well short of it.
+    List<RagRun> runs = new java.util.ArrayList<>();
+    for (int i = 0; i < 3; i++) {
+      runs.add(capped(answerable, hit, 64, wrong, correct));
+    }
+    runs.add(capped(answerable, hit, 12, correct, correct));
+
+    RagBenchmarkSummary summary = RagStatistics.summarize(runs, 4, Map.of("known", answerable), 64);
+
+    assertThat(summary.truncatedAnswerRate()).isEqualTo(0.75);
+    assertThat(summary.correctAnswerRate())
+        .describedAs("the pipeline still reports every answer correct")
+        .isEqualTo(1.0);
+  }
+
+  private static RagRun capped(
+      RagCase testCase,
+      RetrievedDocument hit,
+      int outputTokens,
+      RagEvaluation rawEvaluation,
+      RagEvaluation evaluation) {
+    return new RagRun(
+        "plain-java",
+        "test",
+        "model",
+        testCase.id(),
+        List.of(hit),
+        "hash",
+        10,
+        5,
+        1_250,
+        new GenerationResult(
+            "cut off mid-sent", 100, 20, 10, outputTokens, 200, 1_200, 500, 20, 1_000, 30, 0.001),
+        new GroundedAnswer(
+            "cut off mid-sent", "fact [source]", GroundingDecision.EXTRACTIVE_FALLBACK),
+        rawEvaluation,
+        evaluation);
+  }
+
+  private static RagRun substituted(
+      RagCase testCase,
+      RetrievedDocument hit,
+      GroundingDecision decision,
+      RagEvaluation rawEvaluation,
+      RagEvaluation evaluation) {
+    return new RagRun(
+        "plain-java",
+        "test",
+        "model",
+        testCase.id(),
+        List.of(hit),
+        "hash",
+        10,
+        5,
+        1_250,
+        new GenerationResult("###", 100, 20, 10, 11, 200, 1_200, 500, 20, 1_000, 30, 0.001),
+        new GroundedAnswer("###", "fact [source]", decision),
+        rawEvaluation,
+        evaluation);
   }
 
   private static RagRun run(

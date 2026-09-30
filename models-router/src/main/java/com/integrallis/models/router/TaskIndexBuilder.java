@@ -92,7 +92,48 @@ public final class TaskIndexBuilder {
       String modelId,
       Path directory,
       QuantizerKind quantizer) {
+    return build(exemplars, embedder, modelId, directory, quantizer, null, null);
+  }
+
+  /**
+   * Embeds a corpus's training split and writes it as a persistent collection, prefixing each
+   * exemplar with {@code documentPrefix}.
+   *
+   * <p>Instruction-tuned embedders expect a task prefix, and the two sides of a comparison must be
+   * prefixed the way the model was trained or the vectors land in different regions of the space.
+   * Both prefixes are recorded in the manifest so the classifier applies the query side itself
+   * rather than depending on every caller to remember: an index that was built with a prefix and
+   * queried without one is not an error anyone observes, just a quieter one.
+   *
+   * @param exemplars the labelled corpus
+   * @param embedder embeds prompts; must be the model the classifier will later query with
+   * @param modelId identifier of that model, recorded in the manifest
+   * @param directory an empty or absent directory to write the index into
+   * @param quantizer how stored vectors are compressed
+   * @param documentPrefix prefix applied to every exemplar before embedding, or null for none
+   * @param queryPrefix prefix the classifier must apply to queries, or null for none
+   * @return how many prompts were indexed
+   * @throws IllegalArgumentException if the corpus is empty, the embedder returns nothing, or only
+   *     one of the two prefixes is supplied
+   */
+  public static int build(
+      TaskExemplars exemplars,
+      TaskEmbedder embedder,
+      String modelId,
+      Path directory,
+      QuantizerKind quantizer,
+      String documentPrefix,
+      String queryPrefix) {
     Objects.requireNonNull(exemplars, "exemplars");
+    // One side alone is worse than neither: it embeds exemplars and queries into different regions.
+    if ((documentPrefix == null) != (queryPrefix == null)) {
+      throw new IllegalArgumentException(
+          "documentPrefix and queryPrefix must be supplied together (got documentPrefix="
+              + documentPrefix
+              + ", queryPrefix="
+              + queryPrefix
+              + ")");
+    }
     Objects.requireNonNull(quantizer, "quantizer");
     Objects.requireNonNull(embedder, "embedder");
     Objects.requireNonNull(modelId, "modelId");
@@ -106,7 +147,8 @@ public final class TaskIndexBuilder {
 
     float[][] vectors = new float[prompts.size()][];
     for (int index = 0; index < prompts.size(); index++) {
-      float[] vector = embedder.embed(prompts.get(index).prompt());
+      String text = prompts.get(index).prompt();
+      float[] vector = embedder.embed(documentPrefix == null ? text : documentPrefix + text);
       if (vector == null || vector.length == 0) {
         throw new IllegalArgumentException("embedder returned no vector for prompt " + index);
       }
@@ -163,7 +205,15 @@ public final class TaskIndexBuilder {
       collection.commit();
     }
 
-    writeManifest(directory, modelId, dimension, prompts.size(), exemplars, quantizer);
+    writeManifest(
+        directory,
+        modelId,
+        dimension,
+        prompts.size(),
+        exemplars,
+        quantizer,
+        documentPrefix,
+        queryPrefix);
     return prompts.size();
   }
 
@@ -199,13 +249,38 @@ public final class TaskIndexBuilder {
     return HexFormat.of().formatHex(digest.digest());
   }
 
+  /**
+   * Escapes a prefix for {@code java.util.Properties} text.
+   *
+   * <p>The prefixes carry {@code :} and {@code =} (EmbeddingGemma's {@code task: classification |
+   * query: }) and end in a significant trailing space, all three of which Properties would
+   * otherwise eat on read.
+   *
+   * @param value the raw prefix
+   * @return the escaped form
+   */
+  private static String escape(String value) {
+    StringBuilder out = new StringBuilder(value.length() + 8);
+    for (int index = 0; index < value.length(); index++) {
+      char character = value.charAt(index);
+      switch (character) {
+        case ':', '=', '#', '!', '\\' -> out.append('\\').append(character);
+        case ' ' -> out.append("\\ ");
+        default -> out.append(character);
+      }
+    }
+    return out.toString();
+  }
+
   private static void writeManifest(
       Path directory,
       String modelId,
       int dimension,
       int count,
       TaskExemplars exemplars,
-      QuantizerKind quantizer) {
+      QuantizerKind quantizer,
+      String documentPrefix,
+      String queryPrefix) {
     String text =
         "# Written by TaskIndexBuilder. Describes the index in this directory.\n"
             + "embeddingModelId="
@@ -220,7 +295,15 @@ public final class TaskIndexBuilder {
             + quantizer.name()
             + "\ntasks="
             + String.join(",", exemplars.taskNames())
-            + "\n";
+            + "\n"
+            // Omitted entirely when absent, so an index built without prefixes reads back as one.
+            + (documentPrefix == null
+                ? ""
+                : "documentPrefix="
+                    + escape(documentPrefix)
+                    + "\nqueryPrefix="
+                    + escape(queryPrefix)
+                    + "\n");
     try {
       Files.writeString(directory.resolve(MANIFEST), text, StandardCharsets.UTF_8);
     } catch (IOException e) {

@@ -129,7 +129,7 @@ class RoutedStreamingChatModelTest {
       BiConsumer<ChatRequest, StreamingChatResponseHandler> call) {
     return new StreamingChatModel() {
       @Override
-      public void doChat(ChatRequest request, StreamingChatResponseHandler handler) {
+      public void chat(ChatRequest request, StreamingChatResponseHandler handler) {
         call.accept(request, handler);
       }
     };

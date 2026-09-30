@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.router;
 
+import java.util.Objects;
 import java.util.OptionalDouble;
 
 /**
@@ -94,6 +95,12 @@ public record RoutingPolicy(
     requireWeight(localityWeight, "localityWeight");
     if (costWeight + qualityWeight + latencyWeight + availabilityWeight + localityWeight <= 0) {
       throw new IllegalArgumentException("at least one weight must be positive");
+    }
+    requireLimit(minimumQuality, "minimumQuality");
+    requireLimit(maximumCostPerMillionTokens, "maximumCostPerMillionTokens");
+    requireLimit(maximumTimeToFirstTokenMillis, "maximumTimeToFirstTokenMillis");
+    if (minimumQuality.isPresent() && minimumQuality.getAsDouble() > 1) {
+      throw new IllegalArgumentException("minimumQuality must be within [0, 1]");
     }
   }
 
@@ -211,6 +218,13 @@ public record RoutingPolicy(
 
   private static void requireWeight(double value, String field) {
     if (!Double.isFinite(value) || value < 0) {
+      throw new IllegalArgumentException(field + " must be finite and non-negative");
+    }
+  }
+
+  private static void requireLimit(OptionalDouble value, String field) {
+    Objects.requireNonNull(value, field);
+    if (value.isPresent() && (!Double.isFinite(value.getAsDouble()) || value.getAsDouble() < 0)) {
       throw new IllegalArgumentException(field + " must be finite and non-negative");
     }
   }

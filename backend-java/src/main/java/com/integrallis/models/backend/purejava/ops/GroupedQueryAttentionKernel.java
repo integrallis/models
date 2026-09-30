@@ -42,6 +42,61 @@ public final class GroupedQueryAttentionKernel {
   private static final VectorShuffle<Float> ROTATE_2 = rotation(2);
   private static final VectorShuffle<Float> ROTATE_1 = rotation(1);
 
+  /**
+   * The score and softmax-sum reductions are pinned to a fixed 8-lane shape, on every host.
+   *
+   * <p>Why: their result depends on how many partial sums the reduction keeps, and {@link #SPECIES}
+   * is host-dependent — 8 lanes at 256 bits, 4 on 128-bit ARM, 16 if {@code vectors.maxBits} is
+   * raised. So the same model produced <em>different attention scores on different machines</em>,
+   * and nothing declared that. This was found while making a CUDA kernel bit-exact: the kernel
+   * could not match "the CPU" because there was no single CPU answer to match.
+   *
+   * <p>Pinning costs nothing on a 256-bit host, which is the default ceiling ({@code
+   * PanamaConstants.DEFAULT_MAX_BITS}) and the common case. On a 128-bit host the 8-lane species is
+   * emulated, and on a host with {@code maxBits} raised to 512 this no longer widens — both are
+   * deliberate: a reproducible number is worth more here than the last few percent, because this
+   * feeds token selection, where a last-bit difference changes the output text.
+   */
+  static final VectorSpecies<Float> REDUCTION_SPECIES =
+      VectorSpecies.of(float.class, VectorShape.S_256_BIT);
+
+  private static final VectorShuffle<Float> REDUCE_ROTATE_4 = reductionRotation(4);
+  private static final VectorShuffle<Float> REDUCE_ROTATE_2 = reductionRotation(2);
+  private static final VectorShuffle<Float> REDUCE_ROTATE_1 = reductionRotation(1);
+
+  private static VectorShuffle<Float> reductionRotation(int distance) {
+    int mask = REDUCTION_SPECIES.length() - 1;
+    return VectorShuffle.fromOp(REDUCTION_SPECIES, lane -> (lane + distance) & mask);
+  }
+
+  private static FloatVector reductionLoad(float[] array, int offset) {
+    return FloatVector.fromArray(REDUCTION_SPECIES, array, offset);
+  }
+
+  /**
+   * Always a true fused multiply-add, never {@code a * b + c}.
+   *
+   * <p>{@code fma(FloatVector...)} and {@code MathUtil.fma} both fall back to a separate multiply
+   * and add when the JVM reports no fast FMA, which changes the result. {@link Math#fma} and {@code
+   * FloatVector.fma} are exact on every host regardless of hardware support — the fast-path flags
+   * are a speed choice, not a numeric one — so this path always fuses and is therefore portable.
+   */
+  private static FloatVector reductionFma(FloatVector a, FloatVector b, FloatVector c) {
+    return a.fma(b, c);
+  }
+
+  /**
+   * The pinned 8-lane fold: {@code ((a0+a4)+(a2+a6)) + ((a1+a5)+(a3+a7))}.
+   *
+   * <p>Written for exactly 8 lanes rather than branching on width, because the branch was the bug.
+   */
+  private static float reduceAddPinnedTree(FloatVector vector) {
+    vector = vector.add(vector.rearrange(REDUCE_ROTATE_4));
+    vector = vector.add(vector.rearrange(REDUCE_ROTATE_2));
+    vector = vector.add(vector.rearrange(REDUCE_ROTATE_1));
+    return vector.lane(0);
+  }
+
   private GroupedQueryAttentionKernel() {}
 
   private static VectorSpecies<Float> species() {
@@ -83,8 +138,8 @@ public final class GroupedQueryAttentionKernel {
       Objects.checkFromIndexSize(
           scoresOffset, (groupSize - 1) * scoresHeadStride + rows, scores.length);
     }
-    int lanes = SPECIES.length();
-    int vectorLimit = SPECIES.loopBound(columns);
+    int lanes = REDUCTION_SPECIES.length();
+    int vectorLimit = REDUCTION_SPECIES.loopBound(columns);
     int blockedRows = rows & ~3;
     // Four rows per head at a time: four independent FMA chains hide the FMA latency that a single
     // dependent chain over 64 columns exposes, and each query vector load serves four rows.
@@ -95,28 +150,28 @@ public final class GroupedQueryAttentionKernel {
       int key3 = key2 + keyRowStride;
       for (int head = 0; head < groupSize; head++) {
         int queryBase = queryOffset + head * queryHeadStride;
-        FloatVector acc0 = FloatVector.zero(SPECIES);
-        FloatVector acc1 = FloatVector.zero(SPECIES);
-        FloatVector acc2 = FloatVector.zero(SPECIES);
-        FloatVector acc3 = FloatVector.zero(SPECIES);
+        FloatVector acc0 = FloatVector.zero(REDUCTION_SPECIES);
+        FloatVector acc1 = FloatVector.zero(REDUCTION_SPECIES);
+        FloatVector acc2 = FloatVector.zero(REDUCTION_SPECIES);
+        FloatVector acc3 = FloatVector.zero(REDUCTION_SPECIES);
         int column = 0;
         for (; column < vectorLimit; column += lanes) {
-          FloatVector q = load(query, queryBase + column);
-          acc0 = fma(q, load(keys, key0 + column), acc0);
-          acc1 = fma(q, load(keys, key1 + column), acc1);
-          acc2 = fma(q, load(keys, key2 + column), acc2);
-          acc3 = fma(q, load(keys, key3 + column), acc3);
+          FloatVector q = reductionLoad(query, queryBase + column);
+          acc0 = reductionFma(q, reductionLoad(keys, key0 + column), acc0);
+          acc1 = reductionFma(q, reductionLoad(keys, key1 + column), acc1);
+          acc2 = reductionFma(q, reductionLoad(keys, key2 + column), acc2);
+          acc3 = reductionFma(q, reductionLoad(keys, key3 + column), acc3);
         }
-        float sum0 = reduceAddFixedTree(acc0);
-        float sum1 = reduceAddFixedTree(acc1);
-        float sum2 = reduceAddFixedTree(acc2);
-        float sum3 = reduceAddFixedTree(acc3);
+        float sum0 = reduceAddPinnedTree(acc0);
+        float sum1 = reduceAddPinnedTree(acc1);
+        float sum2 = reduceAddPinnedTree(acc2);
+        float sum3 = reduceAddPinnedTree(acc3);
         for (; column < columns; column++) {
           float q = query[queryBase + column];
-          sum0 = MathUtil.fma(q, keys[key0 + column], sum0);
-          sum1 = MathUtil.fma(q, keys[key1 + column], sum1);
-          sum2 = MathUtil.fma(q, keys[key2 + column], sum2);
-          sum3 = MathUtil.fma(q, keys[key3 + column], sum3);
+          sum0 = Math.fma(q, keys[key0 + column], sum0);
+          sum1 = Math.fma(q, keys[key1 + column], sum1);
+          sum2 = Math.fma(q, keys[key2 + column], sum2);
+          sum3 = Math.fma(q, keys[key3 + column], sum3);
         }
         int scoreBase = scoresOffset + head * scoresHeadStride + row;
         scores[scoreBase] = sum0 * scale;
@@ -129,14 +184,18 @@ public final class GroupedQueryAttentionKernel {
       int keyBase = keyOffset + row * keyRowStride;
       for (int head = 0; head < groupSize; head++) {
         int queryBase = queryOffset + head * queryHeadStride;
-        FloatVector acc = FloatVector.zero(SPECIES);
+        FloatVector acc = FloatVector.zero(REDUCTION_SPECIES);
         int column = 0;
         for (; column < vectorLimit; column += lanes) {
-          acc = fma(load(query, queryBase + column), load(keys, keyBase + column), acc);
+          acc =
+              reductionFma(
+                  reductionLoad(query, queryBase + column),
+                  reductionLoad(keys, keyBase + column),
+                  acc);
         }
-        float sum = reduceAddFixedTree(acc);
+        float sum = reduceAddPinnedTree(acc);
         for (; column < columns; column++) {
-          sum = MathUtil.fma(query[queryBase + column], keys[keyBase + column], sum);
+          sum = Math.fma(query[queryBase + column], keys[keyBase + column], sum);
         }
         scores[scoresOffset + head * scoresHeadStride + row] = sum * scale;
       }
@@ -184,15 +243,21 @@ public final class GroupedQueryAttentionKernel {
     // plain lanewise arithmetic (range reduction and a polynomial) and is identical in both tiers;
     // the scalar tail uses the same arithmetic so a row's probabilities do not depend on where the
     // vector loop stops.
-    FloatVector maxBroadcast = FloatVector.broadcast(SPECIES, max);
-    FloatVector sumVector = FloatVector.zero(SPECIES);
+    // The sum is pinned to the same 8-lane shape as the score reduction, and for the same reason:
+    // how many partial sums it keeps decides its last bits, and that must not depend on the host.
+    // The maximum above needs no pinning (max is exact and order-free) and the exponential is
+    // elementwise, so only this reduction changes.
+    int pinnedLanes = REDUCTION_SPECIES.length();
+    int pinnedLimit = REDUCTION_SPECIES.loopBound(size);
+    FloatVector maxBroadcast = FloatVector.broadcast(REDUCTION_SPECIES, max);
+    FloatVector sumVector = FloatVector.zero(REDUCTION_SPECIES);
     index = 0;
-    for (; index < vectorLimit; index += lanes) {
-      FloatVector value = expVector(load(x, offset + index).sub(maxBroadcast));
+    for (; index < pinnedLimit; index += pinnedLanes) {
+      FloatVector value = expVector(reductionLoad(x, offset + index).sub(maxBroadcast));
       value.intoArray(x, offset + index);
       sumVector = sumVector.add(value);
     }
-    float sum = reduceAddFixedTree(sumVector);
+    float sum = reduceAddPinnedTree(sumVector);
     for (; index < size; index++) {
       float value = expScalar(x[offset + index] - max);
       x[offset + index] = value;
@@ -406,20 +471,26 @@ public final class GroupedQueryAttentionKernel {
    * integer shift, so the interpreter fallback and the compiled intrinsics agree bit for bit.
    */
   static FloatVector expVector(FloatVector x) {
+    // Broadcasts take their species from the incoming vector, not a static one: this is called with
+    // REDUCTION_SPECIES vectors from the pinned softmax, and a static SPECIES broadcast would be a
+    // shape mismatch at runtime on any host where the two differ. It also uses a true fused
+    // multiply-add throughout, so the vector path and its scalar twin stay bit-identical to each
+    // other on every host, with no fast-FMA flag able to separate them.
+    VectorSpecies<Float> species = x.species();
     x = x.max(EXP_LOWER).min(EXP_UPPER);
     // Round to nearest through the 1.5 * 2^23 magic constant: plain add and subtract, exact for
     // the clamped range, and the same operation in the scalar twin.
-    FloatVector magic = FloatVector.broadcast(SPECIES, ROUND_MAGIC);
+    FloatVector magic = FloatVector.broadcast(species, ROUND_MAGIC);
     FloatVector n = x.mul(LOG2E).add(magic).sub(magic);
-    FloatVector r = fma(n, FloatVector.broadcast(SPECIES, -LN2_HI), x);
-    r = fma(n, FloatVector.broadcast(SPECIES, -LN2_LO), r);
-    FloatVector p = FloatVector.broadcast(SPECIES, P0);
-    p = fma(p, r, FloatVector.broadcast(SPECIES, P1));
-    p = fma(p, r, FloatVector.broadcast(SPECIES, P2));
-    p = fma(p, r, FloatVector.broadcast(SPECIES, P3));
-    p = fma(p, r, FloatVector.broadcast(SPECIES, P4));
-    p = fma(p, r, FloatVector.broadcast(SPECIES, 1.0f));
-    p = fma(p, r, FloatVector.broadcast(SPECIES, 1.0f));
+    FloatVector r = n.fma(FloatVector.broadcast(species, -LN2_HI), x);
+    r = n.fma(FloatVector.broadcast(species, -LN2_LO), r);
+    FloatVector p = FloatVector.broadcast(species, P0);
+    p = p.fma(r, FloatVector.broadcast(species, P1));
+    p = p.fma(r, FloatVector.broadcast(species, P2));
+    p = p.fma(r, FloatVector.broadcast(species, P3));
+    p = p.fma(r, FloatVector.broadcast(species, P4));
+    p = p.fma(r, FloatVector.broadcast(species, 1.0f));
+    p = p.fma(r, FloatVector.broadcast(species, 1.0f));
     IntVector exponent = (IntVector) n.convert(VectorOperators.F2I, 0);
     exponent = exponent.add(127).lanewise(VectorOperators.LSHL, 23);
     return p.mul(exponent.reinterpretAsFloats());
@@ -429,15 +500,17 @@ public final class GroupedQueryAttentionKernel {
   static float expScalar(float x) {
     x = Math.min(Math.max(x, EXP_LOWER), EXP_UPPER);
     float n = (x * LOG2E + ROUND_MAGIC) - ROUND_MAGIC;
-    float r = MathUtil.fma(n, -LN2_HI, x);
-    r = MathUtil.fma(n, -LN2_LO, r);
+    // Math.fma, not MathUtil.fma: the latter degrades to a * b + c without fast scalar FMA, which
+    // would make this scalar tail disagree with the vector body on exactly those hosts.
+    float r = Math.fma(n, -LN2_HI, x);
+    r = Math.fma(n, -LN2_LO, r);
     float p = P0;
-    p = MathUtil.fma(p, r, P1);
-    p = MathUtil.fma(p, r, P2);
-    p = MathUtil.fma(p, r, P3);
-    p = MathUtil.fma(p, r, P4);
-    p = MathUtil.fma(p, r, 1.0f);
-    p = MathUtil.fma(p, r, 1.0f);
+    p = Math.fma(p, r, P1);
+    p = Math.fma(p, r, P2);
+    p = Math.fma(p, r, P3);
+    p = Math.fma(p, r, P4);
+    p = Math.fma(p, r, 1.0f);
+    p = Math.fma(p, r, 1.0f);
     return p * Float.intBitsToFloat(((int) n + 127) << 23);
   }
 

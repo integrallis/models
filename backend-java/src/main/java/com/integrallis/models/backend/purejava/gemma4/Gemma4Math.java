@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava.gemma4;
 
+import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.Arrays;
 import java.util.Objects;
@@ -149,15 +150,14 @@ final class Gemma4Math {
     }
   }
 
-  /** Applies Gemma 4's bounded final-logit transform in place. */
+  /**
+   * Applies Gemma 4's bounded final-logit transform in place.
+   *
+   * <p>Delegates to {@link TensorOps#softcap}, which gemma3n also uses. Kept as an entry point here
+   * so this package's callers and tests are unaffected by where the formula lives.
+   */
   static void softcap(float[] logits, float softcap) {
-    Objects.requireNonNull(logits, "logits");
-    if (!(softcap > 0.0f) || !Float.isFinite(softcap)) {
-      throw new IllegalArgumentException("softcap must be finite and > 0: " + softcap);
-    }
-    for (int index = 0; index < logits.length; index++) {
-      logits[index] = softcap * (float) Math.tanh(logits[index] / softcap);
-    }
+    TensorOps.softcap(logits, softcap);
   }
 
   private static void insertCandidate(

@@ -270,8 +270,10 @@ class ExecutionPlannerTest {
             false,
             false,
             false,
+            false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false);
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -299,8 +301,10 @@ class ExecutionPlannerTest {
             false,
             false,
             false,
+            false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false);
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -334,8 +338,10 @@ class ExecutionPlannerTest {
             false,
             false,
             false,
+            false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false);
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -379,6 +385,7 @@ class ExecutionPlannerTest {
                     valid.finalLayerKvOnlyPrefill(),
                     valid.batchedAttentionScores(),
                     valid.batchedAttentionValues(),
+                    false,
                     valid.stagedQuantizedFfn(),
                     valid.stagedQuantizedLayer(),
                     valid.blockMajorQ8Activations(),
@@ -416,8 +423,10 @@ class ExecutionPlannerTest {
             false,
             false,
             false,
+            false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false);
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(runtime, uniformTopology(GgufTensorType.Q4_0), configuration);
@@ -501,8 +510,10 @@ class ExecutionPlannerTest {
                 false,
                 false,
                 false,
+                false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false));
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT));
 
     assertThat(plan.groupedProjections()).isTrue();
     assertThat(plan.mixedKProjections()).isFalse();
@@ -527,8 +538,10 @@ class ExecutionPlannerTest {
             false,
             false,
             false,
+            false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false);
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
 
     PureJavaExecutionPlan plan =
         ExecutionPlanner.plan(
@@ -571,8 +584,10 @@ class ExecutionPlannerTest {
                 false,
                 false,
                 false,
+                false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false));
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT));
 
     assertThat(plan.finalLayerPrefillPruning()).isTrue();
     assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
@@ -603,8 +618,10 @@ class ExecutionPlannerTest {
                 false,
                 false,
                 false,
+                false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false));
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT));
 
     assertThat(plan.finalLayerPrefillPruning()).isFalse();
     assertThat(plan.finalLayerKvOnlyPrefill()).isFalse();
@@ -1121,8 +1138,10 @@ class ExecutionPlannerTest {
                     false,
                     false,
                     false,
+                    false,
                     GgufQ8BlockMajorKernel.SCATTERED,
-                    false))
+                    false,
+                    PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.prefillBatchSize");
     assertThatThrownBy(() -> PureJavaPlanConfiguration.groupedProjections("sometimes"))
@@ -1313,6 +1332,7 @@ class ExecutionPlannerTest {
                     false,
                     false,
                     false,
+                    false,
                     GgufQ8BlockMajorKernel.SCATTERED,
                     false,
                     valid.diagnostics()))
@@ -1340,6 +1360,7 @@ class ExecutionPlannerTest {
                     32,
                     false,
                     true,
+                    false,
                     false,
                     false,
                     false,

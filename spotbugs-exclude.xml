@@ -58,12 +58,80 @@
         </Or>
     </Match>
 
+    <!-- Lfm2ForwardPass hands back its own logits buffer, which is what every decoder in this
+         backend does: the contract is that the array is valid until the next forward call, and the
+         callers immediately read or clone it. Copying a vocabulary-sized array on every token would
+         allocate once per generated token for no benefit, and the returned array is documented as
+         transient on the method itself. -->
+    <Match>
+        <Class name="com.integrallis.models.backend.purejava.lfm2.Lfm2ForwardPass"/>
+        <Method name="forward"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <!-- Gemma3nForwardPass hands back its own logits buffer for the same reason Lfm2ForwardPass does:
+         the contract is that the array is valid until the next forward call, the callers read or clone
+         it immediately, and copying a vocabulary-sized array per generated token would allocate once
+         per token for no benefit. Documented on the method itself. -->
+    <Match>
+        <Class name="com.integrallis.models.backend.purejava.gemma3n.Gemma3nForwardPass"/>
+        <Method name="forward"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <!-- Deepseek2ForwardPass hands back its own logits buffer, the same contract as every other decoder
+         here: valid until the next forward call, read or cloned immediately by the caller. Documented on
+         the method. -->
+    <Match>
+        <Class name="com.integrallis.models.backend.purejava.deepseek2.Deepseek2ForwardPass"/>
+        <Method name="forward"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
     <!-- A ModelFleet deliberately shares its mutable ModelRouter so applications and framework
          adapters can publish live availability, load, cache, and call feedback to the same router
          that makes decisions. Returning a defensive copy would split that operational state. -->
     <Match>
         <Class name="com.integrallis.models.router.ModelFleet"/>
         <Method name="router"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <!-- An Attempt is the intentional lifecycle handle for an active reservation. Sharing its
+         identity lets provider callbacks and cancellation settle the same reservation exactly once;
+         a defensive copy would double-charge or lose that coordination. -->
+    <Match>
+        <Class name="com.integrallis.models.router.RoutingExecution"/>
+        <Method name="beginAttempt"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <!-- models-decisions: every answer space's criteria() hands back a Map.copyOf result, built by
+         AnswerSpaces.requireCriteria, so it is already immutable. Asserted behaviourally by
+         AnswerSpaceCriteriaTest rather than trusted. Noul joins the list below because it now holds
+         a map too. -->
+    <Match>
+        <Or>
+            <Class name="com.integrallis.models.decisions.Noul"/>
+            <Class name="com.integrallis.models.decisions.Choice"/>
+            <Class name="com.integrallis.models.decisions.Score"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <!-- models-decisions: Choice.options and Score.levels hold List.copyOf results, which are
+         genuinely immutable; SpotBugs cannot see through the factory. The immutability is pinned
+         behaviourally by AnswerSpaceTest, which asserts both that the returned list rejects
+         mutation and that the space copies the options it was handed. Copying again on every read
+         would allocate once per decision for no gain. -->
+    <Match>
+        <Or>
+            <Class name="com.integrallis.models.decisions.Choice"/>
+            <Class name="com.integrallis.models.decisions.Score"/>
+        </Or>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <!-- These hand back a DecisionArtifact, a final class of final fields with no array accessor.
+         The value is immutable; SpotBugs cannot see that through the accessor. -->
+    <Match>
+        <Or>
+            <Class name="com.integrallis.models.decisions.NoulEvaluation"/>
+            <Class name="com.integrallis.models.decisions.TypedEvaluation"/>
+        </Or>
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
 </FindBugsFilter>

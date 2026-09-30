@@ -12,6 +12,10 @@ use std::cell::Cell;
 
 #[cfg(test)]
 static GATED_DELTA_NET_PARALLEL_PARTITIONS: AtomicUsize = AtomicUsize::new(0);
+/// Counted separately from the single-sequence one: the two live in one process under `cargo test`
+/// and a shared counter let whichever test reset it last erase the other's evidence.
+#[cfg(test)]
+static GROUPED_GATED_DELTA_NET_PARALLEL_PARTITIONS: AtomicUsize = AtomicUsize::new(0);
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
@@ -58,7 +62,7 @@ fn record_q6_k_single_horizontal_reduction() {
     Q6_K_SINGLE_HORIZONTAL_REDUCTIONS.with(|count| count.set(count.get() + 1));
 }
 
-const ABI_VERSION: u32 = 5;
+const ABI_VERSION: u32 = 6;
 const CAPABILITY_Q4_0_F32_BATCHED_MATMUL: u64 = 1;
 const CAPABILITY_Q4_0_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 1;
 const CAPABILITY_PERSISTENT_WORKER_CONTEXT: u64 = 1 << 2;
@@ -82,6 +86,9 @@ const CAPABILITY_ACTIVE_THREADS: u64 = 1 << 19;
 const CAPABILITY_GROUPED_ATTENTION_F32: u64 = 1 << 20;
 /// The worker pool's poll budget before parking is settable per context.
 const CAPABILITY_POLL_BUDGET: u64 = 1 << 21;
+/// Several independent sequences advance one token each in one launch, against one recurrent
+/// state apiece. This is what lets a group of questions about one piece of evidence use the pool.
+const CAPABILITY_GROUPED_GATED_DELTA_NET_F32: u64 = 1 << 22;
 
 const STATUS_OK: i32 = 0;
 const STATUS_NULL_POINTER: i32 = 1;
@@ -376,6 +383,16 @@ struct GatedDeltaNetJob {
     value_head_count: usize,
     key_dimension: usize,
     value_dimension: usize,
+    /// Independent sequences sharing this launch, each with its own state. One is a single
+    /// sequence and behaves exactly as before.
+    branch_count: usize,
+    /// Optional `*const i32` of `branch_count` entries giving each branch's slot in `state`. Null
+    /// means branch `i` owns slot `i`. A group whose questions have unequal length stops feeding
+    /// some branches before others, so the rows still running are not slots `0..rows`.
+    state_index: usize,
+    /// Slots present in `state`, which is at least `branch_count` and is larger whenever some
+    /// branches have already finished.
+    state_slot_count: usize,
 }
 
 impl WorkerPool {
@@ -481,10 +498,16 @@ impl WorkerPool {
     }
 
     fn execute_gated_delta_net(&self, job: GatedDeltaNetJob) -> bool {
-        if self.workers.is_empty() || job.token_count == 1 {
+        // One token of one sequence is decode, and waking the pool once per layer for it costs
+        // more than it saves. One token of MANY sequences is not decode: a group of questions
+        // answered together is branch_count x value_head_count independent recurrences, which is
+        // exactly the shape the pool exists for. Measured before this: a grouped answer ran the
+        // recurrence on one core and twenty questions took 13.3 s against 9.1 s asked one at a
+        // time, so grouping was slower than not grouping.
+        let units = job.branch_count * job.value_head_count;
+        if self.workers.is_empty() || (job.token_count == 1 && job.branch_count == 1) || units < 2 {
             return catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: the caller owns all recurrence buffers for this synchronous execution.
-                // Decode remains caller-only so it does not wake matrix workers once per layer.
                 unsafe { execute_gated_delta_net_partition(job, 0, 1) }
             }))
             .is_ok();
@@ -952,10 +975,13 @@ unsafe fn execute_gated_delta_net_partition(
     worker_index: usize,
     total_threads: usize,
 ) {
-    let query_elements = job.token_count * job.key_head_count * job.key_dimension;
-    let value_elements = job.token_count * job.value_head_count * job.value_dimension;
-    let gate_elements = job.token_count * job.value_head_count;
-    let state_elements = job.value_head_count * job.key_dimension * job.value_dimension;
+    let branches = job.branch_count.max(1);
+    let query_elements = branches * job.token_count * job.key_head_count * job.key_dimension;
+    let value_elements = branches * job.token_count * job.value_head_count * job.value_dimension;
+    let gate_elements = branches * job.token_count * job.value_head_count;
+    let state_slots = job.state_slot_count.max(branches);
+    let state_elements =
+        state_slots * job.value_head_count * job.key_dimension * job.value_dimension;
     // SAFETY: the exported entry point validates every buffer length before publishing the job.
     let query = unsafe { slice::from_raw_parts(job.query as *const f32, query_elements) };
     let key = unsafe { slice::from_raw_parts(job.key as *const f32, query_elements) };
@@ -964,10 +990,13 @@ unsafe fn execute_gated_delta_net_partition(
     let beta = unsafe { slice::from_raw_parts(job.beta as *const f32, gate_elements) };
     let state = unsafe { slice::from_raw_parts_mut(job.state as *mut f32, state_elements) };
     let output = unsafe { slice::from_raw_parts_mut(job.output as *mut f32, value_elements) };
-    let start_head = job.value_head_count * worker_index / total_threads;
-    let end_head = job.value_head_count * (worker_index + 1) / total_threads;
+    // Work is one recurrence per branch per head, so a group of questions partitions across the
+    // pool even though each branch carries a single token.
+    let units = branches * job.value_head_count;
+    let start_unit = units * worker_index / total_threads;
+    let end_unit = units * (worker_index + 1) / total_threads;
     #[cfg(test)]
-    if total_threads > 1 && start_head < end_head {
+    if total_threads > 1 && start_unit < end_unit {
         GATED_DELTA_NET_PARALLEL_PARTITIONS.fetch_add(1, Ordering::Relaxed);
     }
     let query_scale = 1.0_f32 / (job.key_dimension as f32).sqrt();
@@ -976,6 +1005,87 @@ unsafe fn execute_gated_delta_net_partition(
     let mut memory = [0.0_f32; MAX_GATED_DELTA_NET_DIMENSION];
     let mut delta = [0.0_f32; MAX_GATED_DELTA_NET_DIMENSION];
     let vectorized = gated_delta_net_avx2_available();
+
+    let branch_query = job.token_count * job.key_head_count * job.key_dimension;
+    let branch_value = job.token_count * job.value_head_count * job.value_dimension;
+    let branch_gate = job.token_count * job.value_head_count;
+    let branch_state = job.value_head_count * job.key_dimension * job.value_dimension;
+
+    if branches > 1 {
+        #[cfg(test)]
+        if total_threads > 1 && start_unit < end_unit {
+            GROUPED_GATED_DELTA_NET_PARALLEL_PARTITIONS.fetch_add(1, Ordering::Relaxed);
+        }
+        // A group: every branch carries the same small number of tokens, and each unit owns one
+        // head of one branch. Nothing is shared between branches, which is the whole contract.
+        // SAFETY: the exported entry validated this table's length against branch_count.
+        let slots = if job.state_index == 0 {
+            None
+        } else {
+            Some(unsafe { slice::from_raw_parts(job.state_index as *const i32, branches) })
+        };
+        for unit in start_unit..end_unit {
+            let branch = unit / job.value_head_count;
+            let head = unit % job.value_head_count;
+            let key_head = head % job.key_head_count;
+            let slot = match slots {
+                None => branch,
+                Some(table) => table[branch] as usize,
+            };
+            let state_offset =
+                slot * branch_state + head * job.key_dimension * job.value_dimension;
+            let head_state = &mut state
+                [state_offset..state_offset + job.key_dimension * job.value_dimension];
+            for token in 0..job.token_count {
+                let token_head = branch * branch_gate + token * job.value_head_count + head;
+                let query_offset = branch * branch_query
+                    + (token * job.key_head_count + key_head) * job.key_dimension;
+                let value_offset = branch * branch_value
+                    + (token * job.value_head_count + head) * job.value_dimension;
+                gated_delta_net_step(
+                    &query[query_offset..query_offset + job.key_dimension],
+                    &key[query_offset..query_offset + job.key_dimension],
+                    &value[value_offset..value_offset + job.value_dimension],
+                    log_decay[token_head],
+                    beta[token_head],
+                    head_state,
+                    &mut output[value_offset..value_offset + job.value_dimension],
+                    &mut normalized_query[..job.key_dimension],
+                    &mut normalized_key[..job.key_dimension],
+                    &mut memory[..job.value_dimension],
+                    &mut delta[..job.value_dimension],
+                    query_scale,
+                    job.key_dimension,
+                    job.value_dimension,
+                    vectorized,
+                );
+            }
+        }
+        return;
+    }
+
+    let start_head = start_unit;
+    let end_head = end_unit;
+
+    if job.token_count >= GATED_DELTA_NET_CHUNK_MINIMUM {
+        // The chunked scan reads the recurrent state twice and writes it once per chunk rather
+        // than four times per token, which is the whole cost of a long prefill at this shape.
+        gated_delta_net_chunked_partition(
+            job,
+            start_head,
+            end_head,
+            query_scale,
+            query,
+            key,
+            value,
+            log_decay,
+            beta,
+            state,
+            output,
+            vectorized,
+        );
+        return;
+    }
 
     for head in start_head..end_head {
         let key_head = head % job.key_head_count;
@@ -1040,6 +1150,354 @@ unsafe fn execute_gated_delta_net_partition(
             }
         }
     }
+}
+
+/// Tokens folded into one associative scan step. The chunk boundary is where the recurrent state
+/// is read and written; everything inside the chunk is expressed as dense blocked products.
+const GATED_DELTA_NET_CHUNK: usize = 64;
+/// Below this token count the sequential recurrence wins: chunking only pays once the state
+/// traffic it removes exceeds the intra-chunk triangular work it adds.
+const GATED_DELTA_NET_CHUNK_MINIMUM: usize = 8;
+/// Tokens whose projection and readout accumulators are held resident while a state row streams.
+const GATED_DELTA_NET_TOKEN_BLOCK: usize = 8;
+/// State rows held resident while the chunk's update rows stream past them.
+const GATED_DELTA_NET_ROW_BLOCK: usize = 16;
+
+/// Chunked (associative-scan) Gated DeltaNet prefill.
+///
+/// The sequential recurrence touches the whole `key_dimension x value_dimension` state four times
+/// per token. At Qwen3.5-4B's shape that state is 256 KiB per head, so a thousand-token prefill
+/// moves hundreds of gigabytes through the cache hierarchy for a few tens of GFLOP of arithmetic.
+///
+/// Unrolling the recurrence over a chunk of `C` tokens gives, with `g_t = exp(sum_{j<=t} logdecay_j)`:
+///
+/// ```text
+///   u_t = beta_t (v_t - g_t (S_0^T k_t)) - sum_{i<t} beta_t (g_t/g_i)(k_i . k_t) u_i
+///   o_t = g_t (S_0^T q_t) + sum_{i<=t} (g_t/g_i)(k_i . q_t) u_i
+///   S_C = g_C S_0 + sum_i (g_C/g_i) k_i (x) u_i
+/// ```
+///
+/// which reads the state twice and writes it once per chunk instead of per token. Decay ratios are
+/// formed from cumulative log-decays so no product of decays is ever reconstructed by division.
+///
+/// This reassociates the arithmetic, so it is not bit-identical to the sequential path; it is held
+/// to a relative tolerance against it by `chunked_gated_delta_net_matches_the_sequential_recurrence`.
+#[allow(clippy::too_many_arguments)]
+fn gated_delta_net_chunked_partition(
+    job: GatedDeltaNetJob,
+    start_head: usize,
+    end_head: usize,
+    query_scale: f32,
+    query: &[f32],
+    key: &[f32],
+    value: &[f32],
+    log_decay: &[f32],
+    beta: &[f32],
+    state: &mut [f32],
+    output: &mut [f32],
+    vectorized: bool,
+) {
+    let key_dimension = job.key_dimension;
+    let value_dimension = job.value_dimension;
+    let chunk = GATED_DELTA_NET_CHUNK.min(job.token_count);
+
+    let mut normalized_key = vec![0.0_f32; chunk * key_dimension];
+    let mut normalized_query = vec![0.0_f32; chunk * key_dimension];
+    let mut decayed_key = vec![0.0_f32; chunk * key_dimension];
+    let mut decayed_query = vec![0.0_f32; chunk * key_dimension];
+    let mut carried_key = vec![0.0_f32; chunk * key_dimension];
+    let mut projection = vec![0.0_f32; chunk * value_dimension];
+    let mut readout = vec![0.0_f32; chunk * value_dimension];
+    let mut update = vec![0.0_f32; chunk * value_dimension];
+    let mut inner_key = vec![0.0_f32; chunk * chunk];
+    let mut inner_query = vec![0.0_f32; chunk * chunk];
+    let mut cumulative = vec![0.0_f32; chunk];
+
+    for head in start_head..end_head {
+        let key_head = head % job.key_head_count;
+        let state_offset = head * key_dimension * value_dimension;
+        let head_state = &mut state[state_offset..state_offset + key_dimension * value_dimension];
+        let mut base = 0;
+        while base < job.token_count {
+            let span = chunk.min(job.token_count - base);
+
+            let mut running = 0.0_f32;
+            for (local, decayed) in cumulative[..span].iter_mut().enumerate() {
+                let token = base + local;
+                let token_head = token * job.value_head_count + head;
+                let source = (token * job.key_head_count + key_head) * key_dimension;
+                let row = local * key_dimension;
+                normalize_gated_delta_net(
+                    &key[source..source + key_dimension],
+                    &mut normalized_key[row..row + key_dimension],
+                );
+                normalize_gated_delta_net(
+                    &query[source..source + key_dimension],
+                    &mut normalized_query[row..row + key_dimension],
+                );
+                for entry in &mut normalized_query[row..row + key_dimension] {
+                    *entry *= query_scale;
+                }
+                running += log_decay[token_head];
+                *decayed = running;
+            }
+            let tail = cumulative[span - 1];
+            for (local, &log_sum) in cumulative[..span].iter().enumerate() {
+                let row = local * key_dimension;
+                let decay = log_sum.exp();
+                let carry = (tail - log_sum).exp();
+                for index in 0..key_dimension {
+                    decayed_key[row + index] = normalized_key[row + index] * decay;
+                    decayed_query[row + index] = normalized_query[row + index] * decay;
+                    carried_key[row + index] = normalized_key[row + index] * carry;
+                }
+            }
+
+            // Both cross-chunk products read the same state row, so they share one streaming pass.
+            projection[..span * value_dimension].fill(0.0);
+            readout[..span * value_dimension].fill(0.0);
+            let mut block = 0;
+            while block < span {
+                let width = GATED_DELTA_NET_TOKEN_BLOCK.min(span - block);
+                for row in 0..key_dimension {
+                    let state_row = &head_state[row * value_dimension..(row + 1) * value_dimension];
+                    for local in block..block + width {
+                        let key_weight = decayed_key[local * key_dimension + row];
+                        if key_weight != 0.0 {
+                            gated_delta_net_add_scaled(
+                                &mut projection
+                                    [local * value_dimension..(local + 1) * value_dimension],
+                                state_row,
+                                key_weight,
+                                vectorized,
+                            );
+                        }
+                        let query_weight = decayed_query[local * key_dimension + row];
+                        if query_weight != 0.0 {
+                            gated_delta_net_add_scaled(
+                                &mut readout
+                                    [local * value_dimension..(local + 1) * value_dimension],
+                                state_row,
+                                query_weight,
+                                vectorized,
+                            );
+                        }
+                    }
+                }
+                block += width;
+            }
+
+            for target in 0..span {
+                let target_row = target * key_dimension;
+                let target_log = cumulative[target];
+                let gate = beta[(base + target) * job.value_head_count + head];
+                for source in 0..=target {
+                    let source_row = source * key_dimension;
+                    let scale = (target_log - cumulative[source]).exp();
+                    inner_query[target * chunk + source] = scale
+                        * gated_delta_net_dot(
+                            &normalized_query[target_row..target_row + key_dimension],
+                            &normalized_key[source_row..source_row + key_dimension],
+                            vectorized,
+                        );
+                    if source < target {
+                        inner_key[target * chunk + source] = gate
+                            * scale
+                            * gated_delta_net_dot(
+                                &normalized_key[target_row..target_row + key_dimension],
+                                &normalized_key[source_row..source_row + key_dimension],
+                                vectorized,
+                            );
+                    }
+                }
+            }
+
+            for target in 0..span {
+                let token_head = (base + target) * job.value_head_count + head;
+                let gate = beta[token_head];
+                let value_offset = token_head * value_dimension;
+                let target_row = target * value_dimension;
+                for index in 0..value_dimension {
+                    update[target_row + index] =
+                        (value[value_offset + index] - projection[target_row + index]) * gate;
+                }
+                let (earlier, current) = update.split_at_mut(target_row);
+                for source in 0..target {
+                    let weight = inner_key[target * chunk + source];
+                    if weight != 0.0 {
+                        gated_delta_net_add_scaled(
+                            &mut current[..value_dimension],
+                            &earlier[source * value_dimension..(source + 1) * value_dimension],
+                            -weight,
+                            vectorized,
+                        );
+                    }
+                }
+            }
+
+            for target in 0..span {
+                let target_row = target * value_dimension;
+                for source in 0..=target {
+                    let weight = inner_query[target * chunk + source];
+                    if weight != 0.0 {
+                        gated_delta_net_add_scaled(
+                            &mut readout[target_row..target_row + value_dimension],
+                            &update[source * value_dimension..(source + 1) * value_dimension],
+                            weight,
+                            vectorized,
+                        );
+                    }
+                }
+                let token_head = (base + target) * job.value_head_count + head;
+                let value_offset = token_head * value_dimension;
+                output[value_offset..value_offset + value_dimension]
+                    .copy_from_slice(&readout[target_row..target_row + value_dimension]);
+            }
+
+            let tail_decay = tail.exp();
+            let mut row_block = 0;
+            while row_block < key_dimension {
+                let rows = GATED_DELTA_NET_ROW_BLOCK.min(key_dimension - row_block);
+                for row in row_block..row_block + rows {
+                    gated_delta_net_scale(
+                        &mut head_state[row * value_dimension..(row + 1) * value_dimension],
+                        tail_decay,
+                        vectorized,
+                    );
+                }
+                for source in 0..span {
+                    let update_row =
+                        &update[source * value_dimension..(source + 1) * value_dimension];
+                    for row in row_block..row_block + rows {
+                        let weight = carried_key[source * key_dimension + row];
+                        if weight != 0.0 {
+                            gated_delta_net_add_scaled(
+                                &mut head_state[row * value_dimension..(row + 1) * value_dimension],
+                                update_row,
+                                weight,
+                                vectorized,
+                            );
+                        }
+                    }
+                }
+                row_block += rows;
+            }
+
+            base += span;
+        }
+    }
+}
+
+#[inline(always)]
+fn gated_delta_net_dot(left: &[f32], right: &[f32], vectorized: bool) -> f32 {
+    debug_assert_eq!(left.len(), right.len());
+    #[cfg(not(target_arch = "x86_64"))]
+    let _ = vectorized;
+    #[cfg(target_arch = "x86_64")]
+    if vectorized {
+        // SAFETY: runtime feature detection selected AVX2/FMA and both slices have equal lengths.
+        return unsafe { gated_delta_net_dot_avx2(left, right) };
+    }
+    let mut total = 0.0_f32;
+    for (&first, &second) in left.iter().zip(right) {
+        total = first.mul_add(second, total);
+    }
+    total
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn gated_delta_net_dot_avx2(left: &[f32], right: &[f32]) -> f32 {
+    let mut first = _mm256_setzero_ps();
+    let mut second = _mm256_setzero_ps();
+    let vector_end = left.len() / 16 * 16;
+    for index in (0..vector_end).step_by(16) {
+        // SAFETY: equal slice lengths and vector_end reserve sixteen complete lanes in both slices.
+        unsafe {
+            first = _mm256_fmadd_ps(
+                _mm256_loadu_ps(left.as_ptr().add(index)),
+                _mm256_loadu_ps(right.as_ptr().add(index)),
+                first,
+            );
+            second = _mm256_fmadd_ps(
+                _mm256_loadu_ps(left.as_ptr().add(index + 8)),
+                _mm256_loadu_ps(right.as_ptr().add(index + 8)),
+                second,
+            );
+        }
+    }
+    let lanes = _mm256_add_ps(first, second);
+    let mut buffer = [0.0_f32; 8];
+    // SAFETY: the destination is an eight-lane f32 array matching the register width.
+    unsafe { _mm256_storeu_ps(buffer.as_mut_ptr(), lanes) };
+    let mut total = buffer.iter().sum::<f32>();
+    for (&one, &other) in left[vector_end..].iter().zip(&right[vector_end..]) {
+        total = one.mul_add(other, total);
+    }
+    total
+}
+
+/// One token of one head's recurrence, shared by the sequential and the grouped paths so a
+/// grouped answer runs the same arithmetic as the same question asked alone.
+#[allow(clippy::too_many_arguments)]
+#[inline]
+fn gated_delta_net_step(
+    query: &[f32],
+    key: &[f32],
+    value: &[f32],
+    log_decay: f32,
+    beta: f32,
+    head_state: &mut [f32],
+    output: &mut [f32],
+    normalized_query: &mut [f32],
+    normalized_key: &mut [f32],
+    memory: &mut [f32],
+    delta: &mut [f32],
+    query_scale: f32,
+    key_dimension: usize,
+    value_dimension: usize,
+    vectorized: bool,
+) {
+    normalize_gated_delta_net(query, normalized_query);
+    normalize_gated_delta_net(key, normalized_key);
+    for entry in normalized_query.iter_mut() {
+        *entry *= query_scale;
+    }
+
+    gated_delta_net_scale(head_state, log_decay.exp(), vectorized);
+
+    memory.fill(0.0);
+    for (row, &key_value) in normalized_key.iter().enumerate() {
+        let offset = row * value_dimension;
+        gated_delta_net_add_scaled(
+            memory,
+            &head_state[offset..offset + value_dimension],
+            key_value,
+            vectorized,
+        );
+    }
+    gated_delta_net_delta(delta, value, memory, beta, vectorized);
+    for (row, &key_value) in normalized_key.iter().enumerate() {
+        let offset = row * value_dimension;
+        gated_delta_net_add_scaled(
+            &mut head_state[offset..offset + value_dimension],
+            delta,
+            key_value,
+            vectorized,
+        );
+    }
+
+    output.fill(0.0);
+    for (row, &query_value) in normalized_query.iter().enumerate() {
+        let offset = row * value_dimension;
+        gated_delta_net_add_scaled(
+            output,
+            &head_state[offset..offset + value_dimension],
+            query_value,
+            vectorized,
+        );
+    }
+    let _ = key_dimension;
 }
 
 #[inline(always)]
@@ -1232,6 +1690,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_ACTIVE_THREADS
         | CAPABILITY_GROUPED_ATTENTION_F32
         | CAPABILITY_POLL_BUDGET
+        | CAPABILITY_GROUPED_GATED_DELTA_NET_F32
 }
 
 #[unsafe(no_mangle)]
@@ -1554,6 +2013,123 @@ pub unsafe extern "C" fn jmodels_gated_delta_net_f32_with_context(
             value_head_count,
             key_dimension,
             value_dimension,
+            branch_count: 1,
+            state_index: 0,
+            state_slot_count: 1,
+        })
+    })) {
+        Ok(true) => STATUS_OK,
+        Ok(false) | Err(_) => STATUS_PANIC,
+    }
+}
+
+#[unsafe(no_mangle)]
+/// Advances several independent sequences by one token each, against one recurrent state apiece.
+///
+/// This is the shape a group of questions about one piece of evidence has: the questions share the
+/// weights and share nothing else, so the recurrence is `row_count x value_head_count` independent
+/// units of work. Calling the single-sequence entry once per question instead leaves every one of
+/// them on the calling thread, because one token of one sequence is decode and decode deliberately
+/// does not wake the pool.
+///
+/// `state` is addressed by slot, not by row. A group whose questions have unequal length stops
+/// feeding the short ones first, so the rows still advancing are some subset of the slots and
+/// `row_state_slot` carries the mapping. Null means row `i` owns slot `i`.
+///
+/// # Safety
+///
+/// `context` must be live. Every data pointer must remain valid for its advertised length for the
+/// synchronous call. State and output must be writable and must not alias any read-only input.
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn jmodels_gated_delta_net_group_f32_with_context(
+    context: *const KernelContext,
+    query: *const f32,
+    key: *const f32,
+    value: *const f32,
+    log_decay: *const f32,
+    beta: *const f32,
+    state: *mut f32,
+    state_elements: u64,
+    output: *mut f32,
+    row_state_slot: *const i32,
+    row_count: u32,
+    state_slot_count: u32,
+    key_head_count: u32,
+    value_head_count: u32,
+    key_dimension: u32,
+    value_dimension: u32,
+) -> i32 {
+    if context.is_null()
+        || query.is_null()
+        || key.is_null()
+        || value.is_null()
+        || log_decay.is_null()
+        || beta.is_null()
+        || state.is_null()
+        || output.is_null()
+    {
+        return STATUS_NULL_POINTER;
+    }
+    let row_count = row_count as usize;
+    let state_slot_count = state_slot_count as usize;
+    let key_head_count = key_head_count as usize;
+    let value_head_count = value_head_count as usize;
+    let key_dimension = key_dimension as usize;
+    let value_dimension = value_dimension as usize;
+    if row_count == 0
+        || state_slot_count < row_count
+        || key_head_count == 0
+        || value_head_count == 0
+        || key_dimension == 0
+        || value_dimension == 0
+        || key_dimension > MAX_GATED_DELTA_NET_DIMENSION
+        || value_dimension > MAX_GATED_DELTA_NET_DIMENSION
+        || !value_head_count.is_multiple_of(key_head_count)
+    {
+        return STATUS_INVALID_SHAPE;
+    }
+    let Some(required_state) = state_slot_count
+        .checked_mul(value_head_count)
+        .and_then(|elements| elements.checked_mul(key_dimension))
+        .and_then(|elements| elements.checked_mul(value_dimension))
+    else {
+        return STATUS_INVALID_SHAPE;
+    };
+    if state_elements < required_state as u64 {
+        return STATUS_BUFFER_TOO_SMALL;
+    }
+    if !row_state_slot.is_null() {
+        // A slot outside the state buffer would be an out-of-bounds write on a worker thread, so
+        // the table is checked here where the length is known rather than trusted in the loop.
+        // SAFETY: the caller advertises row_count entries and Java pins the array for the call.
+        let slots = unsafe { slice::from_raw_parts(row_state_slot, row_count) };
+        if slots
+            .iter()
+            .any(|&slot| slot < 0 || slot as usize >= state_slot_count)
+        {
+            return STATUS_INVALID_SHAPE;
+        }
+    }
+
+    match catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: Java pins every validated array for the duration of this synchronous call.
+        let context = unsafe { &*context };
+        context.workers.execute_gated_delta_net(GatedDeltaNetJob {
+            query: query as usize,
+            key: key as usize,
+            value: value as usize,
+            log_decay: log_decay as usize,
+            beta: beta as usize,
+            state: state as usize,
+            output: output as usize,
+            token_count: 1,
+            key_head_count,
+            value_head_count,
+            key_dimension,
+            value_dimension,
+            branch_count: row_count,
+            state_index: row_state_slot as usize,
+            state_slot_count,
         })
     })) {
         Ok(true) => STATUS_OK,
@@ -5178,7 +5754,7 @@ mod tests {
 
     #[test]
     fn exports_stable_abi_and_capabilities() {
-        assert_eq!(jmodels_kernels_abi_version(), 5);
+        assert_eq!(jmodels_kernels_abi_version(), 6);
         assert_eq!(
             jmodels_kernels_capabilities(),
             CAPABILITY_Q4_0_F32_BATCHED_MATMUL
@@ -5203,6 +5779,7 @@ mod tests {
                 | CAPABILITY_ACTIVE_THREADS
                 | CAPABILITY_GROUPED_ATTENTION_F32
                 | CAPABILITY_POLL_BUDGET
+                | CAPABILITY_GROUPED_GATED_DELTA_NET_F32
         );
     }
 
@@ -6536,5 +7113,405 @@ mod tests {
             scratch[batch_size - 1] = 11;
             assert_eq!(scratch[batch_size - 1], 11);
         }
+    }
+
+    fn gated_delta_net_fixture(seed: u64, count: usize) -> Vec<f32> {
+        let mut state = seed | 1;
+        (0..count)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                ((state >> 40) as f32 / 8_388_608.0) - 1.0
+            })
+            .collect()
+    }
+
+    /// A grouped step must equal each row stepped alone, and must actually use the pool.
+    ///
+    /// The slot table is deliberately not the identity: a group whose questions have unequal
+    /// length drops the short ones first, so the rows still advancing address scattered slots.
+    /// An identity-only test would pass while every ragged group read the wrong state.
+    #[test]
+    fn grouped_gated_delta_net_matches_each_row_stepped_alone() {
+        const ROWS: usize = 5;
+        const SLOTS: usize = 8;
+        const KEY_HEADS: usize = 2;
+        const VALUE_HEADS: usize = 4;
+        const DIMENSION: usize = 4;
+        const STATE_PER_SLOT: usize = VALUE_HEADS * DIMENSION * DIMENSION;
+
+        let slots: [i32; ROWS] = [7, 0, 3, 1, 6];
+        let query = gated_delta_net_fixture(11, ROWS * KEY_HEADS * DIMENSION);
+        let key = gated_delta_net_fixture(12, ROWS * KEY_HEADS * DIMENSION);
+        let value = gated_delta_net_fixture(13, ROWS * VALUE_HEADS * DIMENSION);
+        let beta = gated_delta_net_fixture(14, ROWS * VALUE_HEADS);
+        let log_decay: Vec<f32> = gated_delta_net_fixture(15, ROWS * VALUE_HEADS)
+            .iter()
+            .map(|value| -value.abs())
+            .collect();
+        let initial = gated_delta_net_fixture(16, SLOTS * STATE_PER_SLOT);
+
+        GROUPED_GATED_DELTA_NET_PARALLEL_PARTITIONS.store(0, Ordering::Relaxed);
+        let context = jmodels_kernels_context_create(4);
+        assert!(!context.is_null());
+
+        let mut grouped_state = initial.clone();
+        let mut grouped_output = vec![0.0_f32; ROWS * VALUE_HEADS * DIMENSION];
+        // SAFETY: every fixture outlives the synchronous call and none of them alias.
+        assert_eq!(
+            unsafe {
+                jmodels_gated_delta_net_group_f32_with_context(
+                    context,
+                    query.as_ptr(),
+                    key.as_ptr(),
+                    value.as_ptr(),
+                    log_decay.as_ptr(),
+                    beta.as_ptr(),
+                    grouped_state.as_mut_ptr(),
+                    grouped_state.len() as u64,
+                    grouped_output.as_mut_ptr(),
+                    slots.as_ptr(),
+                    ROWS as u32,
+                    SLOTS as u32,
+                    KEY_HEADS as u32,
+                    VALUE_HEADS as u32,
+                    DIMENSION as u32,
+                    DIMENSION as u32,
+                )
+            },
+            STATUS_OK
+        );
+        assert!(
+            GROUPED_GATED_DELTA_NET_PARALLEL_PARTITIONS.load(Ordering::Relaxed) > 0,
+            "a group of rows must reach the worker pool, not run on the caller alone"
+        );
+
+        let mut expected_state = initial.clone();
+        for row in 0..ROWS {
+            let slot = slots[row] as usize;
+            let mut row_state = expected_state[slot * STATE_PER_SLOT..(slot + 1) * STATE_PER_SLOT]
+                .to_vec();
+            let mut row_output = vec![0.0_f32; VALUE_HEADS * DIMENSION];
+            let query_span = KEY_HEADS * DIMENSION;
+            let value_span = VALUE_HEADS * DIMENSION;
+            // SAFETY: the row slices are live for this synchronous call and do not alias.
+            assert_eq!(
+                unsafe {
+                    jmodels_gated_delta_net_f32_with_context(
+                        context,
+                        query[row * query_span..].as_ptr(),
+                        query_span as u64,
+                        key[row * query_span..].as_ptr(),
+                        query_span as u64,
+                        value[row * value_span..].as_ptr(),
+                        value_span as u64,
+                        log_decay[row * VALUE_HEADS..].as_ptr(),
+                        VALUE_HEADS as u64,
+                        beta[row * VALUE_HEADS..].as_ptr(),
+                        VALUE_HEADS as u64,
+                        row_state.as_mut_ptr(),
+                        row_state.len() as u64,
+                        row_output.as_mut_ptr(),
+                        row_output.len() as u64,
+                        1,
+                        KEY_HEADS as u32,
+                        VALUE_HEADS as u32,
+                        DIMENSION as u32,
+                        DIMENSION as u32,
+                    )
+                },
+                STATUS_OK
+            );
+            assert_eq!(
+                &grouped_output[row * value_span..(row + 1) * value_span],
+                row_output.as_slice(),
+                "grouped row {row} disagreed with the same row stepped alone"
+            );
+            expected_state[slot * STATE_PER_SLOT..(slot + 1) * STATE_PER_SLOT]
+                .copy_from_slice(&row_state);
+        }
+        assert_eq!(
+            grouped_state, expected_state,
+            "grouped recurrent state diverged from stepping each row alone"
+        );
+
+        // Untouched slots must be untouched: slots 2, 4 and 5 are in no row.
+        for slot in [2_usize, 4, 5] {
+            assert_eq!(
+                &grouped_state[slot * STATE_PER_SLOT..(slot + 1) * STATE_PER_SLOT],
+                &initial[slot * STATE_PER_SLOT..(slot + 1) * STATE_PER_SLOT],
+                "slot {slot} belongs to no row and must not have been written"
+            );
+        }
+
+        // SAFETY: the context was created above and is not used after this call.
+        assert_eq!(unsafe { jmodels_kernels_context_destroy(context) }, STATUS_OK);
+    }
+
+    /// A slot outside the state buffer is rejected rather than written on a worker thread.
+    #[test]
+    fn grouped_gated_delta_net_rejects_an_out_of_range_slot() {
+        let slots: [i32; 2] = [0, 4];
+        let query = gated_delta_net_fixture(21, 2 * 2);
+        let value = gated_delta_net_fixture(22, 2 * 2);
+        let gates = gated_delta_net_fixture(23, 2);
+        let mut state = vec![0.0_f32; 2 * 2 * 2];
+        let mut output = vec![0.0_f32; 4];
+        let context = jmodels_kernels_context_create(2);
+        // SAFETY: every fixture outlives the call; the call is expected to reject before reading.
+        assert_eq!(
+            unsafe {
+                jmodels_gated_delta_net_group_f32_with_context(
+                    context,
+                    query.as_ptr(),
+                    query.as_ptr(),
+                    value.as_ptr(),
+                    gates.as_ptr(),
+                    gates.as_ptr(),
+                    state.as_mut_ptr(),
+                    state.len() as u64,
+                    output.as_mut_ptr(),
+                    slots.as_ptr(),
+                    2,
+                    2,
+                    1,
+                    1,
+                    2,
+                    2,
+                )
+            },
+            STATUS_INVALID_SHAPE
+        );
+        // SAFETY: the context was created above and is not used after this call.
+        assert_eq!(unsafe { jmodels_kernels_context_destroy(context) }, STATUS_OK);
+    }
+
+    #[test]
+    fn chunked_gated_delta_net_matches_the_sequential_recurrence() {
+        let context = jmodels_kernels_context_create(3);
+        assert!(!context.is_null());
+        let tokens = 40;
+        let key_heads = 2;
+        let value_heads = 4;
+        let key_dimension = 16;
+        let value_dimension = 16;
+
+        let query = gated_delta_net_fixture(1, tokens * key_heads * key_dimension);
+        let key = gated_delta_net_fixture(2, tokens * key_heads * key_dimension);
+        let value = gated_delta_net_fixture(3, tokens * value_heads * value_dimension);
+        let beta = gated_delta_net_fixture(4, tokens * value_heads)
+            .iter()
+            .map(|entry| 0.5 + 0.4 * entry)
+            .collect::<Vec<_>>();
+        let log_decay = gated_delta_net_fixture(5, tokens * value_heads)
+            .iter()
+            .map(|entry| -0.05 - 0.15 * entry.abs())
+            .collect::<Vec<_>>();
+        let initial = gated_delta_net_fixture(6, value_heads * key_dimension * value_dimension);
+
+        let mut chunked_state = initial.clone();
+        let mut chunked_output = vec![0.0_f32; tokens * value_heads * value_dimension];
+        // SAFETY: every fixture outlives the call and none of the buffers alias one another.
+        assert_eq!(
+            unsafe {
+                jmodels_gated_delta_net_f32_with_context(
+                    context,
+                    query.as_ptr(),
+                    query.len() as u64,
+                    key.as_ptr(),
+                    key.len() as u64,
+                    value.as_ptr(),
+                    value.len() as u64,
+                    log_decay.as_ptr(),
+                    log_decay.len() as u64,
+                    beta.as_ptr(),
+                    beta.len() as u64,
+                    chunked_state.as_mut_ptr(),
+                    chunked_state.len() as u64,
+                    chunked_output.as_mut_ptr(),
+                    chunked_output.len() as u64,
+                    tokens as u32,
+                    key_heads as u32,
+                    value_heads as u32,
+                    key_dimension as u32,
+                    value_dimension as u32,
+                )
+            },
+            STATUS_OK
+        );
+
+        let mut sequential_state = initial;
+        let mut sequential_output = vec![0.0_f32; tokens * value_heads * value_dimension];
+        for token in 0..tokens {
+            let query_base = token * key_heads * key_dimension;
+            let value_base = token * value_heads * value_dimension;
+            let gate_base = token * value_heads;
+            // SAFETY: each slice is a distinct in-bounds window over the same live fixtures.
+            assert_eq!(
+                unsafe {
+                    jmodels_gated_delta_net_f32_with_context(
+                        context,
+                        query[query_base..].as_ptr(),
+                        (key_heads * key_dimension) as u64,
+                        key[query_base..].as_ptr(),
+                        (key_heads * key_dimension) as u64,
+                        value[value_base..].as_ptr(),
+                        (value_heads * value_dimension) as u64,
+                        log_decay[gate_base..].as_ptr(),
+                        value_heads as u64,
+                        beta[gate_base..].as_ptr(),
+                        value_heads as u64,
+                        sequential_state.as_mut_ptr(),
+                        sequential_state.len() as u64,
+                        sequential_output[value_base..].as_mut_ptr(),
+                        (value_heads * value_dimension) as u64,
+                        1,
+                        key_heads as u32,
+                        value_heads as u32,
+                        key_dimension as u32,
+                        value_dimension as u32,
+                    )
+                },
+                STATUS_OK
+            );
+        }
+
+        let tolerance = 2.0e-4_f32;
+        for (index, (actual, expected)) in chunked_output.iter().zip(&sequential_output).enumerate()
+        {
+            assert!(
+                (actual - expected).abs() <= tolerance * expected.abs().max(1.0),
+                "output[{index}] chunked {actual} vs sequential {expected}"
+            );
+        }
+        for (index, (actual, expected)) in chunked_state.iter().zip(&sequential_state).enumerate() {
+            assert!(
+                (actual - expected).abs() <= tolerance * expected.abs().max(1.0),
+                "state[{index}] chunked {actual} vs sequential {expected}"
+            );
+        }
+        // SAFETY: the test consumes the unique context pointer exactly once.
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
+        );
+    }
+
+    /// Prints where a Qwen3.5-4B prefill step actually spends its time. Ignored by default because
+    /// it is a measurement, not an assertion; run with
+    /// `cargo test --release -- --ignored --nocapture prefill_budget`.
+    #[test]
+    #[ignore]
+    fn prefill_budget() {
+        use std::time::Instant;
+        let threads: usize = std::env::var("JMODELS_BENCH_THREADS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(8);
+        let repeats: usize = std::env::var("JMODELS_BENCH_REPEATS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(20);
+        let context = jmodels_kernels_context_create(threads as u32);
+        assert!(!context.is_null());
+
+        let tokens = 64;
+        let heads = 16;
+        let dimension = 256;
+        let query = gated_delta_net_fixture(11, tokens * heads * dimension);
+        let key = gated_delta_net_fixture(12, tokens * heads * dimension);
+        let value = gated_delta_net_fixture(13, tokens * heads * dimension);
+        let beta = gated_delta_net_fixture(14, tokens * heads)
+            .iter()
+            .map(|entry| 0.5 + 0.4 * entry)
+            .collect::<Vec<_>>();
+        let log_decay = gated_delta_net_fixture(15, tokens * heads)
+            .iter()
+            .map(|entry| -0.05 - 0.15 * entry.abs())
+            .collect::<Vec<_>>();
+        let mut recurrent = gated_delta_net_fixture(16, heads * dimension * dimension);
+        let mut recurrent_output = vec![0.0_f32; tokens * heads * dimension];
+
+        let mut best = f64::INFINITY;
+        for _ in 0..repeats {
+            let started = Instant::now();
+            // SAFETY: every fixture outlives the call and none of the buffers alias one another.
+            assert_eq!(
+                unsafe {
+                    jmodels_gated_delta_net_f32_with_context(
+                        context,
+                        query.as_ptr(),
+                        query.len() as u64,
+                        key.as_ptr(),
+                        key.len() as u64,
+                        value.as_ptr(),
+                        value.len() as u64,
+                        log_decay.as_ptr(),
+                        log_decay.len() as u64,
+                        beta.as_ptr(),
+                        beta.len() as u64,
+                        recurrent.as_mut_ptr(),
+                        recurrent.len() as u64,
+                        recurrent_output.as_mut_ptr(),
+                        recurrent_output.len() as u64,
+                        tokens as u32,
+                        heads as u32,
+                        heads as u32,
+                        dimension as u32,
+                        dimension as u32,
+                    )
+                },
+                STATUS_OK
+            );
+            best = best.min(started.elapsed().as_secs_f64());
+        }
+        println!(
+            "gated-delta-net: {:.3} ms per {tokens}-token layer step ({:.3} ms per token)",
+            best * 1000.0,
+            best * 1000.0 / tokens as f64
+        );
+
+        let rows = 12288;
+        let cols = 2560;
+        let weight_bytes = rows * cols / 256 * Q4_K_BLOCK_BYTES;
+        let weights = vec![0x42_u8; weight_bytes];
+        let input = gated_delta_net_fixture(17, tokens * cols);
+        let mut projected = vec![0.0_f32; tokens * rows];
+        let mut matmul_best = f64::INFINITY;
+        for _ in 0..repeats {
+            let started = Instant::now();
+            // SAFETY: the weight buffer covers rows*cols Q4_K blocks and the shapes match it.
+            assert_eq!(
+                unsafe {
+                    jmodels_quantized_f32_batched_matmul_with_context(
+                        context,
+                        2,
+                        weights.as_ptr(),
+                        weights.len() as u64,
+                        input.as_ptr(),
+                        input.len() as u64,
+                        projected.as_mut_ptr(),
+                        projected.len() as u64,
+                        tokens as u32,
+                        rows as u32,
+                        cols as u32,
+                    )
+                },
+                STATUS_OK
+            );
+            matmul_best = matmul_best.min(started.elapsed().as_secs_f64());
+        }
+        let gflop = 2.0 * tokens as f64 * rows as f64 * cols as f64 / 1.0e9;
+        println!(
+            "q4_k matmul {rows}x{cols} batch {tokens}: {:.3} ms ({:.1} GFLOP/s)",
+            matmul_best * 1000.0,
+            gflop / matmul_best
+        );
+        // SAFETY: the test consumes the unique context pointer exactly once.
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
+        );
     }
 }

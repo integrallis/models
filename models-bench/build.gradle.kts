@@ -60,6 +60,10 @@ tasks.withType<JavaExec>().configureEach {
 }
 
 dependencies {
+    // The Rust PTX GPU arm. Present on every platform: the module's own fallback reports an
+    // absent or ineligible device rather than failing, so a CPU-only host still builds and runs
+    // the gate command (it reports accelerated=false, which is the G3 evidence).
+    implementation(project(":backend-cuda"))
     implementation(project(":models-runtime"))
     implementation(project(":backend-java"))
     implementation(project(":models-router"))
@@ -83,8 +87,8 @@ dependencies {
     // runtime is not requested; the bridge JAR needs no Cargo build to compile.
     jmhImplementation(project(":backend-native"))
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.21.4")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.21.4")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.21.7")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.21.7")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.assertj:assertj-core:3.27.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")

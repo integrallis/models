@@ -185,6 +185,16 @@ final class LlamaDecoder implements PureJavaDecoder {
   }
 
   @Override
+  public float[][] prefillBatchHiddenStates(Session[] sessions, int[][] tokenBatches) {
+    return forwardPass.prefillBatchHiddenStates(unwrapSessions(sessions), tokenBatches);
+  }
+
+  @Override
+  public boolean supportsBatchedHiddenStates() {
+    return true;
+  }
+
+  @Override
   public LogitBatch prefillBatchTransient(Session[] sessions, int[][] tokenBatches) {
     return forwardPass.prefillBatchTransient(unwrapSessions(sessions), tokenBatches);
   }

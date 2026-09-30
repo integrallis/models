@@ -73,15 +73,34 @@ class LlamaForwardPassTest {
   private static final float SIMD_REDUCTION_TOLERANCE = 2.0e-7f;
 
   private GgufFile buildNanoModel(Random rng) {
+    return buildNanoModel(rng, "llama");
+  }
+
+  /**
+   * The same nano model under any architecture id. Only the metadata prefix differs: the per-layer
+   * tensor set is identical, which is the point for Gemma 1 -- it carries exactly the Llama
+   * tensors.
+   */
+  private GgufFile buildNanoModel(Random rng, String arch) {
+    return buildNanoModel(rng, arch, 0.0f);
+  }
+
+  /** The nano model under any architecture, optionally with a Gemma 2 attention-logit softcap. */
+  private GgufFile buildNanoModel(Random rng, String arch, float attnSoftcap) {
+    boolean gemmaPostNorms = arch.equals("gemma2") || arch.equals("gemma3");
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()
-            .addUint32("llama.embedding_length", DIM)
-            .addUint32("llama.block_count", LAYERS)
-            .addUint32("llama.attention.head_count", HEADS)
-            .addUint32("llama.attention.head_count_kv", KV_HEADS)
-            .addUint32("llama.vocab_size", VOCAB_SIZE)
-            .addUint32("llama.context_length", CONTEXT)
-            .addUint32("llama.feed_forward_length", HIDDEN_DIM);
+            .addString("general.architecture", arch)
+            .addUint32(arch + ".embedding_length", DIM)
+            .addUint32(arch + ".block_count", LAYERS)
+            .addUint32(arch + ".attention.head_count", HEADS)
+            .addUint32(arch + ".attention.head_count_kv", KV_HEADS)
+            .addUint32(arch + ".vocab_size", VOCAB_SIZE)
+            .addUint32(arch + ".context_length", CONTEXT)
+            .addUint32(arch + ".feed_forward_length", HIDDEN_DIM);
+    if (attnSoftcap != 0.0f) {
+      builder.addFloat32(arch + ".attn_logit_softcapping", attnSoftcap);
+    }
 
     // token_embd.weight: [vocab_size x dim]
     builder.addTensor(
@@ -102,6 +121,15 @@ class LlamaForwardPassTest {
       String prefix = "blk." + l + ".";
       builder.addTensor(
           prefix + "attn_norm.weight", GgufTensorType.F32, new long[] {DIM}, onesF32(DIM));
+      if (gemmaPostNorms) {
+        builder.addTensor(
+            prefix + "post_attention_norm.weight",
+            GgufTensorType.F32,
+            new long[] {DIM},
+            onesF32(DIM));
+        builder.addTensor(
+            prefix + "post_ffw_norm.weight", GgufTensorType.F32, new long[] {DIM}, onesF32(DIM));
+      }
       builder.addTensor(
           prefix + "attn_q.weight",
           GgufTensorType.F32,
@@ -392,6 +420,260 @@ class LlamaForwardPassTest {
 
   @Nested
   class NanoModel {
+
+    @Test
+    void gemma2AttentionSoftcapChangesOutputAndIsAppliedOnBothAttentionRoutes() {
+      // Two properties, and the second is the one that catches a half-done change.
+      //
+      // 1. The cap must actually do something: the same weights with and without
+      //    attn_logit_softcapping must produce different logits. A softcap wired into a config but
+      //    never applied would look correct in every config assertion.
+      // 2. It must be applied on BOTH attention routes. The head-by-head loop and the fused grouped
+      //    path softmax in different places, so capping one and not the other would make output
+      //    depend on which route the plan happened to choose -- exactly the asymmetry that bit the
+      //    Gemma 4 dense work, where I guarded the single-token post-norm and missed its batched
+      // twin.
+      // Cap 0.5 rather than Gemma 2's own 50: this test verifies the WIRING, and at nano scale the
+      // attention logits are far below 50, where 50*tanh(x/50) rounds back to x and the cap is
+      // unobservable. The real 50.0 is asserted in the config test.
+      GgufFile uncapped = buildNanoModel(new Random(77), "gemma2", 0.0f);
+      GgufFile capped = buildNanoModel(new Random(77), "gemma2", 0.5f);
+
+      LlamaConfig uncappedConfig = LlamaConfig.fromMetadata(uncapped.metadata());
+      LlamaConfig cappedConfig = LlamaConfig.fromMetadata(capped.metadata());
+      assertThat(uncappedConfig.attnLogitSoftcap()).isZero();
+      assertThat(cappedConfig.attnLogitSoftcap()).isEqualTo(0.5f);
+      assertThat(cappedConfig.numHeads() / cappedConfig.numKvHeads())
+          .describedAs("the fused route only engages above group size one")
+          .isGreaterThan(1);
+
+      // Must be past position 0: with a single cached key softmax([x]) is [1.0] for every x, so a
+      // cap applied there changes nothing and the test would pass vacuously.
+      LlamaForwardPass plain =
+          newForwardPass(uncappedConfig, LlamaWeights.fromGgufFile(uncapped, uncappedConfig));
+      plain.forward(3, 0);
+      plain.forward(5, 1);
+      float[] withoutCap = plain.forward(7, 2).clone();
+
+      LlamaForwardPass capping =
+          newForwardPass(cappedConfig, LlamaWeights.fromGgufFile(capped, cappedConfig));
+      capping.forward(3, 0);
+      capping.forward(5, 1);
+      float[] withCap = capping.forward(7, 2).clone();
+
+      assertThat(withCap)
+          .describedAs("an attention softcap that changes nothing is not being applied")
+          .isNotEqualTo(withoutCap);
+
+      // Now the same capped model down the fused grouped route.
+      LlamaForwardPass fusedRoute =
+          new LlamaForwardPass(
+              cappedConfig,
+              LlamaWeights.fromGgufFile(capped, cappedConfig),
+              new KvCache(
+                  cappedConfig.numLayers(),
+                  cappedConfig.contextLength(),
+                  cappedConfig.keyDim(),
+                  cappedConfig.valueDim()),
+              ExecutionPlanner.plan(
+                  RuntimeFingerprint.capture(),
+                  ModelTopology.from(
+                      cappedConfig.architecture().metadataId(),
+                      cappedConfig,
+                      LlamaWeights.fromGgufFile(capped, cappedConfig)),
+                  fusedAttentionPlanConfiguration()),
+              GgufBatchedMatrixKernel.none());
+
+      fusedRoute.forward(3, 0);
+      fusedRoute.forward(5, 1);
+      assertThat(fusedRoute.forward(7, 2))
+          .describedAs("the fused route must cap attention logits exactly as head-by-head does")
+          .containsExactly(withCap);
+    }
+
+    /** {@link PureJavaPlanConfiguration#defaults()} with the fused grouped-attention knob on. */
+    private static PureJavaPlanConfiguration fusedAttentionPlanConfiguration() {
+      return new PureJavaPlanConfiguration(
+          true,
+          true,
+          GgufQ4Kernel.WIDENED,
+          GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
+          PureJavaPlanConfiguration.DEFAULT_PREFILL_BATCH_SIZE,
+          true,
+          true,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          GgufQ8BlockMajorKernel.SCATTERED,
+          false,
+          PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
+    }
+
+    @Test
+    void phi3FusedQkvAndGateUpSplitToExactlyTheSeparateTensors() {
+      // The claim worth proving is not "phi-3 loads" but "the split is exact". Two models are built
+      // from identical weight data -- one with separate attn_q/k/v and ffn_gate/ffn_up, one with
+      // Phi-3's fused attn_qkv and fused ffn_up -- and their logits must be bit-identical. A wrong
+      // offset, a wrong stacking order, or a mid-block cut would all show up as different numbers
+      // rather than as an error, which is exactly how this class of bug ships unnoticed.
+      int kvDim = KV_HEADS * (DIM / HEADS);
+      // Raw tensor bytes: concatenating these is exactly what a fused tensor stores, so the test
+      // compares the bytes the loader must recover rather than a re-encoding of them.
+      byte[][] q = new byte[LAYERS][];
+      byte[][] k = new byte[LAYERS][];
+      byte[][] v = new byte[LAYERS][];
+      byte[][] gate = new byte[LAYERS][];
+      byte[][] up = new byte[LAYERS][];
+      Random data = new Random(9001);
+      for (int l = 0; l < LAYERS; l++) {
+        q[l] = randomF32(data, DIM * DIM);
+        k[l] = randomF32(data, kvDim * DIM);
+        v[l] = randomF32(data, kvDim * DIM);
+        gate[l] = randomF32(data, HIDDEN_DIM * DIM);
+        up[l] = randomF32(data, HIDDEN_DIM * DIM);
+      }
+
+      GgufFile separate = buildSplitModel(q, k, v, gate, up, kvDim, false);
+      GgufFile fused = buildSplitModel(q, k, v, gate, up, kvDim, true);
+
+      LlamaConfig separateConfig = LlamaConfig.fromMetadata(separate.metadata());
+      LlamaConfig fusedConfig = LlamaConfig.fromMetadata(fused.metadata());
+      assertThat(fusedConfig.architecture()).isEqualTo(DecoderArchitecture.PHI3);
+
+      float[] fromSeparate =
+          newForwardPass(separateConfig, LlamaWeights.fromGgufFile(separate, separateConfig))
+              .forward(3, 0);
+      float[] fromFused =
+          newForwardPass(fusedConfig, LlamaWeights.fromGgufFile(fused, fusedConfig)).forward(3, 0);
+
+      assertThat(fromFused)
+          .describedAs("splitting a fused attn_qkv and ffn_up must reproduce the separate tensors")
+          .containsExactly(fromSeparate);
+    }
+
+    /**
+     * The nano model with Q/K/V and gate/up either separate or fused, from the same weight data.
+     *
+     * <p>Fused stacks Q then K then V along the output dimension, and gate then up, which is the
+     * order Phi-3 publishes.
+     */
+    private GgufFile buildSplitModel(
+        byte[][] q, byte[][] k, byte[][] v, byte[][] gate, byte[][] up, int kvDim, boolean fuse) {
+      String arch = fuse ? "phi3" : "llama";
+      Random rng = new Random(4242);
+      SyntheticGgufBuilder builder =
+          new SyntheticGgufBuilder()
+              .addString("general.architecture", arch)
+              .addUint32(arch + ".embedding_length", DIM)
+              .addUint32(arch + ".block_count", LAYERS)
+              .addUint32(arch + ".attention.head_count", HEADS)
+              .addUint32(arch + ".attention.head_count_kv", KV_HEADS)
+              .addUint32(arch + ".vocab_size", VOCAB_SIZE)
+              .addUint32(arch + ".context_length", CONTEXT)
+              .addUint32(arch + ".feed_forward_length", HIDDEN_DIM);
+      byte[] embedding = randomF32(rng, VOCAB_SIZE * DIM);
+      builder.addTensor(
+          "token_embd.weight", GgufTensorType.F32, new long[] {DIM, VOCAB_SIZE}, embedding);
+      builder.addTensor("output_norm.weight", GgufTensorType.F32, new long[] {DIM}, onesF32(DIM));
+      builder.addTensor(
+          "output.weight", GgufTensorType.F32, new long[] {DIM, VOCAB_SIZE}, embedding);
+      for (int l = 0; l < LAYERS; l++) {
+        String prefix = "blk." + l + ".";
+        builder.addTensor(
+            prefix + "attn_norm.weight", GgufTensorType.F32, new long[] {DIM}, onesF32(DIM));
+        if (fuse) {
+          byte[] qkv = new byte[q[l].length + k[l].length + v[l].length];
+          System.arraycopy(q[l], 0, qkv, 0, q[l].length);
+          System.arraycopy(k[l], 0, qkv, q[l].length, k[l].length);
+          System.arraycopy(v[l], 0, qkv, q[l].length + k[l].length, v[l].length);
+          builder.addTensor(
+              prefix + "attn_qkv.weight",
+              GgufTensorType.F32,
+              new long[] {DIM, DIM + 2L * kvDim},
+              qkv);
+        } else {
+          builder.addTensor(
+              prefix + "attn_q.weight", GgufTensorType.F32, new long[] {DIM, DIM}, q[l]);
+          builder.addTensor(
+              prefix + "attn_k.weight", GgufTensorType.F32, new long[] {DIM, kvDim}, k[l]);
+          builder.addTensor(
+              prefix + "attn_v.weight", GgufTensorType.F32, new long[] {DIM, kvDim}, v[l]);
+        }
+        builder.addTensor(
+            prefix + "attn_output.weight",
+            GgufTensorType.F32,
+            new long[] {DIM, DIM},
+            randomF32(rng, DIM * DIM));
+        builder.addTensor(
+            prefix + "ffn_norm.weight", GgufTensorType.F32, new long[] {DIM}, onesF32(DIM));
+        if (fuse) {
+          byte[] gateUp = new byte[gate[l].length + up[l].length];
+          System.arraycopy(gate[l], 0, gateUp, 0, gate[l].length);
+          System.arraycopy(up[l], 0, gateUp, gate[l].length, up[l].length);
+          builder.addTensor(
+              prefix + "ffn_up.weight",
+              GgufTensorType.F32,
+              new long[] {DIM, 2L * HIDDEN_DIM},
+              gateUp);
+        } else {
+          builder.addTensor(
+              prefix + "ffn_gate.weight",
+              GgufTensorType.F32,
+              new long[] {DIM, HIDDEN_DIM},
+              gate[l]);
+          builder.addTensor(
+              prefix + "ffn_up.weight", GgufTensorType.F32, new long[] {DIM, HIDDEN_DIM}, up[l]);
+        }
+        builder.addTensor(
+            prefix + "ffn_down.weight",
+            GgufTensorType.F32,
+            new long[] {HIDDEN_DIM, DIM},
+            randomF32(rng, DIM * HIDDEN_DIM));
+      }
+      byte[] data = builder.build();
+      var segment = Arena.ofConfined().allocate(data.length);
+      MemorySegment.copy(data, 0, segment, ValueLayout.JAVA_BYTE, 0, data.length);
+      return GgufParser.parseSegment(segment);
+    }
+
+    @Test
+    void gemma1LoadsWithoutTheGemma2NormsAndPrefillMatchesOneTokenAtATime() {
+      // Gemma 1 carries exactly the Llama tensor set: no post_attention_norm, no post_ffw_norm, no
+      // QK norms. Loading must therefore not ask for them, and the decoder must still apply the
+      // family's own semantics -- GELU-gated feed-forward, embedding scaled by sqrt(d), NeoX rope.
+      // Prefill/decode equivalence is the invariant: it exercises the batched and single-token
+      // paths
+      // and forces them to agree, which is what caught a missed guard in the Gemma 4 dense work.
+      GgufFile file = buildNanoModel(new Random(42), "gemma");
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+
+      assertThat(config.architecture()).isEqualTo(DecoderArchitecture.GEMMA);
+      assertThat(config.usesGeluFfn()).isTrue();
+      assertThat(config.usesNeoxRope()).isTrue();
+      assertThat(config.embeddingScale()).isEqualTo((float) Math.sqrt(config.embeddingDim()));
+      assertThat(config.usesPostAttentionNorm()).isFalse();
+      assertThat(config.usesPostFfnNorm()).isFalse();
+
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaForwardPass pass = newForwardPass(config, weights);
+
+      float[] first = pass.forward(1, 0).clone();
+      float[] second = pass.forward(2, 1).clone();
+      for (float value : second) {
+        assertThat(Float.isFinite(value)).describedAs("gemma 1 logits must be finite").isTrue();
+      }
+      assertThat(first).isNotEqualTo(second);
+
+      LlamaForwardPass batched = newForwardPass(config, LlamaWeights.fromGgufFile(file, config));
+      float[] prefilled = batched.prefill(new int[] {1, 2}, 0);
+
+      assertThat(prefilled)
+          .describedAs("batched prefill must match running the same tokens one at a time")
+          .containsExactly(second);
+    }
 
     @Test
     void rejectsAnExecutionPlanForDifferentWeights() {
@@ -725,8 +1007,10 @@ class LlamaForwardPassTest {
                   false,
                   false,
                   false,
+                  false,
                   GgufQ8BlockMajorKernel.SCATTERED,
-                  false));
+                  false,
+                  PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT));
       LlamaForwardPass baseline =
           new LlamaForwardPass(
               config,
@@ -1164,11 +1448,13 @@ class LlamaForwardPassTest {
                 true,
                 false,
                 false,
+                false,
                 true,
                 false,
                 false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false);
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         KvCache stagedCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -1214,11 +1500,13 @@ class LlamaForwardPassTest {
                 true,
                 false,
                 false,
+                false,
                 true,
                 false,
                 false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false);
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         KvCache baselineCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -1248,11 +1536,13 @@ class LlamaForwardPassTest {
                 true,
                 false,
                 false,
+                false,
                 true,
                 true,
                 false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false);
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         KvCache stagedCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -1517,8 +1807,10 @@ class LlamaForwardPassTest {
                 false,
                 false,
                 false,
+                false,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false);
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         KvCache baselineCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -1548,11 +1840,13 @@ class LlamaForwardPassTest {
                 true,
                 false,
                 false,
+                false,
                 true,
                 true,
                 true,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                false);
+                false,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         KvCache stagedCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -1582,11 +1876,13 @@ class LlamaForwardPassTest {
                 true,
                 false,
                 false,
+                false,
                 true,
                 true,
                 true,
                 GgufQ8BlockMajorKernel.SCATTERED,
-                true);
+                true,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         KvCache parallelCache =
             new KvCache(
                 config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
@@ -1612,11 +1908,13 @@ class LlamaForwardPassTest {
                 true,
                 false,
                 false,
+                false,
                 true,
                 true,
                 true,
                 GgufQ8BlockMajorKernel.ROW_ACCUMULATED,
-                true);
+                true,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         PureJavaExecutionPlan rowAccumulatedPlan =
             ExecutionPlanner.plan(
                 graalRuntime(),
@@ -1640,11 +1938,13 @@ class LlamaForwardPassTest {
                 true,
                 false,
                 false,
+                false,
                 true,
                 true,
                 true,
                 GgufQ8BlockMajorKernel.FLOAT_LANE_ACCUMULATED,
-                true);
+                true,
+                PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
         PureJavaExecutionPlan floatLanePlan =
             ExecutionPlanner.plan(
                 graalRuntime256(),
@@ -1810,8 +2110,10 @@ class LlamaForwardPassTest {
                       false,
                       false,
                       false,
+                      false,
                       GgufQ8BlockMajorKernel.SCATTERED,
-                      false)));
+                      false,
+                      PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT)));
       float[] actual = batched.prefill(tokens, 0);
 
       assertThat(batched.usesBatchedPrefill()).isTrue();
@@ -2943,8 +3245,10 @@ class LlamaForwardPassTest {
             false,
             false,
             false,
+            false,
             GgufQ8BlockMajorKernel.SCATTERED,
-            false));
+            false,
+            PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT));
   }
 
   private static RuntimeFingerprint graalRuntime() {

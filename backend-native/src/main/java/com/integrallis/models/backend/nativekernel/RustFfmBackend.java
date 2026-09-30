@@ -18,12 +18,14 @@ package com.integrallis.models.backend.nativekernel;
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.BatchInferenceBackend;
+import com.integrallis.models.api.GroupedDecisionBackend;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
+import com.integrallis.models.api.ResumableInferenceBackend;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
@@ -41,11 +43,18 @@ import java.util.Objects;
  * GGUF backend that keeps transformer execution in Java and delegates qualified matrix kernels to
  * Models-owned Rust code through FFM.
  */
-public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchInferenceBackend {
+public final class RustFfmBackend
+    implements GroupedDecisionBackend,
+        ResumableInferenceBackend,
+        SpeculativeInferenceBackend,
+        BatchInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
   public static final String LOAD_WARMUP_PROPERTY = "models.native.loadWarmup";
   public static final String PLAN_VERSION = "rust-ffm-v13";
+
+  /** The recorded decision this backend's grouping break-even turns on. */
+  private static final String NATIVE_DECODE_ENVIRONMENT_KEY = "native-quantized-decode";
 
   private final PureJavaBackend delegate;
   private final BackendDiagnostics diagnostics;
@@ -287,6 +296,62 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchI
   }
 
   @Override
+  public boolean supportsResumption() {
+    return delegate.supportsResumption();
+  }
+
+  @Override
+  public boolean supportsGroupedDecisions() {
+    return delegate.supportsGroupedDecisions();
+  }
+
+  @Override
+  public int maximumGroupSize() {
+    return delegate.maximumGroupSize();
+  }
+
+  @Override
+  public boolean groupedDecisionsMatchSingleDecisions() {
+    // No. MEASURED 2026-09-24: this kernel keeps a dedicated single-row path -- the `batch_size ==
+    // 1`
+    // specialisations reduce one row's blocks straight to a scalar, while two or more rows
+    // accumulate per-row vector lanes and reduce at the end. Both are correct and they round
+    // differently: 4e-7 relative on one projection, 6e-2 mean logit by the end of the graph, about
+    // 0.03 to 0.10 of probability. Splitting a prefill into several batches is bit-identical, so
+    // the
+    // grouping of rows is not the issue; crossing between one row and many is.
+    return false;
+  }
+
+  @Override
+  public int groupedDecisionBreakEven() {
+    // Not delegated, because what decides this is the kernel this backend adds and not the graph
+    // underneath it. The native quantized decode kernel makes the single-token step that ends each
+    // question cheap, and that step is the only thing grouping removes. MEASURED 2026-09-24 on a
+    // Hetzner CCX33, twenty questions over one contract: with the kernel on, grouped and one-at-a-
+    // time are within noise at every group size from ten to thirty (0.94x, 1.00x, 1.05x, band
+    // +-5%); with it off, grouping is worth 1.69x. So grouping earns its place only without it.
+    return "true".equals(diagnostics.environment().get(NATIVE_DECODE_ENVIRONMENT_KEY))
+        ? Integer.MAX_VALUE
+        : 2;
+  }
+
+  @Override
+  public float[][] decideGrouped(int[][] suffixes) {
+    return delegate.decideGrouped(suffixes);
+  }
+
+  @Override
+  public Resumption capture() {
+    return delegate.capture();
+  }
+
+  @Override
+  public void resume(Resumption point) {
+    delegate.resume(point);
+  }
+
+  @Override
   public void reset() {
     delegate.reset();
   }
@@ -314,7 +379,7 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchI
         "native-kernel-poll-millis",
         kernel.supportsPollBudget() ? Long.toString(kernel.pollMillis()) : "unsupported");
     environment.put("java-executor-poll-millis", Long.toString(VectorUtil.ggufPollMillis()));
-    environment.put("native-quantized-decode", Boolean.toString(kernel.nativeDecodeEnabled()));
+    environment.put(NATIVE_DECODE_ENVIRONMENT_KEY, Boolean.toString(kernel.nativeDecodeEnabled()));
     environment.put(
         "native-grouped-attention", Boolean.toString(kernel.supportsGroupedAttention()));
     environment.put("native-q5-0-grouped", Boolean.toString(kernel.q5_0GroupedEnabled()));
@@ -379,6 +444,28 @@ public final class RustFfmBackend implements SpeculativeInferenceBackend, BatchI
                 RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
                 "state",
                 "caller-owned-java-array")));
+    optimizations.add(
+        new OptimizationDecision(
+            "rust-grouped-gated-delta-net",
+            kernel.supportsGroupedGatedDeltaNet()
+                ? OptimizationStatus.ENABLED
+                : kernel.gatedDeltaNetEnabled()
+                    ? OptimizationStatus.UNSUPPORTED
+                    : OptimizationStatus.DISABLED,
+            kernel.supportsGroupedGatedDeltaNet()
+                ? "a group of questions advances every branch's recurrence in one launch across the worker pool"
+                : kernel.gatedDeltaNetEnabled()
+                    ? "loaded native kernel advances only one sequence per launch"
+                    : "disabled by " + RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
+            Map.of(
+                "abi",
+                Integer.toString(NativeKernelLibrary.ABI_VERSION),
+                "boundary",
+                "panama-ffm-critical",
+                "property",
+                RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
+                "state",
+                "branch-major-caller-owned-java-array")));
     optimizations.add(
         new OptimizationDecision(
             "rust-q5-0-grouped-matmul",

@@ -116,6 +116,36 @@ interface PureJavaDecoder extends AutoCloseable {
     return false;
   }
 
+  /** Whether this decoder can return to a position it has read without re-reading it. */
+  default boolean supportsResumption() {
+    return false;
+  }
+
+  /** Whether this decoder can answer several suffixes against one prefix in a single sweep. */
+  default boolean supportsGroupedDecisions() {
+    return false;
+  }
+
+  /** The largest group this decoder will answer at once. */
+  default int maximumGroupSize() {
+    return 1;
+  }
+
+  /** Answers each suffix against the prefix the default session is positioned at. */
+  default float[][] decideGrouped(int[][] suffixes) {
+    throw new UnsupportedOperationException("decoder cannot answer a group");
+  }
+
+  /** Captures the default session's state at its current position. */
+  default Object captureResumption() {
+    throw new UnsupportedOperationException("decoder cannot capture a resumption");
+  }
+
+  /** Returns the default session to a captured position. */
+  default void resume(Object point) {
+    throw new UnsupportedOperationException("decoder cannot resume");
+  }
+
   default boolean supportsActivatedBranch() {
     return false;
   }
@@ -160,6 +190,16 @@ interface PureJavaDecoder extends AutoCloseable {
 
   default boolean supportsRaggedPrefillBatch() {
     return false;
+  }
+
+  /** Whether this decoder can prefill several sessions and return their hidden states together. */
+  default boolean supportsBatchedHiddenStates() {
+    return false;
+  }
+
+  /** Prefills independent sessions, returning one final normalized hidden state per session. */
+  default float[][] prefillBatchHiddenStates(Session[] sessions, int[][] tokenBatches) {
+    throw new UnsupportedOperationException("this decoder cannot batch hidden states");
   }
 
   default LogitBatch prefillBatch(Session[] sessions, int[][] tokenBatches) {

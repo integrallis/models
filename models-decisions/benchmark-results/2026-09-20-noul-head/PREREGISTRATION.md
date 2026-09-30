@@ -1,0 +1,381 @@
+# Pre-registration — Noul head vs decode verdict
+
+**Written and committed 2026-09-20, before any split was opened and before any hidden state was
+harvested.** Nothing below may be changed once the sealed split is read. If the gate fails, the
+failure is the result.
+
+## Hypothesis
+
+A linear head reading the base's final normalized hidden state reproduces the verdict that the same
+base reaches through an autoregressive decode loop, closely enough to replace it, and its
+probabilities are calibrated well enough to be worth reading.
+
+## Artifact and host, both fixed
+
+| | |
+| --- | --- |
+| Base | `granite-4.1-3b-Q4_K_M.gguf`, SHA-256 `662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29`, verified equal to the ModelJars catalog |
+| Hidden width | 2560 |
+| Backend | `rust-ffm` (`backend-native`, `jmodels-kernels` 0.3.42 built on this host), because the qualified answerability evidence is on `rust-ffm` |
+| Host | Hetzner ccx33, 8 vCPU AMD EPYC-Milan, AVX2, 30 GiB, Ubuntu 24.04.4, Temurin 25.0.4.1 |
+| Decode | greedy, temperature 0. Deterministic by construction |
+
+## Corpora — two, in different genres, both published and neither authored here
+
+| | SQuAD v2 dev | MS MARCO v2.1 validation |
+| --- | --- | --- |
+| SHA-256 | `80a5225e94905956a6446d296ca1093975c4d3b3260f1d6c8f68bc2ab77182d8` | `a07a87f483e602f5812573bff45109e5cbd934773c1c364366f176dd791e44d7` |
+| Items | 11,873 | 101,093 |
+| Negative class | 5,945 unanswerable (0.5007) | 45,457 no-answer (0.4497) |
+| **Majority-class floor** | **0.5007** | **0.5503** |
+| Genre | Wikipedia, crowd-written questions | real web search queries and retrieved passages |
+
+The two-dataset requirement is not decoration. One dataset measured carefully has already produced a
+confident wrong answer here. **The gate must hold on both.** A pass on one and a failure on the
+other is a failure, and is to be reported as the disagreement it is.
+
+## Sampling and splits, fixed before harvest
+
+- N = 1000 per dataset, drawn uniformly at random with seed **20260920**, preserving the natural
+  base rate rather than rebalancing, so the realized floor is reported as it falls.
+- Split 500 train / 200 calibration / **300 sealed test**, disjoint, same seed.
+- Splits are grouped by source passage: no passage may appear in two splits. This forecloses the
+  leakage that would otherwise inflate agreement.
+- The sealed test split is read **once**, after the head and the temperature are frozen.
+
+## Procedure
+
+1. For each item, build the prompt from a template fixed now and recorded in the run manifest.
+2. Harvest, in one pass per item: the decode verdict from the base, and the final normalized hidden
+   state at the last prompt position.
+3. Fit the linear head on the train split only, by deterministic logistic regression with fixed
+   iteration count and fixed L2, no early stopping of any kind.
+4. Fit the calibration temperature on the calibration split only, by minimizing negative log
+   likelihood.
+5. Open the sealed test split once and report.
+
+## Gates
+
+**Primary.** Agreement between head verdict and decode verdict on the sealed split **>= 0.95**.
+
+**Secondary.** Expected calibration error of the head on the sealed split **<= 0.05**, 15 equal-width
+bins.
+
+**Performance.** Median per-decision cost strictly below one decode turn, same host, same process,
+**n = 3**.
+
+**Both gates must hold on both datasets.**
+
+## Sanity condition, declared in advance
+
+If the decode verdict's own accuracy against the published labels does not exceed that dataset's
+majority-class floor by at least **0.10**, then the base cannot do this task, agreement is agreement
+with a coin flip, and the arm is reported **UNINFORMATIVE** — neither pass nor fail. This is written
+down now precisely so a high agreement with a useless teacher cannot later be read as success.
+
+## On sample size
+
+Given a fixed artifact, greedy decode, and fixed seeds, agreement and calibration error are
+deterministic functions of the inputs rather than draws from a distribution: repeating the harvest
+returns the identical number, so n = 1 is exact for them and reporting error bars would be
+theatre. Latency is the stochastic quantity, and carries n = 3.
+
+## What this design cannot test
+
+- Whether the result transfers to any base other than Granite 4.1 3B, or to any task other than
+  answerability. It cannot, and no claim of that kind may be drawn from it.
+- Whether a from-scratch encoder (arm C) would do better. That is a separate arm.
+- Anything whatever about Jev, which we have not run and do not have access to.
+- Whether calibration measured on these two corpora holds on a customer's data. It is reported per
+  dataset and never pooled, for exactly this reason.
+
+## Stopping rule
+
+The sealed split is opened once. No hyperparameter may be changed and the split re-read. If the
+gate fails, the recorded outcome is a failure, and any subsequent attempt is a new experiment with
+a new pre-registration and a fresh split.
+
+---
+
+# Amendment 1 — enterprise corpus, energy, and a hardware sweep
+
+**Written 2026-09-20. No split has been opened and not one hidden state has been harvested**, so
+this is still pre-registration rather than a revision made after seeing a result. The original gates
+are unchanged; this adds a corpus, an axis, and two hardware arms.
+
+## A1.1 Third corpus — CUAD, because enterprise usage is the case worth making
+
+SQuAD and MS MARCO are academic and web genres. The buyer this tier is aimed at reads contracts,
+policies and support tickets, so a third corpus is added in that genre.
+
+| | CUAD test split |
+| --- | --- |
+| Source | `github.com/TheAtticusProject/cuad` `data.zip`, SHA-256 `f8161d18bea4e9c05e78fa6dda61c19c846fb8087ea969c172753bc2f45b999a` |
+| Contents | 102 commercial contracts, 4,182 clause questions |
+| Negative class | 2,938 unanswerable (0.7025) |
+| **Majority-class floor** | **0.7025** |
+| Licence | Apache-2.0, published by the Atticus Project |
+
+CUAD is the most awkward of the three and that is why it is in. Its base rate is skewed 70/30 rather
+than near-even, which is the enterprise reality the other two do not test: most questions asked of a
+document have no answer in it. Accuracy is a weak metric against a 0.70 floor, so on this corpus the
+weight falls on agreement and calibration, and that is stated now rather than discovered later.
+
+**The gate must hold on all three.** A pass on two and a failure on the third is a failure, reported
+as the disagreement it is.
+
+## A1.2 Long documents — a fixed window, and the ceiling it imposes, reported
+
+Contracts are far longer than SQuAD paragraphs or MS MARCO passages. The protocol therefore takes a
+**fixed 4,000-token window from the start of each contract**, applied identically to answerable and
+unanswerable items, with no answer-aware cropping of any kind — cropping around a known span would
+leak the answer's location for the positives and have no counterpart for the negatives.
+
+**The fraction of answerable items whose gold span falls outside the window is measured and reported
+beside every CUAD figure.** Those items cannot be answered correctly by any model at any quality, so
+they cap achievable accuracy for a reason that has nothing to do with what is being measured. An
+over-long input has silently destroyed two datasets in this tree before; the mitigation is to handle
+the limit and say how often it was hit.
+
+## A1.3 Energy — an axis, measured where possible and approximated where not
+
+Latency alone understates the case. A decision that avoids a decode loop should cost far fewer
+joules, and for an enterprise buyer reporting under CSRD that is the number that matters.
+
+**What this host can and cannot do, checked rather than assumed.** The Hetzner VM exposes
+`/sys/class/powercap` empty, no `/dev/cpu/*/msr`, no `rapl` or `amd_energy` module and no `hwmon`
+entries. **Joules are not measurable on it.** What is available is exact cgroup CPU accounting.
+
+Reported per arm, each labelled by how it was obtained:
+
+| Quantity | Method | Label |
+| --- | --- | --- |
+| CPU-microseconds per decision | cgroup `cpu.stat` delta | **measured** |
+| Watt-hours per decision, CPU arms | CPU-seconds x host TDP fraction, TDP read from the part's specification | **computed, approximate** |
+| Watts and joules, GPU arm | NVML via `nvidia-smi` sampling across the run | **measured** |
+
+The approximation is explicitly an approximation and may not be quoted as a measurement. Its purpose
+is an order of magnitude, which is the scale the comparison actually turns on.
+
+**Honesty condition on any energy claim.** The per-decision figure is the defensible one. Total
+energy reduction is not: efficiency gains of this kind historically raise total consumption rather
+than lower it, and the model this tier imitates is named after the economist who described exactly
+that. No write-up may convert a per-decision saving into a sustainability claim.
+
+## A1.4 GPU arm
+
+`TornadoGgufBatchedMatrixKernel` implements `GgufBatchedMatrixKernel`, so it can be injected through
+`PureJavaBackend.load(path, kernel)`. That arrangement keeps the backend a
+`SharedPrefixInferenceBackend` — the prefix sharing the whole tier depends on survives — while the
+projections execute on the device. Q4_K and Q6_K projection support is on `models` `origin/main`
+(#194), which is what Granite 4.1 3B Q4_K_M needs.
+
+- Host: Vultr `vcg-a16-3c-32g-8vram`, NVIDIA A16, 8 GiB VRAM, about USD 0.236/hour, three locations
+  currently available. A 2.0 GB Q4_K_M fits with room for the cache.
+- The same pre-registered gates apply unchanged. The GPU arm is a hardware comparison, not a
+  different experiment.
+- **`backend-cuda` is excluded.** Our own Rust PTX kernels carry a known Q6_K parity defect that is
+  not bit-exact past one super-block (`models` PR #198, reproduced on an A40). Measuring a decision
+  quality gate on a kernel known to be numerically wrong would produce a number about the defect.
+  The arm may be added once that is fixed and its parity gate is green.
+
+## A1.5 TPU — not reachable from this stack, and saying so
+
+There is **no JVM-native path to a Google TPU**, and this is a structural absence rather than work
+not yet done. TornadoVM targets OpenCL, PTX and SPIR-V. ONNX Runtime ships no TPU execution
+provider. `libtpu` is reached through XLA from C++ or Python. A Coral Edge TPU is int8 with a few
+megabytes of SRAM and cannot hold a 3B model at all. `models-backend-apple` is a bridge to Apple
+Foundation Models, a different model entirely, not an accelerator for our GGUF artifact.
+
+What is possible, if wanted, is an **external hardware control**: the same model family converted to
+JAX/Flax and run on a Cloud TPU, under a small pinned Python environment of the kind this project
+already permits for third-party reproduction. It would bound what the best available hardware does.
+It would say nothing whatever about the JVM tier, because it would be a different implementation of
+a different graph, and it must never be reported as an arm of this experiment. **Not adopted here;
+recorded as available on request.**
+
+---
+
+# Amendment 2 — the Jev arm
+
+**Written 2026-09-20, on registering for the Jev preview and before any access was granted.** No
+Jev output has been seen. No sealed split has been opened. This exists so the comparison protocol
+is fixed while we still have nothing to tune it against.
+
+## A2.1 Why this arm and not an inference from reproductions
+
+Jev is the system this tier's category comes from. Everything published about its performance is
+either vendor-reported (67.8% on a four-workflow benchmark of its own construction, tying GPT-5.6
+Terra at about 1/76th the cost and 25x the speed) or a third-party reproduction we did not run.
+Neither transfers. The only comparison worth making is one where **we run both arms ourselves,
+under one protocol, on data neither of us authored.**
+
+`edgelabs-ai/jev48`, the open reproduction with weights, is **not** a substitute and is not adopted
+here. If it is ever run it must be labelled a reproduction of Jev in every sentence that mentions
+it, because that is what it is.
+
+## A2.2 What the arm is allowed to be used for
+
+**Evaluation only.** Jev outputs are used to score this comparison and for nothing else. They are
+**not** stored as training data, not used to fit a head, and not used to fit a temperature. That
+boundary is not incidental: our own teacher stack is deliberately Apache-2.0 and MIT precisely so
+no trained weight has a licence question attached to it, and a benchmark arm must not reintroduce
+one. **Read the preview terms before the first call** and record here whether evaluation use is
+permitted; if it is not, the arm does not run.
+
+## A2.3 Protocol symmetry, fixed now
+
+- **Same items.** The identical sealed splits from the three corpora, already frozen by seed
+  20260920. Nothing is re-drawn for Jev.
+- **Same state.** The identical context, under the identical 4,000-token window policy, including
+  the same truncation and the same out-of-window accounting.
+- **Same question, one phrasing.** The exact wording is the one already committed in
+  `NoulHarvestTool.buildPrompt`, chosen before either arm ran.
+
+  **Neither arm's phrasing may be tuned.** An independent review of Jev reports that its accuracy
+  *swings with how the question is asked*. That cuts both ways and is the single easiest place to
+  produce a flattering result without technically lying: search phrasings for ours, use the default
+  for theirs. One phrasing, fixed before either arm runs, no per-arm search. If a phrasing sweep is
+  ever run it is run **for both arms** and reported in full.
+- **Same mapping.** Our `Noul` and their binary primitive answer the same proposition. No
+  post-hoc threshold tuning on either side; both report a probability and both are scored at 0.5
+  unless a threshold is fitted on the calibration split, in which case it is fitted for **both**.
+
+## A2.4 What is reported, and separately
+
+Field coverage notes that Jev's published accuracy "is better understood as agreement with a
+model-derived reference than as independently verified correctness." This protocol does not blend
+those. For **each arm, on each corpus**, four numbers with the majority-class floor beside them:
+
+1. **Accuracy against the corpus's published labels** — the only one that is correctness.
+2. **Agreement with our base's decode verdict** — a different quantity, reported as such, and
+   meaningless for Jev except as a curiosity.
+3. **Calibration**: ECE over 15 bins, and Brier. Per corpus, never pooled.
+4. **Cost per decision**: wall latency, CPU-microseconds where the arm is local, and money where
+   the arm is metered.
+
+## A2.5 What would make us lose, stated in advance
+
+We publish the result whichever way it falls. Specifically:
+
+- If Jev is **more accurate** on all three corpora, that is the finding and it is reported in the
+  headline, not a footnote.
+- If our advantage is **only** latency and locality and not quality, the claim is latency and
+  locality. It does not become a quality claim by adjacency.
+- If the margin between arms is **inside the noise** — and with sealed splits of 300, 300 and
+  (pending) 75 it very well may be — the finding is "indistinguishable on this evidence", not a
+  win. A sub-point margin between two systems is exactly the press-release ordering this project
+  refuses to produce.
+
+## A2.6 Timing
+
+Access is not expected to arrive before the harvest finishes, and the arm does not block it. The
+sealed splits are frozen and reproducible from their seed, so the Jev arm runs against **the same
+items** whenever access lands. That is precisely why they were frozen.
+
+---
+
+# Amendment 3 — CUAD sample size
+
+**Written 2026-09-20T17:30Z, before CUAD's split was opened.** Seven CUAD items were harvested
+when the wrapper script advanced automatically at the end of MS MARCO; the run was stopped within
+four minutes and **those seven rows are discarded**, because they were drawn from an N=1000 split
+and this amendment changes the draw. No CUAD hidden state has been read, no CUAD label has been
+looked at, and no CUAD figure exists.
+
+## What changed and why
+
+Measured on this host: SQuAD v2 took 6.09 s/item and MS MARCO 7.20 s/item, both close to
+prediction. CUAD's items are an order of magnitude larger, because the 4,000-token window from
+Amendment 1 is doing exactly what it was written to do — contracts are long. At roughly 121 s/item
+CUAD would need about **33.6 hours** for N=1000, against a host deletion deadline about **15.9
+hours** away.
+
+This is a cost-and-clock constraint discovered by measurement, not a response to any CUAD result.
+The original N=1000 was set from SQuAD's smoke without re-deriving it per corpus, which was an
+error in the original sizing rather than a change of intent.
+
+## The change
+
+**CUAD N = 250** (125 train / 50 calibration / **75 sealed**), drawn with the same seed 20260920
+and the same passage-grouped splitter. About 8.4 hours, inside the deadline with margin.
+
+**The 4,000-token window is unchanged.** It would have been faster to shrink the window instead,
+and that option is explicitly rejected: the window is the realistic enterprise shape, and the
+out-of-window gold-span rate is one of the numbers CUAD exists to report. Trading it for runtime
+would corrupt the thing being measured in order to measure it sooner. SQuAD and MS MARCO both
+recorded `outOfWindowAnswerable=0`, so CUAD is the only corpus where this policy has any effect at
+all, which is precisely why it must not move.
+
+## The cost, stated rather than hidden
+
+A sealed split of 75 gives a materially wider interval than the 300 of the other two corpora. Any
+CUAD figure must be reported with that n beside it, and **no CUAD margin smaller than the interval
+75 samples supports may be called a difference**. If the enterprise arm turns out to hinge on a
+margin that 75 items cannot resolve, the honest report is that this run could not resolve it, and
+the corpus needs a longer-lived host rather than a louder claim.
+
+The gates themselves are unchanged. The two-corpus requirement is unaffected: SQuAD and MS MARCO
+are complete at N=1000 each.
+
+---
+
+# Amendment 4 — the MS MARCO context was built wrong, and is rebuilt
+
+**Written 2026-09-20T18:15Z. MS MARCO's sealed split was never opened.** The defect below was found
+by inspecting the **train split only**, which the protocol permits; the sealed 300 were harvested
+but never read, and are discarded unread along with the rest.
+
+## The defect
+
+MS MARCO supplies **ten retrieved passages per query**, with an `is_selected` flag marking those
+that contain the answer. The first converter built context as the first three passages **by
+position**, ignoring `is_selected` entirely. Sampling three rows shows answer-bearing passages at
+indices `[5]`, `[4,5]` and `[]` — none inside the window that was fed.
+
+So for a large share of items the model was given context that genuinely does not contain the
+answer, the item was labelled answerable because MS MARCO records a human answer *somewhere*, and
+the model was scored wrong for correctly refusing. **The base was penalised for being right.**
+
+## How it was caught, and what the signature was
+
+The pre-registered sanity condition. On the train split, decode-versus-label accuracy was **0.4660
+against a majority floor of 0.5900**, a margin of **-0.1240**, with the decode verdict saying "not
+answerable" 438 times in 500 while 295 of 500 were labelled answerable.
+
+**Accuracy below the floor is the tell.** A model that had merely found the task hard would land
+near the floor, not beneath it; landing beneath it means the question asked of the model and the
+question the label answers are different questions. The guard was written to stop a high agreement
+with a useless teacher reading as success. It caught the inverse, which is the better outcome.
+
+For contrast, SQuAD v2 on the same check: **0.7860 against a floor of 0.5020, margin +0.2840.**
+
+## The rebuild
+
+Context is now **every retrieved passage, in rank order**. "Answerable" then means answerable from
+the retrieved set, which is what the label actually records. No subset selection, so no judgement
+about which distractors to keep and no way to discard the answer-bearing passage.
+
+| | old (void) | rebuilt |
+| --- | --- | --- |
+| Context | first 3 passages by position | all 10, rank order |
+| SHA-256 | `163a6a12a41a4fd098de32c35a085cc9184913265f43f3adf8076fd45c7e204e` | `01f8294855cf2cbc47ca8b385e9845941878bf32d632550fdcf15eb2f5bb305d` |
+| Rows / answerable / floor | 101,093 / 0.4497 no-answer / 0.5503 | unchanged — only the context changed |
+| Context length | — | p50 497 words, p90 658, p99 1042, max 1443 |
+
+The 1,000 harvested rows from the void construction are **quarantined, not reinterpreted**, as
+`msmarco-void-passage-subset.jsonl`. They measured the wrong question and no figure may be drawn
+from them.
+
+N stays at 1000 with the same seed and splitter. At roughly 20 s/item the rebuild costs about 5.8
+hours, and the host's recorded deletion deadline is extended to **2026-09-21T14:00Z** with the
+spend ceiling raised to **USD 15** to cover it.
+
+## What this says about the process
+
+Two thousand rows were harvested and reported as progress -- `done` lines, wall clock, CPU-seconds,
+ETAs -- without a single row being read back. A validation pass over the first twenty-five rows
+would have caught this before the second corpus began. **Harvest validation is now a required step
+before a corpus is allowed to run to completion, not an optional one**, and the check is the one
+already written into the protocol: decode-versus-label accuracy against the floor, on the train
+split, reported before any further compute is spent.

@@ -4,6 +4,577 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Corrected
+
+- **The 0.3.48 and 0.3.49 qualification claims overstate model quality.** Both releases state that
+  fourteen models scored 1.000 on every quality metric. `correctAnswerRate` scores the **pipeline**:
+  under the grounding policy these runs used, an answer that fails citation screening is replaced with
+  text extracted from the retrieved document, and the replacement is what is scored. Across all 14
+  models and 378 attempts, **69% were answered by `EXTRACTIVE_FALLBACK`**, 20% by the model, 11% by
+  retrieval abstention.
+
+  Applying `RagProductionQualificationPolicy` -- this repository's own gate, at a 1/3 model-answer
+  floor and 90% correctness among those answers -- **five of the fourteen qualify**: `lfm2`,
+  `qwen3-30b-a3b-instruct-2507` and `qwen3-coder-30b-a3b` (`qwen3moe`), `kat-coder-v2.5` (`qwen35moe`),
+  and `gemma-4-E4B`. `qwen3next`, `deepseek2`, `gemma3n`, `gpt-oss` and `mistral3` have **no qualifying
+  model**.
+
+  Nothing in the released artifacts is affected, and no catalogue record was ever contributed from
+  these runs. The full correction, including the per-model table and the raw model output, is in
+  `release-evidence/CORRECTION-2026-09-29.md`.
+
+- **The summary now publishes what makes that visible.** `RagBenchmarkSummary` gains
+  `rawCorrectAnswerRate`, `modelAnswerRate`, `modelAnswerCorrectRate` and `extractiveFallbackRate`, and
+  the CLI prints the last three beside `correct=`. They existed only inside `runs[]` before, which is
+  why a summary could report a perfect score for a model that contributed nothing and no reader had
+  anything to contradict it. `RagStatisticsTest` pins that exact case.
+
+### Fixed
+
+- **gemma3n never applied its final logit softcap.** The reference's graph ends in SCALE, TANH, SCALE
+  around the output projection -- `30 * tanh(logit / 30)` -- and gemma3n's published header declares no
+  softcapping key, so the reference's hparams default of 30 applies. Our decoder applied nothing, while
+  gemma4 has applied its own since it shipped. The formula now lives in `TensorOps.softcap` with gemma4
+  delegating to it, so there is one implementation.
+
+  Confirmed numerically against a dump of the reference graph: raw `-15.6992` leaves as `-14.4074`, and
+  `30 * tanh(-15.6992 / 30)` is `-14.41`.
+
+  **This is not why gemma3n produces corrupted text.** The transform is monotonic, so it cannot change
+  which token a greedy decode picks, and the generated text is byte-identical before and after -- which
+  is also why nothing noticed its absence. It matters for any consumer reading a probability, a
+  temperature or a logprob from these logits.
+
+- **GELU could read past the end of the tanh table.** `ArrayIndexOutOfBoundsException: Index 65537 out
+  of bounds for length 65537`, from `TensorOps.tableTanh` inside `gelu`, which killed a gemma3n
+  qualification run 456 seconds in. The table holds `TANH_TABLE_SIZE + 1` entries so the last
+  interpolation has a neighbour to read, but a value one float ulp below the table's limit still scales
+  onto that last slot -- adding `10.0f` rounds it to `20.0f` and `20.0f * scale` is exactly the size --
+  so the read went one past the end.
+
+  Shared code: any architecture whose feed-forward uses GELU could reach it. No existing measurement
+  changes, because the only inputs affected previously threw. The test reproduces the exact exception,
+  and hits the boundary directly -- a sweep through plausible activations was written first and passed
+  against the crashing version, because the boundary is one ulp wide.
+
+- **A reasoning trace was scored as if it were the answer; grounding policy is now v21.** Screening a
+  `<think>` block fails on the block's own terms -- it reasons aloud, so it states things the retrieved
+  documents do not support, the whole output is rejected, and the answer that followed is never
+  examined. Several models answered correctly after a trace and were reported as contributing nothing.
+  A closed `<think>`, `<thinking>` or `<reasoning>` block is now removed before screening, with
+  `rawText` still carrying the full generation. `POLICY_ID` becomes v21 because this changes which
+  decision a completion receives, and records written under v20 keep their meaning rather than being
+  reinterpreted.
+
+  An explicit refusal for *unterminated* traces was written and then removed: probing the policy showed
+  the decision is `EXTRACTIVE_FALLBACK` with or without it on every input tried, because ordinary
+  screening already rejects such text. Code whose effect cannot be demonstrated is a claim, not a
+  safeguard.
+
+- **The output token cap defaults to 256, not 64.** The campaign never chose 64 -- it inherited the CLI
+  default, and at 64 most attempts were truncated. A grounded answer here is one short sentence plus a
+  bracketed source id, and a model that reasons first needs room for both, so the old default could not
+  express a passing answer for a whole class of models. 256 is a floor that lets them finish, not a
+  tuned optimum. Every report records the cap it ran with, so older records stay interpretable.
+
+- **DeepSeek-V2 models were prompted with the DeepSeek-V1 format.** The harness rendered
+  `### Instruction:` / `### Response:`, while DeepSeek-Coder-V2-Lite-Instruct's own
+  `tokenizer.chat_template` in the published GGUF uses `User: ` / `Assistant: `. Shown the `###`
+  markers, the model continued the pattern and emitted `###` for entire completions -- which read as a
+  broken decoder until the template was checked. A new `deepseek-v2` template fixes it; `deepseek` is
+  left exactly as it was, because the V1 coder models are already qualified against those markers with
+  their greedy oracles pinned on them.
+
+  **The template was not the cause of its garbage output, and this entry originally implied it was.**
+  Re-run on the corrected template with a 256-token cap, the model emits pure newline tokens for the
+  whole completion: `modelAnswerRate` 0.000, `truncatedAnswerRate` 1.000. `###` under one prompt and
+  `\n` under another are the same degeneracy. The `deepseek2` decoder is defective on real weights; the
+  template fix is right and independent.
+
+### Notes
+
+- **`deepseek2`, `gemma3n` and `qwen3next` emit incoherent output that prompting does not explain.**
+  `deepseek2` emits only newlines once correctly prompted, which is the strongest evidence of the three.
+  `gemma3n` produces corrupted text at 0.0 raw correct; `qwen3next` degenerates into repetition at
+  11.1%. The `gemma` template used matches gemma3n's own turn markers read from the published GGUF, and
+  `chatml` matches Qwen's, so a decoder defect is the leading explanation -- stated as a suspicion, not
+  a diagnosis. Evidence in `release-evidence/CORRECTION-2026-09-29.md`.
+
+### Notes
+
+- **`gpt-oss` from a GGUF is qualified on published weights**, measured after 0.3.49 shipped and so not
+  claimed by it. `unsloth/gpt-oss-20b-GGUF` Q4_K_M (11.6 GB), on `models@0.3.49+rerun11-fbe951608665`:
+  **1.000 on all six quality metrics over 27/27 attempts with zero failures**, 63.7 s ttft p50 and
+  361.6 ms per token, 11.6 GB peak RSS. It ran on the `gpt-4o` o200k pre-tokenizer split added in
+  0.3.48, which until this run had no catalogue model exercising it.
+
+  That leaves `mistral3` as the only one of the eight new architectures with no published-weights run
+  behind it.
+
+  **The latency is the honest headline.** 361.6 ms per token is the parallel MXFP4 kernel from 0.3.49
+  at work -- the same model on 0.3.48 sat at 8% CPU and had not finished a run after 100 minutes,
+  where this completed in 55 -- but it is still several times slower per token than a K-quant model of
+  comparable size, because the second half of the MXFP4 gap is untouched. The K-quant kernels quantize
+  the activation to Q8 and reduce in integer arithmetic; MXFP4 still multiplies in scalar floats. That
+  kernel is the next piece of work, and it has to be proven identical to the scalar one before it can
+  be adopted.
+
+## [0.3.49] - 2026-09-29
+
+### Fixed
+
+- **MXFP4 projections use every core instead of one.** Every other quantization hands its whole matrix
+  to vectors-core's `gguf*BatchDotProduct`, which parallelises above a one-mebibyte threshold. MXFP4
+  alone looped rows on the calling thread, so a model whose weights are MXFP4 decoded on a single core
+  while the rest of the catalogue used all of them. Found on a 16-vCPU qualification worker running
+  gpt-oss from a GGUF, sitting at a flat **8% CPU -- about one core** -- where K-quant models pegged the
+  box.
+
+  **Measured 5.15x on 12 cores** on the shape gpt-oss actually uses (one expert, 2880x2880, 4.2 MiB of
+  weights): 11.60 ms to 2.25 ms per projection. Not 12x, because the kernel dequantizes as it reads and
+  is bandwidth-bound rather than compute-bound.
+
+  Two models in the catalogue touch MXFP4: gpt-oss from a GGUF, where every expert is MXFP4 and the
+  effect is the whole model, and Qwen3-Next, where only the shared-expert gate and up are, so the
+  effect is a slice of each layer. **No published number is retracted.** `Qwen3-Coder-Next`'s 241 ms
+  per token was measured on exactly the code that shipped in 0.3.48; it will be faster on this
+  release, and re-measuring it is a new measurement epoch rather than a correction.
+
+  Rows are split, never reductions. Each output element is its own dot product over its own row, so
+  thread count cannot move a bit -- asserted bit-identical to the serial path rather than close, which
+  in a backend that pins float reduction order on purpose is the only assertion worth making.
+
+  The first version of this crashed instead of being slow, which the tests caught: a `MemorySegment`
+  from a confined arena is readable only by the thread that allocated it, so handing its rows to a pool
+  thread throws `WrongThreadException` from inside the dot product. Parallelism is now gated on the
+  segment actually being reachable from another thread -- the same property the execution planner
+  already gates thread sharing on -- and a confined-arena projection stays on the calling thread at any
+  size.
+
+  The scalar float activation is unchanged and still deliberate: the K-quant kernels quantize the
+  activation to Q8 and reduce in integer arithmetic, and an MXFP4 kernel that does the same has to be
+  proven identical to this one first. This release fixes the thread factor only.
+
+## [0.3.48] - 2026-09-29
+
+### Changed
+
+- **Fused grouped-query attention is now available to every grouped-query model, off by default.**
+  The fused kernels read each cached K and V row once per KV head instead of once per query head,
+  which on a decode step bound by cache bytes is one pass instead of `groupSize`. They were always
+  parameterised by group size, head stride and scale and were never Granite-specific.
+
+  **It is off by default because it is not token-preserving, which we measured rather than assumed.**
+  The fused path agrees with the head-by-head loop to 1.4e-6 relative on the attention output, flat in
+  context length (3.8e-7 at 64 cached rows, 1.4e-6 at 1024 and 4096) — but greedy decoding is a
+  discrete argmax, so a perturbation that small still flips a token whenever the top two candidates
+  sit inside it. Swapping only the attention kernel under Granite on the RAG workload changed **2 of 9
+  generated answers from byte-identical prompts** (a comma became a semicolon; one clause was
+  reworded) at unchanged `correctAnswerRate`, `retrievalRecall` and `abstentionAccuracy`. The Rust
+  native grouped-attention kernel diverges less — 7.3e-7 relative, bit-identical at a single cached
+  position — and still flipped those same two answers.
+
+  **And the gain does not justify that cost.** Measured on a group-8 model (qwen2.5-coder-3b,
+  1838-token context, four counterbalanced arms): **2.89 vs 2.74 tok/s decode, a 5.5% gain**. The two
+  `true` arms agreed to 0.3% and each path's checksum was bit-reproducible, so the measurement is tight
+  — it is the *prediction* that was wrong. A bytes-per-token model said 1.45x, assuming the head-by-head
+  path's `groupSize` re-reads of each K and V row all come from DRAM. They do not: one group's KV
+  working set is under a megabyte per layer at this context, so it is L2/L3 resident and fusion saves
+  cache traffic rather than memory traffic. The Rust native grouped-attention kernel is the better
+  candidate if an attention change is ever adopted — 15% decode measured on Granite, and half the
+  divergence — but it flips the same answers.
+
+  A qualification record is a claim about the bytes a model produced, and a published one cannot be
+  retracted. So each architecture keeps the route its records were measured on: Granite the native
+  kernel with the Java fused loop as its fallback, everything else head-by-head. Adopting a faster
+  route is a **new measurement epoch** — every pinned greedy oracle re-run and the tier band
+  re-derived on it — not a default flip. `models.purejava.fusedGroupedAttention=true` asks for it by
+  name, and the choice is recorded as the `fused-grouped-attention` optimization decision so a record
+  always says which route produced it.
+
+- **New performance tier `PERFORMANCE_REDUCED`, split out of `OFFLINE`.** `OFFLINE` was conflating
+  "too slow for this SLO" with "cannot be used at all", and the difference turned out to be most of the
+  catalogue. Measured on the small/medium qualification campaign: of 28 models tiered `OFFLINE`, **every
+  one** passed retrieval recall, citation recall, abstention accuracy and correct-answer rate — none
+  were broken, they were slower than the USABLE latency bound. Five were rejected on the tail alone,
+  with a ttft median under 2000ms at 95% confidence and only 3–7 of 27 requests over it;
+  `gemma_3_4b_it` missed by **90ms (4.5%)** while holding better than 2x margin on retrieval, tpot and
+  end-to-end, and landed in the same tier as a model 3x over.
+
+  A `PERFORMANCE_REDUCED` model is shippable with a slower latency expectation, which for a
+  small/medium-first catalogue is a product category rather than a failure. Quality failures still
+  outrank latency, so a model that is both slow and ungrounded reports `FAILED_QUALITY` — returning
+  "works, just slower" for a model producing wrong answers would be worse than the old tier was.
+
+  `OFFLINE` is retained and no longer produced: 316 certified records carry it and a published
+  qualification cannot be retracted. Those records are unaffected — `performanceTier` is a stored field,
+  not a recomputation — and they stay re-readable, since an `OFFLINE` record whose quality gates passed
+  is a `PERFORMANCE_REDUCED` record under the current taxonomy, derivable from the stored summary
+  without re-running anything.
+
+- The `fused-grouped-attention-not-wired` performance cliff is now
+  **`fused-grouped-attention-disabled`**. It used to mean the fused kernel served Granite only; it now
+  means the faster route was available and not taken. The id changed rather than being kept stable
+  because records carrying the old one were written when it meant something else —
+  `benchmark-results/2026-09-16-loader-cliffs/README.md` is one of them.
+
+### Fixed
+
+- **Four defects that only a real published model could expose, each found on a fleet worker after the
+  weights had already been downloaded.** All four were invisible to the unit suite for the same
+  reason: the fixtures were uniform on the axis that broke.
+
+  - The execution planner crashed with a `NullPointerException` on the first mixture-of-experts model
+    to reach the fleet. `ModelTopology` decided thread-shareability by dereferencing the dense
+    feed-forward's first matrix, which is null on a routed layer. It now walks every segment a layer
+    actually owns. The regression test needs an auto arena, because with a confined one the
+    shareability check short-circuits false before it ever reaches the null.
+  - Gemma 4 E4B would not load: its shared-expert hidden dimension **varies by layer** and the loader
+    read one key for all of them. Scratch buffers are now sized from the maximum and indexed per
+    layer — kept deliberately separate, since a buffer sized from one layer's width is an
+    out-of-bounds write rather than an exception when another layer is wider.
+  - Gemma 4 E4B, again, was rejected with `Tensor not found: blk.24.attn_v.weight`. It declares
+    `shared_kv_layers=18` over 42 layers, so layers 24-41 attend to an earlier layer's cache and carry
+    no `attn_k`, `attn_k_norm` or `attn_v` of their own. The forward pass already skipped those
+    projections for such a layer; the loader was demanding tensors nothing would have read. Every
+    fixture had given all three to every layer *because* the loader demanded them, so the shape a real
+    file has could not be expressed in a test.
+  - `ggufMatmul` handled F16 only in its batched form, which a decoder running one token at a time
+    cannot reach. Gemma 4 E4B publishes `per_layer_model_proj` as F16 where E2B publishes BF16, and
+    that projection runs per token.
+
+- The same model produced **different output text on different machines**. Every vectorised float
+  reduction in the model path sized itself from the host — `SPECIES_PREFERRED` capped by
+  `vectors.maxBits` — and a float reduction's last bits are decided by how many partial sums it keeps
+  and in what order it folds them. In a retrieval score that is invisible. In a transformer it
+  decides which token is selected, so it changes the generated text. `PinnedReduction` pins the shape
+  at eight lanes and now backs `rmsNorm`, the F32 row score, the batched F32 path and the attention
+  reduction. It is **bit-identical to what it replaces at the 256-bit default**, so x86 hosts running
+  the default see no change; ARM and narrower or wider configurations do.
+
+- CUDA K-quant and attention kernels are now bit-exact against the CPU control, and G1 token parity
+  passes on device (640 tokens identical, both stages routed). Three defects, all the same mistake of
+  validating a device kernel against a plausible reference instead of the path the gate compares it
+  to: Q6_K folded the way the scalar path folds rather than the way the Panama control does; `expf`
+  approximated the exponential instead of transcribing the CPU's own polynomial, argument reduction
+  and rounding; and the attention reduction folded in a different order.
+
+- Completed deadlines were never removed from the routing timer queue, so a long-lived
+  `RoutingExecution` accumulated them.
+
+- Spring AI did not surface budget overruns as terminal accounting failures.
+
+- LangChain4j applied SDK parameters around provider public APIs rather than through them.
+
+### Added
+
+- **Eight decoder architectures the pure-Java backend could not load before: `lfm2`, `qwen3moe`,
+  `mistral3`, `qwen35moe`, `qwen3next`, `gemma3n`, `deepseek2`, and `gpt-oss` from a GGUF.**
+
+  Six of them are qualified on real published weights, measured here on a 16-vCPU m6a.4xlarge. Every
+  model below scored `correctAnswerRate`, `retrievalRecall`, `citationRecall`, `citationPrecision`,
+  `factCoverage` and `abstentionAccuracy` of **1.000 over 27/27 attempts with zero failures**:
+
+  | model | arch | size | ttft p50 | tpot p50 |
+  |---|---|---|---|---|
+  | `LFM2-1.2B-Instruct` Q4_K_M | `lfm2` | 0.7 GB | 11.1 s | 65.6 ms |
+  | `Qwen3-30B-A3B` Q4_K_M (3 variants) | `qwen3moe` | 18.6 GB | 3.9 s | ~106 ms |
+  | `Ornith-1.0-35B` Q4_K_M | `qwen35moe` | 21.2 GB | 13.0 s | 87.2 ms |
+  | `KAT-Coder-V2.5-Dev` Q4_K_M | `qwen35moe` | 21.4 GB | 20.1 s | 130.8 ms |
+  | `Qwen3.5-35B-A3B` Q4_K_M | `qwen35moe` | 22.0 GB | 15.4 s | 101.0 ms |
+  | `Qwen3-Coder-Next` Q4_K_M | `qwen3next` | 48.5 GB | 38.6 s | 241.0 ms |
+  | `DeepSeek-Coder-V2-Lite-Instruct` Q4_K_M | `deepseek2` | 10.4 GB | 13.6 s | 190.7 ms |
+  | `gemma-3n-E2B-it` Q8_0 | `gemma3n` | 4.8 GB | 25.8 s | 150.8 ms |
+  | `gemma-4-E2B-it` Q4_K_M | `gemma4` (already supported, see Fixed) | 3.4 GB | 3.0 s | 58.0 ms |
+
+  `Qwen3-Coder-Next` is an 80B-class model answering correctly on all 27 attempts inside a 64 GB box at
+  39.2 GB peak RSS — the largest artifact this backend has qualified.
+
+  `mistral3` and `gpt-oss`-from-GGUF are **implemented and verified against unit-level scalar
+  references only; no published-weights qualification yet**, so nothing in the catalogue claims them.
+
+  `deepseek2`'s run exercises multi-head latent attention, 64-expert unnormalised routing and the YaRN
+  variant that moves the mscale into the softmax; it is also the first real model to use the
+  `deepseek-llm` pre-tokenizer split added here. `gemma3n`'s exercises AltUp's four parallel residual
+  streams, LAuReL, shared key-value layers, and a softmax scale of 1.0 rather than 1/sqrt(head_dim).
+
+  What each needed, since "supports the architecture" hides the work: `lfm2` interleaves attention
+  with gated short convolutions over a shift register; `qwen3moe` and `qwen35moe` add routed experts
+  read as strides over one stacked tensor; `qwen3next` adds a gated delta network whose beta and alpha
+  arrive interleaved in a single `ssm_ba` tensor, grouped per key head; `gemma3n` carries four parallel
+  residual streams with AltUp predict/correct plus LAuReL low-rank residuals; `deepseek2` uses
+  multi-head latent attention with a YaRN variant that moves the mscale into the softmax; `gpt-oss`
+  reads MXFP4 experts as one interleaved blob where its safetensors form splits blocks from scales.
+
+  Expert routing is shared between architectures and comes in two forms that are not interchangeable:
+  renormalised (softmax over the selected experts, weights sum to one) for `qwen3moe` and `qwen35moe`,
+  unnormalised (softmax over all experts, weights used as they are) for `deepseek2`, which publishes
+  no `expert_weights_norm` at all. Routed models run the expert branch one token at a time, since
+  expert selection differs per token and a batched matmul cannot serve rows that need different
+  weights.
+
+- **Pre-tokenizer splits for tekken (Mistral 3), the o200k family, single-digit GPT-2, deepseek-coder,
+  deepseek-llm and hunyuan.** A GGUF carries a pre-tokenizer *name*, not its regex, so an unrecognised
+  name silently falls back to a split that is wrong for the model: it loads, generates fluent text, and
+  scores worse for no visible reason. Several are sequences of expressions applied in order rather than
+  one alternation, because the reference applies them that way and joining them changes the split —
+  measured, not assumed: joined against sequential over 32 strings differed on 4 for deepseek-coder,
+  every one CJK, Hangul or leading whitespace. Every pattern is transcribed from the model's own
+  `tokenizer.json` or the reference's corresponding case, with the source named in the javadoc.
+  o200k matters beyond gpt-oss: `phi3` declares `gpt-4o` on a byte-level BPE vocabulary, so it would
+  have been scheduled and tokenized with no word-boundary split at all.
+
+- Sharded HuggingFace models can be qualified. The CLI required a single `model.safetensors`, which was
+  the only thing standing between a sharded bundle and a run — `gpt-oss-20b` ships three shards and an
+  index. The artifact digest hashes **the shards**, in index order, rather than the index: an index holds
+  a tensor-name-to-shard map and no weight content, so hashing it would let two different models with
+  the same layout write the same provenance digest.
+
+- `greedyOracleSweepSmall` and `greedyOracleSweepLarge` run the pinned llama.cpp greedy oracles as
+  Gradle tasks, split because one 7B-class fixture can run past 45 minutes and a single task reports
+  nothing for most of an hour. The `fusedGroupedAttention` property is forwarded explicitly: its
+  default is off, so without forwarding the sweep would exercise the very baseline the oracles were
+  recorded on and pass while proving nothing.
+
+- Routing execution controls: per-request and shared spending budgets, deadlines, token bounds and
+  cancellation, via `RoutingExecution`, `RoutingExecutionOptions`, `RoutingBudget`,
+  `RoutingTokenBounds`, `RoutingUsage`, `RoutingCancellationToken` and
+  `RoutingBudgetExceededException`, surfaced on the Spring AI and LangChain4j routed adapters.
+  `RoutingBudget` is a thread-safe account in one application-selected currency, reusable across a
+  session, tenant or process; candidate prices and the account must agree on currency, and **usage
+  the provider does not report is charged at the reserved bound**. It is an in-process ledger and not
+  a payment API. Existing constructors keep their unbudgeted behaviour.
+
+- `TaskClassifier.local()` declares whether classification, including every embedding call, stays in
+  this process. It defaults to `false`, so **unknown is treated as remote**. Wrapping a
+  `PretrainedTaskClassifier` with `TaskClassifier.local` is only correct when the supplied embedder
+  is also local: the index establishes nothing about the embedding client's data boundary.
+
+- A task index records the embedding prefixes its exemplars were built with, and
+  `PretrainedTaskClassifier` applies the query side itself, so callers pass bare queries. Supplying
+  one side without the other is refused rather than half-applied. `--document-prefix` and
+  `--query-prefix` select them on `task-index build`, and `task-index evaluate` gains `--per-item`
+  for paired comparisons between two indexes.
+
+- `ToolSpecRetriever` applies a document prefix when indexing tool descriptions and a query prefix
+  when selecting. It embeds both sides, so it is the easiest place here to get an instruction-tuned
+  embedder wrong, and getting it wrong is silent: selection still returns tools, just less accurately
+  than the model allows. One prefix without the other is refused.
+
+- Bench gates for the GPU campaign and router evaluation: `CudaParityRun`, `CudaDecodeRun`,
+  `GreedyDecode`, `CudaRoutingRecorder` and `RouterSelectionEvaluationCli`.
+
+### Changed
+
+- The bundled router task index is rebuilt and now embeds both exemplars and queries with
+  EmbeddingGemma's classification prefix, `task: classification | query: `, **worth +4.2 points of
+  held-out accuracy**: 0.9459 (455/481) against 0.9044 (435/481) unprefixed, McNemar exact
+  p = 0.0012 on 36 discordant pairs. Gains concentrate where intent rather than surface form
+  separates the classes — extraction +0.185, reasoning +0.119, summarization to 58/58 — while code,
+  math, translation and near-ceiling sql move by at most one prompt.
+
+  The arm that lost is the more useful result. Embedding exemplars as titled documents and queries as
+  search queries, which is the obvious pairing to reach for, measured **0.8399 — 6.4 points below
+  using no prefix at all** — and collapsed chat from 41/50 to 17/50. The two sides land in regions
+  the model keeps apart. Two plausible prefixes, one worth +4.2 and one worth −6.4, and the GGUF
+  carries no template metadata to arbitrate: `BundledTaskIndexTest` now pins both prefixes, including
+  the trailing space that `java.util.Properties` would otherwise eat. Pre-registration, decision rule
+  and per-task results in `docs/findings/embeddinggemma-task-prefix-ab.md`.
+
+  Not separated: which half of the prefix earns the gain, since the arm moved `task: classification`
+  and the `query: ` scaffold together. Not measured: whether any of this transfers to Nomic or E5, or
+  the per-query cost of the seven extra tokens.
+
+- Consume Vectors 0.1.24. Its manifest grew from 164 to 200 bytes to carry an embedding recipe
+  reference, and the version is an exact match rather than a floor, so **0.1.24 cannot open an index
+  written by 0.1.23**. The bundled index is migrated accordingly. `models-router/CORPUS.md` gains the
+  archive packaging step, which was previously undocumented — the documented rebuild writes a
+  collection directory, but what ships is a zip of its contents with the generation directories at the
+  archive root.
+
+- Align `jackson-datatype-jdk8` to 2.21.7, the last Jackson module still on 2.21.4.
+
+- Corrected a `backend-cuda` contract table that asserted the score dot product matches the CPU. It
+  was never tested and it does not: the Java path uses a lane-striped `FloatVector` fold.
+
+## [0.3.47] - 2026-09-25
+
+### Fixed
+
+- Preserve standard cancellation/interruption signals through SDK cause chains. Stop Spring AI
+  and LangChain4j streaming fallback on these signals without penalizing model health; keep the
+  original streaming error and restore interruption only for blocking callers.
+
+- Reject non-finite/negative routing price and latency ceilings, and quality floors outside
+  `[0, 1]`, at policy construction. `NaN` previously bypassed hard eligibility comparisons.
+- Stop blocking fleet execution on cancellation or interruption without invoking fallback clients
+  or recording a model-health failure. Preserve the interrupt flag and propagate interruption
+  as `CancellationException` with the original cause.
+
+### Added
+
+- Per-request capability and data-boundary factories on the Spring AI and LangChain4j routed
+  adapters. Factories receive the complete original request; requirements constrain both selection
+  and fallback, including streams. Existing constructors retain their unconstrained defaults.
+
+
+- `GgufHugePages` loads weights into an anonymous `MADV_HUGEPAGE` mapping instead of mapping the
+  GGUF, so a 2.6 GiB model costs roughly 1,300 page-table entries rather than 650,000. **Off by
+  default**, via `models.purejava.hugePages`, because that is what the measurement says. On a
+  dedicated CCX33 it is worth +3.7% on a bare 18-token forward pass (0.4999 s to 0.4813 s, seven of
+  eight alternating rounds won) and nothing at all on the workload the decision path actually runs:
+  ten rounds of a fifteen-decision video-shape cohort give 1.3837 s against 1.3689 s per decision,
+  +1.1% on five rounds won out of ten, with per-round deltas that alternate sign. `AnonHugePages`
+  was sampled at 2,674,688 kB during those runs, so that is no effect rather than no data. Kept,
+  off, because it is bit-exact and cheap to switch on for a workload that prefills narrowly instead
+  of in wide batches. Mapping the region directly also removed a 2.7 GB zeroing memset that
+  `Arena.allocate` was doing: `GgufParser.parse` went from 1.858 s to 0.653 s when the path is on.
+
+### Changed
+
+- Consume Vectors 0.1.23, including the Q6_K scalar bit-equality correction, and update Jackson
+  dependencies to 2.21.7. The latter removes the three OSV advisory matches on the adapter's
+  previously declared Databind 2.21.4 dependency.
+
+
+- Q4_K output-row tiling was implemented, measured and **reverted**. It is worth +9.1% on an
+  isolated matmul and +0.4% on a real forward pass, because the isolated arm re-times one ~13 MB
+  tensor until it is L3 resident and a forward pass never sees a weight twice. Two earlier
+  conclusions are retracted in the benchmark notes as a result: the Q4_K inner loop is **not** at its
+  algorithmic ceiling -- the same kernel reaches 25.6 MAC/cycle/core with weights resident against
+  17.1 cold, and neither arm uses more than a fifth of the host's measured 38.0 GB/s -- and the
+  "43% of a forward pass is not matmul" figure was an artifact of timing resident tensors, where
+  cold it is 21%.
+
+## [0.3.46] - 2026-09-24
+
+### Added
+
+- An answer space can say what its labels mean. `AnswerSpace.criteria()` carries an optional
+  per-label rubric, `Noul`, `Choice` and `Score` accept one, and `LetterLogitScorer.renderCriteria`
+  renders it. The published score for a decision model had been measured on a prompt this API could
+  not build: JevBench hands every system a per-label rubric out of `question.criteria`, and
+  `AnswerSpace` had only `question()` and `labels()`. Measured over 120 JevBench items on a
+  dedicated CCX33, same model and kernel, the only variable being whether a rubric reaches the
+  prompt: accuracy 0.7500 and Intelligence 72.2 without, 0.9000 and **88.9** with. Ordinal questions
+  went from 0.2500 to 0.9167, which is what `A: 3` means to a reader never told what 3 is. For scale,
+  swapping the recurrence kernel across all 24 layers moves one item in that cohort.
+- Where the rubric goes was measured rather than chosen, and it is also where the latency is. Rubric
+  and letters both after the criterion scored 86.1, both before it 79.6, the rubric before with the
+  letters after 88.9. The last is both the most accurate and the cheapest, because everything before
+  the criterion is shared across every question about one piece of evidence: a 53-token rubric costs
+  0.486 s per question against 0.490 s for no rubric at all. Placed after the criterion it would
+  have cost 0.98 s per question.
+- `GroupedDecisionBackend.groupedDecisionsMatchSingleDecisions()` and
+  `groupedDecisionBreakEven()`, so a backend states whether grouping changes its answers and at what
+  size it starts to pay, instead of the caller assuming both.
+
+### Fixed
+
+- Grouping could change an answer. A lone question reads its answer out of a batch of one row and a
+  group reads its out of a batch of many, and the native kernel keeps a separate single-row path.
+  Measured: three of four grouped answers differed from the same questions asked alone, by up to
+  0.28 of a logit; the pure Java decoder is bit-identical. Grouping is now refused unless the
+  backend states it preserves answers, however profitable it would be.
+- A grouped decision re-read its whole evidence on every call and discarded the resumption point, so
+  the next one-at-a-time decision paid for it again. Twenty questions went from 10.79 s to 8.22 s.
+- The Gated DeltaNet kernel stays on the calling thread for one token of one sequence, which is right
+  for decode; a group called it once per branch and ran every branch on one core. It now takes a
+  whole group in one launch, at native kernel ABI 6. Twenty questions: 12.39 s to 10.79 s.
+- A decision ended by prefilling all but its last token and then stepping that token alone, reading
+  all 2.55 GiB of weights for one token at 67 ms. The answer is now read off the final position of
+  one prefill, where it is one more row of an already compute-bound batch. 0.520 s to 0.485 s per
+  question, with no answer changed: 0 of 120 winners moved.
+- Artifacts written before the rubric existed stay readable. Version 3 appends a per-label rubric;
+  version 2 files are read as having none rather than rejected.
+
+### Changed
+
+- Documentation that claimed a decision is bandwidth bound, and that answering N questions one at a
+  time pays for the weights N times, said the opposite of what this hardware does. Batched prefill
+  measures 18.5 ms per token, linear with no fixed cost, halving from one thread to two and again to
+  four before saturating on four physical cores. It is compute bound and already at the ceiling, so
+  N questions cost N questions' arithmetic however they are arranged. The claims are corrected in
+  place and the measurements are in `benchmark-results/2026-09-24-decision-latency`.
+
+## [0.3.45] - 2026-09-24
+
+### Fixed
+
+- A session was sized for the model's own maximum context. For Qwen3.5 that is 262,144 tokens,
+  whose key and value cache alone is about 17 GB, so opening a decision runtime on a default heap
+  died before the first answer. `models.purejava.maxContextLength` is now a plan-configuration
+  setting like every other, so a ModelJar that knows its prompts are short can recommend a bound.
+  A deployment setting still wins, and absent both the session is sized for the model's maximum.
+  Measured with Harriet on an 8-vCPU EPYC-Milan box: `OutOfMemoryError` before, `open 2.79 s` on a
+  7.7 GiB default heap after.
+
+## [0.3.44] - 2026-09-23
+
+### Added
+
+- `ResumableInferenceBackend`: a backend can capture a position it has read and return to it, so
+  repeated decisions over one piece of evidence stop paying for that evidence every time. Measured
+  with Harriet on an 8-vCPU EPYC-Milan box over a 112-word contract, per-decision cost fell from
+  3.74 s to 0.69 s. Resumed answers are bit-identical to a cold prefill of the same prompt.
+
+  It is deliberately narrower than `SharedPrefixInferenceBackend`: a shared prefix hands out
+  branches that live at the same time, a resumption is strictly sequential. Sequential reuse is the
+  only shape a recurrent state can offer cheaply, because a Gated DeltaNet state is a running
+  summary that can be copied back but not sliced.
+
+### Fixed
+
+- Qwen3.5 `reset()` and `rewind()` reallocated the whole session state on every call. They now
+  clear the recurrent and convolution state in place; a key or value at or beyond the new position
+  is never read.
+
+## [0.3.43] - 2026-09-23
+
+### Added
+
+- `models-decisions`, a System One decision tier: state in, typed probabilistic decisions out, in
+  one pass, with no decode loop anywhere. Three primitives, `Noul` for binary, `Choice` for 2 to
+  255 unordered options and `Score` for 2 to 10 ordered levels, with the answer space declared
+  before the decision is made so it is a contract rather than something parsed out of prose.
+  Candidates are scored against a state read once, forking from a frozen KV prefix, so many
+  questions against one document pay for that document once. `DecisionArtifact` is the release
+  unit and carries the base weight digest: loading it against weights whose SHA-256 disagrees
+  throws rather than scores.
+
+- `backend-cuda`, Models-owned Rust kernels compiled to PTX and driven through Panama FFM: fused
+  dequantise-and-multiply projections for Q4_K and Q6_K, and grouped-query attention for the decode
+  step. The arithmetic compiles unchanged for the host and for `nvptx64`, so it is tested against a
+  CPU reference on any machine with no GPU and no CUDA toolkit. `CudaRoutingCounters` records what
+  executed on the device and why anything did not, so a run that accelerates nothing distinguishes
+  an unsupported format from an ineligible shape from an absent device. **No kernel here has been
+  shown to beat the CPU path**; measured warm on an A40 against 8-core CPU SIMD it is slower. This
+  is the substrate the measurements run on, not a performance claim.
+
+- `RuntimeReport`, which prints the kernel, device and settings a run actually used and can fail
+  closed on a demanded kernel. An unreported fallback has invalidated measurements here before,
+  once landing within 1% of the previous number while hiding a large difference.
+
+### Changed
+
+- The hidden-state prefill now reaches the batched path. `prefill` has consulted the batched
+  execution plan since it was written and `prefillHiddenState` never did, so every hidden-state
+  consumer ran the whole prompt one token at a time: embeddings through `GgufEmbeddingBackend`, and
+  any consumer reading a state off a prompt. Measured on Granite 4.1 3B Q4_K_M on an 8-vCPU
+  EPYC-Milan host, over 128 tokens, the hidden-state prefill went from 66,538 ms (1.9 tok/s) to
+  4,283 ms (29.9 tok/s), a 15.5x improvement. It now runs slightly faster than the logits prefill
+  at that length and reaches parity by 512 tokens, which is the expected shape: it skips the
+  vocabulary projection on every row but the last.
+
+  The `vectors.gguf.pollMillis` budget was the leading hypothesis and was ablated in both
+  directions, 1.86 tok/s at zero against 1.87 at the default; it explains none of the gap. The
+  cause is memory bandwidth, since a single-token forward streams the whole weight set to produce
+  one row.
+
+  Results are unchanged within the repository's existing SIMD reduction tolerance: the hidden
+  state, the key/value cache contents, and the next generated token all match running the prompt
+  one token at a time.
+
 ### Added
 - `backend-tornado` K-quant projection kernels: Java TornadoVM kernels for GGUF Q4_K and Q6_K by Q8_K, alongside the existing Q4_0 by Q8_0 kernels. This is what a `Q4_K_M` catalog model is made of, so the accelerator previously admitted none of its projections. Admitted grouped shapes are `Q4_K/Q4_K`, `Q4_K/Q4_K/Q4_K` and `Q4_K/Q4_K/Q6_K` — the last being the query/key/value group `Q4_K_M` presents, since llama.cpp promotes the value projection to Q6_K. Q4_0 (Q8_0 activations) and the K-quants (Q8_K activations) are never combined in one grouped dispatch, and K-quant projections additionally require a column count that is a multiple of 256. Q5_K, Q2_K, Q3_K and every unquantized format still fall back to the Vector API per projection.
 - `TornadoBackendRuntime.routedProjectionsByFormat()` and `projectionPlanCount()`: how many projections actually reached the device, per GGUF weight format, counted once per matrix in a grouped dispatch. A mixed-format model can otherwise look accelerated while one of its formats silently falls back.

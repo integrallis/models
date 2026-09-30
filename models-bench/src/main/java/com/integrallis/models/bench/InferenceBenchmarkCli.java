@@ -103,6 +103,10 @@ public final class InferenceBenchmarkCli {
       DeterminismAuditCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;
     }
+    if (args.length > 0 && "router-evaluate".equals(args[0])) {
+      RouterSelectionEvaluationCli.run(Arrays.copyOfRange(args, 1, args.length));
+      return;
+    }
     if (args.length > 0 && "task-index".equals(args[0])) {
       // Its evaluate subcommand is a gate, so the verdict travels in the exit status.
       System.exit(TaskIndexCli.run(Arrays.copyOfRange(args, 1, args.length)));
@@ -120,6 +124,10 @@ public final class InferenceBenchmarkCli {
     }
     if (args.length > 0 && "tool-qualification".equals(args[0])) {
       System.exit(ToolCallingQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
+    if (args.length > 0 && "cuda-kernel-gate".equals(args[0])) {
+      System.exit(CudaKernelGateCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
     if (args.length > 0 && "activated-prefix-sharing".equals(args[0])) {

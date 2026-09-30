@@ -35,7 +35,12 @@ public final class GgufParser {
   public static GgufFile parse(Path path, Arena arena) throws IOException {
     try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
       long fileSize = channel.size();
-      MemorySegment fileSegment = channel.map(FileChannel.MapMode.READ_ONLY, 0, fileSize, arena);
+      // A mapped GGUF is 4 KiB pages, and a forward pass touches every weight once, so a multi
+      // gigabyte model spends much of its time in page walks. See GgufHugePages for the numbers.
+      MemorySegment fileSegment =
+          GgufHugePages.isRequested(fileSize)
+              ? GgufHugePages.copyInto(channel, fileSize, arena)
+              : channel.map(FileChannel.MapMode.READ_ONLY, 0, fileSize, arena);
       return parseSegment(fileSegment);
     }
   }

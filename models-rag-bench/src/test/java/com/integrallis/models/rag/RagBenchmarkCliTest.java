@@ -28,6 +28,31 @@ class RagBenchmarkCliTest {
 
   @TempDir Path temporaryDirectory;
 
+  /**
+   * The output cap defaults to room for a grounded answer, which 64 was not.
+   *
+   * <p>Pinned because the value is not cosmetic: at 64 the 2026-09-29 campaign truncated most of
+   * its attempts, and a truncated answer cannot carry the citation the grounding policy screens
+   * for, so it was replaced by an extractive one and scored exactly like a model with nothing to
+   * say. The campaign never chose 64 -- it inherited this default.
+   */
+  @Test
+  void theOutputTokenCapDefaultsToRoomForAGroundedAnswer() throws Exception {
+    Path model = Files.writeString(temporaryDirectory.resolve("default-cap.gguf"), "fixture");
+
+    RagBenchmarkConfiguration configuration =
+        RagBenchmarkCli.parse(
+            new String[] {
+              "--framework", "plain-java",
+              "--backend", "pure-java",
+              "--model", model.toString(),
+              "--model-id", "fixture",
+              "--workload", "general"
+            });
+
+    assertThat(configuration.maxTokens()).isEqualTo(256);
+  }
+
   @Test
   void parsesAReproduciblePureJavaRun() throws Exception {
     Path model = Files.writeString(temporaryDirectory.resolve("model.gguf"), "fixture");
@@ -117,6 +142,43 @@ class RagBenchmarkCliTest {
 
     assertThat(configuration.artifact()).isEqualTo(modelDirectory);
     assertThat(RagBenchmarkCli.artifactIdentity(configuration.artifact())).isEqualTo(weights);
+  }
+
+  @Test
+  void aShardedHuggingFaceDirectoryIsIdentifiedByItsIndex() throws Exception {
+    // gpt-oss-20b ships model-0000x-of-00002.safetensors plus an index and no single
+    // model.safetensors. SafetensorsBundle already loads either shape; rejecting the sharded one
+    // here was the only thing keeping such a model out of a qualification run.
+    Path directory = Files.createTempDirectory("sharded-hf");
+    Files.writeString(
+        directory.resolve("model.safetensors.index.json"),
+        "{\"weight_map\": {\"a\": \"model-00001-of-00002.safetensors\","
+            + " \"b\": \"model-00002-of-00002.safetensors\"}}");
+    Files.write(directory.resolve("model-00001-of-00002.safetensors"), new byte[] {1, 2, 3});
+    Files.write(directory.resolve("model-00002-of-00002.safetensors"), new byte[] {4, 5});
+
+    assertThat(RagBenchmarkCli.artifactIdentity(directory))
+        .isEqualTo(directory.resolve("model.safetensors.index.json"));
+  }
+
+  @Test
+  void aSingleFileBundleStillWinsOverAnIndex() throws Exception {
+    Path directory = Files.createTempDirectory("single-hf");
+    Files.write(directory.resolve("model.safetensors"), new byte[] {9});
+    Files.writeString(directory.resolve("model.safetensors.index.json"), "{}");
+
+    assertThat(RagBenchmarkCli.artifactIdentity(directory))
+        .describedAs("a directory with both must use the single file, as it did before")
+        .isEqualTo(directory.resolve("model.safetensors"));
+  }
+
+  @Test
+  void aDirectoryWithNeitherShapeSaysSo() throws Exception {
+    Path directory = Files.createTempDirectory("empty-hf");
+
+    assertThatThrownBy(() -> RagBenchmarkCli.artifactIdentity(directory))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("model.safetensors.index.json");
   }
 
   @Test
