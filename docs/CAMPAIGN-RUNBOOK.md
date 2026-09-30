@@ -181,3 +181,18 @@ prove the assertion is sensitive by flipping the flag and watching it fail.
 - Do not attribute a defect in this code to anyone else; we authored it.
 - Do not report a pipeline metric as a model metric.
 - Do not let a shard run to completion to confirm a failure already visible in its first minutes.
+
+## The SQL workload needs its own policy, not the grounded-RAG one
+
+Ran on 2026-09-30 and every model failed the contribution gate while answering correctly. The reason is
+structural: `sqlcoder-7b-2` replies `SELECT c.email_normalized, c.customer_id FROM customers c WHERE ...`,
+which is a text-to-SQL model doing exactly its job, and the grounded-RAG screen asks for a cited
+natural-language claim supported by a retrieved document. The two cases it "passed" it passed by echoing
+the context verbatim, citation included, which is worse than failing.
+
+General chat models fare better on the same corpus but still fall back, because the corpus's questions do
+not elicit citations the way the general corpus's do.
+
+So a text-to-SQL qualification wants its own policy -- correctness of the emitted query against a schema,
+not citation grounding -- and running that corpus under the RAG gate measures the wrong thing. Do not
+loosen the grounding gate to accommodate it.
