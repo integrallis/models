@@ -205,7 +205,17 @@ final class Gemma3nScalarReference {
     scale(merged, 1.0f / altup);
     merged = rms(merged, model.tensor("output_norm.weight"));
     position++;
-    return matmul(model.tensor("token_embd.weight"), config.vocabSize(), dim, merged);
+    float[] logits = matmul(model.tensor("token_embd.weight"), config.vocabSize(), dim, merged);
+    // The bounded final-logit transform, written out here rather than calling the production helper
+    // so
+    // this stays an independent implementation. The reference graph's last three nodes are a scale,
+    // a
+    // tanh and a scale around the output projection.
+    float cap = config.finalLogitSoftcap();
+    for (int index = 0; index < logits.length; index++) {
+      logits[index] = cap * (float) Math.tanh(logits[index] / cap);
+    }
+    return logits;
   }
 
   private float[] modalities(float[] source, String prefix) {

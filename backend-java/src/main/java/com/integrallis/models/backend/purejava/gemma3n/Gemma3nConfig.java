@@ -68,7 +68,8 @@ public record Gemma3nConfig(
     float rmsNormEpsilon,
     int slidingWindow,
     List<Boolean> slidingWindowByLayer,
-    List<Float> sparsityScaleByLayer) {
+    List<Float> sparsityScaleByLayer,
+    float finalLogitSoftcap) {
 
   /**
    * The attention softmax scale.
@@ -170,8 +171,19 @@ public record Gemma3nConfig(
         requiredFloat(metadata, "gemma3n.attention.layer_norm_rms_epsilon"),
         requiredInt(metadata, "gemma3n.attention.sliding_window"),
         sliding,
-        sparsity);
+        sparsity,
+        // The published E2B header carries no softcapping key at all -- all 42 of its keys were
+        // checked -- and the reference never reads one for this architecture, so its hparams
+        // default
+        // of 30 applies. Confirmed against the reference's own graph dump: a raw logit of -15.6992
+        // leaves as -14.4074, and 30 * tanh(-15.6992 / 30) is -14.41. Read the key anyway, so a
+        // future
+        // conversion that starts publishing it is honoured rather than silently overridden.
+        metadata.getFloat32("gemma3n.final_logit_softcapping").orElse(DEFAULT_FINAL_LOGIT_SOFTCAP));
   }
+
+  /** The reference's hparams default, which gemma3n does not override. */
+  public static final float DEFAULT_FINAL_LOGIT_SOFTCAP = 30.0f;
 
   /** Query projection width. */
   public int queryDim() {
