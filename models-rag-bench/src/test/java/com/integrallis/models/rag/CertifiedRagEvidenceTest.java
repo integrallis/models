@@ -29,6 +29,14 @@ class CertifiedRagEvidenceTest {
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260724/rag/native-q8-prefix-cache");
   private static final Path SMOLLM2_EVIDENCE = EVIDENCE_ROOT.resolve("smollm2-360m-q8_0");
+  // The first two models qualified by the two-arm fleet worker, which runs the candidate and its
+  // same-host Ollama comparator in one session from the same GGUF.
+  private static final Path TWO_ARM_EVIDENCE =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20260930/rag");
+  private static final Path QWEN3_5_2B_EVIDENCE = TWO_ARM_EVIDENCE.resolve("qwen3.5-2b-q4_k_m");
+  private static final Path GEMMA_3_4B_EVIDENCE =
+      TWO_ARM_EVIDENCE.resolve("gemma-3-4b-it-q4_k_m");
   private static final Path QWEN3_1_7B_EVIDENCE = EVIDENCE_ROOT.resolve("qwen3-1.7b-q8_0");
   private static final Path QWEN2_5_CODER_EVIDENCE =
       EVIDENCE_ROOT.resolve("qwen2.5-coder-0.5b-q8_0");
@@ -2463,6 +2471,57 @@ class CertifiedRagEvidenceTest {
         .extracting(RagRun::rawEvaluation)
         .containsExactlyElementsOf(baseline.runs().stream().map(RagRun::rawEvaluation).toList());
     return qualification;
+  }
+
+  @Test
+  void qwen35TwoBillionQualifiesAgainstTheSameHostOllamaComparator() throws Exception {
+    RagBenchmarkReport candidate =
+        report(QWEN3_5_2B_EVIDENCE, "qwen3.5-2b-rust-ffm-grounded.json");
+    RagBenchmarkReport ollama = report(QWEN3_5_2B_EVIDENCE, "qwen3.5-2b-ollama-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(qualification.modelAnswerRate())
+        .describedAs("the contribution gate needs a third of the cases answered by the model")
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_RATE);
+    assertThat(qualification.comparisons())
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.90, 0.91);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.22, 1.23);
+            });
+  }
+
+  @Test
+  void gemma3FourBillionQualifiesAndBeatsTheComparatorEndToEnd() throws Exception {
+    RagBenchmarkReport candidate =
+        report(GEMMA_3_4B_EVIDENCE, "gemma-3-4b-it-rust-ffm-grounded.json");
+    RagBenchmarkReport ollama = report(GEMMA_3_4B_EVIDENCE, "gemma-3-4b-it-ollama-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(qualification.comparisons())
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.87, 0.88);
+              assertThat(comparison.endToEndLatencyRatio())
+                  .describedAs("end to end this one is faster than the comparator")
+                  .isLessThan(1.0);
+            });
   }
 
   private RagBenchmarkReport report(Path directory, String filename) throws IOException {
