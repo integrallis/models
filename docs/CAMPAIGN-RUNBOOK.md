@@ -74,6 +74,32 @@ ceiling: `cpu3c` at $0.03/vCPU/hr (2 GB RAM per vCPU), `cpu3g` at $0.04 (4 GB). 
 $0.48/hr against $0.69 for an `m6a.4xlarge`. Put no credentials on a pod — presign the S3 GETs and
 PUTs and pass a single manifest URL.
 
+## Rotary layout per architecture — settled, do not re-derive
+
+Checked against llama.cpp's `llama_model_rope_type` table and, where it mattered, against the real
+GGUF headers. Getting one of these wrong rotates the right angles onto the wrong element pairs, which
+scrambles position and degrades a decoder to near-garbage output without failing any shape assertion.
+
+- **The Llama path is correct as it stands.** `LlamaConfig.usesNeoxRope()` returns NeoX for QWEN2,
+  QWEN3, QWEN3MOE, PHI3, HUNYUAN_DENSE and the Gemma family, and NORM for LLAMA, GRANITE, MISTRAL3 and
+  SMOLLM3. Every one of those matches the reference table. Audited; leave it alone.
+- **deepseek2 is NORM**, not NeoX — it was the single wrong entry and is now fixed. It sits outside
+  `usesNeoxRope()` because the family has its own decoder, so the flag could not protect it.
+- **lfm2 is NeoX**, which is what it already does. Not a bug.
+- **qwen35 / qwen35moe are `LLAMA_ROPE_TYPE_IMROPE`, and for text-only input that is exactly NeoX.**
+  Do not "fix" this. Three independent reasons, all checked: ggml documents IMROPE as "interleaved
+  M-RoPE, still NEOX ordering"; `llama-graph.cpp` fills a text token's four position components as
+  `(pos, pos, pos, 0)`, so the t/h/w thetas start equal and are scaled by the same factor every step
+  and therefore stay equal, making IMROPE's branch selection a no-op; and the only branch that *could*
+  differ, the `theta_e = 0` fallthrough, is unreachable because the published sections
+  `qwen35.rope.dimension_sections = [11, 11, 10, 0]` sum to 32 = `rope.dimension_count / 2`, so every
+  sector lands inside one of the three ranges. Qwen3.5-2B also qualified with a model-answer-correct
+  rate of 1.000, which is the measured corroboration.
+
+A rope-layout bug cannot be caught by a fixture whose rotary width is 2: NORM pairs (0,1) and NeoX
+with `half == 1` pairs (0, 0+1), the same two elements. Keep every rotary fixture at 4 or wider, and
+prove the assertion is sensitive by flipping the flag and watching it fail.
+
 ## Evidence discipline
 
 - **Never validate a decoder only against our own scalar reference.** Both can share one
