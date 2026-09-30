@@ -4,10 +4,6 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
-<<<<<<< HEAD
-### Fixed
-
-=======
 ### Corrected
 
 - **The 0.3.48 and 0.3.49 qualification claims overstate model quality.** Both releases state that
@@ -247,7 +243,8 @@ All notable changes to models are documented here.
     cannot reach. Gemma 4 E4B publishes `per_layer_model_proj` as F16 where E2B publishes BF16, and
     that projection runs per token.
 
->>>>>>> origin/main
+### Fixed
+
 - The same model produced **different output text on different machines**. Every vectorised float
   reduction in the model path sized itself from the host — `SPECIES_PREFERRED` capped by
   `vectors.maxBits` — and a float reduction's last bits are decided by how many partial sums it keeps
@@ -273,8 +270,6 @@ All notable changes to models are documented here.
 
 ### Added
 
-<<<<<<< HEAD
-=======
 - **Eight decoder architectures the pure-Java backend could not load before: `lfm2`, `qwen3moe`,
   `mistral3`, `qwen35moe`, `qwen3next`, `gemma3n`, `deepseek2`, and `gpt-oss` from a GGUF.**
 
@@ -343,7 +338,6 @@ All notable changes to models are documented here.
   default is off, so without forwarding the sweep would exercise the very baseline the oracles were
   recorded on and pass while proving nothing.
 
->>>>>>> origin/main
 - Routing execution controls: per-request and shared spending budgets, deadlines, token bounds and
   cancellation, via `RoutingExecution`, `RoutingExecutionOptions`, `RoutingBudget`,
   `RoutingTokenBounds`, `RoutingUsage`, `RoutingCancellationToken` and
