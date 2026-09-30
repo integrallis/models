@@ -81,9 +81,27 @@ gemma3n's own turn markers (`<start_of_turn>user` / `<end_of_turn>` / `<start_of
 the published GGUF, and `chatml` matches Qwen's. Those two remain open, and a decoder defect is the
 leading explanation rather than a confirmed one.
 
-**Correct content, screened out.** `unsloth_qwen3_6_35b_a3b` reaches 77.8% raw correct and 0% model
-contribution; `gpt-oss` 44.4% and 0%. The model answered well and the answer was rejected, most often
-for a missing citation.
+**Truncated at the output cap -- a harness setting, not a model.** The run used
+`maxOutputTokens = 64`. Every failing attempt examined stopped at exactly 64 output tokens, mid-sentence
+or mid-word:
+
+- `gpt-oss` ended on *"...Windshield repair has a 75 dollar deductible"* -- correct, and cut off before
+  it could emit the citation the grounding policy screens for.
+- `qwen3-30b-a3b` ended on *"...must be reported through the Aurora portal within "*, having spent most
+  of the budget on a `<think>` reasoning trace.
+
+A thinking model cannot reach an answer in 64 tokens, and no model can emit prose followed by a
+citation in what is left. `unsloth_qwen3_6_35b_a3b` reaches 77.8% raw correct with 0% contribution for
+the same reason. This accounts for most of the nine failures and is a configuration defect in how the
+campaign was run, not a property of the models.
+
+`extractiveFallbackRate` and `truncatedAnswerRate` are now both part of the summary and the CLI's
+output, so a run cut off at the cap is visible as truncation rather than indistinguishable from a model
+with nothing to say.
+
+**Instruction-following.** `ornith-1.0-35b` echoed the prompt's own instructions back
+(*"...One short sentence. Copy source ID exactly from brackets."*) rather than answering. That one is a
+model-quality observation and stands.
 
 **Reasoning traces not stripped.** `qwen3moe`, `qwen35moe` and `gemma4` E2B emit `<think>...` or
 `Thinking Process:` before answering. `kat-coder` returns `<think></think>You have 30 calendar

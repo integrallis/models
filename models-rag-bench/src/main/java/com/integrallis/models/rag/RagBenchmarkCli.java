@@ -238,7 +238,8 @@ public final class RagBenchmarkCli {
     }
 
     int totalAttempts = cases.size() * configuration.iterations();
-    RagBenchmarkSummary summary = RagStatistics.summarize(runs, totalAttempts, casesById);
+    RagBenchmarkSummary summary =
+        RagStatistics.summarize(runs, totalAttempts, casesById, configuration.maxTokens());
     Path artifact = configuration.artifact();
     Path artifactIdentity = artifact == null ? null : artifactIdentity(artifact);
     return new RagBenchmarkReport(
@@ -398,7 +399,8 @@ public final class RagBenchmarkCli {
         // the three together is what stops the line being read as a statement about the model.
         "%s/%s/%s: tier=%s success=%d/%d p95-retrieval=%.1fms p95-ttft=%.1fms "
             + "p50-decode=%.2f tok/s p95-e2e=%.1fms correct=%.1f%% "
-            + "model-answered=%.1f%% of-those-correct=%.1f%% extractive-fallback=%.1f%%"
+            + "model-answered=%.1f%% of-those-correct=%.1f%% extractive-fallback=%.1f%% "
+            + "truncated=%.1f%%"
             + "%nreport: %s%n",
         report.framework(),
         report.backend(),
@@ -414,6 +416,7 @@ public final class RagBenchmarkCli {
         summary.modelAnswerRate() * 100,
         summary.modelAnswerCorrectRate() * 100,
         summary.extractiveFallbackRate() * 100,
+        summary.truncatedAnswerRate() * 100,
         output.toAbsolutePath());
   }
 

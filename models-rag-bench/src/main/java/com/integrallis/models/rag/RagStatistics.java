@@ -25,7 +25,7 @@ public final class RagStatistics {
   private RagStatistics() {}
 
   public static RagBenchmarkSummary summarize(
-      List<RagRun> runs, int totalAttempts, Map<String, RagCase> casesById) {
+      List<RagRun> runs, int totalAttempts, Map<String, RagCase> casesById, int maxOutputTokens) {
     Objects.requireNonNull(runs, "runs");
     Objects.requireNonNull(casesById, "casesById");
     if (totalAttempts < runs.size() || totalAttempts < 1) {
@@ -76,7 +76,16 @@ public final class RagStatistics {
         average(modelContributed, run -> run.evaluation().correct() ? 1 : 0),
         average(
             runs,
-            run -> run.grounding().decision() == GroundingDecision.EXTRACTIVE_FALLBACK ? 1 : 0));
+            run -> run.grounding().decision() == GroundingDecision.EXTRACTIVE_FALLBACK ? 1 : 0),
+        // Reaching the cap is the only signal available that generation was cut off: nothing here
+        // carries a stop reason, so a run that stopped on the cap cannot be told apart from one
+        // that
+        // finished at exactly that length. Counted as truncated, which errs toward reporting a
+        // problem
+        // rather than hiding one.
+        maxOutputTokens <= 0
+            ? 0.0
+            : average(runs, run -> run.generation().outputTokens() >= maxOutputTokens ? 1 : 0));
   }
 
   private static Double totalEstimatedApiCost(List<RagRun> runs) {
