@@ -82,6 +82,18 @@ Benchmark comparators and external oracles **only**. Our code is Java plus Rust 
 read their source and translate an algorithm or snippet to Java/Rust; we never link, vendor, or ship
 them. Their published numbers are never a substitute for an arm we ran ourselves.
 
+## Never inherit a prompt template from an older shard
+
+Building a queue by reusing the template an earlier shard used for the same model looks like using
+ground truth and is not: it propagates whatever was wrong before. It carried `deepseek` -- the V1
+`### Instruction:` format -- onto DeepSeek-Coder-V2-Lite, months after `deepseek-v2` was added for that
+family and transcribed from the model's own published chat template, and it would have kept five Gemma 4
+models on a template already *measured* to produce a model-answer rate of 0.000.
+
+Derive the template from the architecture, keep per-model exceptions in one explicit table with a stated
+reason each, and audit the whole queue against that mapping before launching. `DEEPSEEK` is deliberately
+frozen for the V1 coder models whose evidence is already published; it is not the deepseek2 template.
+
 ## Fleet operations (EC2)
 
 - **The EC2 vCPU quota is 16** — exactly one `m6a.4xlarge`. Gate a relaunch on *no instances in
