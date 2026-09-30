@@ -28,6 +28,31 @@ class RagBenchmarkCliTest {
 
   @TempDir Path temporaryDirectory;
 
+  /**
+   * The output cap defaults to room for a grounded answer, which 64 was not.
+   *
+   * <p>Pinned because the value is not cosmetic: at 64 the 2026-09-29 campaign truncated most of
+   * its attempts, and a truncated answer cannot carry the citation the grounding policy screens
+   * for, so it was replaced by an extractive one and scored exactly like a model with nothing to
+   * say. The campaign never chose 64 -- it inherited this default.
+   */
+  @Test
+  void theOutputTokenCapDefaultsToRoomForAGroundedAnswer() throws Exception {
+    Path model = Files.writeString(temporaryDirectory.resolve("default-cap.gguf"), "fixture");
+
+    RagBenchmarkConfiguration configuration =
+        RagBenchmarkCli.parse(
+            new String[] {
+              "--framework", "plain-java",
+              "--backend", "pure-java",
+              "--model", model.toString(),
+              "--model-id", "fixture",
+              "--workload", "general"
+            });
+
+    assertThat(configuration.maxTokens()).isEqualTo(256);
+  }
+
   @Test
   void parsesAReproduciblePureJavaRun() throws Exception {
     Path model = Files.writeString(temporaryDirectory.resolve("model.gguf"), "fixture");
