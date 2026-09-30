@@ -225,10 +225,14 @@ public final class Deepseek2ForwardPass {
 
     rotary.prepare(position);
     // NORM rotary, pairing adjacent elements, NOT the split-half NeoX form. The reference maps this
-    // family to LLAMA_ROPE_TYPE_NORM (llama-model.cpp, the DEEPSEEK2 case), unlike the Qwen and Gemma
-    // families on the Llama path, where LlamaConfig.usesNeoxRope() selects the split-half form. Using
-    // NeoX here rotates the wrong pairs at the right angles, which scrambles position and leaves the
-    // decoder emitting newlines -- and the toy test could not catch it, because the scalar reference
+    // family to LLAMA_ROPE_TYPE_NORM (llama-model.cpp, the DEEPSEEK2 case), unlike the Qwen and
+    // Gemma
+    // families on the Llama path, where LlamaConfig.usesNeoxRope() selects the split-half form.
+    // Using
+    // NeoX here rotates the wrong pairs at the right angles, which scrambles position and leaves
+    // the
+    // decoder emitting newlines -- and the toy test could not catch it, because the scalar
+    // reference
     // paired the halves the same wrong way.
     // The query's rotary half sits AFTER its no-rope half within each head.
     for (int head = 0; head < heads; head++) {
