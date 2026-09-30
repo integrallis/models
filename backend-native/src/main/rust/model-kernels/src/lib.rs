@@ -164,26 +164,39 @@ macro_rules! batch_scratch {
     };
 }
 
+#[cfg(target_arch = "aarch64")]
+mod neon;
+
 #[derive(Clone, Copy)]
 enum DotKernel {
     Q4,
     #[cfg(target_arch = "x86_64")]
     Q4Avx2,
+    #[cfg(target_arch = "aarch64")]
+    Q4Neon,
     Q5,
     #[cfg(target_arch = "x86_64")]
     Q5Avx2,
+    #[cfg(target_arch = "aarch64")]
+    Q5Neon,
     Q8,
     #[cfg(target_arch = "x86_64")]
     Q8Avx2,
+    #[cfg(target_arch = "aarch64")]
+    Q8Neon,
     Q4K,
     #[cfg(target_arch = "x86_64")]
     Q4KAvx2,
+    #[cfg(target_arch = "aarch64")]
+    Q4KNeon,
     Q5K,
     #[cfg(target_arch = "x86_64")]
     Q5KAvx2,
     Q6K,
     #[cfg(target_arch = "x86_64")]
     Q6KAvx2,
+    #[cfg(target_arch = "aarch64")]
+    Q6KNeon,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -3466,6 +3479,97 @@ unsafe fn compute_batched_row_range(
                 );
             }
         }
+        #[cfg(target_arch = "aarch64")]
+        DotKernel::Q4Neon => {
+            // SAFETY: runtime dispatch selected this variant only when NEON and the
+            // dot-product extension are available.
+            unsafe {
+                neon::compute_q4_batched_row_range(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
+        #[cfg(target_arch = "aarch64")]
+        DotKernel::Q5Neon => {
+            // SAFETY: runtime dispatch selected this variant only when NEON and the
+            // dot-product extension are available.
+            unsafe {
+                neon::compute_q5_batched_row_range(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
+        #[cfg(target_arch = "aarch64")]
+        DotKernel::Q8Neon => {
+            // SAFETY: runtime dispatch selected this variant only when NEON and the
+            // dot-product extension are available.
+            unsafe {
+                neon::compute_q8_batched_row_range(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
+        #[cfg(target_arch = "aarch64")]
+        DotKernel::Q4KNeon => {
+            // SAFETY: runtime dispatch selected this variant only when NEON and the
+            // dot-product extension are available.
+            unsafe {
+                neon::compute_q4_k_batched_row_range(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
+        #[cfg(target_arch = "aarch64")]
+        DotKernel::Q6KNeon => {
+            // SAFETY: runtime dispatch selected this variant only when NEON and the
+            // dot-product extension are available.
+            unsafe {
+                neon::compute_q6_k_batched_row_range(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
     }
 }
 
@@ -4622,6 +4726,54 @@ fn compute_output_range(
                     )
                 }
             }
+            #[cfg(target_arch = "aarch64")]
+            DotKernel::Q4Neon => {
+                // SAFETY: this variant is selected only after runtime NEON and dot-product
+                // detection.
+                unsafe {
+                    neon::dot_q4_0_q8_0_row(weights, quantized, activation_scales, batch, row, cols)
+                }
+            }
+            #[cfg(target_arch = "aarch64")]
+            DotKernel::Q5Neon => {
+                // SAFETY: this variant is selected only after runtime NEON and dot-product
+                // detection.
+                unsafe {
+                    neon::dot_q5_0_q8_0_row(weights, quantized, activation_scales, batch, row, cols)
+                }
+            }
+            #[cfg(target_arch = "aarch64")]
+            DotKernel::Q8Neon => {
+                // SAFETY: this variant is selected only after runtime NEON and dot-product
+                // detection.
+                unsafe {
+                    neon::dot_q8_0_q8_0_row(weights, quantized, activation_scales, batch, row, cols)
+                }
+            }
+            #[cfg(target_arch = "aarch64")]
+            DotKernel::Q4KNeon => {
+                // SAFETY: this variant is selected only after runtime NEON and dot-product
+                // detection.
+                unsafe {
+                    neon::dot_q4_k_q8_k_row(
+                        weights,
+                        quantized,
+                        activation_scales,
+                        activation_sums,
+                        batch,
+                        row,
+                        cols,
+                    )
+                }
+            }
+            #[cfg(target_arch = "aarch64")]
+            DotKernel::Q6KNeon => {
+                // SAFETY: this variant is selected only after runtime NEON and dot-product
+                // detection.
+                unsafe {
+                    neon::dot_q6_k_q8_k_row(weights, quantized, activation_scales, batch, row, cols)
+                }
+            }
         };
     }
 }
@@ -4630,6 +4782,10 @@ fn selected_q4_kernel() -> DotKernel {
     #[cfg(target_arch = "x86_64")]
     if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
         return DotKernel::Q4Avx2;
+    }
+    #[cfg(target_arch = "aarch64")]
+    if neon::available() {
+        return DotKernel::Q4Neon;
     }
     DotKernel::Q4
 }
@@ -4642,6 +4798,10 @@ fn selected_q8_kernel() -> DotKernel {
     {
         return DotKernel::Q8Avx2;
     }
+    #[cfg(target_arch = "aarch64")]
+    if neon::available() {
+        return DotKernel::Q8Neon;
+    }
     DotKernel::Q8
 }
 
@@ -4653,6 +4813,10 @@ fn selected_q5_kernel() -> DotKernel {
     {
         return DotKernel::Q5Avx2;
     }
+    #[cfg(target_arch = "aarch64")]
+    if neon::available() {
+        return DotKernel::Q5Neon;
+    }
     DotKernel::Q5
 }
 
@@ -4663,6 +4827,10 @@ fn selected_q4_k_kernel() -> DotKernel {
         && std::arch::is_x86_feature_detected!("f16c")
     {
         return DotKernel::Q4KAvx2;
+    }
+    #[cfg(target_arch = "aarch64")]
+    if neon::available() {
+        return DotKernel::Q4KNeon;
     }
     DotKernel::Q4K
 }
@@ -4685,6 +4853,10 @@ fn selected_q6_k_kernel() -> DotKernel {
         && std::arch::is_x86_feature_detected!("f16c")
     {
         return DotKernel::Q6KAvx2;
+    }
+    #[cfg(target_arch = "aarch64")]
+    if neon::available() {
+        return DotKernel::Q6KNeon;
     }
     DotKernel::Q6K
 }
