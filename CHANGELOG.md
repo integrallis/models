@@ -4,6 +4,93 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.51] - 2026-09-30
+
+The catalogue goes from 47 to 76 qualified models. Most of that came from fixing decoders and the
+grounding policy rather than from running more models: five defects each turned a model that looked
+worthless into one that qualifies.
+
+### Fixed
+
+- **deepseek2 applied the wrong rotary layout.** It used the split-half NeoX form where the reference
+  maps `LLM_ARCH_DEEPSEEK2` to `LLAMA_ROPE_TYPE_NORM`. Rotating the wrong pairs at the right angles
+  scrambles position, and the decoder emitted nothing but newlines. Two things hid it: the scalar
+  reference paired the halves the same wrong way, so it reproduced the graph's error instead of checking
+  it, and the toy fixture pinned the rotary width to two, where NORM pairs `(0,1)` and NeoX with
+  `half == 1` pairs `(0, 0+1)` -- the same elements. The one axis that mattered was held at the one value
+  where it collapses. The fixture is now four wide, and reverting the graph fails the comparison.
+  Measured afterwards on DeepSeek-Coder-V2-Lite: a 0.444 model-answer rate, correct every time.
+
+- **LongRoPE was ignored on the Llama path.** Phi-3.5-mini answered nothing at all across 27 cases while
+  Phi-3-mini-4k, the same architecture on the same template, was fine. 3.5 reaches 128K context through
+  LongRoPE and publishes `rope_factors_long`/`rope_factors_short` and `rope.scaling.attn_factor` with no
+  `rope.scaling.type` at all, so the presence of the tensors is what identifies the layout. None of it
+  was read. `RotaryTable` already had per-pair divisors and an attention magnitude, so this is wiring:
+  the divisors are loaded, the trained context is retained on the linear branch too, and selection
+  mirrors `llama_model::get_rope_factors`. Phi-3.5-mini now qualifies.
+
+- **Grounding v21 to v23, twice for the same class of bug.** A reasoning trace whose *opening* token came
+  from the prompt survived screening and was judged as the answer. v22 handled Gemma 4's channel closer;
+  it also anchored on the last closer unconditionally, which deleted the entire answer of a model that
+  emits the closer last, and that regression was caught against the captured completion before it
+  reached any published record. v23 requires content after a closer, removes a trailing one, accepts a
+  bare `</think>`, and cuts a completion at the model's own stop token -- DeepSeek-Coder 6.7B answered
+  correctly and then invented a whole further exchange past `<|eot_id|>`, filling the budget. Gemma 4
+  E2B went from a 0.000 model-answer rate to qualifying at a 0.953 decode ratio.
+
+- **The catalogue recorded capabilities it had not measured.** A qualified model declaring `tool-calling`
+  with no tool-calling qualification is now rejected by the build, and the importer drops the claim
+  rather than publishing it. A RAG run says nothing about tool use.
+
+### Added
+
+- **A summarization workload**, so a router can select a model for the most common request there is.
+  Every chat model can summarize; none could declare it, because a capability comes from a qualification
+  and a qualification needs a workload. Alongside it, `RagCorpusTest` now screens every corpus through
+  `GroundedAnswerPolicy.assess` itself rather than a restatement of the rule -- written after this
+  workload failed all nine cases with retrieval working perfectly, because each question began with the
+  capitalised word "Summarize", which counts as a named entity and appeared in no document.
+
+- **`framework-exercise`**, which sends five ordinary requests through the plain Java runtime, the
+  LangChain4j adapter and the Spring AI adapter and reports whether the three agree. Greedy, with the
+  backend reset between prompts, so a disagreement is an adapter defect rather than sampling noise. The
+  qualification gate measures grounded answering over a pinned corpus and says nothing about whether a
+  model is coherent when someone simply asks it something.
+
+- **A `gemma4-answer` prompt template**, the Gemma 4 envelope with the answer channel prefilled, for a
+  model that opens with a prose reasoning preamble. The envelope is unchanged and matches the published
+  chat template; only the prefill is added.
+
+- **Per-job workload and decode-thread selection on the fleet worker**, so the harness's other nine
+  corpora are reachable and a thread count can be chosen per model rather than imposed on a shard.
+
+### Changed
+
+- **Matrix partitions are sized by the work they carry, not by the pool width.** Any job above 64 output
+  elements was split across every worker, however little it streamed; within one model an attention
+  projection carries about 1.2MB of Q4_K where the feed-forward pair carries nearer 4.7MB, and decode
+  runs on the order of two hundred dispatches per token with no batch to amortise them. Partitions are
+  now weight bytes over a minimum, clamped to the pool. The threshold lives on the context and is
+  settable, and the default is deliberately low so it cannot slow a job the whole pool already served.
+  **This is measured on unit tests and not yet on x86**; no throughput claim is made for it here.
+
+- **Decode thread count is chosen per model from a measured sweep.** Across 16, 8 and 4 threads on one
+  instance type, every K-quant model was faster at 8 than at the full pool -- 26% at 0.32GB, 3% at
+  1.28GB, 11% at 2.39GB -- while the one Q4_0 model was slower at 8 and collapsed 43% at 4. Ollama's arm
+  held flat, which is what says the variable was isolated. Phi-3.5-mini and Ministral 3 3B crossed the
+  floor on that setting alone.
+
+### Evidence
+
+- 175 certified-evidence tests re-derive every published verdict from its committed reports, pinning both
+  ratios, rather than trusting the recorded verdict.
+- `benchmark-results/certified-20260930` holds the candidate report, the same-host Ollama comparator and
+  the verdict for each model qualified in this campaign.
+- Known and unfixed: `phi-3-mini-4k` misses the decode floor by 0.007, `sqlcoder-7b-2` by 0.0005, and
+  `phi-4-mini` clears decode at 0.853 but fails end-to-end latency at 6.57 against a 1.50 ceiling, which
+  is prefill and not decode. The SQL workload needs a query-correctness policy rather than citation
+  grounding: text-to-SQL models answer with a `SELECT`, which the grounded-RAG screen rightly rejects.
+
 ## [0.3.50] - 2026-09-30
 
 ### Corrected

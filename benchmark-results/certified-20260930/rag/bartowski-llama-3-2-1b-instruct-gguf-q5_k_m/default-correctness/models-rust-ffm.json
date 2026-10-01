@@ -1,0 +1,912 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-09-30T22:59:22.992608276Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.3.50+sumfix-e5f0b3e04d8e",
+  "modelId" : "bartowski_llama_3_2_1b_instruct_gguf_q5_k_m",
+  "model" : "/work/models/bartowski_llama_3_2_1b_instruct_gguf_q5_k_m.gguf",
+  "artifactSha256" : "4f22f95fb1679ef8e2fd6f1659d23f06cd1dbedb79ff291db7413a7ae509e2a9",
+  "artifactSizeBytes" : 911503488,
+  "settings" : {
+    "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+    "workload" : "general",
+    "caseIds" : [ "auto-glass-deadline", "travel-limit", "telemedicine-benefit", "claim-payment-times", "chargeback-evidence", "break-glass", "idempotency", "priority-one", "unsupported-lunar-vehicle" ],
+    "promptTemplate" : "llama3",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 256,
+    "warmups" : 0,
+    "iterations" : 1,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "topK" : "1",
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topP" : "1.0",
+      "promptCache" : "longest-common-prefix",
+      "seed" : "42"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-1-93",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971658752,
+    "maxHeapBytes" : 16500391936,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v13",
+    "environment" : {
+      "processors" : "16",
+      "java-feature" : "25",
+      "fast-scalar-fma" : "true",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "q4-short-pairwise-supported" : "true",
+      "compiler" : "hotspot-c2",
+      "kernel-implementation" : "rust-ffm-quantized-v13",
+      "vm-vendor" : "Eclipse Adoptium",
+      "gguf-parallel" : "true",
+      "native-grouped-attention" : "true",
+      "end-of-generation-token-ids" : "128001,128008,128009",
+      "native-kernel-decode-threads" : "16",
+      "gguf-executor" : "persistent",
+      "native-kernel-poll-millis" : "5",
+      "vector-api" : "true",
+      "java-version" : "25.0.4.1",
+      "gguf-chunks-per-thread" : "2",
+      "architecture" : "amd64",
+      "native-kernel-abi" : "6",
+      "java-executor-poll-millis" : "0",
+      "end-of-generation.128009" : "tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn",
+      "performance-cliff.fused-grouped-attention-disabled" : "architecture=llama, group-size=4",
+      "tokenizer.pre.implemented" : "true",
+      "end-of-generation.128008" : "vocabulary-text",
+      "kernel-runtime" : "rust-ffm",
+      "end-of-generation.128001" : "vocabulary-text",
+      "end-of-generation.chat-template" : "resolved:128009",
+      "native-quantized-decode" : "false",
+      "native-load-warmup" : "false",
+      "native-q5-0-grouped" : "false",
+      "projection-layers" : "16",
+      "preferred-vector-bits" : "256",
+      "q4-unsigned-pairwise-supported" : "true",
+      "model-architecture" : "llama",
+      "tokenizer.pre" : "llama-bpe",
+      "native-kernel-threads" : "16",
+      "native-gated-delta-net" : "false",
+      "performance-cliffs" : "fused-grouped-attention-disabled",
+      "os" : "Linux",
+      "vm-version" : "25.0.4.1+1-LTS",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "fast-vector-fma" : "true",
+      "active-vector-bits" : "256",
+      "sve" : "false",
+      "transformer-runtime" : "java",
+      "gguf-threads" : "16"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "grouped",
+        "implementation" : "rust-ffm-quantized-v13",
+        "gate-up" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64",
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "architecture" : "amd64",
+        "batch-size" : "32",
+        "active-vector-bits" : "256",
+        "requested-kernel" : "one-query-block",
+        "kernel" : "one-query-block"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q5_K,Q5_K,Q6_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q5_K,Q5_K,Q6_K,Q5_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "2"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "7"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256",
+        "requested-kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "16",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment",
+        "artifact-format" : "gguf"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "16",
+        "chunks-per-thread" : "2",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "load-warmup",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.loadWarmup",
+      "settings" : {
+        "property" : "models.native.loadWarmup",
+        "sequence-state" : "reset-after-warmup"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.gatedDeltaNet",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "state" : "caller-owned-java-array",
+        "abi" : "6",
+        "property" : "models.native.gatedDeltaNet"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.gatedDeltaNet",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "state" : "branch-major-caller-owned-java-array",
+        "abi" : "6",
+        "property" : "models.native.gatedDeltaNet"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
+      "settings" : {
+        "property" : "models.native.q5_0.grouped",
+        "qualification" : "model-and-platform-specific"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.quantizedDecode",
+      "settings" : {
+        "property" : "models.native.quantizedDecode",
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 9,
+    "successfulAttempts" : 9,
+    "loadMillis" : 503.42155,
+    "retrievalMillis" : {
+      "p50" : 2.624858,
+      "p95" : 20.77563399999999
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 2.0487339999999676,
+      "p95" : 7.009797599999817
+    },
+    "ttftMillis" : {
+      "p50" : 550.478343,
+      "p95" : 1521.1372299999994
+    },
+    "tpotMillis" : {
+      "p50" : 127.71945324999999,
+      "p95" : 160.19707143333332
+    },
+    "endToEndMillis" : {
+      "p50" : 3518.4502,
+      "p95" : 4255.3581542
+    },
+    "p50PrefillTokensPerSecond" : 122.18308450593803,
+    "p50DecodeTokensPerSecond" : 7.8296608273336785,
+    "peakRssBytes" : 1366564864,
+    "totalCpuMillis" : 456210.0,
+    "totalInputTokens" : 1514,
+    "totalCacheReadInputTokens" : 815,
+    "totalCacheWriteInputTokens" : 699,
+    "totalOutputTokens" : 194,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.1111111111111111,
+    "modelAnswerRate" : 0.5555555555555556,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.3333333333333333,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "USABLE",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Llama 3.2 1B Instruct",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e5da299a30bd5376ff229ad962a725f5e2ebfe2db07da5b519a8f04dc2ae15c8",
+    "retrievalMillis" : 32.431508,
+    "frameworkOverheadMillis" : 10.283865999999762,
+    "endToEndMillis" : 3987.375072,
+    "generation" : {
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "inputTokens" : 173,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 173,
+      "outputTokens" : 13,
+      "ttftMillis" : 2122.036352,
+      "totalMillis" : 3944.659698,
+      "prefillTokensPerSecond" : 81.8456840238329,
+      "loadMillis" : 503.42155,
+      "peakRssBytes" : 1347362816,
+      "cpuMillis" : 58610.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "You have 30 calendar days to report an auto glass claim.",
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Llama 3.2 1B Instruct",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b1f008c5b3ce5d95cf12c39a17f8b32497114181a1d93f6f35a45b948378ca8b",
+    "retrievalMillis" : 3.291823,
+    "frameworkOverheadMillis" : 2.0578350000000682,
+    "endToEndMillis" : 3066.259473,
+    "generation" : {
+      "text" : "[claims-travel] T-19 and the reimbursement limit is $3,500 per covered traveler.",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 103,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 21,
+      "ttftMillis" : 506.52075,
+      "totalMillis" : 3060.909815,
+      "prefillTokensPerSecond" : 122.66757838486947,
+      "loadMillis" : 503.42155,
+      "peakRssBytes" : 1347878912,
+      "cpuMillis" : 46140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[claims-travel] T-19 and the reimbursement limit is $3,500 per covered traveler.",
+      "text" : "[claims-travel] T-19 and the reimbursement limit is $3,500 per covered traveler.",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Llama 3.2 1B Instruct",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "da0c832c7e2208e96ede0366626b0e3e9e7a2e3c7f7172cea73397e0fa87ec40",
+    "retrievalMillis" : 2.624858,
+    "frameworkOverheadMillis" : 2.0487339999999676,
+    "endToEndMillis" : 3518.4502,
+    "generation" : {
+      "text" : "In-network behavioral health telemedicine visits do not require a referral, and the member copay is $15 per visit. [health-telemedicine]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 65,
+      "outputTokens" : 24,
+      "ttftMillis" : 619.788547,
+      "totalMillis" : 3513.776608,
+      "prefillTokensPerSecond" : 105.05058926075519,
+      "loadMillis" : 503.42155,
+      "peakRssBytes" : 1348120576,
+      "cpuMillis" : 52900.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "In-network behavioral health telemedicine visits do not require a referral, and the member copay is $15 per visit.",
+      "text" : "In-network behavioral health telemedicine visits do not require a referral, and the member copay is $15 per visit. [health-telemedicine]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Llama 3.2 1B Instruct",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4af0f8174db0ce6334a764375556acaecf09fa6af0d7ce730503fc530270ad82",
+    "retrievalMillis" : 2.229619,
+    "frameworkOverheadMillis" : 1.6265260000000126,
+    "endToEndMillis" : 3272.797519,
+    "generation" : {
+      "text" : "Domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days. [payments-settlement]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 23,
+      "ttftMillis" : 488.834818,
+      "totalMillis" : 3268.941374,
+      "prefillTokensPerSecond" : 129.1087160742948,
+      "loadMillis" : 503.42155,
+      "peakRssBytes" : 1348366336,
+      "cpuMillis" : 49440.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days.",
+      "text" : "Domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days. [payments-settlement]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Llama 3.2 1B Instruct",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5bee3e8cb3d327450f991626debd6584813d847a43c157fa61cf836472c129bd",
+    "retrievalMillis" : 1.787199,
+    "frameworkOverheadMillis" : 2.0674559999997655,
+    "endToEndMillis" : 4393.650023,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 104,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 32,
+      "ttftMillis" : 508.614533,
+      "totalMillis" : 4389.795368,
+      "prefillTokensPerSecond" : 122.18308450593803,
+      "loadMillis" : 503.42155,
+      "peakRssBytes" : 1349533696,
+      "cpuMillis" : 65980.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The merchant chargeback evidence deadline is 7 calendar days after notification, and evidence is uploaded as a PDF under 10 MB in the Disputes console.",
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Llama 3.2 1B Instruct",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0fd4e9ae866eb5259ed23e4c5b1e38d6439a39e6485ca4b9cfa6518450df6072",
+    "retrievalMillis" : 3.036216,
+    "frameworkOverheadMillis" : 1.5686460000001716,
+    "endToEndMillis" : 3222.475853,
+    "generation" : {
+      "text" : "Cobalt-17 requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 22,
+      "ttftMillis" : 550.478343,
+      "totalMillis" : 3217.870991,
+      "prefillTokensPerSecond" : 120.13503199438902,
+      "loadMillis" : 503.42155,
+      "peakRssBytes" : 1349603328,
+      "cpuMillis" : 48600.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Cobalt-17 requires approval from two on-call managers and the resulting credentials expire after 60 minutes.",
+      "text" : "Cobalt-17 requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Llama 3.2 1B Instruct",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5189c67714c319e91c8cf34efddab417b5b2769bb1e48b346782bbf1afe68033",
+    "retrievalMillis" : 2.640678,
+    "frameworkOverheadMillis" : 1.6928360000001703,
+    "endToEndMillis" : 4047.920351,
+    "generation" : {
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "inputTokens" : 182,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 80,
+      "outputTokens" : 28,
+      "ttftMillis" : 591.759058,
+      "totalMillis" : 4043.586837,
+      "prefillTokensPerSecond" : 135.42036977899713,
+      "loadMillis" : 503.42155,
+      "peakRssBytes" : 1363202048,
+      "cpuMillis" : 60670.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Idempotency-Key header makes Claims API create idempotent and a key can be replayed for up to 24 hours.",
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Llama 3.2 1B Instruct",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e488b6af8d5ff41b37a5cdaef97ac131059ffed54b8a3b400c01de25a32af6cf",
+    "retrievalMillis" : 1.912912,
+    "frameworkOverheadMillis" : 1.6607950000002347,
+    "endToEndMillis" : 3711.939119,
+    "generation" : {
+      "text" : "A priority one incident is acknowledged within 15 minutes, and the route escalates to NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 26,
+      "ttftMillis" : 462.238393,
+      "totalMillis" : 3708.365412,
+      "prefillTokensPerSecond" : 136.56226854795398,
+      "loadMillis" : 503.42155,
+      "peakRssBytes" : 1366495232,
+      "cpuMillis" : 55090.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "A priority one incident is acknowledged within 15 minutes, and the route escalates to NORTHSTAR-P1 pages the incident commander.",
+      "text" : "A priority one incident is acknowledged within 15 minutes, and the route escalates to NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Llama 3.2 1B Instruct",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7b18eaae9599c59132e03a24838a7a92906f6bc34cfe0209bb40f476a09854b8",
+    "retrievalMillis" : 1.86822,
+    "frameworkOverheadMillis" : 2.098694999999907,
+    "endToEndMillis" : 1280.764073,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 65,
+      "outputTokens" : 5,
+      "ttftMillis" : 613.844092,
+      "totalMillis" : 1276.797158,
+      "prefillTokensPerSecond" : 106.02745288256624,
+      "loadMillis" : 503.42155,
+      "peakRssBytes" : 1366564864,
+      "cpuMillis" : 18780.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "INSUFFICIENT_CONTEXT.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

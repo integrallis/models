@@ -47,7 +47,13 @@ final class Deepseek2ToyModel {
   static final int DIM = 8;
   static final int LAYERS = 3;
   static final int HEADS = 2;
-  static final int ROPE_DIM = 2;
+  // Four, not two. At a rotary width of two the NORM and NeoX layouts pair the SAME elements --
+  // NORM pairs (0,1) and NeoX with half=1 pairs (0, 0+1) -- so the two are mathematically
+  // indistinguishable and no assertion built on this fixture can separate them. That is exactly how
+  // the graph came to apply the split-half form to a family the reference maps to NORM: the fixture
+  // held the one axis that mattered at the one value where it collapses. Widening it to four makes
+  // the pairings differ and the scalar-reference comparison sensitive to which one is used.
+  static final int ROPE_DIM = 4;
   static final int NO_ROPE_DIM = 2;
   static final int KEY_LENGTH = NO_ROPE_DIM + ROPE_DIM;
   static final int VALUE_LENGTH = 3;

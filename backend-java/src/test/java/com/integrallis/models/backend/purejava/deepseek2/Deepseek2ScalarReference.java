@@ -252,6 +252,16 @@ final class Deepseek2ScalarReference {
     return result;
   }
 
+  /**
+   * NORM rotary: adjacent elements are paired, so pair {@code i} rotates {@code values[2i]} against
+   * {@code values[2i + 1]}.
+   *
+   * <p>Written out here rather than delegating to the production helper, and pairing adjacently
+   * rather than by halves. The earlier version of this method paired {@code values[i]} with {@code
+   * values[i + half]} -- the split-half NeoX form -- which is the same misunderstanding the graph
+   * held, so the two agreed with each other and the toy test passed while the real model emitted
+   * newlines. A reference that reproduces the graph's error is not a reference.
+   */
   private float[] rope(float[] values) {
     int half = values.length / 2;
     float magnitude = config.ropeAttentionFactor();
@@ -260,10 +270,10 @@ final class Deepseek2ScalarReference {
       double angle = position * (double) ropeFrequencies[pair];
       float cos = (float) (magnitude * Math.cos(angle));
       float sin = (float) (magnitude * Math.sin(angle));
-      float low = values[pair];
-      float high = values[pair + half];
-      result[pair] = low * cos - high * sin;
-      result[pair + half] = low * sin + high * cos;
+      float low = values[2 * pair];
+      float high = values[2 * pair + 1];
+      result[2 * pair] = low * cos - high * sin;
+      result[2 * pair + 1] = low * sin + high * cos;
     }
     return result;
   }

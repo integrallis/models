@@ -1,0 +1,36 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v6",
+  "candidate" : {
+    "path" : "/work/out/king3djbl_nexus_legal_gguf_q5_k_m.json",
+    "sha256" : "f076b6b7c1a5e4f2d9f0248b695f99f7e23a838d7a239bfa7d21d90d6e8fabf2"
+  },
+  "comparators" : [ {
+    "path" : "/work/out/king3djbl_nexus_legal_gguf_q5_k_m.comparator.json",
+    "sha256" : "83efb8f1bfb183a9d7e2b801124a830a0ca353d4b9d2c78c27392749f667663b"
+  } ],
+  "qualification" : {
+    "modelId" : "king3djbl_nexus_legal_gguf_q5_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "656e708221c2c705d3e07b897186790130af21626b3b6e7fa11bd26f308b4d51",
+    "absoluteTier" : "USABLE",
+    "verdict" : "QUALIFIED",
+    "qualified" : true,
+    "modelAnswerCount" : 9,
+    "modelAnswerRate" : 0.3333333333333333,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ "ollama" ],
+    "comparisons" : [ {
+      "comparatorBackend" : "ollama",
+      "decodeThroughputRatio" : 0.8755883018562701,
+      "endToEndLatencyRatio" : 1.1647797901511217,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : true,
+      "failures" : [ ]
+    } ],
+    "exclusions" : { }
+  }
+}

@@ -158,7 +158,12 @@ public record LlamaConfig(
 
   /** Complete long-context scaling contract retained from GGUF metadata. */
   public record RopeScaling(
-      RopeScalingType type, float factor, int originalContext, float betaFast, float betaSlow) {
+      RopeScalingType type,
+      float factor,
+      int originalContext,
+      float betaFast,
+      float betaSlow,
+      float attentionFactor) {
 
     public RopeScaling {
       type = Objects.requireNonNull(type, "type");
@@ -175,6 +180,10 @@ public record LlamaConfig(
       if (!(betaSlow > 0.0f) || !Float.isFinite(betaSlow)) {
         throw new IllegalArgumentException("YaRN betaSlow must be finite and > 0: " + betaSlow);
       }
+      if (!(attentionFactor > 0.0f) || !Float.isFinite(attentionFactor)) {
+        throw new IllegalArgumentException(
+            "RoPE attentionFactor must be finite and > 0: " + attentionFactor);
+      }
     }
 
     static RopeScaling linear(float frequencyScale) {
@@ -182,11 +191,16 @@ public record LlamaConfig(
         throw new IllegalArgumentException(
             "RoPE frequency scale must be finite and > 0: " + frequencyScale);
       }
-      return new RopeScaling(RopeScalingType.LINEAR, 1.0f / frequencyScale, 0, 32.0f, 1.0f);
+      return new RopeScaling(RopeScalingType.LINEAR, 1.0f / frequencyScale, 0, 32.0f, 1.0f, 1.0f);
     }
 
     static RopeScaling yarn(float factor, int originalContext, float betaFast, float betaSlow) {
-      return new RopeScaling(RopeScalingType.YARN, factor, originalContext, betaFast, betaSlow);
+      return new RopeScaling(
+          RopeScalingType.YARN, factor, originalContext, betaFast, betaSlow, 1.0f);
+    }
+
+    RopeScaling withAttentionFactor(float attentionFactor) {
+      return new RopeScaling(type, factor, originalContext, betaFast, betaSlow, attentionFactor);
     }
 
     float frequencyScale() {
@@ -439,6 +453,29 @@ public record LlamaConfig(
     return new RotaryTable(ropeDimensions, ropeTheta, ropeFrequencyScale);
   }
 
+  /**
+   * The global table, using published LongRoPE divisors when the model carries them.
+   *
+   * <p>Selection mirrors {@code llama_model::get_rope_factors}: the long divisors apply only when
+   * the requested context exceeds {@code rope.scaling.original_context_length}, and the short ones
+   * otherwise. Phi-3.5 and Phi-4 publish no {@code rope.scaling.type}, so the presence of the
+   * tensors is what identifies the layout -- not a metadata string.
+   *
+   * @param ropeFactorsLong divisors for a context above the trained one, or null
+   * @param ropeFactorsShort divisors for a context within the trained one, or null
+   * @return the table
+   */
+  RotaryTable globalRotaryTable(float[] ropeFactorsLong, float[] ropeFactorsShort) {
+    int trainedContext = ropeScaling.originalContext();
+    float[] selected =
+        trainedContext > 0 && contextLength > trainedContext ? ropeFactorsLong : ropeFactorsShort;
+    if (selected == null) {
+      return globalRotaryTable();
+    }
+    return RotaryTable.longRope(
+        ropeDimensions, ropeTheta, ropeFrequencyScale, selected, ropeScaling.attentionFactor());
+  }
+
   /** Builds the unscaled table used by architectures with alternating sliding-window RoPE. */
   RotaryTable slidingWindowRotaryTable() {
     return new RotaryTable(ropeDimensions, slidingWindowRopeTheta, 1.0f);
@@ -647,8 +684,23 @@ public record LlamaConfig(
             .getString(arch + ".rope.scaling.type")
             .or(() -> metadata.getString("llama.rope.scaling.type"))
             .orElse("linear");
+    float attentionFactor =
+        getArchFloatKey(metadata, arch, "rope.scaling.attn_factor").orElse(1.0f);
     if ("none".equals(type) || "linear".equals(type)) {
-      return RopeScaling.linear("none".equals(type) ? 1.0f : frequencyScale);
+      // Phi-3.5 and Phi-4 publish no scaling type at all, only attn_factor and
+      // original_context_length, and carry the divisors as rope_factors_long/short tensors. So the
+      // trained context has to be retained on this branch too, or the long/short choice at a
+      // context
+      // above the trained one is not even representable.
+      int trainedContext =
+          getArchKey(metadata, arch, "rope.scaling.original_context_length").orElse(0);
+      return new RopeScaling(
+          RopeScalingType.LINEAR,
+          "none".equals(type) ? 1.0f : 1.0f / frequencyScale,
+          trainedContext,
+          32.0f,
+          1.0f,
+          attentionFactor);
     }
     if (!"yarn".equals(type)) {
       throw new IllegalArgumentException("Unsupported RoPE scaling type: " + type);
@@ -658,7 +710,8 @@ public record LlamaConfig(
         getArchKey(metadata, arch, "rope.scaling.original_context_length").orElse(contextLength);
     float betaFast = getArchFloatKey(metadata, arch, "rope.scaling.yarn_beta_fast").orElse(32.0f);
     float betaSlow = getArchFloatKey(metadata, arch, "rope.scaling.yarn_beta_slow").orElse(1.0f);
-    return RopeScaling.yarn(factor, originalContext, betaFast, betaSlow);
+    return RopeScaling.yarn(factor, originalContext, betaFast, betaSlow)
+        .withAttentionFactor(attentionFactor);
   }
 
   private static float ropeFrequencyScale(GgufMetadata metadata, String arch) {

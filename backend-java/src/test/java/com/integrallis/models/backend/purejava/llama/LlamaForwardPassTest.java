@@ -84,6 +84,19 @@ class LlamaForwardPassTest {
 
   /** The nano model under any architecture, optionally with a Gemma 2 attention-logit softcap. */
   private GgufFile buildNanoModel(Random rng, String arch, float attnSoftcap) {
+    return buildNanoModel(rng, arch, attnSoftcap, 0.0f);
+  }
+
+  /**
+   * The nano model, optionally publishing LongRoPE divisors the way Phi-3.5 and Phi-4 do.
+   *
+   * <p>A divisor above zero adds {@code rope_factors_long.weight} and {@code
+   * rope_factors_short.weight} together with the trained context and {@code attn_factor}, and no
+   * {@code rope.scaling.type} -- which is exactly the published shape. Both tensors carry the same
+   * value so this fixture is about whether the divisors reach the graph at all, not about which of
+   * the two gets selected; {@code LlamaConfigTest.LongRope} covers the selection.
+   */
+  private GgufFile buildNanoModel(Random rng, String arch, float attnSoftcap, float ropeDivisor) {
     boolean gemmaPostNorms = arch.equals("gemma2") || arch.equals("gemma3");
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()
@@ -97,6 +110,17 @@ class LlamaForwardPassTest {
             .addUint32(arch + ".feed_forward_length", HIDDEN_DIM);
     if (attnSoftcap != 0.0f) {
       builder.addFloat32(arch + ".attn_logit_softcapping", attnSoftcap);
+    }
+    if (ropeDivisor > 0.0f) {
+      // Trained context above CONTEXT so the short divisors are the ones selected.
+      builder.addUint32(arch + ".rope.scaling.original_context_length", CONTEXT * 2);
+      builder.addFloat32(arch + ".rope.scaling.attn_factor", 1.1902381f);
+      int pairs = (DIM / HEADS) / 2;
+      byte[] divisors = constantF32(pairs, ropeDivisor);
+      builder.addTensor(
+          "rope_factors_long.weight", GgufTensorType.F32, new long[] {pairs}, divisors);
+      builder.addTensor(
+          "rope_factors_short.weight", GgufTensorType.F32, new long[] {pairs}, divisors);
     }
 
     // token_embd.weight: [vocab_size x dim]
@@ -3088,6 +3112,15 @@ class LlamaForwardPassTest {
     return data;
   }
 
+  private static byte[] constantF32(int count, float value) {
+    byte[] data = new byte[count * 4];
+    ByteBuffer buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+    for (int i = 0; i < count; i++) {
+      buf.putFloat(i * 4, value);
+    }
+    return data;
+  }
+
   private static byte[] onesF32(int count) {
     byte[] data = new byte[count * 4];
     ByteBuffer buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
@@ -3283,5 +3316,42 @@ class LlamaForwardPassTest {
       buffer.putShort(block * 210 + 208, Float.floatToFloat16(0.01f));
     }
     return data;
+  }
+
+  @Test
+  void publishedLongRopeDivisorsReachTheGraph() {
+    // Same seed, so the weights are identical and only the published divisors differ.
+    GgufFile plainFile = buildNanoModel(new Random(1234), "phi3", 0.0f, 0.0f);
+    GgufFile scaledFile = buildNanoModel(new Random(1234), "phi3", 0.0f, 8.0f);
+
+    LlamaConfig plainConfig = LlamaConfig.fromMetadata(plainFile.metadata());
+    LlamaConfig scaledConfig = LlamaConfig.fromMetadata(scaledFile.metadata());
+    assertThat(plainConfig.ropeScaling().attentionFactor()).isEqualTo(1.0f);
+    assertThat(scaledConfig.ropeScaling().attentionFactor()).isEqualTo(1.1902381f);
+
+    LlamaWeights scaledWeights = LlamaWeights.fromGgufFile(scaledFile, scaledConfig);
+    assertThat(scaledWeights.ropeFactorsShort())
+        .describedAs("the published divisors must be loaded, not skipped")
+        .isNotNull();
+    assertThat(LlamaWeights.fromGgufFile(plainFile, plainConfig).ropeFactorsShort())
+        .describedAs("a model publishing none must report none rather than an empty array")
+        .isNull();
+
+    // Past position 0: every rotary layout is the identity at position zero, so a divisor applied
+    // only there changes nothing and the assertion below would pass vacuously.
+    LlamaForwardPass plain =
+        newForwardPass(plainConfig, LlamaWeights.fromGgufFile(plainFile, plainConfig));
+    plain.forward(3, 0);
+    plain.forward(5, 1);
+    float[] withoutDivisors = plain.forward(7, 2).clone();
+
+    LlamaForwardPass scaled = newForwardPass(scaledConfig, scaledWeights);
+    scaled.forward(3, 0);
+    scaled.forward(5, 1);
+    float[] withDivisors = scaled.forward(7, 2).clone();
+
+    assertThat(withDivisors)
+        .describedAs("LongRoPE divisors that change no logit are being loaded and ignored")
+        .isNotEqualTo(withoutDivisors);
   }
 }

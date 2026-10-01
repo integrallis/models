@@ -1,0 +1,36 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v6",
+  "candidate" : {
+    "path" : "/work/out/bartowski_google_gemma_3_1b_it_gguf_q8_0.json",
+    "sha256" : "200bcbd2622048519e420a4810a351a794393b3b2d2a36855a3b919c537a0b2e"
+  },
+  "comparators" : [ {
+    "path" : "/work/out/bartowski_google_gemma_3_1b_it_gguf_q8_0.comparator.json",
+    "sha256" : "88343872743c73997bb73384dd65393717c72aa6e5eea8fedd1937da3e9f4de7"
+  } ],
+  "qualification" : {
+    "modelId" : "bartowski_google_gemma_3_1b_it_gguf_q8_0",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "375e12a4a18929a641f9744b060d4a7cf4e279530750555828ec0c117870bc96",
+    "absoluteTier" : "PRODUCTION_READY",
+    "verdict" : "QUALIFIED",
+    "qualified" : true,
+    "modelAnswerCount" : 21,
+    "modelAnswerRate" : 0.7777777777777778,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ "ollama" ],
+    "comparisons" : [ {
+      "comparatorBackend" : "ollama",
+      "decodeThroughputRatio" : 0.8682719432547514,
+      "endToEndLatencyRatio" : 0.9586648546187959,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : true,
+      "failures" : [ ]
+    } ],
+    "exclusions" : { }
+  }
+}

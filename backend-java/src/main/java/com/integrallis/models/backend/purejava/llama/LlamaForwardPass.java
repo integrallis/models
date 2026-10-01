@@ -482,7 +482,8 @@ public final class LlamaForwardPass {
       throw new IllegalArgumentException(
           "execution plan selected Llama-only layer shortcuts for " + config.architecture());
     }
-    this.globalRopeTable = config.globalRotaryTable();
+    this.globalRopeTable =
+        config.globalRotaryTable(weights.ropeFactorsLong(), weights.ropeFactorsShort());
     this.slidingWindowRopeTable =
         config.slidingWindow() > 0 ? config.slidingWindowRotaryTable() : globalRopeTable;
 

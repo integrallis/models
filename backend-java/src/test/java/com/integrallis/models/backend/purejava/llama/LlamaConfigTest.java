@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
 import com.integrallis.models.backend.purejava.gguf.GgufMetadataValue;
 import com.integrallis.models.backend.purejava.gguf.GgufValueType;
+import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,118 @@ class LlamaConfigTest {
     entries.put("llama.attention.head_count", new GgufMetadataValue.Uint32Value(headCount));
     entries.put("llama.attention.head_count_kv", new GgufMetadataValue.Uint32Value(headCountKv));
     return new GgufMetadata(entries);
+  }
+
+  @Nested
+  class LongRope {
+
+    /**
+     * Phi-3.5's published shape: a trained context and an attn_factor, and no scaling type at all.
+     */
+    private GgufMetadata phi3LongRopeMetadata(int contextLength) {
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("general.architecture", new GgufMetadataValue.StringValue("phi3"));
+      entries.put("phi3.embedding_length", new GgufMetadataValue.Uint32Value(64));
+      entries.put("phi3.block_count", new GgufMetadataValue.Uint32Value(2));
+      entries.put("phi3.attention.head_count", new GgufMetadataValue.Uint32Value(4));
+      entries.put("phi3.attention.head_count_kv", new GgufMetadataValue.Uint32Value(4));
+      entries.put("phi3.vocab_size", new GgufMetadataValue.Uint32Value(32));
+      entries.put("phi3.context_length", new GgufMetadataValue.Uint32Value(contextLength));
+      entries.put("phi3.feed_forward_length", new GgufMetadataValue.Uint32Value(128));
+      entries.put("phi3.rope.freq_base", new GgufMetadataValue.Float32Value(10000.0f));
+      entries.put("phi3.rope.dimension_count", new GgufMetadataValue.Uint32Value(16));
+      entries.put(
+          "phi3.rope.scaling.original_context_length", new GgufMetadataValue.Uint32Value(4096));
+      entries.put("phi3.rope.scaling.attn_factor", new GgufMetadataValue.Float32Value(1.1902381f));
+      return new GgufMetadata(entries);
+    }
+
+    private float[] factors(float value, int pairs) {
+      float[] result = new float[pairs];
+      java.util.Arrays.fill(result, value);
+      return result;
+    }
+
+    /**
+     * Applying a table to a fixed vector is the only externally visible difference between them.
+     */
+    private float[] rotate(RotaryTable table, int position) {
+      float[] vector = new float[16];
+      for (int index = 0; index < vector.length; index++) {
+        vector[index] = index + 1;
+      }
+      table.prepare(position);
+      table.apply(vector, 0, true);
+      return vector;
+    }
+
+    @Test
+    void theTrainedContextAndAttentionFactorSurviveWithNoScalingTypeKey() {
+      LlamaConfig config = LlamaConfig.fromMetadata(phi3LongRopeMetadata(131072));
+
+      assertThat(config.ropeScaling().originalContext()).isEqualTo(4096);
+      assertThat(config.ropeScaling().attentionFactor()).isEqualTo(1.1902381f);
+    }
+
+    @Test
+    void anAbsentAttentionFactorStaysNeutral() {
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("llama.embedding_length", new GgufMetadataValue.Uint32Value(64));
+      entries.put("llama.block_count", new GgufMetadataValue.Uint32Value(2));
+      entries.put("llama.attention.head_count", new GgufMetadataValue.Uint32Value(4));
+      entries.put("llama.attention.head_count_kv", new GgufMetadataValue.Uint32Value(4));
+
+      assertThat(
+              LlamaConfig.fromMetadata(new GgufMetadata(entries)).ropeScaling().attentionFactor())
+          .isEqualTo(1.0f);
+    }
+
+    @Test
+    void theDivisorsChangeTheRotationRatherThanBeingCarriedAndIgnored() {
+      LlamaConfig config = LlamaConfig.fromMetadata(phi3LongRopeMetadata(2048));
+      int pairs = config.ropeDimensions() / 2;
+
+      float[] withoutFactors = rotate(config.globalRotaryTable(null, null), 3);
+      float[] withFactors = rotate(config.globalRotaryTable(null, factors(4.0f, pairs)), 3);
+
+      assertThat(withFactors).isNotEqualTo(withoutFactors);
+    }
+
+    @Test
+    void aContextWithinTheTrainedOneTakesTheShortDivisors() {
+      LlamaConfig config = LlamaConfig.fromMetadata(phi3LongRopeMetadata(2048));
+      int pairs = config.ropeDimensions() / 2;
+      float[] shortFactors = factors(2.0f, pairs);
+      float[] longFactors = factors(8.0f, pairs);
+
+      float[] selected = rotate(config.globalRotaryTable(longFactors, shortFactors), 5);
+
+      assertThat(selected)
+          .isEqualTo(rotate(config.globalRotaryTable(null, shortFactors), 5))
+          .isNotEqualTo(rotate(config.globalRotaryTable(longFactors, null), 5));
+    }
+
+    @Test
+    void aContextAboveTheTrainedOneTakesTheLongDivisors() {
+      LlamaConfig config = LlamaConfig.fromMetadata(phi3LongRopeMetadata(131072));
+      int pairs = config.ropeDimensions() / 2;
+      float[] shortFactors = factors(2.0f, pairs);
+      float[] longFactors = factors(8.0f, pairs);
+
+      float[] selected = rotate(config.globalRotaryTable(longFactors, shortFactors), 5);
+
+      assertThat(selected)
+          .isEqualTo(rotate(config.globalRotaryTable(longFactors, null), 5))
+          .isNotEqualTo(rotate(config.globalRotaryTable(null, shortFactors), 5));
+    }
+
+    @Test
+    void aModelPublishingNoDivisorsKeepsThePlainTable() {
+      LlamaConfig config = LlamaConfig.fromMetadata(phi3LongRopeMetadata(2048));
+
+      assertThat(rotate(config.globalRotaryTable(null, null), 7))
+          .isEqualTo(rotate(config.globalRotaryTable(), 7));
+    }
   }
 
   @Nested

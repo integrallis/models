@@ -1,0 +1,909 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-09-30T23:36:00.513977613Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.3.50+sumfix-e5f0b3e04d8e",
+  "modelId" : "deepreinforce_ai_ornith_1_0_9b_gguf_q4_k_m",
+  "model" : "/work/models/deepreinforce_ai_ornith_1_0_9b_gguf_q4_k_m.gguf",
+  "artifactSha256" : "5720d1f671b4996481274fffe01868c3c36e87c135cc8538471cc7bd6087b106",
+  "artifactSizeBytes" : 5629108704,
+  "settings" : {
+    "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+    "workload" : "general",
+    "caseIds" : [ "auto-glass-deadline", "travel-limit", "telemedicine-benefit", "claim-payment-times", "chargeback-evidence", "break-glass", "idempotency", "priority-one", "unsupported-lunar-vehicle" ],
+    "promptTemplate" : "chatml",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 256,
+    "warmups" : 0,
+    "iterations" : 1,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topK" : "1",
+      "seed" : "42",
+      "promptCache" : "longest-common-prefix",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-0-155",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971646464,
+    "maxHeapBytes" : 16500391936,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v13",
+    "environment" : {
+      "gguf-threads" : "16",
+      "kernel-implementation" : "rust-ffm-quantized-v13",
+      "os" : "Linux",
+      "tokenizer.pre" : "qwen35",
+      "native-kernel-abi" : "6",
+      "native-kernel-poll-millis" : "5",
+      "end-of-generation.chat-template" : "resolved:248046",
+      "native-quantized-decode" : "false",
+      "compiler" : "hotspot-c2",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "sve" : "false",
+      "model-architecture" : "qwen35",
+      "java-feature" : "25",
+      "transformer-runtime" : "java",
+      "q4-unsigned-pairwise-supported" : "true",
+      "java-executor-poll-millis" : "0",
+      "active-vector-bits" : "256",
+      "q4-short-pairwise-supported" : "true",
+      "end-of-generation.248044" : "vocabulary-text",
+      "end-of-generation.248046" : "tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn",
+      "native-q5-0-grouped" : "false",
+      "native-gated-delta-net" : "false",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "projection-layers" : "32",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "native-kernel-threads" : "16",
+      "tokenizer.pre.implemented" : "true",
+      "kernel-runtime" : "rust-ffm",
+      "preferred-vector-bits" : "256",
+      "java-version" : "25.0.4.1",
+      "processors" : "16",
+      "fast-scalar-fma" : "true",
+      "end-of-generation-token-ids" : "248044,248046",
+      "native-kernel-decode-threads" : "16",
+      "gguf-chunks-per-thread" : "2",
+      "vm-vendor" : "Eclipse Adoptium",
+      "native-grouped-attention" : "true",
+      "vector-api" : "true",
+      "architecture" : "amd64",
+      "gguf-executor" : "persistent",
+      "fast-vector-fma" : "true",
+      "vm-version" : "25.0.4.1+1-LTS",
+      "gguf-parallel" : "true",
+      "native-load-warmup" : "false"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "grouped",
+        "gate-up" : "grouped",
+        "implementation" : "rust-ffm-quantized-v13"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "eligible-layers" : "4",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2",
+        "architecture" : "amd64",
+        "os" : "Linux"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "architecture" : "amd64",
+        "kernel" : "one-query-block",
+        "requested-kernel" : "one-query-block",
+        "active-vector-bits" : "256",
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "output-rows" : "all"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "unused-rows" : "full-attention",
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "2",
+        "parallel" : "true",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "7",
+        "parallel" : "true",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered",
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "eligible-layers" : "0",
+        "partitions" : "16",
+        "partition" : "batch-rows"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "16"
+      }
+    }, {
+      "id" : "load-warmup",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.loadWarmup",
+      "settings" : {
+        "sequence-state" : "reset-after-warmup",
+        "property" : "models.native.loadWarmup"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.gatedDeltaNet",
+      "settings" : {
+        "property" : "models.native.gatedDeltaNet",
+        "abi" : "6",
+        "state" : "caller-owned-java-array",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.gatedDeltaNet",
+      "settings" : {
+        "property" : "models.native.gatedDeltaNet",
+        "abi" : "6",
+        "state" : "branch-major-caller-owned-java-array",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
+      "settings" : {
+        "qualification" : "model-and-platform-specific",
+        "property" : "models.native.q5_0.grouped"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.quantizedDecode",
+      "settings" : {
+        "transformer" : "java",
+        "property" : "models.native.quantizedDecode"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 9,
+    "successfulAttempts" : 9,
+    "loadMillis" : 596.459653,
+    "retrievalMillis" : {
+      "p50" : 2.211354,
+      "p95" : 20.90567319999999
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 2.3817069999931846,
+      "p95" : 10.358196999997013
+    },
+    "ttftMillis" : {
+      "p50" : 5622.416982,
+      "p95" : 6846.664255199999
+    },
+    "tpotMillis" : {
+      "p50" : 419.8032576363637,
+      "p95" : 420.7263585564706
+    },
+    "endToEndMillis" : {
+      "p50" : 66127.086104,
+      "p95" : 97577.9767452
+    },
+    "p50PrefillTokensPerSecond" : 30.591843714289126,
+    "p50DecodeTokensPerSecond" : 2.3820682231727854,
+    "peakRssBytes" : 6109888512,
+    "totalCpuMillis" : 9274780.0,
+    "totalInputTokens" : 1603,
+    "totalCacheReadInputTokens" : 855,
+    "totalCacheWriteInputTokens" : 748,
+    "totalOutputTokens" : 1336,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.8888888888888888,
+    "modelAnswerRate" : 0.4444444444444444,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.4444444444444444,
+    "truncatedAnswerRate" : 0.1111111111111111
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Ornith 1.0 9B",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c98b1a9e299af5dab1c81fb866ce891f5288532eba56984b2263e55e87f367a",
+    "retrievalMillis" : 32.526092,
+    "frameworkOverheadMillis" : 15.314454999999725,
+    "endToEndMillis" : 114591.597712,
+    "generation" : {
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "inputTokens" : 183,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 183,
+      "outputTokens" : 256,
+      "ttftMillis" : 7350.041674,
+      "totalMillis" : 114543.757165,
+      "prefillTokensPerSecond" : 24.961792971575637,
+      "loadMillis" : 596.459653,
+      "peakRssBytes" : 5939519488,
+      "cpuMillis" : 1731310.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nThinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A context snippet about auto glass claims and a question about reporting time and deductible.\n    *   Rules:\n        *   If context doesn't contain the answer, reply exactly `INSUFFICIENT_CONTEXT`.\n        *   Answer in one short sentence.\n        *   Copy supporting source IDs from square brackets at the start of the CONTEXT entry.\n        *   Only IDs present in CONTEXT are valid citations.\n        *   Do not use prior knowledge.\n\n2.  **Analyze the Context:**\n    *   Source ID: `[claims-auto-glass]`\n    *   Content: \"Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required.\"\n\n3.  **Analyze the Question:**\n    *   \"How long do I have to report an auto glass claim and what is the deductible?\"\n\n4.  **Match Context to Question:**\n    *   \"How long do I have to report...\": Context says \"within 30 calendar days\".\n    *   \"What",
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Ornith 1.0 9B",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9bac66c4cd1be06f8af7f1e20bba73e90f20a93e95ebd6445aee83f09f963333",
+    "retrievalMillis" : 3.16659,
+    "frameworkOverheadMillis" : 2.9238099999929545,
+    "endToEndMillis" : 48575.834886,
+    "generation" : {
+      "text" : "Trip interruption claims use form T-19 with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "inputTokens" : 177,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 103,
+      "ttftMillis" : 5631.254329,
+      "totalMillis" : 48569.744486,
+      "prefillTokensPerSecond" : 30.041717221633963,
+      "loadMillis" : 596.459653,
+      "peakRssBytes" : 6013358080,
+      "cpuMillis" : 739100.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nThe user is asking about trip interruption claims based on the provided context.\n\nFrom the context:\n- \"Trip interruption claims use form T-19\n- \"The reimbursement limit is 3,500 dollars per covered traveler\n\nI need to answer in one short sentence and cite the source ID [claims-travel].\n</think>\n\nTrip interruption claims use form T-19 with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "text" : "Trip interruption claims use form T-19 with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Ornith 1.0 9B",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d8ac07be5ecbf49c6e3987c048195ef6675271932ca9553d9e96508db29d477d",
+    "retrievalMillis" : 3.475045,
+    "frameworkOverheadMillis" : 2.42276000000129,
+    "endToEndMillis" : 59782.654186,
+    "generation" : {
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "inputTokens" : 176,
+      "cacheReadInputTokens" : 107,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 130,
+      "ttftMillis" : 5634.09135,
+      "totalMillis" : 59776.756381,
+      "prefillTokensPerSecond" : 30.70870594336949,
+      "loadMillis" : 596.459653,
+      "peakRssBytes" : 6016909312,
+      "cpuMillis" : 911350.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nThe user is asking about behavioral health telemedicine requirements (referral) and copay. Let me check the context.\n\nFrom the context:\n- \"In-network behavioral health telemedicine visits do not require a referral.\"\n- \"The member copay is 15 dollars per visit\n\nSo the answer is:\n- No referral needed\n- Copay is $15 per visit\n\nI need to cite the source ID which is [health-telemedicine].\n</think>\n\nNo, behavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine].",
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Ornith 1.0 9B",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "380c007011a7f5db80c7048eace219a980cfd3610c794d6a2564cdd1758eaa2d",
+    "retrievalMillis" : 2.765979,
+    "frameworkOverheadMillis" : 2.487805999997363,
+    "endToEndMillis" : 52953.861887,
+    "generation" : {
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 106,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 114,
+      "ttftMillis" : 5468.670539,
+      "totalMillis" : 52948.608102,
+      "prefillTokensPerSecond" : 30.202780065046007,
+      "loadMillis" : 596.459653,
+      "peakRssBytes" : 6058344448,
+      "cpuMillis" : 807490.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nThe user is asking about settlement times for approved domestic ACH claims and international claim wires. I need to find this information in the provided context.\n\nFrom the context:\n- \"Approved domestic claims paid by ACH settle within 2 business days.\"\n- \"International claim wires settle within 5 business days and may incur an intermediary bank fee.\"\n\nI can answer this directly from the context.\n</think>\n\nApproved domestic ACH claims settle within 2 business days, while international claim wires settle within 5 business days. [payments-settlement]",
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Ornith 1.0 9B",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "2c3474424e6ad74d141ff736bdad09e820bb4d67be4aa7ad3eeaa78d0c95cb72",
+    "retrievalMillis" : 1.924161,
+    "frameworkOverheadMillis" : 2.3817069999931846,
+    "endToEndMillis" : 67991.706311,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "inputTokens" : 175,
+      "cacheReadInputTokens" : 109,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 150,
+      "ttftMillis" : 5575.050413,
+      "totalMillis" : 67987.400443,
+      "prefillTokensPerSecond" : 29.82545664210034,
+      "loadMillis" : 596.459653,
+      "peakRssBytes" : 6060212224,
+      "cpuMillis" : 1037270.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nThe user is asking about the merchant chargeback evidence deadline and upload format. I need to check the context provided.\n\nFrom the context:\n- \"Merchants must submit chargeback evidence within 7 calendar days of notification.\"\n- \"Evidence is uploaded as a PDF under 10 MB in the Disputes console.\"\n\nSo the deadline is 7 calendar days of notification, and the format is PDF under 10 MB.\n\nI should answer in one short sentence and cite the source ID [payments-chargeback].\n</think>\n\nMerchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Ornith 1.0 9B",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d2f53b19f41f7d91dc6f7dd6b315e7cab5343d34960adaee9fb6abe494fda55a",
+    "retrievalMillis" : 2.211354,
+    "frameworkOverheadMillis" : 1.8762280000009923,
+    "endToEndMillis" : 58538.500283,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers. [security-access]",
+      "inputTokens" : 177,
+      "cacheReadInputTokens" : 106,
+      "cacheWriteInputTokens" : 71,
+      "outputTokens" : 127,
+      "ttftMillis" : 5622.416982,
+      "totalMillis" : 58534.412701,
+      "prefillTokensPerSecond" : 30.700173924398143,
+      "loadMillis" : 596.459653,
+      "peakRssBytes" : 6088843264,
+      "cpuMillis" : 892540.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nThe user is asking about the production break-glass code name and how many managers approve it.\n\nFrom the context:\n- \"The production break-glass procedure is code-named Cobalt-17.\"\n- \"It requires approval from two on-call managers\n\nSo the answer is:\n- Code name: Cobalt-17\n- Managers: 2 on-call managers\n\nI need to cite the source ID which is [security-access].\n</think>\n\nThe production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers. [security-access]",
+      "text" : "The production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers. [security-access]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Ornith 1.0 9B",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b590af5ae835c55e27f24d72da74dcba9d7ec08b7d7906b1e65dbf463422745a",
+    "retrievalMillis" : 1.846445,
+    "frameworkOverheadMillis" : 1.7756899999949383,
+    "endToEndMillis" : 66127.086104,
+    "generation" : {
+      "text" : "The **Idempotency-Key** header makes Claims API creates idempotent, and a key can be replayed for **24 hours**. [api-idempotency]",
+      "inputTokens" : 193,
+      "cacheReadInputTokens" : 107,
+      "cacheWriteInputTokens" : 86,
+      "outputTokens" : 144,
+      "ttftMillis" : 6091.598127,
+      "totalMillis" : 66123.463969,
+      "prefillTokensPerSecond" : 30.934012079081384,
+      "loadMillis" : 596.459653,
+      "peakRssBytes" : 6090711040,
+      "cpuMillis" : 1007770.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nThe user is asking about the Claims API idempotency header and replay window duration. Let me check the context provided.\n\nThe context says:\n- Claims API clients send the Idempotency-Key header on create requests\n- Keys remain valid for a 24 hour replay window\n- Reusing a key with a different payload returns HTTP 409\n\nThis directly answers the question. The header is \"Idempotency-Key and the replay window is 24 hours.\n</think>\n\nThe **Idempotency-Key** header makes Claims API creates idempotent, and a key can be replayed for **24 hours**. [api-idempotency]",
+      "text" : "The **Idempotency-Key** header makes Claims API creates idempotent, and a key can be replayed for **24 hours**. [api-idempotency]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Ornith 1.0 9B",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "63d22ca7667495eef75d9900690e54a3b799f12319e7a4edd419369137dc9633",
+    "retrievalMillis" : 2.002628,
+    "frameworkOverheadMillis" : 1.678381999998237,
+    "endToEndMillis" : 72057.545295,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 174,
+      "cacheReadInputTokens" : 106,
+      "cacheWriteInputTokens" : 68,
+      "outputTokens" : 160,
+      "ttftMillis" : 5516.495682,
+      "totalMillis" : 72053.864285,
+      "prefillTokensPerSecond" : 30.591843714289126,
+      "loadMillis" : 596.459653,
+      "peakRssBytes" : 6108975104,
+      "cpuMillis" : 1100470.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nThe user is asking about priority one incident acknowledgment time and escalation route. Let me check the context.\n\nFrom the context:\n- \"A priority one incident must be acknowledged within 15 minutes.\"\n- \"If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander.\"\n\nSo the answer is:\n- Acknowledged within 15 minutes\n- Escalated via NORTHSTAR-P1 to the incident commander after 30 minutes\n\nI need to cite the source ID which is [support-escalation].\n</think>\n\nA priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated via NORTHSTAR-P1 to page the incident commander. [support-escalation]",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Ornith 1.0 9B",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "21f3713cf382940c25f833bcac879a6a3bc2f3fa15142355a21bb94e5c03f042",
+    "retrievalMillis" : 1.52183,
+    "frameworkOverheadMillis" : 1.6895729999960167,
+    "endToEndMillis" : 68649.166984,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 176,
+      "cacheReadInputTokens" : 106,
+      "cacheWriteInputTokens" : 70,
+      "outputTokens" : 152,
+      "ttftMillis" : 5510.585113,
+      "totalMillis" : 68645.955581,
+      "prefillTokensPerSecond" : 30.919971187569384,
+      "loadMillis" : 596.459653,
+      "peakRssBytes" : 6109888512,
+      "cpuMillis" : 1047480.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>\nThe user is asking about a deductible for damage to a lunar rover. The context provided is about auto glass claims for Northstar Mutual auto insurance. There is no information about lunar rovers in the context. I need to determine if the context contains the answer.\n\nThe context only discusses:\n- Auto glass claims\n- Northstar Mutual auto glass claims\n- Aurora portal\n- 30 calendar days reporting\n- Windshield repair deductible of $75\n- No police report required\n\nThere is absolutely no mention of lunar rovers or any space vehicle insurance. This is clearly outside the scope of the provided context.\n\nI should reply INSUFFICIENT_CONTEXT since the context does not contain the answer.\n</think>\n\nINSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

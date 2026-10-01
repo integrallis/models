@@ -485,10 +485,13 @@ impl WorkerPool {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::Matrix(job));
             state.failed = false;
-            self.shared
-                .partitions
-                .0
-                .store(partitions, Ordering::Release);
+            // `shared.partitions` is the pool's ACTIVATION GATE -- a worker parks while its index is
+            // at or beyond it, and only an increase in the active count notifies it again. It is not
+            // this job's partition count, which travels in the generation word and is read back by
+            // every worker as `job_partitions(observed_generation)`. Writing the job's count here
+            // was harmless only while the two were always equal; once a job can ask for fewer
+            // partitions than the pool has threads, it permanently parks every worker above that
+            // count, and the next job that needs them waits for workers that will never wake.
             self.shared
                 .remaining
                 .0
@@ -5923,6 +5926,103 @@ fn f32_to_f16(value: f32) -> u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn matrix_job_of(weight_bytes: usize) -> MatrixJob {
+        MatrixJob {
+            weights: 0,
+            weight_bytes,
+            output: 0,
+            rows: 1,
+            kernel: DotKernel::Q4K,
+            quantized: 0,
+            quantized_elements: 0,
+            activation_scales: 0,
+            scale_elements: 0,
+            activation_sums: 0,
+            sum_elements: 0,
+            batch_size: 1,
+            cols: 1,
+        }
+    }
+
+    fn parallel_job_of(output_elements: usize, weight_bytes: &[usize]) -> ParallelJob {
+        let mut matrices: [Option<MatrixJob>; MAX_GROUPED_MATRICES] = Default::default();
+        for (slot, bytes) in weight_bytes.iter().enumerate() {
+            matrices[slot] = Some(matrix_job_of(*bytes));
+        }
+        ParallelJob {
+            matrices,
+            matrix_count: weight_bytes.len(),
+            output_elements,
+            partitions: 1,
+        }
+    }
+
+    /// Buffers a dispatchable job points at. `slice::from_raw_parts` requires a non-null, aligned
+    /// pointer even for a zero-length slice, and the activation slices are built before the row
+    /// range is consulted, so a job cannot be dispatched with null pointers however few rows it has.
+    struct DispatchableBuffers {
+        quantized: Vec<i8>,
+        scales: Vec<f32>,
+        sums: Vec<i16>,
+    }
+
+    impl DispatchableBuffers {
+        fn new() -> Self {
+            Self {
+                quantized: vec![0; 1],
+                scales: vec![0.0; 1],
+                sums: vec![0; 1],
+            }
+        }
+
+        /// `rows: 0` empties every partition's row range, so the weights pointer -- the one slice
+        /// built only after that range is non-empty -- is never dereferenced and no kernel runs.
+        /// That is what lets the pool's publish-and-wait path be tested on its own.
+        fn job(&self, output_elements: usize) -> ParallelJob {
+            let mut job = parallel_job_of(output_elements, &[1 << 20]);
+            let matrix = job.matrices[0].as_mut().expect("matrix");
+            matrix.rows = 0;
+            matrix.quantized = self.quantized.as_ptr() as usize;
+            matrix.activation_scales = self.scales.as_ptr() as usize;
+            matrix.activation_sums = self.sums.as_ptr() as usize;
+            job
+        }
+    }
+
+    #[test]
+    fn a_published_job_partitions_across_the_active_pool_and_leaves_the_gate_alone() {
+        let pool = WorkerPool::new(4).expect("pool");
+        let buffers = DispatchableBuffers::new();
+        assert_eq!(pool.shared.partitions.0.load(Ordering::Acquire), 4);
+
+        assert!(pool.execute_matrix(buffers.job(4096)));
+        // A job's partition count travels in the generation word, and it is the whole active pool.
+        // Deriving it from the work the job streams instead is what broke this, and the breakage was
+        // invisible in every test of the sizing arithmetic because none of them published a job.
+        assert_eq!(
+            job_partitions(pool.shared.generation.0.load(Ordering::Acquire)),
+            4
+        );
+        // `shared.partitions` is the pool's ACTIVATION GATE, never job state: a worker parks while
+        // its own index is at or beyond it and is woken again only when the ACTIVE count rises, so a
+        // job-sized value strands every worker above it for the rest of the pool's life and the next
+        // job that needs them waits on threads that will never run.
+        assert_eq!(
+            pool.shared.partitions.0.load(Ordering::Acquire),
+            4,
+            "publishing a job must not change the pool's activation gate"
+        );
+
+        // Lowering the active count lowers both, which is the one legitimate way they move.
+        assert_eq!(pool.set_active_threads(2), 2);
+        assert!(pool.execute_matrix(buffers.job(4096)));
+        assert_eq!(
+            job_partitions(pool.shared.generation.0.load(Ordering::Acquire)),
+            2
+        );
+        assert_eq!(pool.shared.partitions.0.load(Ordering::Acquire), 2);
+    }
 
     #[test]
     fn exports_stable_abi_and_capabilities() {

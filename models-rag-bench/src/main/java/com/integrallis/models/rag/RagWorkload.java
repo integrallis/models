@@ -29,6 +29,13 @@ public enum RagWorkload {
   MATH("math", "/rag/math/documents.json", "/rag/math/cases.json"),
   MULTILINGUAL("multilingual", "/rag/multilingual/documents.json", "/rag/multilingual/cases.json"),
   SQL("sql", "/rag/sql/documents.json", "/rag/sql/cases.json"),
+  // Summarization asks for coverage of one source rather than extraction of one fact, so its cases
+  // carry three required facts each where the other workloads carry two. The router cannot select a
+  // model for a summarization request until a qualification records that capability, and no
+  // workload
+  // existed to produce one.
+  SUMMARIZATION(
+      "summarization", "/rag/summarization/documents.json", "/rag/summarization/cases.json"),
   TRANSPORTATION(
       "transportation", "/rag/transportation/documents.json", "/rag/transportation/cases.json");
 

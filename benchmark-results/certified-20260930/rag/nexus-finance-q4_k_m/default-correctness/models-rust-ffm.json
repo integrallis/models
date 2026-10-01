@@ -1,0 +1,903 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-09-30T23:10:19.701428319Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.3.50+sumfix-e5f0b3e04d8e",
+  "modelId" : "king3djbl_nexus_finance_gguf_q4_k_m",
+  "model" : "/work/models/king3djbl_nexus_finance_gguf_q4_k_m.gguf",
+  "artifactSha256" : "a849ca49f91889b614518e9242ceec6e24034289de0f3f8621784f3e1b77bb60",
+  "artifactSizeBytes" : 986045632,
+  "settings" : {
+    "corpusSha256" : "923a8686ef45df6c09c08c0bd80e08ab40a96ad0b4d37fb356729dbd6738befc",
+    "workload" : "finance",
+    "caseIds" : [ "aurora-reserve-review", "birch-duration-coupon", "cobalt-invoice-overdue", "delta-issuer-limit", "ember-loan-terms", "fjord-hedge-policy", "grove-runway-refresh", "harbor-variance-escalation", "unsupported-crypto-allocation" ],
+    "promptTemplate" : "chatml-no-think",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 256,
+    "warmups" : 0,
+    "iterations" : 1,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topK" : "1",
+      "seed" : "42",
+      "promptCache" : "longest-common-prefix",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-5-114",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971658752,
+    "maxHeapBytes" : 16500391936,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v13",
+    "environment" : {
+      "sve" : "false",
+      "performance-cliffs" : "fused-grouped-attention-disabled",
+      "kernel-runtime" : "rust-ffm",
+      "compiler" : "hotspot-c2",
+      "native-kernel-decode-threads" : "16",
+      "native-quantized-decode" : "false",
+      "end-of-generation.151643" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+      "end-of-generation.151645" : "vocabulary-text",
+      "vector-api" : "true",
+      "model-architecture" : "qwen2",
+      "architecture" : "amd64",
+      "gguf-parallel" : "true",
+      "vm-version" : "25.0.4.1+1-LTS",
+      "gguf-executor" : "persistent",
+      "gguf-chunks-per-thread" : "2",
+      "performance-cliff.fused-grouped-attention-disabled" : "architecture=qwen2, group-size=6",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "native-kernel-poll-millis" : "5",
+      "end-of-generation-token-ids" : "151643,151645",
+      "native-grouped-attention" : "true",
+      "gguf-threads" : "16",
+      "end-of-generation.chat-template" : "unresolved:no add_generation_prompt block",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "tokenizer.pre" : "qwen2",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "os" : "Linux",
+      "active-vector-bits" : "256",
+      "native-load-warmup" : "false",
+      "fast-vector-fma" : "true",
+      "java-executor-poll-millis" : "0",
+      "q4-short-pairwise-supported" : "true",
+      "java-feature" : "25",
+      "tokenizer.pre.implemented" : "true",
+      "processors" : "16",
+      "native-gated-delta-net" : "false",
+      "preferred-vector-bits" : "256",
+      "q4-unsigned-pairwise-supported" : "true",
+      "transformer-runtime" : "java",
+      "native-kernel-abi" : "6",
+      "vm-vendor" : "Eclipse Adoptium",
+      "kernel-implementation" : "rust-ffm-quantized-v13",
+      "native-q5-0-grouped" : "false",
+      "fast-scalar-fma" : "true",
+      "projection-layers" : "28",
+      "native-kernel-threads" : "16",
+      "java-version" : "25.0.4.1"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "grouped",
+        "gate-up" : "grouped",
+        "implementation" : "rust-ffm-quantized-v13"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "14"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "architecture" : "amd64",
+        "os" : "Linux",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "batch-size" : "32",
+        "architecture" : "amd64",
+        "kernel" : "one-query-block",
+        "requested-kernel" : "one-query-block"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "2",
+        "parallel" : "true",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "7",
+        "parallel" : "true",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "partitions" : "16",
+        "partition" : "batch-rows",
+        "staged-layers" : "0",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "16"
+      }
+    }, {
+      "id" : "load-warmup",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.loadWarmup",
+      "settings" : {
+        "property" : "models.native.loadWarmup",
+        "sequence-state" : "reset-after-warmup"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "6"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "6"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "6"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "6"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "6"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "6"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "6"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.gatedDeltaNet",
+      "settings" : {
+        "state" : "caller-owned-java-array",
+        "boundary" : "panama-ffm-critical",
+        "property" : "models.native.gatedDeltaNet",
+        "abi" : "6"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.gatedDeltaNet",
+      "settings" : {
+        "state" : "branch-major-caller-owned-java-array",
+        "boundary" : "panama-ffm-critical",
+        "property" : "models.native.gatedDeltaNet",
+        "abi" : "6"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
+      "settings" : {
+        "property" : "models.native.q5_0.grouped",
+        "qualification" : "model-and-platform-specific"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.quantizedDecode",
+      "settings" : {
+        "property" : "models.native.quantizedDecode",
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 9,
+    "successfulAttempts" : 9,
+    "loadMillis" : 499.03722,
+    "retrievalMillis" : {
+      "p50" : 2.729836,
+      "p95" : 17.163591199999992
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 2.2367629999998826,
+      "p95" : 11.039710799999007
+    },
+    "ttftMillis" : {
+      "p50" : 496.271605,
+      "p95" : 1460.9164891999994
+    },
+    "tpotMillis" : {
+      "p50" : 87.63675164,
+      "p95" : 93.90119443283558
+    },
+    "endToEndMillis" : {
+      "p50" : 8892.292496,
+      "p95" : 22868.580331600002
+    },
+    "p50PrefillTokensPerSecond" : 139.3508692776901,
+    "p50DecodeTokensPerSecond" : 11.410737861529437,
+    "peakRssBytes" : 1476485120,
+    "totalCpuMillis" : 1331610.0,
+    "totalInputTokens" : 1476,
+    "totalCacheReadInputTokens" : 814,
+    "totalCacheWriteInputTokens" : 662,
+    "totalOutputTokens" : 963,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.1111111111111111,
+    "modelAnswerRate" : 0.0,
+    "modelAnswerCorrectRate" : 0.0,
+    "extractiveFallbackRate" : 0.8888888888888888,
+    "truncatedAnswerRate" : 0.2222222222222222
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "aurora-reserve-review",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-aurora-reserve",
+        "title" : "Aurora reserve policy",
+        "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month."
+      },
+      "score" : 5.188199,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3aaa0b11174bb78dc6c53e81fd79ad7cd4d3f71d2c323d885bae82230ea610ce",
+    "retrievalMillis" : 26.568226,
+    "frameworkOverheadMillis" : 16.586193999999523,
+    "endToEndMillis" : 7150.227051,
+    "generation" : {
+      "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month. [finance-aurora-reserve]",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 172,
+      "outputTokens" : 53,
+      "ttftMillis" : 2047.117994,
+      "totalMillis" : 7107.072631,
+      "prefillTokensPerSecond" : 84.50088588100387,
+      "loadMillis" : 499.03722,
+      "peakRssBytes" : 1457356800,
+      "cpuMillis" : 102210.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve, and it is reviewed on the first business day of each month. The user asked for the percentage and the review frequency, so I'll provide both pieces of information.\n\n</assistant-response>",
+      "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month. [finance-aurora-reserve]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "birch-duration-coupon",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-birch-duration",
+        "title" : "Birch bond profile",
+        "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year."
+      },
+      "score" : 7.3422394,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ed46fd944739b7146edcd4e726fa66df63861d779e2a70082d61c55850e80059",
+    "retrievalMillis" : 3.056639,
+    "frameworkOverheadMillis" : 2.5979879999999866,
+    "endToEndMillis" : 2892.602476,
+    "generation" : {
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 27,
+      "ttftMillis" : 581.614232,
+      "totalMillis" : 2886.947849,
+      "prefillTokensPerSecond" : 113.76845472794902,
+      "loadMillis" : 499.03722,
+      "peakRssBytes" : 1458974720,
+      "cpuMillis" : 43850.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year.\n</assistant>",
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "cobalt-invoice-overdue",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-cobalt-invoices",
+        "title" : "Cobalt receivables",
+        "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31."
+      },
+      "score" : 8.500158,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8934496effd06711165e2b6fa1dd6c0f8e8ec40b844265c66083dc7667ce4cf7",
+    "retrievalMillis" : 2.676513,
+    "frameworkOverheadMillis" : 2.2367629999998826,
+    "endToEndMillis" : 2536.954969,
+    "generation" : {
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 24,
+      "ttftMillis" : 496.271605,
+      "totalMillis" : 2532.041693,
+      "prefillTokensPerSecond" : 139.39640994889794,
+      "loadMillis" : 499.03722,
+      "peakRssBytes" : 1460092928,
+      "cpuMillis" : 38510.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Cobalt Services uses net-30 terms. An invoice becomes overdue on day 31.\n</assistant>",
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "delta-issuer-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-delta-concentration",
+        "title" : "Delta concentration limit",
+        "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit."
+      },
+      "score" : 6.1008873,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a8c184f68d6d9551e4a3b0f48c40b5385ac00544fad788aa8fbf8fa295e972a5",
+    "retrievalMillis" : 2.456889,
+    "frameworkOverheadMillis" : 2.066290000000663,
+    "endToEndMillis" : 9137.795392,
+    "generation" : {
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 100,
+      "ttftMillis" : 504.481127,
+      "totalMillis" : 9133.272213,
+      "prefillTokensPerSecond" : 131.15058435474236,
+      "loadMillis" : 499.03722,
+      "peakRssBytes" : 1470271488,
+      "cpuMillis" : 136890.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The user asked for Delta Portfolio's single-issuer limit and which holding is excluded. The context states that Delta Portfolio limits exposure to any single issuer to 12 percent of net assets, and cash is excluded from that limit. I should provide the specific numbers and the exclusion rule.\n\nThe single-issuer limit is 12 percent of net assets, and cash is excluded from that limit. The holding excluded is cash.\n\nI'll now provide the requested information in the requested format.\n\n</assistant>",
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "ember-loan-terms",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-ember-loan",
+        "title" : "Ember equipment loan",
+        "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031."
+      },
+      "score" : 6.752196,
+      "rank" : 1
+    } ],
+    "promptSha256" : "80b8f08c8351d5ce6ed2dc9bba20949c1b360d9a9cf3a71ff93fd7708ad1a1d2",
+    "retrievalMillis" : 2.804202,
+    "frameworkOverheadMillis" : 2.342720000000554,
+    "endToEndMillis" : 8892.292496,
+    "generation" : {
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 68,
+      "outputTokens" : 98,
+      "ttftMillis" : 483.63535,
+      "totalMillis" : 8887.145574,
+      "prefillTokensPerSecond" : 141.03858745855803,
+      "loadMillis" : 499.03722,
+      "peakRssBytes" : 1474543616,
+      "cpuMillis" : 133530.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The user asked for the loan rate and maturity date. I need to look at the context to find the relevant information. The context mentions \"Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031.\" I can see that the rate is 6.25 percent and the maturity is June 2031. I should provide the requested information directly without adding any extra information or citations.\n\n</assistant>",
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "fjord-hedge-policy",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-fjord-hedge",
+        "title" : "Fjord currency hedge",
+        "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months."
+      },
+      "score" : 4.780636,
+      "rank" : 1
+    } ],
+    "promptSha256" : "14ca8b7c47414578397a510da7a9a1e466c83b1e6534853b909bc1c30fe5bbeb",
+    "retrievalMillis" : 2.729836,
+    "frameworkOverheadMillis" : 2.2159820000015316,
+    "endToEndMillis" : 23144.10553,
+    "generation" : {
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 256,
+      "ttftMillis" : 497.006889,
+      "totalMillis" : 23139.159712,
+      "prefillTokensPerSecond" : 139.3508692776901,
+      "loadMillis" : 499.03722,
+      "peakRssBytes" : 1474699264,
+      "cpuMillis" : 338800.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The user wants to know how much of Fjord Export's euro receipts are hedged, and for what horizon. I need to identify the relevant information in the context.\n\nThe relevant information is: \"Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months.\" I can extract the percentage and the horizon from this.\n\nI'll use the exact context to find the IDs and then use the IDs to find the answer.\n\nI'll use the IDs from the context to find the answer. The IDs are: [finance-fjord-hedge] Fjord currency hedge, [finance-fjord-hedge] Fjord Export hedges 70 percent of forecast euro receipts, [finance-fjord-hedge] The hedge horizon is six months.\n\nI'll use the IDs to find the answer. The IDs are: [finance-fjord-hedge] Fjord currency hedge, [finance-fjord-hedge] Fjord Export hedges 70 percent of forecast euro receipts, [finance-fjord-hedge] The hedge horizon is six months.\n\nI'll use the IDs to find the answer. The IDs are: [finance-fjord-hedge] Fjord currency hedge",
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "grove-runway-refresh",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-grove-runway",
+        "title" : "Grove cash runway",
+        "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly."
+      },
+      "score" : 5.838581,
+      "rank" : 1
+    } ],
+    "promptSha256" : "23caf0f23369ded907c979b075fba4ee2217f3dd0497f82e06de5f34d8a4d2ea",
+    "retrievalMillis" : 2.934971,
+    "frameworkOverheadMillis" : 2.2209819999998217,
+    "endToEndMillis" : 2648.502467,
+    "generation" : {
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 26,
+      "ttftMillis" : 452.427723,
+      "totalMillis" : 2643.346514,
+      "prefillTokensPerSecond" : 141.83009290278846,
+      "loadMillis" : 499.03722,
+      "peakRssBytes" : 1475428352,
+      "cpuMillis" : 40350.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly.\n</assistant>",
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "harbor-variance-escalation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-harbor-variance",
+        "title" : "Harbor budget escalation",
+        "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review."
+      },
+      "score" : 5.6997347,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cef82fe3a1cb5c5e93a72888f8eeee9b47ead1ff733a6ff8ca71e97255ea6bb2",
+    "retrievalMillis" : 2.436947,
+    "frameworkOverheadMillis" : 2.7199859999982436,
+    "endToEndMillis" : 10989.139666,
+    "generation" : {
+      "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 123,
+      "ttftMillis" : 443.346561,
+      "totalMillis" : 10983.982733,
+      "prefillTokensPerSecond" : 142.6276772403582,
+      "loadMillis" : 499.03722,
+      "peakRssBytes" : 1475547136,
+      "cpuMillis" : 164990.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "At 5 percent, Harbor Division escalates. The finance director owns the review.\n\nI need to cite the source. The user asked for a specific variance threshold, so I should reference the rule directly. The rule is in the finance-harbor-variance file, which is the source of the information. I'll use the exact ID from the file, which is the first line of the file: \"variance = 5 percent\". I'll then include the source ID at the end of the sentence.\n\nI'll keep the answer concise and direct, without any prior knowledge or additional information.\n</assistant>",
+      "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Merged",
+    "caseId" : "unsupported-crypto-allocation",
+    "retrieved" : [ ],
+    "promptSha256" : "61a32a85eacb920e02a5613d036cef33dc801b2ec03ea5b8327ba856f0689311",
+    "retrievalMillis" : 0.991528,
+    "frameworkOverheadMillis" : 1.6263010000002396,
+    "endToEndMillis" : 22455.292534,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 125,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 25,
+      "outputTokens" : 256,
+      "ttftMillis" : 188.753506,
+      "totalMillis" : 22452.674705,
+      "prefillTokensPerSecond" : 132.9378810687625,
+      "loadMillis" : 499.03722,
+      "peakRssBytes" : 1476485120,
+      "cpuMillis" : 332480.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The question asks about Meridian Treasury's cryptocurrency allocation. I need to find the relevant information in the database. Let me search for \"meridian treasury cryptocurrency allocation and retrieve the exact text. I'll also search for \"meridian treasury crypto allocation to ensure I cover all possible variations. The user asked for the exact allocation, so I should be precise in my response.\n\nNow I'm reading the file. The file contains a description of Meridian Treasury, its mission, and its cryptocurrency holdings. I need to find the specific allocation section. The file mentions \"Cryptocurrency Holdings and then lists the assets. I'll search for \"cryptocurrency allocation to find the exact figure. The file also mentions \"Cryptocurrency Holdings and then lists the assets. I'll search for \"cryptocurrency allocation to find the exact figure. The file mentions \"Cryptocurrency Holdings and then lists the assets. I'll search for \"cryptocurrency allocation to find the exact figure. The file mentions \"Cryptocurrency Holdings and then lists the assets. I'll search for \"cryptocurrency allocation to find the exact figure. The file mentions \"Cryptocurrency Holdings and then lists the assets. I'll search for \"cryptocurrency allocation to find the exact figure.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

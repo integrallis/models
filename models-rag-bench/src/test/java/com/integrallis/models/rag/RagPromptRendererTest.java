@@ -327,6 +327,29 @@ class RagPromptRendererTest {
   }
 
   @Test
+  void gemma4AnswerPrefillsTheAnswerChannelAfterTheClosedThoughtChannel() {
+    RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
+    List<RetrievedDocument> retrieved = List.of(new RetrievedDocument(document, 1.0f, 1));
+
+    String plain =
+        RagPromptRenderer.render("What is the answer?", retrieved, RagPromptTemplate.GEMMA4);
+    String prefilled =
+        RagPromptRenderer.render("What is the answer?", retrieved, RagPromptTemplate.GEMMA4_ANSWER);
+
+    // The envelope stays byte-for-byte the model's own: a closed thought channel, exactly what the
+    // published chat template emits for add_generation_prompt with thinking disabled. The variant
+    // adds
+    // the answer prefill and nothing else, so the only difference is the trailing text.
+    assertThat(prefilled)
+        .startsWith("<|turn>system\nYou answer questions")
+        .contains("<turn|>\n<|turn>user\nCONTEXT\n[source-1] Policy")
+        .contains("<turn|>\n<|turn>model\n<|channel>thought\n<channel|>")
+        .endsWith("Answer: ");
+    assertThat(prefilled).isEqualTo(plain + "Answer: ");
+    assertThat(RagPromptTemplate.parse("gemma4-answer")).isEqualTo(RagPromptTemplate.GEMMA4_ANSWER);
+  }
+
+  @Test
   void phi3ProfileUsesRoleAndEndTokens() {
     RagDocument document = new RagDocument("source-1", "Policy", "The answer is quartz.");
 

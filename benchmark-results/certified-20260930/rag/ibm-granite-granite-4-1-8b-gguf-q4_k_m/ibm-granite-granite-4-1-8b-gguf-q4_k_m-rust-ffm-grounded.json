@@ -1,0 +1,1898 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-09-30T18:56:06.297203016Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.3.50+g4answer-4d2395dd0680",
+  "modelId" : "granite_4_1_8b_q4_k_m",
+  "model" : "/work/models/granite_4_1_8b_q4_k_m.gguf",
+  "artifactSha256" : "ed902ac9eb6adce5a90c6a08c8ea201b50e23fdc5976d1cd0362006afac5309e",
+  "artifactSizeBytes" : 5347914400,
+  "settings" : {
+    "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+    "workload" : "general",
+    "caseIds" : [ "auto-glass-deadline", "travel-limit", "telemedicine-benefit", "claim-payment-times", "chargeback-evidence", "break-glass", "idempotency", "priority-one", "unsupported-lunar-vehicle" ],
+    "promptTemplate" : "granite",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 256,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v21",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "seed" : "42",
+      "topK" : "1",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0",
+      "topP" : "1.0",
+      "promptCache" : "longest-common-prefix"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-14-254",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971658752,
+    "maxHeapBytes" : 16500391936,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v13",
+    "environment" : {
+      "compiler" : "hotspot-c2",
+      "gguf-chunks-per-thread" : "2",
+      "end-of-generation-token-ids" : "100257",
+      "sve" : "false",
+      "fast-vector-fma" : "true",
+      "gguf-threads" : "16",
+      "tokenizer.pre" : "dbrx",
+      "q4-short-pairwise-supported" : "true",
+      "java-executor-poll-millis" : "0",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "active-vector-bits" : "256",
+      "projection-layers" : "40",
+      "end-of-generation.chat-template" : "resolved:100257",
+      "fast-scalar-fma" : "true",
+      "native-kernel-poll-millis" : "5",
+      "native-load-warmup" : "false",
+      "q4-unsigned-pairwise-supported" : "true",
+      "native-quantized-decode" : "true",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "vm-version" : "25.0.4.1+1-LTS",
+      "gguf-executor" : "persistent",
+      "architecture" : "amd64",
+      "end-of-generation.100257" : "tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn",
+      "native-kernel-abi" : "6",
+      "preferred-vector-bits" : "256",
+      "processors" : "16",
+      "tokenizer.pre.implemented" : "true",
+      "os" : "Linux",
+      "native-gated-delta-net" : "false",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "gguf-parallel" : "true",
+      "transformer-runtime" : "java",
+      "vector-api" : "true",
+      "native-kernel-threads" : "16",
+      "vm-vendor" : "Eclipse Adoptium",
+      "java-version" : "25.0.4.1",
+      "native-grouped-attention" : "true",
+      "native-q5-0-grouped" : "false",
+      "model-architecture" : "granite",
+      "kernel-runtime" : "rust-ffm",
+      "java-feature" : "25",
+      "native-kernel-decode-threads" : "8",
+      "kernel-implementation" : "rust-ffm-quantized-v13"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "gate-up" : "grouped",
+        "qkv" : "grouped",
+        "implementation" : "rust-ffm-quantized-v13"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "20"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "java-feature" : "25",
+        "active-vector-bits" : "256",
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64",
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "requested-kernel" : "one-query-block",
+        "kernel" : "one-query-block",
+        "architecture" : "amd64",
+        "batch-size" : "32",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionScores",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.batchedAttentionValues",
+      "settings" : {
+        "rows-per-group" : "1"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "stages" : "2",
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "stages" : "7",
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "requested-kernel" : "scattered",
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "16",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "chunks-per-thread" : "2",
+        "executor" : "persistent",
+        "threads" : "16"
+      }
+    }, {
+      "id" : "load-warmup",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.loadWarmup",
+      "settings" : {
+        "sequence-state" : "reset-after-warmup",
+        "property" : "models.native.loadWarmup"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "6",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.gatedDeltaNet",
+      "settings" : {
+        "property" : "models.native.gatedDeltaNet",
+        "boundary" : "panama-ffm-critical",
+        "state" : "caller-owned-java-array",
+        "abi" : "6"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.native.gatedDeltaNet",
+      "settings" : {
+        "property" : "models.native.gatedDeltaNet",
+        "boundary" : "panama-ffm-critical",
+        "state" : "branch-major-caller-owned-java-array",
+        "abi" : "6"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
+      "settings" : {
+        "property" : "models.native.q5_0.grouped",
+        "qualification" : "model-and-platform-specific"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "single-token Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "property" : "models.native.quantizedDecode"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 410.893948,
+    "retrievalMillis" : {
+      "p50" : 1.319004,
+      "p95" : 2.0022319
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 1.4823530000003302,
+      "p95" : 1.7570273999996062
+    },
+    "ttftMillis" : {
+      "p50" : 1943.805013,
+      "p95" : 2479.0004672
+    },
+    "tpotMillis" : {
+      "p50" : 144.2209155862069,
+      "p95" : 146.85577999999998
+    },
+    "endToEndMillis" : {
+      "p50" : 6836.494611,
+      "p95" : 9935.556074600001
+    },
+    "p50PrefillTokensPerSecond" : 32.47205426434603,
+    "p50DecodeTokensPerSecond" : 6.933807041339008,
+    "peakRssBytes" : 5763334144,
+    "totalCpuMillis" : 1850970.0,
+    "totalInputTokens" : 4542,
+    "totalCacheReadInputTokens" : 2865,
+    "totalCacheWriteInputTokens" : 1677,
+    "totalOutputTokens" : 921,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.6666666666666666,
+    "modelAnswerRate" : 0.3333333333333333,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.5555555555555556,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "40e1da5782974e19832e753605ace4d79bd6f96223f1cd054769f31eb9eb52c4",
+    "retrievalMillis" : 2.135133,
+    "frameworkOverheadMillis" : 1.6695639999998093,
+    "endToEndMillis" : 4843.047216,
+    "generation" : {
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "inputTokens" : 173,
+      "cacheReadInputTokens" : 148,
+      "cacheWriteInputTokens" : 25,
+      "outputTokens" : 29,
+      "ttftMillis" : 786.408804,
+      "totalMillis" : 4839.242519,
+      "prefillTokensPerSecond" : 31.818195372733047,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5760217088,
+      "cpuMillis" : 44780.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "You have 30 calendar days to report an auto glass claim, and the deductible for windshield repair is $75. [claims-auto-glass]",
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "bf81ea0ed227b015f90f472e5e04a3826a7d7403dffcc3e41057656ca171191d",
+    "retrievalMillis" : 1.92704,
+    "frameworkOverheadMillis" : 1.6595040000001973,
+    "endToEndMillis" : 6082.381573,
+    "generation" : {
+      "text" : "Form T-19 is used for trip interruption claims, with a reimbursement limit of 3,500 dollars per covered traveler. [claims-travel]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 30,
+      "ttftMillis" : 1897.478222,
+      "totalMillis" : 6078.795029,
+      "prefillTokensPerSecond" : 33.21348414525602,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5760684032,
+      "cpuMillis" : 63520.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Form T-19 is used for trip interruption claims, with a reimbursement limit of 3,500 dollars per covered traveler. [claims-travel]",
+      "text" : "Form T-19 is used for trip interruption claims, with a reimbursement limit of 3,500 dollars per covered traveler. [claims-travel]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8de02764a0b93aa9e8c3ce83a309b294109b83ea3765144efecd1149f54819b1",
+    "retrievalMillis" : 1.668484,
+    "frameworkOverheadMillis" : 1.7459800000005998,
+    "endToEndMillis" : 5086.924401,
+    "generation" : {
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 21,
+      "ttftMillis" : 2145.910773,
+      "totalMillis" : 5083.509937,
+      "prefillTokensPerSecond" : 30.768903026621746,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5761142784,
+      "cpuMillis" : 57440.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "No referral is needed, and the copay is $15 per visit. [health-telemedicine]",
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b2c1c9373b0628499a81dbc010158193de67cf6d3eb26195741ad9903ef2b2d2",
+    "retrievalMillis" : 1.633602,
+    "frameworkOverheadMillis" : 1.584128999999848,
+    "endToEndMillis" : 6966.552812,
+    "generation" : {
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 35,
+      "ttftMillis" : 2069.40924,
+      "totalMillis" : 6963.335081,
+      "prefillTokensPerSecond" : 30.937588290710647,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5761679360,
+      "cpuMillis" : 71530.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Approved domestic ACH claims settle within 2 business days, while international claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "45f9ca4a8be084458575330e1a7be81834158b53224c79179a990d8c103eafc5",
+    "retrievalMillis" : 1.406378,
+    "frameworkOverheadMillis" : 1.4965840000004391,
+    "endToEndMillis" : 7194.648485,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 103,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 38,
+      "ttftMillis" : 1884.799476,
+      "totalMillis" : 7191.745523,
+      "prefillTokensPerSecond" : 33.4358868949245,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762105344,
+      "cpuMillis" : 72360.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The merchant chargeback evidence must be submitted within 7 calendar days of notification and uploaded as a PDF file under 10 MB in the Disputes console. [payments-chargeback]",
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c161fcec778ece64531c9a14b7f3abd1126bb090dcf3c3260b76c390f3dca5a7",
+    "retrievalMillis" : 1.557368,
+    "frameworkOverheadMillis" : 1.745930000000044,
+    "endToEndMillis" : 5720.006593,
+    "generation" : {
+      "text" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 26,
+      "ttftMillis" : 2080.30724,
+      "totalMillis" : 5716.703295,
+      "prefillTokensPerSecond" : 32.216214892947214,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762465792,
+      "cpuMillis" : 62100.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]",
+      "text" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3cfba19afbcae0ff0b7d29b412c8ac190912519f35aed40772a74e182c178112",
+    "retrievalMillis" : 1.4468,
+    "frameworkOverheadMillis" : 1.6587540000000445,
+    "endToEndMillis" : 6954.020012,
+    "generation" : {
+      "text" : "Clients send the Idempotency-Key header on create requests, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "inputTokens" : 182,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 81,
+      "outputTokens" : 32,
+      "ttftMillis" : 2467.485897,
+      "totalMillis" : 6950.914458,
+      "prefillTokensPerSecond" : 32.83679611266819,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762629632,
+      "cpuMillis" : 75120.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Clients send the Idempotency-Key header on create requests, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "text" : "Clients send the Idempotency-Key header on create requests, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e985eb01fe913399052d04e8d155da8128084524c37a9c5dad7023cd4d8707a2",
+    "retrievalMillis" : 1.348124,
+    "frameworkOverheadMillis" : 1.5753789999998844,
+    "endToEndMillis" : 7511.809482,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 40,
+      "ttftMillis" : 1927.964543,
+      "totalMillis" : 7508.885979,
+      "prefillTokensPerSecond" : 33.208933446975344,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762682880,
+      "cpuMillis" : 75240.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated via NORTHSTAR-P1 pages to the incident commander. [support-escalation]",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "bba6d5b112adff71afca4e3eba889fa56e37cf44617f04a0e7ae7d5f79502705",
+    "retrievalMillis" : 0.956471,
+    "frameworkOverheadMillis" : 1.6264110000010987,
+    "endToEndMillis" : 9965.819831,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 56,
+      "ttftMillis" : 2111.322364,
+      "totalMillis" : 9963.236949,
+      "prefillTokensPerSecond" : 31.270802071928294,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762707456,
+      "cpuMillis" : 96270.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "INSUFFICIENT_CONTEXT\n\nThe provided context only discusses auto glass claims for Northstar Mutual, specifically mentioning a $75 deductible for windshield repair and the requirement to report claims through the Aurora portal within 30 days. There is no information about deductibles for damage to a lunar rover.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "40e1da5782974e19832e753605ace4d79bd6f96223f1cd054769f31eb9eb52c4",
+    "retrievalMillis" : 1.557937,
+    "frameworkOverheadMillis" : 1.5740100000002712,
+    "endToEndMillis" : 4841.675363,
+    "generation" : {
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "inputTokens" : 173,
+      "cacheReadInputTokens" : 148,
+      "cacheWriteInputTokens" : 25,
+      "outputTokens" : 29,
+      "ttftMillis" : 778.499174,
+      "totalMillis" : 4838.543416,
+      "prefillTokensPerSecond" : 32.141370108594195,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762740224,
+      "cpuMillis" : 44750.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "You have 30 calendar days to report an auto glass claim, and the deductible for windshield repair is $75. [claims-auto-glass]",
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "bf81ea0ed227b015f90f472e5e04a3826a7d7403dffcc3e41057656ca171191d",
+    "retrievalMillis" : 2.034457,
+    "frameworkOverheadMillis" : 1.9333220000007714,
+    "endToEndMillis" : 6102.153043,
+    "generation" : {
+      "text" : "Form T-19 is used for trip interruption claims, with a reimbursement limit of 3,500 dollars per covered traveler. [claims-travel]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 30,
+      "ttftMillis" : 1913.180334,
+      "totalMillis" : 6098.185264,
+      "prefillTokensPerSecond" : 32.94704974518673,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762764800,
+      "cpuMillis" : 63810.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Form T-19 is used for trip interruption claims, with a reimbursement limit of 3,500 dollars per covered traveler. [claims-travel]",
+      "text" : "Form T-19 is used for trip interruption claims, with a reimbursement limit of 3,500 dollars per covered traveler. [claims-travel]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8de02764a0b93aa9e8c3ce83a309b294109b83ea3765144efecd1149f54819b1",
+    "retrievalMillis" : 1.350914,
+    "frameworkOverheadMillis" : 1.4011680000012348,
+    "endToEndMillis" : 5004.306787,
+    "generation" : {
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 21,
+      "ttftMillis" : 2055.465402,
+      "totalMillis" : 5001.554705,
+      "prefillTokensPerSecond" : 32.11963233877408,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762809856,
+      "cpuMillis" : 56260.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "No referral is needed, and the copay is $15 per visit. [health-telemedicine]",
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b2c1c9373b0628499a81dbc010158193de67cf6d3eb26195741ad9903ef2b2d2",
+    "retrievalMillis" : 1.217106,
+    "frameworkOverheadMillis" : 1.4471999999996115,
+    "endToEndMillis" : 6811.363697,
+    "generation" : {
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 35,
+      "ttftMillis" : 1923.161717,
+      "totalMillis" : 6808.699391,
+      "prefillTokensPerSecond" : 33.28870356723167,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762822144,
+      "cpuMillis" : 69630.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Approved domestic ACH claims settle within 2 business days, while international claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "45f9ca4a8be084458575330e1a7be81834158b53224c79179a990d8c103eafc5",
+    "retrievalMillis" : 1.001862,
+    "frameworkOverheadMillis" : 1.4400799999993978,
+    "endToEndMillis" : 7210.573616,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 103,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 38,
+      "ttftMillis" : 1895.223763,
+      "totalMillis" : 7208.131674,
+      "prefillTokensPerSecond" : 33.25125133510504,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762834432,
+      "cpuMillis" : 72590.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The merchant chargeback evidence must be submitted within 7 calendar days of notification and uploaded as a PDF file under 10 MB in the Disputes console. [payments-chargeback]",
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c161fcec778ece64531c9a14b7f3abd1126bb090dcf3c3260b76c390f3dca5a7",
+    "retrievalMillis" : 1.362885,
+    "frameworkOverheadMillis" : 1.453312000000551,
+    "endToEndMillis" : 5720.944179,
+    "generation" : {
+      "text" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 26,
+      "ttftMillis" : 2082.303721,
+      "totalMillis" : 5718.127982,
+      "prefillTokensPerSecond" : 32.185896963237134,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762916352,
+      "cpuMillis" : 62210.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]",
+      "text" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3cfba19afbcae0ff0b7d29b412c8ac190912519f35aed40772a74e182c178112",
+    "retrievalMillis" : 1.319004,
+    "frameworkOverheadMillis" : 1.6534750000000713,
+    "endToEndMillis" : 6994.833794,
+    "generation" : {
+      "text" : "Clients send the Idempotency-Key header on create requests, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "inputTokens" : 182,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 81,
+      "outputTokens" : 32,
+      "ttftMillis" : 2507.009375,
+      "totalMillis" : 6991.861315,
+      "prefillTokensPerSecond" : 32.31993274466191,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762957312,
+      "cpuMillis" : 75740.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Clients send the Idempotency-Key header on create requests, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "text" : "Clients send the Idempotency-Key header on create requests, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e985eb01fe913399052d04e8d155da8128084524c37a9c5dad7023cd4d8707a2",
+    "retrievalMillis" : 1.455412,
+    "frameworkOverheadMillis" : 1.7617619999991803,
+    "endToEndMillis" : 7520.662877,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 40,
+      "ttftMillis" : 1928.467299,
+      "totalMillis" : 7517.445703,
+      "prefillTokensPerSecond" : 33.201291692518154,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762977792,
+      "cpuMillis" : 75310.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated via NORTHSTAR-P1 pages to the incident commander. [support-escalation]",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "bba6d5b112adff71afca4e3eba889fa56e37cf44617f04a0e7ae7d5f79502705",
+    "retrievalMillis" : 0.924067,
+    "frameworkOverheadMillis" : 1.411020000001372,
+    "endToEndMillis" : 9940.586837,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 56,
+      "ttftMillis" : 2097.775242,
+      "totalMillis" : 9938.25175,
+      "prefillTokensPerSecond" : 31.470348360978267,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5762985984,
+      "cpuMillis" : 95990.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "INSUFFICIENT_CONTEXT\n\nThe provided context only discusses auto glass claims for Northstar Mutual, specifically mentioning a $75 deductible for windshield repair and the requirement to report claims through the Aurora portal within 30 days. There is no information about deductibles for damage to a lunar rover.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "40e1da5782974e19832e753605ace4d79bd6f96223f1cd054769f31eb9eb52c4",
+    "retrievalMillis" : 1.212448,
+    "frameworkOverheadMillis" : 1.4497309999997015,
+    "endToEndMillis" : 4830.630219,
+    "generation" : {
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "inputTokens" : 173,
+      "cacheReadInputTokens" : 148,
+      "cacheWriteInputTokens" : 25,
+      "outputTokens" : 29,
+      "ttftMillis" : 770.472803,
+      "totalMillis" : 4827.96804,
+      "prefillTokensPerSecond" : 32.47205426434603,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5763002368,
+      "cpuMillis" : 44600.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "You have 30 calendar days to report an auto glass claim, and the deductible for windshield repair is $75. [claims-auto-glass]",
+      "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required. [claims-auto-glass]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "bf81ea0ed227b015f90f472e5e04a3826a7d7403dffcc3e41057656ca171191d",
+    "retrievalMillis" : 1.240048,
+    "frameworkOverheadMillis" : 1.3980170000004364,
+    "endToEndMillis" : 6064.159236,
+    "generation" : {
+      "text" : "Form T-19 is used for trip interruption claims, with a reimbursement limit of 3,500 dollars per covered traveler. [claims-travel]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 30,
+      "ttftMillis" : 1879.114619,
+      "totalMillis" : 6061.521171,
+      "prefillTokensPerSecond" : 33.537820201646326,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5763072000,
+      "cpuMillis" : 63320.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Form T-19 is used for trip interruption claims, with a reimbursement limit of 3,500 dollars per covered traveler. [claims-travel]",
+      "text" : "Form T-19 is used for trip interruption claims, with a reimbursement limit of 3,500 dollars per covered traveler. [claims-travel]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8de02764a0b93aa9e8c3ce83a309b294109b83ea3765144efecd1149f54819b1",
+    "retrievalMillis" : 1.080058,
+    "frameworkOverheadMillis" : 1.4140180000003966,
+    "endToEndMillis" : 5038.798713,
+    "generation" : {
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 21,
+      "ttftMillis" : 2100.317353,
+      "totalMillis" : 5036.304637,
+      "prefillTokensPerSecond" : 31.430823626688987,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5763100672,
+      "cpuMillis" : 56830.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "No referral is needed, and the copay is $15 per visit. [health-telemedicine]",
+      "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b2c1c9373b0628499a81dbc010158193de67cf6d3eb26195741ad9903ef2b2d2",
+    "retrievalMillis" : 1.195205,
+    "frameworkOverheadMillis" : 1.4274599999998827,
+    "endToEndMillis" : 6836.494611,
+    "generation" : {
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 35,
+      "ttftMillis" : 1943.805013,
+      "totalMillis" : 6833.871946,
+      "prefillTokensPerSecond" : 32.936175158404204,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5763174400,
+      "cpuMillis" : 69930.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Approved domestic ACH claims settle within 2 business days, while international claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "45f9ca4a8be084458575330e1a7be81834158b53224c79179a990d8c103eafc5",
+    "retrievalMillis" : 1.10698,
+    "frameworkOverheadMillis" : 1.4605020000008153,
+    "endToEndMillis" : 7227.285415,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 103,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 38,
+      "ttftMillis" : 1911.720575,
+      "totalMillis" : 7224.717933,
+      "prefillTokensPerSecond" : 32.96435372924059,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5763268608,
+      "cpuMillis" : 72840.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The merchant chargeback evidence must be submitted within 7 calendar days of notification and uploaded as a PDF file under 10 MB in the Disputes console. [payments-chargeback]",
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c161fcec778ece64531c9a14b7f3abd1126bb090dcf3c3260b76c390f3dca5a7",
+    "retrievalMillis" : 0.955291,
+    "frameworkOverheadMillis" : 1.4477609999994456,
+    "endToEndMillis" : 5734.507059,
+    "generation" : {
+      "text" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 26,
+      "ttftMillis" : 2092.348901,
+      "totalMillis" : 5732.104007,
+      "prefillTokensPerSecond" : 32.03009850189899,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5763297280,
+      "cpuMillis" : 62400.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]",
+      "text" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3cfba19afbcae0ff0b7d29b412c8ac190912519f35aed40772a74e182c178112",
+    "retrievalMillis" : 0.886766,
+    "frameworkOverheadMillis" : 1.4823530000003302,
+    "endToEndMillis" : 6957.512901,
+    "generation" : {
+      "text" : "Clients send the Idempotency-Key header on create requests, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "inputTokens" : 182,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 81,
+      "outputTokens" : 32,
+      "ttftMillis" : 2483.935283,
+      "totalMillis" : 6955.143782,
+      "prefillTokensPerSecond" : 32.61716001529231,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5763301376,
+      "cpuMillis" : 75250.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Clients send the Idempotency-Key header on create requests, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "text" : "Clients send the Idempotency-Key header on create requests, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e985eb01fe913399052d04e8d155da8128084524c37a9c5dad7023cd4d8707a2",
+    "retrievalMillis" : 0.874385,
+    "frameworkOverheadMillis" : 1.4288489999999001,
+    "endToEndMillis" : 7516.888341,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 40,
+      "ttftMillis" : 1938.20365,
+      "totalMillis" : 7514.585107,
+      "prefillTokensPerSecond" : 33.029400267044146,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5763325952,
+      "cpuMillis" : 75370.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated via NORTHSTAR-P1 pages to the incident commander. [support-escalation]",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Granite 4.1 8b",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "bba6d5b112adff71afca4e3eba889fa56e37cf44617f04a0e7ae7d5f79502705",
+    "retrievalMillis" : 0.712284,
+    "frameworkOverheadMillis" : 1.4184490000006917,
+    "endToEndMillis" : 9923.817629,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 56,
+      "ttftMillis" : 2088.723535,
+      "totalMillis" : 9921.686896,
+      "prefillTokensPerSecond" : 31.607360601071008,
+      "loadMillis" : 410.893948,
+      "peakRssBytes" : 5763334144,
+      "cpuMillis" : 95780.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "INSUFFICIENT_CONTEXT\n\nThe provided context only discusses auto glass claims for Northstar Mutual, specifically mentioning a $75 deductible for windshield repair and the requirement to report claims through the Aurora portal within 30 days. There is no information about deductibles for damage to a lunar rover.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}
