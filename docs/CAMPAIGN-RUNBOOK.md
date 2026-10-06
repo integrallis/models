@@ -290,3 +290,35 @@ default-configuration smoke produced by the shipped library, so each entry carri
 that the model answers its whole workload correctly under library defaults. Run the smoke across the
 whole catalogue whenever the released library changes the grounding policy, the decoder, or the
 kernel — not only across the entries that are new.
+
+
+## Read the documented procedure before writing a script
+
+The repositories already automate what the campaign needs, and the procedures are written down. A
+whole day of failed catalog publishes came from not reading one sentence that was already in
+`modeljars/docs/github-setup.md`: the `Model artifacts` workflow's reserved `all` value *bootstraps a
+complete catalogue* and `verify` must be run before either publication target. Dispatching `all` for
+an incremental publish made Central reject all 44 already-published markers, and the finalize step
+correctly refused the batch.
+
+**Before any publish, release, or fleet task: read `CONTRIBUTING.md`, `docs/github-setup.md`,
+`RELEASING.md` and this file; read the workflow YAML for its required inputs and environment gates;
+run the documented verify or dry-run target; run every local gate.** They all finish in under a
+minute. Prefer the existing workflow to a script of your own.
+
+When a script is genuinely needed, three mistakes made in one day are worth naming so they are not
+made again:
+
+- **Check the exit status of the command, not of a pipe.** `gh pr merge … | tail -2 || die` reports
+  the status of `tail`, so a refused merge was swallowed and the next stage published from the wrong
+  catalogue. (The same shape once made a kernel upload report success while the copy was denied.)
+- **Never key a wait on a commit message or on list ordering.** A pipeline that waited for a fixed
+  commit subject never matched a later commit, and `gh run list --limit 1` returned a run from the
+  previous month. Key on content, and pin run ids explicitly.
+- **`waiting` is not a failure.** A GitHub run in `waiting` is holding for a deployment-environment
+  approval. Counting it against a timeout aborted a healthy run after two hours of correctly waiting
+  for a person. Also poll matrix JOBS, not the run: a run has been seen reporting
+  `completed/success` while one job was still `in_progress`.
+
+The step-by-step catalog publish lives in modeljars' `CONTRIBUTING.md` under "Publishing newly
+qualified models, step by step". Follow it rather than reconstructing it.
