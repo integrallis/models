@@ -1,0 +1,322 @@
+{
+  "schemaVersion": 1,
+  "notes": [
+    "Every protocol arm except FRONTIER (needs explicit API-spend approval) and ORACLE (derived by `logit-fusion summarize` from the A, B, C member reports).",
+    "Member names in specs (A, B, C, BIG) bind to GGUF paths through the modelSet: q8 = A-q8,B-q8,C-q8,BIG-q4; q4 = A-q4,B-q4,C-q4,BIG-q4; big-q8 = BIG-q8 (keys in models.json).",
+    "Pilot (S2) runs before S3 tuning: host-run rewrites `:tuned` to `:uniform`, keeps tie-break member B, runs vote-conf uncalibrated, and records the rewrite as `pilotSubstitution`.",
+    "`${SC_K}` is resolved by host-run from env SC_K (default 2). The default is a placeholder [believed]; the protocol sets k so SC-k decode compute is within +/-10% of F-tuned as measured, so k must be re-set from pilot core-seconds before S4.",
+    "dependsOn lists arm labels whose reports (same dataset, same run mode) are passed as --member-reports; they are reused, never regenerated, so vote/rerank compute = dependency compute + aggregation/scoring compute."
+  ],
+  "arms": [
+    {
+      "label": "A",
+      "spec": "member:A",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Per-component baseline."
+    },
+    {
+      "label": "B",
+      "spec": "member:B",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Per-component baseline; pilot tie-break member."
+    },
+    {
+      "label": "C",
+      "spec": "member:C",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Per-component baseline; largest member (SC-k source)."
+    },
+    {
+      "label": "BIG",
+      "spec": "member:BIG",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Memory-matched control, Qwen3 8B Q4_K_M. Also serves as BIG-Q4 for H6 (same file)."
+    },
+    {
+      "label": "A-think",
+      "spec": "member:A",
+      "thinking": "on",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Thinking-mode member; feeds VOTE-think/-consist/-conf and calibration."
+    },
+    {
+      "label": "B-think",
+      "spec": "member:B",
+      "thinking": "on",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Thinking-mode member."
+    },
+    {
+      "label": "C-think",
+      "spec": "member:C",
+      "thinking": "on",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Thinking-mode member."
+    },
+    {
+      "label": "BIG-think",
+      "spec": "member:BIG",
+      "thinking": "on",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Thinking-mode memory-matched control."
+    },
+    {
+      "label": "AB",
+      "spec": "fuse:A+B:poe:tuned",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": true,
+      "pilot": true,
+      "notes": "Leave-one-out pair (H5). Fused arms run non-thinking only."
+    },
+    {
+      "label": "AC",
+      "spec": "fuse:A+C:poe:tuned",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": true,
+      "pilot": true,
+      "notes": "Leave-one-out pair (H5)."
+    },
+    {
+      "label": "BC",
+      "spec": "fuse:B+C:poe:tuned",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": true,
+      "pilot": true,
+      "notes": "Leave-one-out pair (H5)."
+    },
+    {
+      "label": "F-uniform",
+      "spec": "fuse:A+B+C:poe:uniform",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Fusion with no tuning."
+    },
+    {
+      "label": "F-tuned",
+      "spec": "fuse:A+B+C:poe:tuned",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": true,
+      "pilot": true,
+      "notes": "Primary treatment. In the pilot this is identical to F-uniform by substitution; the stop rule is evaluated on that stand-in and the report must say so."
+    },
+    {
+      "label": "F-mix",
+      "spec": "fuse:A+B+C:mixture:tuned",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": true,
+      "pilot": true,
+      "notes": "Combination-rule comparison."
+    },
+    {
+      "label": "F-article",
+      "spec": "fuse:A+B+C:article:0.5,0.2,0.3",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Raw-logit sum as published in the article; weights fixed by the protocol, never tuned."
+    },
+    {
+      "label": "VOTE",
+      "spec": "vote:A+B+C:best",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [
+        "A",
+        "B",
+        "C"
+      ],
+      "requiresFrozen": true,
+      "pilot": true,
+      "notes": "Answer-level majority. Full runs: tie-break member must equal the dev-split best member recorded in the frozen JSON; B is the pilot default. Tie-break is the development-split best member from frozen.json (spec :best); the S2 pilot runs with --pilot true, which substitutes member B and records it."
+    },
+    {
+      "label": "VOTE-think",
+      "spec": "vote:A+B+C:best",
+      "thinking": "on",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [
+        "A-think",
+        "B-think",
+        "C-think"
+      ],
+      "requiresFrozen": true,
+      "pilot": true,
+      "notes": "Plain-vote baseline for H7. Tie-break is the development-split best member from frozen.json (spec :best); the S2 pilot runs with --pilot true, which substitutes member B and records it."
+    },
+    {
+      "label": "VOTE-consist",
+      "spec": "vote-consist:A+B+C:best",
+      "thinking": "on",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [
+        "A-think",
+        "B-think",
+        "C-think"
+      ],
+      "requiresFrozen": true,
+      "pilot": true,
+      "notes": "Drops votes whose reasoning answer differs from the stated answer; keeps all if all dropped. Tie-break is the development-split best member from frozen.json (spec :best); the S2 pilot runs with --pilot true, which substitutes member B and records it."
+    },
+    {
+      "label": "VOTE-conf",
+      "spec": "vote-conf:A+B+C:best",
+      "thinking": "on",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [
+        "A-think",
+        "B-think",
+        "C-think"
+      ],
+      "requiresFrozen": true,
+      "pilot": true,
+      "notes": "Votes weighted by calibrated answer-token confidence (G7). Pilot runs uncalibrated (temperature 1 per member) by substitution. Tie-break is the development-split best member from frozen.json (spec :best); the S2 pilot runs with --pilot true, which substitutes member B and records it."
+    },
+    {
+      "label": "RERANK",
+      "spec": "rerank:A+B+C:tuned",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [
+        "A",
+        "B",
+        "C"
+      ],
+      "requiresFrozen": true,
+      "pilot": true,
+      "notes": "H8: fusion used for verification. Compute = dependency generation + prefill-only scoring, reported separately."
+    },
+    {
+      "label": "RERANK-think",
+      "spec": "rerank:A+B+C:tuned",
+      "thinking": "on",
+      "modelSet": "q8",
+      "temperature": 0,
+      "dependsOn": [
+        "A-think",
+        "B-think",
+        "C-think"
+      ],
+      "requiresFrozen": true,
+      "pilot": true,
+      "notes": "The protocol runs RERANK in both thinking modes."
+    },
+    {
+      "label": "SC-k",
+      "spec": "sc:C:${SC_K}",
+      "thinking": "off",
+      "modelSet": "q8",
+      "temperature": 0.7,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Compute-matched control; k samples of C at T=0.7, seeds seed..seed+k-1, prompt KV reused. k must be re-set from pilot-measured compute (H3 requires +/-10%)."
+    },
+    {
+      "label": "SC-k-think",
+      "spec": "sc:C:${SC_K}",
+      "thinking": "on",
+      "modelSet": "q8",
+      "temperature": 0.7,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Thinking-mode SC-k."
+    },
+    {
+      "label": "F-tuned-Q4",
+      "spec": "fuse:A+B+C:poe:tuned",
+      "thinking": "off",
+      "modelSet": "q4",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": true,
+      "pilot": true,
+      "notes": "H6. A-q4 and B-q4 are proposed-substitute pins (no official Q4_K_M for 0.6B/1.7B); host-run refuses them unless ALLOW_PROPOSED_PINS=1. Uses the Q8-tuned weights (protocol tunes once)."
+    },
+    {
+      "label": "BIG-Q4",
+      "spec": "member:BIG",
+      "thinking": "off",
+      "modelSet": "q4",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "H6. Same GGUF (BIG-q4) and same configuration as BIG; host-run may reuse the BIG report. Kept as a label so the H6 comparison names both sides."
+    },
+    {
+      "label": "BIG-Q8",
+      "spec": "member:BIG",
+      "thinking": "off",
+      "modelSet": "big-q8",
+      "temperature": 0,
+      "dependsOn": [],
+      "requiresFrozen": false,
+      "pilot": true,
+      "notes": "Required by the H6 decision rule (BIG-Q8 - BIG-Q4). Also the threat-list 'second BIG at Q8_0'. 8.7 GB file; needs a host with enough RAM."
+    }
+  ]
+}

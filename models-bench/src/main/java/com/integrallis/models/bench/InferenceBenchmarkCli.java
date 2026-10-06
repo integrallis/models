@@ -130,6 +130,12 @@ public final class InferenceBenchmarkCli {
       System.exit(CudaKernelGateCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "logit-fusion".equals(args[0])) {
+      System.exit(
+          com.integrallis.models.bench.fusion.FusionCli.run(
+              Arrays.copyOfRange(args, 1, args.length)));
+      return;
+    }
     if (args.length > 0 && "activated-prefix-sharing".equals(args[0])) {
       System.exit(ActivatedPrefixSharingBenchmarkCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
