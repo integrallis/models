@@ -56,8 +56,10 @@ class PureJavaBackendTest {
   private static final int HEADS = 2;
   private static final int KV_HEADS = 1;
   private static final int HIDDEN_DIM = 32;
+
   /** The second layer's feed-forward width, so the fixture varies the axis E2B varies. */
   private static final int WIDE_HIDDEN_DIM = 2 * HIDDEN_DIM;
+
   private static final int VOCAB_SIZE = 32;
   private static final int LAYERS = 2;
   private static final int CONTEXT = 64;
@@ -732,7 +734,9 @@ class PureJavaBackendTest {
     return buildNanoGemma4ModelFile(dir, rng, 2);
   }
 
-  /** @param expertCount 0 builds the dense shape, as Gemma 4 E2B publishes it. */
+  /**
+   * @param expertCount 0 builds the dense shape, as Gemma 4 E2B publishes it.
+   */
   private static Path buildNanoGemma4ModelFile(Path dir, Random rng, int expertCount)
       throws IOException {
     return buildNanoGemma4ModelFile(dir, rng, expertCount, GgufTensorType.F32);
@@ -741,8 +745,8 @@ class PureJavaBackendTest {
   /**
    * @param expertCount 0 builds the dense shape, as Gemma 4 E2B publishes it
    * @param ffnType the shared feed-forward tensor type; a quantized type routes the projection
-   *     through {@code TensorOps.ggufMatmul} instead of the float path, which is where a real
-   *     Q4_K E2B failed
+   *     through {@code TensorOps.ggufMatmul} instead of the float path, which is where a real Q4_K
+   *     E2B failed
    */
   private static Path buildNanoGemma4ModelFile(
       Path dir, Random rng, int expertCount, GgufTensorType ffnType) throws IOException {
@@ -770,9 +774,7 @@ class PureJavaBackendTest {
             // feed_forward_length = [6144 x15, 12288 x20]. A scalar here cannot exercise the
             // forward pass's per-layer width, which is how a 12288-vs-6144 mismatch reached a
             // qualified model.
-            .addInt32Array(
-                "gemma4.feed_forward_length", List.of(HIDDEN_DIM, WIDE_HIDDEN_DIM))
-
+            .addInt32Array("gemma4.feed_forward_length", List.of(HIDDEN_DIM, WIDE_HIDDEN_DIM))
             .addUint32("gemma4.attention.key_length", headLength)
             .addUint32("gemma4.attention.key_length_swa", headLength)
             .addUint32("gemma4.attention.value_length", headLength)
