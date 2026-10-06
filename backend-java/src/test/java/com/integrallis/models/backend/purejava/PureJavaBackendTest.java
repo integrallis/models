@@ -56,6 +56,8 @@ class PureJavaBackendTest {
   private static final int HEADS = 2;
   private static final int KV_HEADS = 1;
   private static final int HIDDEN_DIM = 32;
+  /** The second layer's feed-forward width, so the fixture varies the axis E2B varies. */
+  private static final int WIDE_HIDDEN_DIM = 2 * HIDDEN_DIM;
   private static final int VOCAB_SIZE = 32;
   private static final int LAYERS = 2;
   private static final int CONTEXT = 64;
@@ -197,6 +199,47 @@ class PureJavaBackendTest {
       try (PureJavaBackend backend = PureJavaBackend.loadAutomatic(modelPath)) {
         assertThat(backend.name()).isEqualTo("pure-java");
         assertThat(backend.forward(5, 0)).hasSize(VOCAB_SIZE);
+      }
+    }
+
+    /**
+     * E2B's shape on the path a user gets: dense, a per-layer feed-forward width, and quantized
+     * feed-forward tensors. A quantized type routes the projection through {@code
+     * TensorOps.ggufMatmul} rather than the float path, and native quantized decode is off by
+     * default, which is the configuration under which a qualified Gemma 4 E2B threw {@code Vector
+     * dimensions differ: 12288 != 6144} on all nine cases.
+     */
+    @Test
+    void loadsDenseQuantizedGemma4WithAPerLayerFeedForwardWidth(@TempDir Path dir)
+        throws IOException {
+      Path modelPath = buildNanoGemma4ModelFile(dir, new Random(84), 0, GgufTensorType.Q4_0);
+
+      try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
+        assertFiniteLogits(backend.forward(5, 0));
+        backend.reset();
+        assertFiniteLogits(backend.prefill(new int[] {5, 7}, 0));
+      }
+    }
+
+    /**
+     * The dense Gemma 4 shape, which is what the E-series publishes: no expert keys, no {@code
+     * *_exps} tensors, and a per-layer feed-forward width. Gemma 4 E2B declares {@code
+     * feed_forward_length = [6144 x15, 12288 x20]}, and on the pure-Java path a qualified E2B threw
+     * {@code Vector dimensions differ: 12288 != 6144} on every case. The routed fixture could not
+     * catch it: it is mixture-of-experts, so it never walks the dense feed-forward, and it declared
+     * one width for every layer.
+     */
+    @Test
+    void loadsDenseGemma4WithAPerLayerFeedForwardWidth(@TempDir Path dir) throws IOException {
+      Path modelPath = buildNanoGemma4ModelFile(dir, new Random(84), 0);
+
+      try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
+        assertThat(backend.executionPlan().topology().architecture()).isEqualTo("gemma4");
+
+        float[] first = backend.forward(5, 0);
+        assertFiniteLogits(first);
+        backend.reset();
+        assertFiniteLogits(backend.prefill(new int[] {5, 7}, 0));
       }
     }
 
@@ -686,9 +729,25 @@ class PureJavaBackendTest {
   }
 
   private static Path buildNanoGemma4ModelFile(Path dir, Random rng) throws IOException {
+    return buildNanoGemma4ModelFile(dir, rng, 2);
+  }
+
+  /** @param expertCount 0 builds the dense shape, as Gemma 4 E2B publishes it. */
+  private static Path buildNanoGemma4ModelFile(Path dir, Random rng, int expertCount)
+      throws IOException {
+    return buildNanoGemma4ModelFile(dir, rng, expertCount, GgufTensorType.F32);
+  }
+
+  /**
+   * @param expertCount 0 builds the dense shape, as Gemma 4 E2B publishes it
+   * @param ffnType the shared feed-forward tensor type; a quantized type routes the projection
+   *     through {@code TensorOps.ggufMatmul} instead of the float path, which is where a real
+   *     Q4_K E2B failed
+   */
+  private static Path buildNanoGemma4ModelFile(
+      Path dir, Random rng, int expertCount, GgufTensorType ffnType) throws IOException {
     int headLength = DIM / HEADS;
     int keyValueDim = KV_HEADS * headLength;
-    int expertCount = 2;
     int expertHiddenDim = 4;
     List<String> tokens = new ArrayList<>();
     List<Float> scores = new ArrayList<>();
@@ -707,10 +766,13 @@ class PureJavaBackendTest {
             .addInt32Array("gemma4.attention.head_count_kv", List.of(KV_HEADS, KV_HEADS))
             .addUint32("gemma4.vocab_size", VOCAB_SIZE)
             .addUint32("gemma4.context_length", CONTEXT)
-            .addUint32("gemma4.feed_forward_length", HIDDEN_DIM)
-            .addUint32("gemma4.expert_feed_forward_length", expertHiddenDim)
-            .addUint32("gemma4.expert_count", expertCount)
-            .addUint32("gemma4.expert_used_count", 1)
+            // Per layer, like the E-series: Gemma 4 E2B publishes
+            // feed_forward_length = [6144 x15, 12288 x20]. A scalar here cannot exercise the
+            // forward pass's per-layer width, which is how a 12288-vs-6144 mismatch reached a
+            // qualified model.
+            .addInt32Array(
+                "gemma4.feed_forward_length", List.of(HIDDEN_DIM, WIDE_HIDDEN_DIM))
+
             .addUint32("gemma4.attention.key_length", headLength)
             .addUint32("gemma4.attention.key_length_swa", headLength)
             .addUint32("gemma4.attention.value_length", headLength)
@@ -729,6 +791,15 @@ class PureJavaBackendTest {
             .addUint32("tokenizer.ggml.bos_token_id", 0)
             .addUint32("tokenizer.ggml.eos_token_id", 1);
 
+    // Absent, not zero: a dense Gemma 4 omits these three keys entirely, and Gemma4Config treats
+    // their absence as DENSE rather than as malformed metadata.
+    if (expertCount > 0) {
+      builder
+          .addUint32("gemma4.expert_feed_forward_length", expertHiddenDim)
+          .addUint32("gemma4.expert_count", expertCount)
+          .addUint32("gemma4.expert_used_count", 1);
+    }
+
     addF32(builder, "token_embd.weight", new long[] {DIM, VOCAB_SIZE}, rng);
     builder.addTensor("output_norm.weight", GgufTensorType.F32, new long[] {DIM}, onesF32(DIM));
     builder.addTensor(
@@ -738,7 +809,15 @@ class PureJavaBackendTest {
         onesF32(headLength / 2));
     for (int layer = 0; layer < LAYERS; layer++) {
       addGemma4Layer(
-          builder, rng, layer, layer == 0, headLength, keyValueDim, expertHiddenDim, expertCount);
+          builder,
+          rng,
+          layer,
+          layer == 0,
+          headLength,
+          keyValueDim,
+          expertHiddenDim,
+          expertCount,
+          ffnType);
     }
 
     Path modelPath = dir.resolve("nano-gemma4.gguf");
@@ -754,7 +833,8 @@ class PureJavaBackendTest {
       int headLength,
       int keyValueDim,
       int expertHiddenDim,
-      int expertCount) {
+      int expertCount,
+      GgufTensorType ffnType) {
     String prefix = "blk." + layer + ".";
     builder.addTensor(
         prefix + "attn_norm.weight", GgufTensorType.F32, new long[] {DIM}, onesF32(DIM));
@@ -777,33 +857,51 @@ class PureJavaBackendTest {
     addGemma4Norm(builder, prefix + "post_attention_norm.weight");
 
     addGemma4Norm(builder, prefix + "ffn_norm.weight");
-    addF32(builder, prefix + "ffn_gate.weight", new long[] {DIM, HIDDEN_DIM}, rng);
-    addF32(builder, prefix + "ffn_up.weight", new long[] {DIM, HIDDEN_DIM}, rng);
-    addF32(builder, prefix + "ffn_down.weight", new long[] {HIDDEN_DIM, DIM}, rng);
+    int sharedHidden = layer == 0 ? HIDDEN_DIM : WIDE_HIDDEN_DIM;
+    builder.addTensor(
+        prefix + "ffn_gate.weight",
+        ffnType,
+        new long[] {DIM, sharedHidden},
+        projectionData(rng, ffnType, sharedHidden * DIM));
+    builder.addTensor(
+        prefix + "ffn_up.weight",
+        ffnType,
+        new long[] {DIM, sharedHidden},
+        projectionData(rng, ffnType, sharedHidden * DIM));
+    builder.addTensor(
+        prefix + "ffn_down.weight",
+        ffnType,
+        new long[] {sharedHidden, DIM},
+        projectionData(rng, ffnType, DIM * sharedHidden));
     addGemma4Norm(builder, prefix + "pre_ffw_norm_2.weight");
     addGemma4Norm(builder, prefix + "post_ffw_norm_1.weight");
     addGemma4Norm(builder, prefix + "post_ffw_norm_2.weight");
     addGemma4Norm(builder, prefix + "post_ffw_norm.weight");
 
-    addGemma4Norm(builder, prefix + "ffn_gate_inp.scale");
-    addF32(builder, prefix + "ffn_gate_inp.weight", new long[] {DIM, expertCount}, rng);
-    builder.addTensor(
-        prefix + "ffn_down_exps.scale",
-        GgufTensorType.F32,
-        new long[] {expertCount},
-        onesF32(expertCount));
     builder.addTensor(
         prefix + "layer_output_scale.weight", GgufTensorType.F32, new long[] {1}, onesF32(1));
-    addF32(
-        builder,
-        prefix + "ffn_gate_up_exps.weight",
-        new long[] {DIM, 2L * expertHiddenDim, expertCount},
-        rng);
-    addF32(
-        builder,
-        prefix + "ffn_down_exps.weight",
-        new long[] {expertHiddenDim, DIM, expertCount},
-        rng);
+
+    // Gemma 4 ships dense and routed. E2B is dense: its GGUF carries no expert_count and no *_exps
+    // tensors at all, so a fixture that always writes them cannot exercise the dense path.
+    if (expertCount > 0) {
+      addGemma4Norm(builder, prefix + "ffn_gate_inp.scale");
+      addF32(builder, prefix + "ffn_gate_inp.weight", new long[] {DIM, expertCount}, rng);
+      builder.addTensor(
+          prefix + "ffn_down_exps.scale",
+          GgufTensorType.F32,
+          new long[] {expertCount},
+          onesF32(expertCount));
+      addF32(
+          builder,
+          prefix + "ffn_gate_up_exps.weight",
+          new long[] {DIM, 2L * expertHiddenDim, expertCount},
+          rng);
+      addF32(
+          builder,
+          prefix + "ffn_down_exps.weight",
+          new long[] {expertHiddenDim, DIM, expertCount},
+          rng);
+    }
   }
 
   private static void addGemma4Norm(SyntheticGgufBuilder builder, String name) {
