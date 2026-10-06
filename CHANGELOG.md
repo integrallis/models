@@ -4,6 +4,34 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.52] - 2026-10-06
+
+### Fixed
+
+- Gemma 4 E2B failed every default-configuration case with `Vector dimensions differ: 12288 != 6144`.
+  Its GGUF header declares `feed_forward_length = [6144 x15, 12288 x20]` and carries no
+  `expert_count`, so it is dense with a per-layer feed-forward width: one activation buffer sized for
+  the widest layer hands a 12288-long buffer to a 6144-column projection. Vectors' quantized GEMV
+  rejected that while its float GEMV accepted it, which is why the model qualified with native
+  quantized decode enabled and failed on library defaults. Fixed in Vectors 0.1.28, which this
+  release consumes.
+- The weekly `Pure-Java Determinism` workflow had failed every run since 2026-08-31 -- six
+  consecutive, last green 2026-08-24. It builds `:models-bench:installDist`, which pulls in
+  `:backend-cuda:compilePtx`; that crate builds with `-Zbuild-std` and needs `rust-src`, and a
+  toolchain rustup auto-installs on first use arrives without it. It was the only workflow building
+  `backend-cuda` without installing the pinned nightly's components explicitly.
+
+### Changed
+
+- Consumes Vectors 0.1.28, which also fixes int8 scalar decode sizing its output by the encoded
+  buffer's length rather than the quantizer's dimension.
+
+### Testing
+
+- The Gemma 4 route fixture can now build the dense shape (no expert keys, no `*_exps` tensors), a
+  per-layer feed-forward width, and quantized feed-forward tensors. Varying any one of those axes
+  alone passes; all three together reproduce the E2B failure in seconds without a model download.
+
 ## [0.3.51] - 2026-09-30
 
 The catalogue goes from 47 to 76 qualified models. Most of that came from fixing decoders and the
