@@ -16,6 +16,7 @@
 package com.integrallis.models.rag;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.backend.nativekernel.RustFfmBackend;
@@ -31,6 +32,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.TreeMap;
 
 /**
  * Exercises one model the way an application would: ordinary prompts, through all three surfaces.
@@ -82,6 +85,27 @@ public final class FrameworkExerciseCli {
 
   private FrameworkExerciseCli() {}
 
+  /**
+   * Writes the configuration the run actually resolved to into the report.
+   *
+   * <p>Extracted so it can be asserted without a model: the contract is that the artifact names
+   * both the backend's resolved diagnostics and every {@code models.*} property in force, so a
+   * reader can tell a treatment arm from its control. It is deliberately not conditional -- an
+   * empty tuning map is itself the evidence that an arm ran at library defaults.
+   */
+  static void recordConfiguration(
+      Map<String, Object> report, BackendDiagnostics diagnostics, Properties properties) {
+    report.put("backendPlanVersion", diagnostics.planVersion());
+    report.put("backendEnvironment", new TreeMap<>(diagnostics.environment()));
+    Map<String, String> tuning = new TreeMap<>();
+    for (String name : properties.stringPropertyNames()) {
+      if (name.startsWith("models.")) {
+        tuning.put(name, properties.getProperty(name));
+      }
+    }
+    report.put("modelsSystemProperties", tuning);
+  }
+
   public static void main(String[] args) throws Exception {
     Path model = null;
     Path output = null;
@@ -132,6 +156,13 @@ public final class FrameworkExerciseCli {
     // would
     // let evidence claim the native path while the pure-Java one ran.
     try (InferenceBackend backend = openBackend(backendId, model)) {
+      // The same argument applies to the settings, and a two-arm run is useless without them. An
+      // arm that varies `-Dmodels.native.loadWarmup` produced a report that recorded neither the
+      // property nor the resolved diagnostic, so the arm could not be shown to have differed from
+      // its control at all, and a run that flipped four of five subjects had to be discarded for
+      // want of evidence that the switch did anything. A toggle that is not in the artifact is not
+      // observable, and an ablation of it is not a measurement.
+      recordConfiguration(report, backend.diagnostics(), System.getProperties());
       RuntimeTextGenerationModel plain = new RuntimeTextGenerationModel(backend);
       ModelsChatModel langchain = new ModelsChatModel(backend, template, options);
       ModelsSpringAiChatModel spring = new ModelsSpringAiChatModel(backend, template, options);
