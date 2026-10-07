@@ -1,9 +1,15 @@
 #!/bin/bash
 # Work a list of shards through the fleet, keeping at most MAX_CONCURRENT boxes alive.
 #
-# The vCPU quota is the real constraint: 64 with 16 per m6a.4xlarge is four boxes. Counting only
-# `running` under-counts, because an instance in `shutting-down` still holds its quota and the next
-# RunInstances then fails with VcpuLimitExceeded -- so every state that holds capacity is counted.
+# The vCPU quota is the real constraint, and it is read, not assumed: it was 16, then 64 was
+# pending, and as of 2026-10-06 it is 192. A hard-coded default sent one run hunting for RunPod
+# capacity while 176 vCPUs sat free, so VCPU_QUOTA defaults to whatever the account reports and
+# falls back to 64 only if the query fails. Counting only `running` under-counts, because an
+# instance in `shutting-down` still holds its quota and the next RunInstances then fails with
+# VcpuLimitExceeded -- so every state that holds capacity is counted.
+#
+# The account is shared. Other projects' boxes hold vCPUs too, which is why held_vcpus counts every
+# instance rather than filtering by tag -- but never terminate one this script did not launch.
 #
 # A shard is finished when it uploads STATUS, not when its instance disappears: the instance
 # terminates itself, and gating on instance state would race the upload.
@@ -11,6 +17,9 @@ set -u
 S=$(cd "$(dirname "$0")" && pwd)
 BOOTSTRAPS=${BOOTSTRAPS:-$S}
 BUCKET=${BUCKET:-models-qual-077051030817}
+VCPU_QUOTA=${VCPU_QUOTA:-$(aws service-quotas get-service-quota --service-code ec2 \
+  --quota-code L-1216C47A --query "Quota.Value" --output text 2>/dev/null \
+  | awk '{printf "%d", $1+0}')}
 VCPU_QUOTA=${VCPU_QUOTA:-64}
 VCPUS_PER_BOX=${VCPUS_PER_BOX:-16}
 AMI=${AMI:-ami-0045d7fc2ad003464}

@@ -96,9 +96,17 @@ frozen for the V1 coder models whose evidence is already published; it is not th
 
 ## Fleet operations (EC2)
 
-- **The EC2 vCPU quota is 16** — exactly one `m6a.4xlarge`. Gate a relaunch on *no instances in
-  `running`, `pending`, `shutting-down` or `stopping`*, not just `running`, or `RunInstances` fails
-  with `VcpuLimitExceeded`. A quota increase to 64 is pending.
+- **The EC2 vCPU quota is 192** (`service-quotas get-service-quota --service-code ec2 --quota-code
+  L-1216C47A`, read 2026-10-06) — twelve `m6a.4xlarge`, not one. The increase that was pending landed
+  and overshot 64. Still gate a relaunch on *no instances in `running`, `pending`, `shutting-down`
+  or `stopping`*, not just `running`, or `RunInstances` fails with `VcpuLimitExceeded`: an instance
+  releases its vCPUs only when it is gone. **Read the quota, do not trust this line** — it said 16
+  for weeks after the increase, and on 2026-10-06 that sent a run looking for RunPod capacity when
+  176 vCPUs were free. `scripts/fleet/run-shards.sh` still defaults `VCPU_QUOTA=64`; pass it
+  explicitly.
+- **Other projects share the account.** A box tagged `project=ribbon-catches-bloom` is not the
+  model campaign's; check tags before assuming a running instance is yours, and never terminate one
+  you did not launch.
 - **EC2 user-data runs with no `$HOME`.** Ollama's `envconfig` resolves its model directory while
   building its CLI, so *every* invocation — `serve` and `create` alike — dies with
   `panic: $HOME is not defined` before parsing an argument. `export HOME=/root`. This single missing
