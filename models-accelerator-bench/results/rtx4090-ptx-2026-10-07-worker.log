@@ -1,0 +1,121 @@
+[20:22:39] nvidia-smi:
+NVIDIA GeForce RTX 4090, 8.9, 570.158.01
+Cuda compilation tools, release 12.8, V12.8.93
+Build cuda_12.8.r12.8/compiler.35583870_0
+[20:22:39] installing build prerequisites
+[20:26:06] maven: [1mApache Maven 3.8.7[m
+[20:26:06] cmake: cmake version 3.28.3
+[20:26:06] installing the pinned rust nightly -- :models-bench:installDist pulls in
+[20:26:06]   :backend-cuda:compilePtx, which needs cargo and -Zbuild-std's rust-src
+[20:26:24] cargo: cargo 1.100.0-nightly (495c385d0 2026-09-16)
+[20:26:24] installing jdk 25
+[20:26:28] jdk: openjdk version "25.0.4.1" 2026-08-18 LTS
+[20:26:28] === building TornadoVM v5.2.0-jdk25 from source, PTX backend ===
+[20:26:28] TORNADOVM_HOME=/work/tornado-sdk (an input to bin/compile, not an output)
+[20:26:30] tornado tree at v5.2.0-jdk25
+[20:26:30] building via bin/compile --jdk jdk25 --backend ptx (bin/compile builds -P<jdk>,<backend>; the wrong jdk value gives -source 8)
+[20:27:58] tornado build rc=0
+20:27:58 [[1;34mINFO[m] tornado-cufft ...................................... [1;32mSUCCESS[m [  1.567 s]
+20:27:58 [[1;34mINFO[m] tornado-cudnn ...................................... [1;32mSUCCESS[m [  1.570 s]
+20:27:58 [[1;34mINFO[m] tornado-cusparse ................................... [1;32mSUCCESS[m [  1.151 s]
+20:27:58 [[1;34mINFO[m] tornado-cutlass .................................... [1;32mSUCCESS[m [  1.260 s]
+20:27:58 [[1;34mINFO[m] tornado-unittests .................................. [1;32mSUCCESS[m [  5.187 s]
+20:27:58 [[1;34mINFO[m] tornado-annotation ................................. [1;32mSUCCESS[m [  1.372 s]
+20:27:58 [[1;34mINFO[m] tornado-assembly ................................... [1;32mSUCCESS[m [ 28.687 s]
+20:27:58 [[1;34mINFO[m] [1m------------------------------------------------------------------------[m
+20:27:58 [[1;34mINFO[m] [1;32mBUILD SUCCESS[m
+20:27:58 [[1;34mINFO[m] [1m------------------------------------------------------------------------[m
+20:27:58 [[1;34mINFO[m] Total time:  01:05 min (Wall Clock)
+20:27:58 [[1;34mINFO[m] Finished at: 2026-10-07T20:27:58Z
+20:27:58 [[1;34mINFO[m] [1m------------------------------------------------------------------------[m
+Maven build succeeded
+###########################################################################
+[32mTornadoVM build success[39m
+Updating PATH and TORNADOVM_HOME to tornadovm-5.2.0-jdk25-ptx-linux-amd64
+Backend : PTX
+Commit  : db146ae
+###########################################################################
+Generated utilities:
+   [Unix-env]: /work/tornadovm/setvars.sh
+   [argfile]: /work/tornadovm/dist/tornadovm-5.2.0-jdk25-ptx-linux-amd64/tornadovm-5.2.0-jdk25-ptx/tornado-argfile
+[36m[INFO][0m Run first: [1msource setvars.sh[0m
+
+[20:27:58] not at $TORNADOVM_HOME/bin/tornado, searching the assembled dist
+[20:27:58] launcher=/work/tornadovm/dist/tornadovm-5.2.0-jdk25-ptx-linux-amd64/tornadovm-5.2.0-jdk25-ptx/bin/tornado
+[20:27:58] TORNADOVM_HOME now /work/tornadovm/dist/tornadovm-5.2.0-jdk25-ptx-linux-amd64/tornadovm-5.2.0-jdk25-ptx
+[20:27:58] backends: tornado.backends=ptx-backend
+version=5.2.0-jdk25
+branch=UNKNOWN
+commit=db146ae
+WARNING: Using incubator modules: jdk.incubator.vector
+
+Number of Tornado drivers: 1
+Driver: [32mPTX[0m
+  Total number of PTX devices  : 1
+  Tornado device=0:0  (DEFAULT)
+	[32mPTX[0m -- PTX -- NVIDIA GeForce RTX 4090
+		Global Memory Size: 23.5 GB
+		Local Memory Size: 48.0 KB
+		Workgroup Dimensions: 3
+		Total Number of Block Threads: [2147483647, 65535, 65535]
+		Max WorkGroup Configuration: [1024, 1024, 64]
+		Device OpenCL C version: N/A
+
+
+[20:27:59] === fetching models source ===
+[20:28:03] models at 10af16c33be7e023c114812e6137b47fab7e0c90
+[20:28:03] === building models-bench dist ===
+[20:29:54] installDist rc=0
+[20:29:54] === fetching model ===
+[20:33:06] model sha verified
+[20:33:06] === accelerator-profile, the documented gate command ===
+[20:33:52] accelerator-profile rc=0
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+	[TornadoVM-PTX-JNI] ERROR : cuLaunchKernel -> Returned: 701
+accelerator profile: accelerated=true device=cuda-0 reason=eligible readiness=32171 ms plans=321
+  prompt=26 tokens prefill=69.34 tok/s (375.0 ms) decode=64 tokens 6.49 tok/s (9857.8 ms)
+  routed projections by format: {Q4_K=16800, Q6_K=2870}
+report: /work/accelerator-profile.json
+[20:33:53] profile uploaded
+[20:33:53] === per-format routing, the point of the command ===
+  accelerated = True  reason = eligible
+  device      = cuda-0
+  readiness   = 32171
+  prefillTokensPerSecond = 69.3391006823717
+  decodeTokensPerSecond = 6.492315709531025
+  routedProjectionsByFormat = {"Q4_K": 16800, "Q6_K": 2870}
+[20:33:53] FINAL_STATUS=COMPLETE
