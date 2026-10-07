@@ -50,6 +50,7 @@ public final class CudaRoutingCounters {
 
   private final Map<String, AtomicLong> accelerated = new ConcurrentHashMap<>();
   private final Map<String, AtomicLong> refusedByReason = new ConcurrentHashMap<>();
+  private final Map<String, AtomicLong> declinedByShape = new ConcurrentHashMap<>();
   private final AtomicLong kernelLaunches = new AtomicLong();
   private final AtomicLong hostToDeviceTransfers = new AtomicLong();
   private final AtomicLong deviceToHostTransfers = new AtomicLong();
@@ -67,6 +68,26 @@ public final class CudaRoutingCounters {
     Objects.requireNonNull(type, "type");
     Objects.requireNonNull(stage, "stage");
     accelerated.computeIfAbsent(key(type, stage), unused -> new AtomicLong()).addAndGet(operations);
+  }
+
+  /**
+   * Records a projection this kernel declined, so the Java branch it took is visible.
+   *
+   * <p>Distinct from {@link #refused}, which is for an explicit ablation. This is the quieter case:
+   * {@code isEligible} answers no, the forward pass takes {@code TensorOps}, and nothing used to
+   * increment. An empty refusals map therefore read as "everything ran on the device" when it only
+   * meant "nothing hit an explicit refusal path" -- and it hid the FFN gate and up projections
+   * running on the CPU for every layer of every token, 53.3% of Granite 4.1 3B\'s per-layer
+   * projection arithmetic, through a G4 measurement that was reported as a dispatch ceiling.
+   */
+  public void declined(GgufTensorType type, CudaStage stage, String reason, int rows, int cols) {
+    Objects.requireNonNull(type, "type");
+    Objects.requireNonNull(stage, "stage");
+    Objects.requireNonNull(reason, "reason");
+    declinedByShape
+        .computeIfAbsent(
+            key(type, stage) + "/" + reason + "/" + rows + "x" + cols, unused -> new AtomicLong())
+        .incrementAndGet();
   }
 
   /** Records one operation that fell back to the Vector API, and why. */
@@ -141,6 +162,16 @@ public final class CudaRoutingCounters {
   /** Accelerated operation counts keyed {@code FORMAT/STAGE}. */
   public Map<String, Long> acceleratedOperations() {
     return snapshot(accelerated);
+  }
+
+  /** Projections this kernel declined, by type, stage, reason and shape. */
+  public Map<String, Long> declinedProjections() {
+    return snapshot(declinedByShape);
+  }
+
+  /** Total projections this kernel declined, which the Java path then computed. */
+  public long totalDeclinedProjections() {
+    return declinedByShape.values().stream().mapToLong(AtomicLong::get).sum();
   }
 
   /** Fallback counts keyed {@code STAGE/reason}. */
