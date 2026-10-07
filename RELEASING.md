@@ -6,10 +6,23 @@ the GitHub release.
 
 The publication allowlist contains `models-api`, `models-runtime`, `models`,
 `models-rag`, `models-semantic-order`, `backend-java`, `backend-tornado`, `backend-native`,
-`backend-apple`, `models-langchain4j`, `models-spring-ai`,
+`backend-cuda`, `backend-apple`, `models-langchain4j`, `models-spring-ai`,
 `models-spring-boot-starter`, `models-embedding`, `models-audio`, `models-router`, and `models-decisions`. Benchmark
 applications, documentation tooling, and modules containing only package scaffolding are not
 published.
+
+`backend-cuda` publishes an **opt-in** artifact and nothing activates it by accident. There is no
+`META-INF/services` entry, so no `ServiceLoader` discovers it: a consumer has to call
+`CudaGgufBatchedMatrixKernel.open()` and inject the kernel, and `-Dmodels.cuda.disabled=true` is a
+kill switch on top of that. One `sm_80` PTX module serves every device of compute capability 8.0 or
+above, carried in the jar under `META-INF/models/cuda/` with a SHA-256 the Java loader recomputes.
+
+**Its numeric state must be stated in the release notes, not assumed from its presence.** G4 (decode
+speed) passes at 6.184x against a 3.00x gate, measured in
+`benchmark-results/2026-10-07-g4-dualpath`. G1 (exact token parity against the CPU path) is a
+separate gate with no tolerance, and a release note must say which way it last ran and on what
+hardware. Shipping the jar does not mean the device path is numerically verified; it means a caller
+can opt into it and read the gates.
 
 ## Cut a release
 

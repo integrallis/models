@@ -53,6 +53,7 @@ val publishedModuleNames =
         "backend-java",
         "backend-tornado",
         "backend-native",
+        "backend-cuda",
         "backend-apple",
         "models-langchain4j",
         "models-spring-ai",

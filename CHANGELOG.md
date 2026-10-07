@@ -4,6 +4,51 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.53] - 2026-10-07
+
+### Added
+
+- `backend-cuda` is now published. It ships one `sm_80` PTX module serving every device of compute
+  capability 8.0 or above, carried in the jar under `META-INF/models/cuda/` with a SHA-256 the Java
+  loader recomputes. **It is opt-in and nothing activates it by accident**: there is no
+  `META-INF/services` entry, so no `ServiceLoader` discovers it, a consumer has to call
+  `CudaGgufBatchedMatrixKernel.open()` and inject the kernel, and `-Dmodels.cuda.disabled=true` is a
+  kill switch on top of that. Having the jar on the classpath does not route anything to a device.
+- `CudaRoutingCounters.declined(type, stage, reason, rows, cols)`, with the shape in the key, and
+  `declinedProjections` / `totalDeclinedProjections` in the gate report. A projection that answered
+  no to `isEligible` and left through the Java branch previously incremented nothing, so an empty
+  refusals map read as "everything ran on the device" when it only meant "nothing hit an explicit
+  refusal path".
+
+### Fixed
+
+- **The FFN gate and up projections never reached the device.** `CudaGgufBatchedMatrixKernel` did
+  not override `multiplyDual`, so `isDualEligible` inherited the SPI default of `false` and
+  `LlamaForwardPass.dualMatmulDispatch` sent both to `TensorOps.ggufDualMatmul` on every layer of
+  every token. On Granite 4.1 3B they are 8192x2560 each -- 53.3% of a layer's projection
+  arithmetic. The triple path for query, key and value was implemented; the dual path was not, and
+  nothing recorded the asymmetry.
+
+### Measured
+
+Both device gates pass, on an RTX 4090 at compute capability 8.9, Granite 4.1 3B Q4_K_M, 20 prompts:
+
+| gate | result | evidence |
+| --- | --- | --- |
+| G1 token parity | **passed** -- 1280 token ids identical | `benchmark-results/2026-10-07-g1-parity` |
+| G4 decode speed | **passed** -- 6.184x against a 3.00x gate | `benchmark-results/2026-10-07-g4-dualpath` |
+
+G4 moved from 1.788x to 6.184x, decode from 9.02 to 31.26 tok/s, with a control arm that moved
+0.2% and a byte-identical PTX module either side. Routing the two projections raised dispatch --
+launches 241 to 321, transfers 402 to 522 per decode step -- and it did not matter. The earlier
+reading of 1.788x as a dispatch ceiling was wrong; the binding constraint was the unimplemented
+path.
+
+**One host and one model.** G1 has no tolerance, so each qualifying hardware profile and each
+architecture family earns its own run before the claim generalises. No published Java artifact
+behaviour changed in this release: `v0.3.52..HEAD` touches no other published module.
+
+
 ## [0.3.52] - 2026-10-06
 
 ### Fixed
