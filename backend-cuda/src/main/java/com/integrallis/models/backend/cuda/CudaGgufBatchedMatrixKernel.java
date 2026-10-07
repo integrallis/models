@@ -219,10 +219,33 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public boolean isEligible(GgufTensorType type, int batchSize, int rows, int cols) {
-    if (closed || !supports(type)) {
-      return false;
+    if (closed) {
+      return decline(type, batchSize, rows, cols, "closed");
     }
-    return isShapeEligible(batchSize, rows, cols);
+    if (!supports(type)) {
+      return decline(type, batchSize, rows, cols, "unsupported-type");
+    }
+    if (!isShapeEligible(batchSize, rows, cols)) {
+      return decline(type, batchSize, rows, cols, "ineligible-shape");
+    }
+    return true;
+  }
+
+  /**
+   * Records a declined projection and answers no.
+   *
+   * <p>The Java branch the caller then takes used to leave no trace at all, which is how the FFN
+   * gate and up projections ran on the CPU through an entire G4 measurement without appearing in
+   * any counter.
+   */
+  private boolean decline(GgufTensorType type, int batchSize, int rows, int cols, String reason) {
+    counters.declined(
+        type,
+        batchSize == 1 ? CudaStage.DECODE_PROJECTION : CudaStage.PREFILL_PROJECTION,
+        reason,
+        rows,
+        cols);
+    return false;
   }
 
   /**
@@ -245,6 +268,55 @@ public final class CudaGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     // The device kernels index a fixed shared-memory scratch by super-block. A wider row is
     // refused here rather than overrunning it there.
     return blocksPerRow <= CudaKernelAbi.MAX_BLOCKS_PER_ROW;
+  }
+
+  @Override
+  public boolean supportsDual(GgufTensorType firstType, GgufTensorType secondType) {
+    return supports(firstType) && supports(secondType);
+  }
+
+  @Override
+  public boolean isDualEligible(
+      GgufTensorType firstType,
+      int firstRows,
+      GgufTensorType secondType,
+      int secondRows,
+      int batchSize,
+      int cols) {
+    return supportsDual(firstType, secondType)
+        && isShapeEligible(batchSize, firstRows, cols)
+        && isShapeEligible(batchSize, secondRows, cols);
+  }
+
+  /**
+   * Computes the gate and up projections from one staged activation.
+   *
+   * <p>This was missing, and the omission was expensive rather than cosmetic. {@code
+   * LlamaForwardPass.dualMatmulDispatch} asks {@link #isDualEligible}, inherited the SPI default of
+   * {@code false}, and sent the FFN gate and up projections to {@code TensorOps.ggufDualMatmul} on
+   * every layer of every token. On Granite 4.1 3B those two are 8192x2560 each, which is 53.3% of a
+   * layer\'s projection arithmetic, so the G4 measurement of 1.788x was taken with more than half
+   * the work never reaching the device. Nothing recorded it: an unimplemented dual path is not a
+   * refusal, and the routing counters have no entry for a projection that took the Java branch.
+   */
+  @Override
+  public void multiplyDual(
+      float[] firstOutput,
+      MemorySegment firstWeights,
+      GgufTensorType firstType,
+      int firstRows,
+      float[] secondOutput,
+      MemorySegment secondWeights,
+      GgufTensorType secondType,
+      int secondRows,
+      float[] input,
+      int batchSize,
+      int cols) {
+    // One activation quantisation, two launches against the resident weights -- the same shape as
+    // multiplyTriple, which is the point of the fused form.
+    stageActivations(input, batchSize, cols);
+    project(firstOutput, firstWeights, firstType, firstRows, batchSize, cols, false);
+    project(secondOutput, secondWeights, secondType, secondRows, batchSize, cols, false);
   }
 
   @Override
