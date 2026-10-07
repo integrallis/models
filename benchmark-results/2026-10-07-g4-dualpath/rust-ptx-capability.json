@@ -1,0 +1,74 @@
+{
+  "schemaVersion" : 2,
+  "createdAt" : "2026-10-07T17:25:56.514564446Z",
+  "policyVersion" : "gpu-large-model-rust-ptx-v2",
+  "modelsRevision" : "c107cd14f9c1ee8f7a446aa861eddbb77b42959e",
+  "mode" : "capability",
+  "accelerated" : true,
+  "refusalReason" : "",
+  "device" : {
+    "name" : "NVIDIA GeForce RTX 4090",
+    "computeCapability" : 89,
+    "globalMemoryBytes" : 25261047808,
+    "driverVersion" : 12080
+  },
+  "kernel" : {
+    "sha256" : "4c534e622452df95ca7fbb3accc65246be54e2c74d53714d98a03be6d31e8e0e",
+    "ptxTarget" : "sm_80",
+    "toolchain" : "nightly-2026-09-17",
+    "entryPoints" : [ "models_q4k_decode_projection", "models_q6k_decode_projection", "models_gqa_decode_attention" ]
+  },
+  "environment" : {
+    "host" : "817bdc3ee892",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-117-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7K62 48-Core Processor",
+    "processors" : 11,
+    "physicalMemoryBytes" : 30999998464,
+    "maxHeapBytes" : 7751073792,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "configuration" : null,
+  "routing" : {
+    "acceleratedOperations" : { },
+    "refusals" : { },
+    "totalAcceleratedOperations" : 0,
+    "inert" : true,
+    "kernelLaunches" : 0,
+    "hostToDeviceTransfers" : 0,
+    "deviceToHostTransfers" : 0,
+    "hostToDeviceBytes" : 0,
+    "deviceToHostBytes" : 0,
+    "weightUploads" : 0,
+    "weightUploadBytes" : 0,
+    "decodeSteps" : 0,
+    "decodeProjections" : 0,
+    "measuredDecodeSteps" : 0,
+    "decodeStepsMarked" : false,
+    "launchesPerDecodeStep" : 0.0,
+    "transfersPerDecodeStep" : 0.0,
+    "activationBytesPerDecodeStep" : 0.0
+  },
+  "readinessMillis" : 523,
+  "parity" : null,
+  "decode" : null,
+  "memory" : null,
+  "gates" : {
+    "routingObservability" : {
+      "gate" : "G2",
+      "passed" : true,
+      "evidence" : "no accelerated operations recorded"
+    },
+    "startupHonesty" : {
+      "gate" : "G5",
+      "passed" : true,
+      "evidence" : "523 ms readiness against a 120000 ms ceiling"
+    },
+    "tokenParity" : null,
+    "decodeSpeedup" : null
+  },
+  "qualified" : true
+}

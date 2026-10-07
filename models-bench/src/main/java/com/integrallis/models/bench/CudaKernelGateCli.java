@@ -576,7 +576,9 @@ final class CudaKernelGateCli {
     return new Routing(
         counters.acceleratedOperations(),
         counters.refusals(),
+        counters.declinedProjections(),
         counters.totalAcceleratedOperations(),
+        counters.totalDeclinedProjections(),
         counters.inert(),
         counters.kernelLaunches(),
         counters.hostToDeviceTransfers(),
@@ -598,6 +600,8 @@ final class CudaKernelGateCli {
     return new Routing(
         Map.of(),
         Map.of(),
+        Map.of(),
+        0L,
         0L,
         true,
         0L,
@@ -829,7 +833,9 @@ final class CudaKernelGateCli {
   record Routing(
       Map<String, Long> acceleratedOperations,
       Map<String, Long> refusals,
+      Map<String, Long> declinedProjections,
       long totalAcceleratedOperations,
+      long totalDeclinedProjections,
       boolean inert,
       long kernelLaunches,
       long hostToDeviceTransfers,
@@ -849,6 +855,7 @@ final class CudaKernelGateCli {
     Routing {
       acceleratedOperations = Map.copyOf(acceleratedOperations);
       refusals = Map.copyOf(refusals);
+      declinedProjections = Map.copyOf(declinedProjections);
     }
   }
 
