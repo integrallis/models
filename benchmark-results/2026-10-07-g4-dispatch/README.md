@@ -30,8 +30,9 @@ Arms, same host, one after the other:
 
 Gates:
 
-- `routingObservability` (G2) **passed** — 2,301,496 accelerated operations, and **`refusals` is
-  empty**: nothing silently fell back, so the counters describe work that really ran on the device.
+- `routingObservability` (G2) **passed** — 2,301,496 accelerated operations. **An empty `refusals`
+  map does not mean nothing fell back**; see the correction below. What it establishes is that the
+  counted operations really ran on the device, not that they were all of the projections.
 - `startupHonesty` (G5) **passed** — 352 ms readiness against a 120,000 ms ceiling.
 - `decodeSpeedup` (G4) **FAILED** — **1.788x against a 3.00x threshold**.
 - `qualified: false`.
@@ -39,9 +40,9 @@ Gates:
 ## What this settles
 
 **The ceiling is dispatch, not arithmetic.** Every decode step issues 241 launches and 402 transfers
-moving 12.66 MB. The projections are already bit-exact at model scale and nothing was refused, so
-the kernels are not the problem: making the arithmetic free would still leave 402 host round-trips
-per token. 1.788x is what that costs.
+moving 12.66 MB. The projections are already bit-exact at model scale, so the kernels are not the
+problem: making the arithmetic free would still leave 402 host round-trips per token. 1.788x is what
+that costs.
 
 The cause is in `CudaGgufBatchedMatrixKernel.project`: it issues one launch and one `copyToHost`
 per projection. `multiplyTriple` and `multiplyDual` share a single activation upload -- which is why
@@ -60,13 +61,33 @@ and a search of main and every worktree found them in no artifact. They are repr
 within the rounding of the note, on different hardware. The lesson is not that the note was wrong --
 it was right -- but that an uncommitted measurement is indistinguishable from a remembered one.
 
-**2. A prediction derived from source was wrong, and is recorded as wrong.** Reading
-`LlamaForwardPass`, the decode path issues 7 projections per layer (wq, wk, wv, output, ffnGate,
-ffnUp, ffnDown) plus an output head, which for 40 blocks predicts ~281 launches and ~442 transfers.
-Measured: 241 and 402. `decodeProjections` is 256,296 over 1,260 steps, about 203 projections per
-step, so roughly 5.1 projections per layer reach the device rather than 7, with `refusals` empty.
-**Why is not established here**, and it is not guessed at: the static read of the dispatch sites did
-not predict the routed count, and closing that gap is its own question.
+**2. A prediction derived from source was wrong, and chasing it found an observability gap.**
+Reading `LlamaForwardPass`, the decode path issues 7 projections per layer (wq, wk, wv, output,
+ffnGate, ffnUp, ffnDown), which for 40 blocks predicts ~281 launches and ~442 transfers. Measured:
+241 and 402, with `decodeProjections` 256,296 over 1,260 steps -- about **5.09** projections per
+layer rather than 7.
+
+Range-fetching the real GGUF header settles part of it. Granite 4.1 3B is plain `granite`, 40
+blocks, 362 tensors -- 9 per layer plus `token_embd` and `output_norm`, so **separate q, k and v**,
+and every projection is `Q4_K` or `Q6_K`, both supported, with `cols` of 2560 or 8192 (both divide
+the 256-value super-block, and `blocksPerRow` of 10 or 32 is far under `MAX_BLOCKS_PER_ROW = 128`).
+Nothing is excluded by type or by shape.
+
+The header also confirms the structure of the model, which is what makes the shortfall meaningful:
+`attn_v` is Q6_K in 20 layers and `ffn_down` Q6_K in the other 20, so exactly **1.00** Q6_K
+projection per layer is predicted and **1.04** was measured. The Q4_K prediction of 6.00 against a
+measured **4.05** is the entire discrepancy, and it is about two projections per layer per token.
+
+**Those two were not refused -- they were not recorded at all.** `CudaRoutingCounters` has no
+counter for a projection that took the Java path, and `counters.refused(...)` is called only for
+explicit ablation and for attention cases. When `isEligible` returns false the forward pass simply
+takes the Java branch and nothing increments. So an empty `refusals` map means "nothing hit an
+explicit refusal path", **not** "everything ran on the device", and this README said the stronger
+thing in its first revision.
+
+What remains open is which two projections per layer stayed on the host, and why, given that type
+and shape both admit them. That needs a fallback counter rather than more inference, which is the
+same lesson as the exercise report that recorded neither its property nor its diagnostics.
 
 ## What it does not say
 
