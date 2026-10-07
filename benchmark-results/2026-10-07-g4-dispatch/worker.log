@@ -1,0 +1,76 @@
+[02:12:02] nvidia-smi:
+NVIDIA GeForce RTX 4090, 8.9, 570.169
+[02:12:02] installing jdk 25
+[02:12:24] jdk: openjdk version "25.0.4.1" 2026-08-18 LTS
+[02:12:24] installing pinned rust nightly-2026-09-17
+[02:13:01] rust: rustc 1.100.0-nightly (923c95cdf 2026-09-16)
+[02:13:01] fetching source
+[02:13:04] source at /work/models, revision 1955b55ba16f9a2cd90655be3ac7323f3efa452a
+[02:13:04] === STEP 1: ptxas assembly (cheap gate) ===
+  Downloaded hashbrown v0.17.1
+  Downloaded rustc-demangle v0.1.28
+  Downloaded getopts v0.2.24
+  Downloaded libc v0.2.189
+   Compiling compiler_builtins v0.1.160 (/root/.rustup/toolchains/nightly-2026-09-17-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/compiler-builtins/compiler-builtins)
+   Compiling core v0.0.0 (/root/.rustup/toolchains/nightly-2026-09-17-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core)
+   Compiling models-cuda-kernels v0.3.46 (/work/models/backend-cuda/src/main/rust/models-cuda-kernels)
+    Finished `release` profile [optimized] target(s) in 21.48s
+[02:15:48] ptx: backend-cuda/build/generated/cuda-resources/META-INF/models/cuda/models-cuda-kernels.ptx (64104 bytes)
+[02:15:48] ptxas OK
+[02:15:48] === STEP 2: capability gate ===
+WARNING: Using incubator modules: jdk.incubator.vector
+PASS cuda-kernel-gate mode=capability device=NVIDIA GeForce RTX 4090 cc=89 kernel=4c534e622452 readiness=513 ms report=/work/capability.json
+[02:15:49] capability report uploaded
+[02:15:49] === STEP 2a: Q6_K device parity (gate before any model) ===
+CudaQ6KDeviceParityTest > a Q6_K row projection is bit-exact against the CPU control at every width > 1 super-block(s) PASSED
+
+CudaQ6KDeviceParityTest > a Q6_K row projection is bit-exact against the CPU control at every width > 2 super-block(s) PASSED
+
+CudaQ6KDeviceParityTest > a Q6_K row projection is bit-exact against the CPU control at every width > 3 super-block(s) PASSED
+
+CudaQ6KDeviceParityTest > a Q6_K row projection is bit-exact against the CPU control at every width > 32 super-block(s) PASSED
+
+CudaQ6KDeviceParityTest > a Q6_K row projection is bit-exact against the CPU control at every width > 33 super-block(s) PASSED
+
+CudaQ6KDeviceParityTest > a Q6_K row projection is bit-exact against the CPU control at every width > 48 super-block(s) PASSED
+
+BUILD SUCCESSFUL in 9s
+13 actionable tasks: 3 executed, 10 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.4.1/userguide/configuration_cache_enabling.html
+[02:15:59] Q6_K device parity OK
+[02:15:59] === fetching model (granite 4.1 3b q4_k_m, 1.96GB) ===
+[02:18:19] model sha verified
+[02:18:19] === STEP 4: decode gate G4, --arm both ===
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 07, 2026 2:18:21 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 07, 2026 2:18:21 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=11 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults ? no -Dvectors.* overrides)]
+FAIL cuda-kernel-gate mode=decode device=NVIDIA GeForce RTX 4090 arm=both accelerated=9.02 tok/s control=5.05 tok/s speedup=1.788 threshold=3.00 report=/work/decode.json
+  routing: launches/step=241.000 transfers/step=402.000 activationBytes/step=12660712.000 (1260 measured steps, 256296 decode projections, 201 weight uploads)
+[02:26:53] decode report uploaded
+[02:26:53] decode gate rc=1
+[02:26:53] === the numbers this run exists for ===
+  --- routing counters, the numbers this run exists for ---
+  routing.kernelLaunches = 312496
+  routing.hostToDeviceTransfers = 208416
+  routing.deviceToHostTransfers = 312496
+  routing.hostToDeviceBytes = 13546408960
+  routing.deviceToHostBytes = 3542253568
+  routing.weightUploadBytes = 1151385600
+  routing.decodeSteps = 1260
+  routing.measuredDecodeSteps = 1260
+  routing.decodeStepsMarked = True
+  routing.launchesPerDecodeStep = 241.0
+  routing.transfersPerDecodeStep = 402.0
+  routing.activationBytesPerDecodeStep = 12660712.0
+  --- arms ---
+  decode.accelerated: prefill=12.189402496824869 decode=9.020919945132652 tok/s steps=1260 peakDevice=1152647008
+  decode.control: prefill=7.287404812400847 decode=5.045384870635013 tok/s steps=1260 peakDevice=0
+  --- verdict ---
+  accelerated   = True
+  refusalReason = 
+  gates         = {"routingObservability": {"gate": "G2", "passed": true, "evidence": "2301496 accelerated operations"}, "startupHonesty": {"gate": "G5", "passed": true, "evidence": "352 ms readiness against a 120000 ms ceiling"}, "tokenParity": null, "decodeSpeedup": {"gate": "G4", "passed": false, "evidence": "1.788x decode against a 3.00x threshold"}}
+  qualified     = False
+  device        = {"name": "NVIDIA GeForce RTX 4090", "computeCapability": 89, "globalMemoryBytes": 25262096384, "driverVersion": 12080}
+[02:26:54] FINAL_STATUS=COMPLETE

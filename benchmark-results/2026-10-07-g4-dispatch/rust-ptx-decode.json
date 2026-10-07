@@ -1,0 +1,148 @@
+{
+  "schemaVersion" : 2,
+  "createdAt" : "2026-10-07T02:26:53.214113776Z",
+  "policyVersion" : "gpu-large-model-rust-ptx-v2",
+  "modelsRevision" : "1955b55ba16f9a2cd90655be3ac7323f3efa452a",
+  "mode" : "decode",
+  "accelerated" : true,
+  "refusalReason" : "",
+  "device" : {
+    "name" : "NVIDIA GeForce RTX 4090",
+    "computeCapability" : 89,
+    "globalMemoryBytes" : 25262096384,
+    "driverVersion" : 12080
+  },
+  "kernel" : {
+    "sha256" : "4c534e622452df95ca7fbb3accc65246be54e2c74d53714d98a03be6d31e8e0e",
+    "ptxTarget" : "sm_80",
+    "toolchain" : "nightly-2026-09-17",
+    "entryPoints" : [ "models_q4k_decode_projection", "models_q6k_decode_projection", "models_gqa_decode_attention" ]
+  },
+  "environment" : {
+    "host" : "5284aa73fe27",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-79-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7K62 48-Core Processor",
+    "processors" : 11,
+    "physicalMemoryBytes" : 30999998464,
+    "maxHeapBytes" : 7751073792,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "configuration" : {
+    "mode" : "decode",
+    "modelPath" : "/work/model.gguf",
+    "modelSha256" : "662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29",
+    "modelBytes" : 2099501664,
+    "promptsPath" : "/work/models/benchmark-results/2026-09-18-gpu-large-model/prompts.txt",
+    "promptsSha256" : "d0c0267f1eeb96b97a6e26f964d4e06c0e967ad7567e40881e54c791d74c7016",
+    "promptCount" : 20,
+    "maxTokens" : 64,
+    "warmupTokens" : 16,
+    "contextLength" : 4096,
+    "arm" : "both",
+    "sampling" : "greedy-argmax-lowest-index-v1",
+    "cudaDisabledProperty" : false,
+    "cudaDeviceOrdinal" : 0,
+    "jvmArguments" : [ "--add-modules=jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED", "-XX:NativeMemoryTracking=summary" ],
+    "workingDirectory" : "/work/models"
+  },
+  "routing" : {
+    "acceleratedOperations" : {
+      "Q6_K/PREFILL_PROJECTION" : 1040,
+      "Q4_K/DECODE_PROJECTION" : 204000,
+      "F32/DECODE_ATTENTION" : 2040000,
+      "Q6_K/DECODE_PROJECTION" : 52296,
+      "Q4_K/PREFILL_PROJECTION" : 4160
+    },
+    "refusals" : { },
+    "totalAcceleratedOperations" : 2301496,
+    "inert" : false,
+    "kernelLaunches" : 312496,
+    "hostToDeviceTransfers" : 208416,
+    "deviceToHostTransfers" : 312496,
+    "hostToDeviceBytes" : 13546408960,
+    "deviceToHostBytes" : 3542253568,
+    "weightUploads" : 201,
+    "weightUploadBytes" : 1151385600,
+    "decodeSteps" : 1260,
+    "decodeProjections" : 256296,
+    "measuredDecodeSteps" : 1260,
+    "decodeStepsMarked" : true,
+    "launchesPerDecodeStep" : 241.0,
+    "transfersPerDecodeStep" : 402.0,
+    "activationBytesPerDecodeStep" : 1.2660712E7
+  },
+  "readinessMillis" : 352,
+  "parity" : null,
+  "decode" : {
+    "accelerated" : {
+      "arm" : "accelerated",
+      "accelerated" : true,
+      "promptCount" : 20,
+      "promptTokens" : 512,
+      "generatedTokens" : 1280,
+      "decodeSteps" : 1260,
+      "sequencesHittingEndOfGeneration" : 1,
+      "prefillNanos" : 42003699536,
+      "decodeNanos" : 139675333299,
+      "wallClockNanos" : 186506164596,
+      "prefillTokensPerSecond" : 12.189402496824869,
+      "decodeTokensPerSecond" : 9.020919945132652,
+      "residentBytesAtEnd" : 519499776,
+      "heapUsedBytesAtEnd" : 171765088,
+      "peakDeviceBytes" : 1152647008,
+      "deviceTotalMemoryBytes" : 25262096384
+    },
+    "control" : {
+      "arm" : "control",
+      "accelerated" : false,
+      "promptCount" : 20,
+      "promptTokens" : 512,
+      "generatedTokens" : 1280,
+      "decodeSteps" : 1260,
+      "sequencesHittingEndOfGeneration" : 1,
+      "prefillNanos" : 70258207576,
+      "decodeNanos" : 249733178401,
+      "wallClockNanos" : 325238761864,
+      "prefillTokensPerSecond" : 7.287404812400847,
+      "decodeTokensPerSecond" : 5.045384870635013,
+      "residentBytesAtEnd" : 592252928,
+      "heapUsedBytesAtEnd" : 229779336,
+      "peakDeviceBytes" : 0,
+      "deviceTotalMemoryBytes" : 25262096384
+    },
+    "speedup" : 1.7879547698404379,
+    "threshold" : 3.0,
+    "wallClockMillis" : 511752
+  },
+  "memory" : {
+    "peakProcessRssBytes" : 2693697536,
+    "residentBytes" : 592252928,
+    "heapUsedBytes" : 229779336,
+    "peakDeviceBytes" : 1152647008,
+    "deviceTotalMemoryBytes" : 25262096384,
+    "reading" : "peakDeviceBytes covers kernel-owned allocations only (weights, staging scratch, per-call attention buffers); the CUDA context and loaded module are not included, so it is a lower bound. peakProcessRssBytes is process-wide and therefore not separable per arm in a two-arm run: use --arm accelerated and --arm control in separate processes for per-arm host peaks."
+  },
+  "gates" : {
+    "routingObservability" : {
+      "gate" : "G2",
+      "passed" : true,
+      "evidence" : "2301496 accelerated operations"
+    },
+    "startupHonesty" : {
+      "gate" : "G5",
+      "passed" : true,
+      "evidence" : "352 ms readiness against a 120000 ms ceiling"
+    },
+    "tokenParity" : null,
+    "decodeSpeedup" : {
+      "gate" : "G4",
+      "passed" : false,
+      "evidence" : "1.788x decode against a 3.00x threshold"
+    }
+  },
+  "qualified" : false
+}
