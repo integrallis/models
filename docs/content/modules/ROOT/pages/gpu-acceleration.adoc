@@ -1,188 +1,107 @@
-= Java GPU Acceleration
+= NVIDIA GPU Acceleration
 
-`backend-tornado` optionally executes Models-owned Java projection kernels
-on a qualified NVIDIA GPU. The model parser, tokenizer, transformer graph,
-attention, KV cache, sampling, and generation loop remain inside Models. There
-is no external inference server and no Rust or handwritten CUDA kernel in this
-path.
+`backend-cuda` optionally executes the K-quant projections and grouped-query
+decode attention on a qualified NVIDIA GPU, using Models-owned Rust kernels
+compiled to PTX. The model parser, tokenizer, transformer graph, KV cache,
+sampling and generation loop remain inside Models. There is no external
+inference server, no vendor math library and no handwritten CUDA C++.
 
-== Qualified Scope
+Models ships *one* GPU implementation. A TornadoVM-based arm existed until
+0.3.53 and was removed: on the same RTX 4090 and the same model it reached
+6.49 tok/s decode over 36 failed `cuLaunchKernel` calls, against 31.26 tok/s
+for this path, and it required a separately installed device runtime that a
+Maven artifact cannot carry. The measurement is retained in
+`benchmark-results/2026-10-07-tornado-removal`.
 
-The production selector currently admits:
+== Nothing activates it by accident
 
-* GGUF Q4_0, Q4_K, and Q6_K projection work;
-* NVIDIA devices exposed by TornadoVM's PTX backend;
-* a device with enough memory for retained prefill and decode plans plus the
-  required safety margin;
-* a single weight tensor small enough to address with a 32-bit index
-  (under 2 GiB on the device); and
-* fixed 32-token prefill plans and separate single-token decode plans.
-
-Attention and unsupported tensors continue on the Vector API. AMD, Intel, and
-Metal devices remain CPU fallback paths until each vendor path passes a real
-hardware parity and performance gate.
-
-=== Weight Formats And Activation Families
-
-Q4_0 weights are multiplied by Q8_0 activations; Q4_K and Q6_K weights are
-multiplied by Q8_K activations. A grouped dispatch shares one prepared
-activation across two or three weight tensors, so the two families are never
-combined inside one group even though a `Q4_K_M` model contains both. The
-admitted grouped shapes are `Q4_0/Q4_0`, `Q4_0/Q4_0/Q4_0`, `Q4_K/Q4_K`,
-`Q4_K/Q4_K/Q4_K`, and `Q4_K/Q4_K/Q6_K` — the last being the query, key, and
-value group a `Q4_K_M` model presents, since llama.cpp promotes the value
-projection to Q6_K. Any other combination falls back to the Vector API
-per projection, and Q5_K, Q2_K, Q3_K, Q8_0, F32, and BF16 tensors are never
-routed to the device.
-
-K-quant tensors additionally require a column count that is a whole multiple of
-256, the K-quant super-block size. Q4_0's 32-value blocks are not sufficient.
-
-=== Numeric Parity With The CPU Kernels
-
-The K-quant kernels accumulate every per-super-block quantized dot product and
-minimum correction in `int`, so those reductions are exact and independent of
-how work is scheduled. Only the per-super-block scale application is floating
-point, and it runs in ascending super-block order in the same two-step form the
-vectors-core CPU kernels use. The CPU kernels fuse those steps with
-`Math.fma` and the device kernels use a plain multiply and add, so the
-guaranteed contract is agreement to within two float roundings per super-block.
-Off-device parity tests assert both halves of this: bit-for-bit equality on
-super-blocks whose scales are powers of two, and the rounding budget on
-pseudo-random super-blocks.
-
-Device-side parity — that TornadoVM's PTX backend lowers these kernels to the
-same arithmetic — is a hardware gate, not a unit test.
-
-== Large Models Are Refused, Not Guessed At
-
-The capacity gate adds up what a model would place on the device: weights under
-the plan shape the kernel builds, per-plan scratch, and any device-resident KV
-cache. It refuses a model when a term it needs is unknown rather than assuming
-it is zero, so a model above 8 GiB of weights is not admitted on a file-size-only
-budget. It also refuses a tensor at or above the 2 GiB TornadoVM `ByteArray`
-limit, and a plan set whose eager readiness would exceed 120 seconds.
-
-A 27B-class Q4_K_M model does not run on this path today. It holds no Q4_0
-tensors, and the retained plan cache keeps one host and one device copy of every
-weight per batch shape, so the shipped plan shape asks for roughly twice the
-model on both sides. Ineligibility messages name what was needed, what was
-available, and which plan shape would have fit, so a refusal is actionable
-rather than a bare fallback.
-
-== Add The Optional Backend
-
-[source,kotlin,subs="attributes+"]
-----
-dependencies {
-    implementation("com.integrallis:backend-tornado:{models-version}")
-}
-----
-
-Install a TornadoVM distribution compatible with the application's JDK and
-with its PTX backend enabled. Follow the
-https://tornadovm.readthedocs.io/en/latest/installation.html[official TornadoVM installation guide^].
-The `backend-tornado` dependency provides the Models integration but does not
-bundle or transitively install TornadoVM's device runtime. Device discovery
-requires the TornadoVM distribution and launch configuration. Start the
-application with `tornado`, or with ordinary `java` and TornadoVM's generated
-argument file.
-
-When `backend-tornado` is on the application classpath, `PureJavaBackend.loadAutomatic(...)`
-discovers it through Java's standard `ServiceLoader`. ModelJars uses that automatic
-entry point for artifacts qualified for the Java backend, so adding the optional
-dependency and launching with TornadoVM is sufficient; application inference code
-does not change. Without the optional module or a qualified device, the same call
-loads the Vector API backend.
-
-== Open And Inspect The Backend
+The jar carries no `META-INF/services` entry, so no `ServiceLoader` discovers
+it. An application opens the accelerator explicitly:
 
 [source,java]
 ----
-var options = TornadoBackendOptions.defaults();
-
-try (var runtime = TornadoBackend.open(modelPath, backendConfiguration, options)) {
-    var backend = runtime.backend();
-    var status = runtime.status();
-
-    System.out.printf("device=%s accelerated=%s readiness=%s%n",
-        status.device(), status.accelerated(), status.readinessTime());
-    // Pass backend to GenerationLoop or the normal Models runtime pipeline.
-}
+CudaGgufBatchedMatrixKernel.Status status = CudaGgufBatchedMatrixKernel.open();
 ----
 
-Applications that do not need the detailed readiness status can use the
-service-loaded entry point directly:
+`open()` never throws for an absent, old or ineligible device; it returns a
+status explaining why. `-Dmodels.cuda.disabled=true` refuses unconditionally,
+and `-Dmodels.cuda.attention.disabled=true` ablates only the attention kernel,
+counting the refusal rather than hiding it.
 
-[source,java]
-----
-try (var backend = PureJavaBackend.loadAutomatic(modelPath, backendConfiguration)) {
-    // Use the normal Models generation pipeline.
-}
-----
+== One module for every qualifying device
 
-Defaults perform eager readiness, accelerate eligible prefill and decode
-projections, and safely load `PureJavaBackend` when acceleration is not
-available. A qualification or deployment gate can set `requireAccelerator` to
-`true`; in that mode an ineligible device or initialization failure stops the
-load instead of falling back.
+PTX is device code, so a single `sm_80` module serves every device of compute
+capability 8.0 or above. It travels inside the jar under
+`META-INF/models/cuda/` with a SHA-256 the Java loader recomputes on load, and
+an ABI field that must match the Java binding. No CUDA toolkit is needed to
+build or to run; only a shipping `libcuda.so.1`.
 
-Readiness is intentional. TornadoVM retains compiled code with each execution
-plan, so Models constructs and compiles the fixed shapes before accepting a
-visible request. `TornadoBackendStatus` reports that cost and the selected
-device.
+== Measured gates
 
-A mixed-format model can look accelerated while one of its formats silently
-falls back, so `TornadoBackendRuntime` also reports how many projections reached
-the device per GGUF weight format. A grouped dispatch counts once per matrix.
-
-[source,java]
-----
-try (var runtime = TornadoBackend.open(modelPath, backendConfiguration, options)) {
-    // Run a prefill first; counts are empty until projections are dispatched.
-    System.out.println(runtime.routedProjectionsByFormat()); // {Q4_K=1344, Q6_K=64}
-    System.out.println(runtime.projectionPlanCount());
-}
-----
-
-== Accelerator Profile Gate
-
-`models-bench` runs prefill and decode for a GGUF file on the Tornado backend and
-writes the device, readiness cost, throughput, and per-format routing counts as
-JSON:
+Run them with `models-bench cuda-kernel-gate`, which has three modes and one
+report shape:
 
 [source,shell]
 ----
-./gradlew :models-bench:installDist
+models-bench cuda-kernel-gate --mode capability --require-device true \
+  --report capability.json --models-revision "$(git rev-parse HEAD)"
 
-lib=models-bench/build/install/models-bench/lib
-classpath=$(printf '%s:' "$lib"/*.jar)
+models-bench cuda-kernel-gate --mode parity --model model.gguf \
+  --prompts prompts.txt --max-tokens 64 --require-device true \
+  --report parity.json --models-revision "$(git rev-parse HEAD)"
 
-tornado -cp "$classpath" \
-  --params="accelerator-profile --model /path/to/model-Q4_K_M.gguf \
-            --tokens 64 --batch 32 --require true \
-            --output build/reports/inference/accelerator-profile.json" \
-  com.integrallis.models.bench.InferenceBenchmarkCli
+models-bench cuda-kernel-gate --mode decode --model model.gguf \
+  --prompts prompts.txt --max-tokens 64 --warmup-tokens 16 --arm both \
+  --require-device true --report decode.json \
+  --models-revision "$(git rev-parse HEAD)"
 ----
 
-`--require true` makes an unavailable or ineligible accelerator a hard failure
-rather than a silent Vector API fallback. Without a qualified device the command
-still runs and the report records `accelerated=false` with the reason.
+`--arm both` measures the accelerated arm and the Vector API control in the
+same process on the same host, which is the only denominator that counts.
+`--models-revision` requires a full 40-character SHA.
 
-== Measured Gates
+Measured on an RTX 4090 (compute capability 8.9), Granite 4.1 3B Q4_K_M, 20
+prompts:
 
-The release candidate preserved the exact greedy CPU token sequence on both
-qualified profiles using Qwen3 0.6B Q4_0. These are Q4_0 numbers; the K-quant
-kernels have not yet been measured on hardware, and no throughput claim is made
-for them here.
-
-[cols="1,1,1,1",options="header"]
+[cols="2,1,3"]
 |===
-|Profile |Warm prefill |Median decode |Eager readiness
-|NVIDIA A16-2Q |4.938 s (`1.93x` CPU) |73.991 ms (`1.21x` CPU) |14.278 s
-|NVIDIA A40-4Q |2.150 s (`4.40x` CPU) |65.767 ms (`1.32x` CPU) |13.554 s
+|Gate |Result |Evidence
+
+|G1 exact token parity
+|*passed*
+|1280 of 1280 token ids identical, `benchmark-results/2026-10-07-g1-parity`
+
+|G4 decode speed
+|*passed*
+|6.184x against a 3.00x threshold, 31.26 against 5.06 tok/s,
+ `benchmark-results/2026-10-07-g4-dualpath`
+
+|G2 routing observability
+|passed
+|2,405,576 accelerated operations, zero declined projections
+
+|G5 startup honesty
+|passed
+|344 ms readiness against a 120,000 ms ceiling
 |===
 
-These are qualification measurements for the tested virtual-GPU profiles, not
-universal performance promises. Application latency depends on device shape,
-CPU allocation, prompt length, model size, and driver/runtime versions.
+G1 carries no tolerance. Each qualifying hardware profile and each
+architecture family earns its own run before the result generalises: the figures
+above are one device and one model.
+
+== What routes, and how to tell
+
+The report records accelerated operations per weight format and stage, plus
+`declinedProjections` keyed by format, stage, reason and shape. That second map
+exists because an unimplemented path is not a refusal: the FFN gate and up
+projections ran on the CPU through an entire measurement because
+`multiplyDual` was missing, 53.3% of a layer's projection arithmetic, and an
+empty refusals map read as "everything ran on the device". A projection that
+answers no to `isEligible` now increments a counter that names it.
+
+Read `launchesPerDecodeStep`, `transfersPerDecodeStep` and
+`activationBytesPerDecodeStep` together with the throughput. The decode path
+issues roughly 321 launches and 522 transfers per token on a 40-block model,
+because every projection result returns to a Java array; that is the standing
+overhead and the next structural lever against it is device-resident
+activations.

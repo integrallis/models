@@ -6,6 +6,27 @@ All notable changes to models are documented here.
 
 ## [0.3.53] - 2026-10-07
 
+### Removed
+
+- **`backend-tornado` is removed.** Models ships one GPU implementation, and this was the weaker of
+  two. Measured on the same RTX 4090 and the same model on the same day: `backend-cuda` reached
+  exact token parity (1280 of 1280 token ids identical) and **31.26 tok/s** decode against a
+  **5.06 tok/s** Vector API control, with 344 ms readiness and no device errors. The TornadoVM arm
+  managed **6.49 tok/s** -- barely above the CPU path it exists to accelerate -- over **36 failed
+  `cuLaunchKernel` calls** (`CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES`) that its report did not record,
+  with 32,171 ms readiness. It also could not be self-contained: the Maven artifact cannot carry
+  TornadoVM's device runtime, so an application had to install a matching distribution and launch
+  through its own launcher, which defeats "add a dependency and get acceleration". Evidence:
+  `benchmark-results/2026-10-07-tornado-removal`.
+- Removed with it, because they existed only to serve it: the `accelerator-profile` command of
+  `models-bench`, the TornadoVM benchmark arm in `models-accelerator-bench`, the `tornado-api` and
+  `tornado-runtime` dependencies, and the release precondition in `RELEASING.md` that required a
+  loader and parity gate on each NVIDIA profile under `models-accelerator-bench/results/`. That
+  precondition existed for `backend-tornado`; `backend-cuda`'s gates are
+  `cuda-kernel-gate --mode capability|parity|decode` and need no external runtime.
+- The KV-ridge experiment in `models-accelerator-bench` is unaffected, and the August measurement
+  records that name `backend-tornado` are kept as written -- they are what was measured then.
+
 ### Added
 
 - `backend-cuda` is now published. It ships one `sm_80` PTX module serving every device of compute
@@ -45,8 +66,11 @@ reading of 1.788x as a dispatch ceiling was wrong; the binding constraint was th
 path.
 
 **One host and one model.** G1 has no tolerance, so each qualifying hardware profile and each
-architecture family earns its own run before the claim generalises. No published Java artifact
-behaviour changed in this release: `v0.3.52..HEAD` touches no other published module.
+architecture family earns its own run before the claim generalises.
+
+The published surface changes in two ways and no others: `backend-cuda` is added and
+`backend-tornado` is removed. No remaining published module's Java behaviour changed -- the rest of
+`v0.3.52..HEAD` touches only benchmark applications and evidence.
 
 
 ## [0.3.52] - 2026-10-06

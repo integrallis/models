@@ -1,4 +1,27 @@
-# backend-tornado on RTX 4090 / PTX: the gate returns 0 and the device errors 36 times
+# Why backend-tornado was removed
+
+**Decision 2026-10-07: Models ships one GPU implementation.** The measurement below is why the
+TornadoVM arm is not it. Same RTX 4090, same model, same day as `backend-cuda`'s gates:
+
+| | `backend-cuda` | `backend-tornado` |
+| --- | --- | --- |
+| G1 exact token parity | **1280 / 1280 identical** | not reached |
+| decode | **31.26 tok/s** | 6.49 tok/s |
+| CPU control, same host | 5.06 tok/s | 5.06 tok/s |
+| readiness | 344 ms | 32,171 ms |
+| device launch errors | 0 | **36 x CUDA 701** |
+| self-contained artifact | yes | no -- needs a separately installed runtime |
+
+A second implementation of the same capability, five times slower than the first and barely ahead of
+the CPU path it is meant to accelerate, is not worth the surface it costs. It is removed rather than
+carried: `backend-tornado`, its publication-allowlist entry, the `accelerator-profile` command it
+drove, its TornadoVM benchmark arm, and the release precondition that pointed at its results
+directory.
+
+The original run notes follow, kept because the numbers above come from them and because the
+`cuLaunchKernel` failures are the substantive finding.
+
+## The run as it was recorded
 
 **Measured 2026-10-07.** RTX 4090, compute capability 8.9. TornadoVM **v5.2.0-jdk25** built from
 source with the PTX backend, JDK 25. Models revision `10af16c33be7e023c114812e6137b47fab7e0c90`.

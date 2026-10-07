@@ -34,9 +34,10 @@ tokens. Models implements that pipeline on Java 25 and uses the Vector API for
 CPU SIMD execution:
 
 - `backend-java` executes every inference kernel in Java.
-- `backend-tornado` optionally compiles the Java Q4_0 projection kernels for a
-  qualified NVIDIA GPU. It keeps the Models graph in-process and falls back to
-  the Vector API when the device or artifact is not eligible.
+- `backend-cuda` optionally runs the K-quant projections and grouped-query decode
+  attention on a qualified NVIDIA GPU, through our own Rust kernels compiled to
+  PTX. It keeps the Models graph in-process and falls back to the Vector API when
+  the device or artifact is not eligible.
 - `backend-native` runs the same Java 25 and Vector API pipeline, substituting
   only selected, measured bottleneck kernels with a small Models-owned Rust
   library through Java's Foreign Function and Memory (FFM) API.
@@ -212,9 +213,11 @@ dependencies {
 }
 ```
 
-For qualified NVIDIA acceleration, add `backend-tornado` and launch with a
-matching TornadoVM PTX runtime. The default loader performs eager readiness and
-uses the Vector API when the GPU cannot safely retain the compiled plans. See
+For qualified NVIDIA acceleration, add `backend-cuda`. One `sm_80` PTX module
+ships inside the jar for every device of compute capability 8.0 or above, so no
+external runtime is installed; the path is opt-in through
+`CudaGgufBatchedMatrixKernel.open()` and falls back to the Vector API when the
+device or artifact is not eligible. See
 [Java GPU acceleration](https://integrallis.github.io/models/docs/models/current/gpu-acceleration.html).
 
 Use Apple's on-device system model on a supported Apple Silicon Mac:
@@ -375,7 +378,7 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 | Model routing | `models-router` | adaptive selection and failover across in-process and hosted clients, with hard per-request capability and data-boundary requirements, without a provider SDK dependency |
 | Vector storage | `models-embedding` | optional bridge to `vectors` |
 | Apple on-device model | `backend-apple` | Apple Foundation Models through Java FFM |
-| Java GPU acceleration | `backend-tornado` | optional Java-authored Q4_0 projections on qualified NVIDIA GPUs |
+| NVIDIA GPU acceleration | `backend-cuda` | optional Rust-authored PTX K-quant projections and decode attention |
 
 These adapters are implemented and tested against the same backend contracts;
 they do not select hidden inference paths. Their framework dependencies are
@@ -409,7 +412,7 @@ RAG, Javadocs, and release testing.
 
 - [Executable Java notebooks](notebooks/README.md)
 - [Apple Foundation Models bridge](models-backend-apple/README.md)
-- [Java GPU acceleration](backend-tornado/README.md)
+- [NVIDIA GPU acceleration](backend-cuda/README.md)
 - [Native kernel backend](backend-native/README.md)
 
 ## Build

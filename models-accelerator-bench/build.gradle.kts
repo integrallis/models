@@ -43,11 +43,8 @@ application {
 
 dependencies {
     implementation(project(":backend-java"))
-    implementation(project(":backend-tornado"))
     implementation(project(":models-runtime"))
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
-    implementation("io.github.beehive-lab:tornado-api:5.2.0-jdk25")
-    implementation("io.github.beehive-lab:tornado-runtime:5.2.0-jdk25")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.assertj:assertj-core:3.27.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
