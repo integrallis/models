@@ -241,3 +241,32 @@ tasks.withType<Test>().configureEach {
 tasks.named("check") {
     dependsOn(cargoTestHost, cargoClippy, verifyPtxArtifact)
 }
+
+// Coverage: the 0.80 bar published modules carry applies to everything here that a host can
+// execute, and two classes are exempted because they structurally cannot be.
+//
+// CudaDriver is the FFM binding to libcuda.so.1 -- every method is a downcall, so without a driver
+// there is nothing to cover. CudaGgufBatchedMatrixKernel's bulk is the dispatch path behind those
+// downcalls. Together they are 2,296 of the module's 2,491 missed instructions; the rest of the
+// module measures 0.86 covered without them, and the classes a host *can* reach are already well
+// past the bar -- CudaRoutingCounters at 391 of 403 instructions, Q8KActivations at 177 of 193.
+//
+// Their verification is hardware, not more off-device tests, and it is retained as evidence rather
+// than asserted: G1 token parity and G4 decode speed in benchmark-results/2026-10-07-g1-parity and
+// benchmark-results/2026-10-07-g4-dualpath, plus CudaQ6KDeviceParityTest, which launches the Q6_K
+// kernel against the CPU control at six widths and skips off-device. Lowering the global bar to let
+// this module in would have hidden a real gap in every other published module instead.
+tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map { directory ->
+                fileTree(directory) {
+                    exclude(
+                        "**/CudaDriver*.class",
+                        "**/CudaGgufBatchedMatrixKernel*.class",
+                    )
+                }
+            },
+        ),
+    )
+}

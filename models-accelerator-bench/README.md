@@ -1,9 +1,10 @@
 # Java accelerator experiments
 
 This private Gradle module retains accelerator experiments, rejected candidates, and release gates.
-The qualified Q4 projection provider now lives in the optional published `backend-tornado` module.
-Its kernels are Java source compiled for an accelerator by TornadoVM; there is no external
-inference server and no handwritten CUDA or Rust shim.
+The GPU provider is the optional published `backend-cuda` module: Models-owned Rust kernels
+compiled to PTX, carried inside the jar, with no external inference server and no handwritten CUDA
+C++. The TornadoVM arm this module used to benchmark was removed in 0.3.53 -- see
+`benchmark-results/2026-10-07-tornado-removal`. What remains here is the KV-ridge experiment.
 
 The first experiment targets quantized matrix projection because profiling and the existing Models
 execution seams identify it as the dominant reusable operation. It currently contains:

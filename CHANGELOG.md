@@ -4,6 +4,75 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.53] - 2026-10-07
+
+### Removed
+
+- **`backend-tornado` is removed.** Models ships one GPU implementation, and this was the weaker of
+  two. Measured on the same RTX 4090 and the same model on the same day: `backend-cuda` reached
+  exact token parity (1280 of 1280 token ids identical) and **31.26 tok/s** decode against a
+  **5.06 tok/s** Vector API control, with 344 ms readiness and no device errors. The TornadoVM arm
+  managed **6.49 tok/s** -- barely above the CPU path it exists to accelerate -- over **36 failed
+  `cuLaunchKernel` calls** (`CUDA_ERROR_LAUNCH_OUT_OF_RESOURCES`) that its report did not record,
+  with 32,171 ms readiness. It also could not be self-contained: the Maven artifact cannot carry
+  TornadoVM's device runtime, so an application had to install a matching distribution and launch
+  through its own launcher, which defeats "add a dependency and get acceleration". Evidence:
+  `benchmark-results/2026-10-07-tornado-removal`.
+- Removed with it, because they existed only to serve it: the `accelerator-profile` command of
+  `models-bench`, the TornadoVM benchmark arm in `models-accelerator-bench`, the `tornado-api` and
+  `tornado-runtime` dependencies, and the release precondition in `RELEASING.md` that required a
+  loader and parity gate on each NVIDIA profile under `models-accelerator-bench/results/`. That
+  precondition existed for `backend-tornado`; `backend-cuda`'s gates are
+  `cuda-kernel-gate --mode capability|parity|decode` and need no external runtime.
+- The KV-ridge experiment in `models-accelerator-bench` is unaffected, and the August measurement
+  records that name `backend-tornado` are kept as written -- they are what was measured then.
+
+### Added
+
+- `backend-cuda` is now published. It ships one `sm_80` PTX module serving every device of compute
+  capability 8.0 or above, carried in the jar under `META-INF/models/cuda/` with a SHA-256 the Java
+  loader recomputes. **It is opt-in and nothing activates it by accident**: there is no
+  `META-INF/services` entry, so no `ServiceLoader` discovers it, a consumer has to call
+  `CudaGgufBatchedMatrixKernel.open()` and inject the kernel, and `-Dmodels.cuda.disabled=true` is a
+  kill switch on top of that. Having the jar on the classpath does not route anything to a device.
+- `CudaRoutingCounters.declined(type, stage, reason, rows, cols)`, with the shape in the key, and
+  `declinedProjections` / `totalDeclinedProjections` in the gate report. A projection that answered
+  no to `isEligible` and left through the Java branch previously incremented nothing, so an empty
+  refusals map read as "everything ran on the device" when it only meant "nothing hit an explicit
+  refusal path".
+
+### Fixed
+
+- **The FFN gate and up projections never reached the device.** `CudaGgufBatchedMatrixKernel` did
+  not override `multiplyDual`, so `isDualEligible` inherited the SPI default of `false` and
+  `LlamaForwardPass.dualMatmulDispatch` sent both to `TensorOps.ggufDualMatmul` on every layer of
+  every token. On Granite 4.1 3B they are 8192x2560 each -- 53.3% of a layer's projection
+  arithmetic. The triple path for query, key and value was implemented; the dual path was not, and
+  nothing recorded the asymmetry.
+
+### Measured
+
+Both device gates pass, on an RTX 4090 at compute capability 8.9, Granite 4.1 3B Q4_K_M, 20 prompts:
+
+| gate | result | evidence |
+| --- | --- | --- |
+| G1 token parity | **passed** -- 1280 token ids identical | `benchmark-results/2026-10-07-g1-parity` |
+| G4 decode speed | **passed** -- 6.184x against a 3.00x gate | `benchmark-results/2026-10-07-g4-dualpath` |
+
+G4 moved from 1.788x to 6.184x, decode from 9.02 to 31.26 tok/s, with a control arm that moved
+0.2% and a byte-identical PTX module either side. Routing the two projections raised dispatch --
+launches 241 to 321, transfers 402 to 522 per decode step -- and it did not matter. The earlier
+reading of 1.788x as a dispatch ceiling was wrong; the binding constraint was the unimplemented
+path.
+
+**One host and one model.** G1 has no tolerance, so each qualifying hardware profile and each
+architecture family earns its own run before the claim generalises.
+
+The published surface changes in two ways and no others: `backend-cuda` is added and
+`backend-tornado` is removed. No remaining published module's Java behaviour changed -- the rest of
+`v0.3.52..HEAD` touches only benchmark applications and evidence.
+
+
 ## [0.3.52] - 2026-10-06
 
 ### Fixed

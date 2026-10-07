@@ -637,40 +637,17 @@ The requested context must hold the prompt plus the larger of the warmup and mea
 The resolved artifact is validated before loading, and the command rejects token IDs outside the
 model vocabulary.
 
-## Accelerator profile (GPU gate)
+## Accelerator profile (GPU gate) — removed
 
-Run prefill and greedy decode for a GGUF file on the TornadoVM backend and record the evidence a
-hardware gate needs. Unlike the other profiles this one takes a GGUF path directly rather than a
-catalog model id, because the accelerator is selected from the file's size and the device inventory.
+`backend-tornado` and this command were removed in 0.3.53. Models ships one GPU implementation,
+`backend-cuda`, because on the same RTX 4090 and the same model it measured exact token parity
+(1280 of 1280 token ids identical) and 31.26 tok/s decode against a 5.06 tok/s CPU control, while
+the TornadoVM arm managed 6.49 tok/s over 36 failed `cuLaunchKernel` calls that its report did not
+record. The evidence for both is in `benchmark-results/2026-10-07-g1-parity`,
+`benchmark-results/2026-10-07-g4-dualpath` and `benchmark-results/2026-10-07-tornado-removal`.
 
-```shell
-./gradlew :models-bench:installDist
-
-lib=models-bench/build/install/models-bench/lib
-classpath=$(printf '%s:' "$lib"/*.jar)
-
-tornado -cp "$classpath" \
-  --params="accelerator-profile --model ~/.jvllm/models/Qwen3-27B-Q4_K_M.gguf \
-            --tokens 64 --batch 32 --require true \
-            --output build/reports/inference/accelerator-profile.json" \
-  com.integrallis.models.bench.InferenceBenchmarkCli
-```
-
-The command reports, to stdout and as JSON, whether the accelerator was selected, the device name,
-the fallback reason when it was not, the eager-readiness time, the number of retained device
-execution plans, prefill and decode tokens per second, and **how many projections reached the device
-per GGUF weight format**. That last figure is the point of the command: a mixed-format model such as
-a `Q4_K_M` build contains both Q4_K and Q6_K tensors, and a run whose `Q6_K` count is zero routed
-only part of the model while still producing a plausible throughput number.
-
-`--require true` turns an unavailable or ineligible accelerator into a hard failure. Without it, and
-without a qualified device, the command still completes and the report records
-`accelerated=false` with the reason — which is the useful CPU control arm.
-
-Options: `--prompt` / `--prompt-file`, `--tokens` (generated tokens, default 64), `--warmups`
-(default 1), `--context` (default 2048), `--batch` (fixed device prefill batch, default 32),
-`--decode` (accelerate single-token decode, default true), `--eager` (compile plans before the first
-visible request, default true), `--require` (default false), `--output`.
+For the device gates use `cuda-kernel-gate` — `--mode capability`, `--mode parity` (G1) and
+`--mode decode` (G4). It needs no external runtime installation.
 
 ## In-process comparison run
 

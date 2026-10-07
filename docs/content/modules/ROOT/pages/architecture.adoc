@@ -30,10 +30,12 @@ loaded through Java's final FFM API. It does not embed or call llama.cpp
 or Ollama. The Java graph remains authoritative, so the backend boundary
 is narrow and testable.
 
-`backend-tornado` is a Java-authored device path for that same graph. TornadoVM
-compiles eligible Q4_0 projections from Java bytecode for a qualified NVIDIA
-GPU; attention and unsupported projections remain on the Vector API. No model
-server or second inference engine is involved.
+`backend-cuda` is the device path for that same graph. Models-owned Rust kernels
+compiled to PTX run the eligible K-quant projections and grouped-query decode
+attention on a qualified NVIDIA GPU; unsupported formats and shapes remain on
+the Vector API, and a declined projection is counted rather than silently
+dropped. No model server or second inference engine is involved, and Models
+ships only this one GPU implementation.
 
 `backend-apple` is also in-process: Java reaches Apple's on-device
 Foundation Models framework through a bundled, integrity-checked FFM
