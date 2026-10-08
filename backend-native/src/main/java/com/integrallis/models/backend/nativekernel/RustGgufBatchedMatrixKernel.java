@@ -28,9 +28,6 @@ import java.util.Objects;
 
 /** Reusable off-heap workspace for Models-owned Rust quantized projection kernels. */
 public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKernel {
-  public static final String NATIVE_DECODE_PROPERTY = "models.native.quantizedDecode";
-  public static final String Q5_0_GROUPED_PROPERTY = "models.native.q5_0.grouped";
-  public static final String GATED_DELTA_NET_PROPERTY = "models.native.gatedDeltaNet";
   private static final int MAX_GROUPED_MATRICES = 16;
 
   private static final Map<String, String> PLAN_RECOMMENDATIONS =
@@ -45,9 +42,6 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
           "false");
 
   private final NativeKernelLibrary library;
-  private final boolean nativeDecode;
-  private final boolean q5_0Grouped;
-  private final boolean gatedDeltaNet;
   private Arena scratchArena;
   private MemorySegment nativeInput = MemorySegment.NULL;
   private MemorySegment nativeOutput = MemorySegment.NULL;
@@ -62,15 +56,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private int outputCapacity;
   private boolean closed;
 
-  private RustGgufBatchedMatrixKernel(
-      NativeKernelLibrary library,
-      boolean nativeDecode,
-      boolean q5_0Grouped,
-      boolean gatedDeltaNet) {
+  private RustGgufBatchedMatrixKernel(NativeKernelLibrary library) {
     this.library = Objects.requireNonNull(library, "library");
-    this.nativeDecode = nativeDecode;
-    this.q5_0Grouped = q5_0Grouped;
-    this.gatedDeltaNet = gatedDeltaNet;
   }
 
   /** Opens a Rust kernel provider from an explicit platform library. */
@@ -101,8 +88,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     Objects.requireNonNull(settings, "settings");
     NativeKernelLibrary library = NativeKernelLibrary.open(libraryPath, settings.threadCount());
     parkJavaExecutor();
-    return new RustGgufBatchedMatrixKernel(
-        library, settings.nativeDecode(), settings.q5_0Grouped(), settings.gatedDeltaNet());
+    return new RustGgufBatchedMatrixKernel(library);
   }
 
   /**
@@ -114,16 +100,6 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
    */
   static void parkJavaExecutor() {
     VectorUtil.setGgufPollMillis(0);
-  }
-
-  static RustGgufBatchedMatrixKernel open(Path libraryPath, boolean nativeDecode) {
-    return open(libraryPath, nativeDecode, false);
-  }
-
-  static RustGgufBatchedMatrixKernel open(
-      Path libraryPath, boolean nativeDecode, boolean q5_0Grouped) {
-    return new RustGgufBatchedMatrixKernel(
-        NativeKernelLibrary.open(libraryPath), nativeDecode, q5_0Grouped, false);
   }
 
   @Override
@@ -147,9 +123,39 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return PLAN_RECOMMENDATIONS;
   }
 
+  /**
+   * Whether the Qwen 3.5 recurrence runs in the shim. It does not, and that is a decision rather
+   * than a setting.
+   *
+   * <p>This was {@code models.native.gatedDeltaNet}, default off. Removing the veto would have made
+   * the shim recurrence unconditional, and that is an epoch change, not a speed-up:
+   *
+   * <ul>
+   *   <li>Every certified Qwen 3.5 record — {@code qwen3.5-0.8b}, {@code qwen3.5-2b} — was produced
+   *       with {@code native-gated-delta-net = false}, so the published bytes come from the Java
+   *       recurrence.
+   *   <li>The shim's chunked recurrence is validated to a <em>2.0e-4 relative</em> tolerance, not
+   *       bit-identically. Greedy decoding is a discrete argmax, and a perturbation of 1.4e-6 was
+   *       already measured to change 2 of 9 generated answers for grouped attention. 2.0e-4 is a
+   *       hundred times larger.
+   *   <li>Whether it is even faster than the Java recurrence is <em>unmeasured</em>. The one
+   *       committed comparison (2026-09-23) times the shim's sequential against its own chunked
+   *       variant, 3.920 against 3.585 ms, and never against Java.
+   * </ul>
+   *
+   * <p>So: an unmeasured benefit against a known byte-level divergence in published records. It
+   * stays unrouted until someone re-runs every pinned greedy oracle and re-derives the tier bands
+   * on it, which is a deliberate epoch change and not a default to flip. The kernel and its parity
+   * tests are kept because that decision needs them.
+   */
   @Override
   public boolean supportsGatedDeltaNet() {
-    return gatedDeltaNet && library.supports(NativeKernelCapability.GATED_DELTA_NET_F32);
+    return false;
+  }
+
+  /** Whether the loaded shim can share one activation quantization across grouped Q5_0 rows. */
+  boolean supportsQ5_0Grouped() {
+    return library.supports(NativeKernelCapability.Q5_0_F32_GROUPED_BATCHED_MATMUL);
   }
 
   @Override
@@ -182,9 +188,12 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
         valueDimension);
   }
 
+  /**
+   * False for the same reason as {@link #supportsGatedDeltaNet()}: it would change published bytes.
+   */
   @Override
   public boolean supportsGroupedGatedDeltaNet() {
-    return gatedDeltaNet && library.supportsGroupedGatedDeltaNet();
+    return false;
   }
 
   @Override
@@ -221,18 +230,6 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
         valueDimension);
   }
 
-  boolean nativeDecodeEnabled() {
-    return nativeDecode;
-  }
-
-  boolean q5_0GroupedEnabled() {
-    return q5_0Grouped;
-  }
-
-  boolean gatedDeltaNetEnabled() {
-    return gatedDeltaNet;
-  }
-
   int threadCount() {
     return library.threadCount();
   }
@@ -250,14 +247,17 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return library.supportsPollBudget();
   }
 
-  private static final String GROUPED_ATTENTION_PROPERTY = "models.native.groupedAttention";
-  private final boolean groupedAttentionEnabled =
-      !"false".equalsIgnoreCase(System.getProperty(GROUPED_ATTENTION_PROPERTY, "true"));
-
+  /**
+   * Whether grouped attention runs in the shim. Capability decides; there is no setting.
+   *
+   * <p>This was {@code models.native.groupedAttention}, an opt-out defaulting to on, read straight
+   * from {@code System.getProperty} and so not even subject to {@link NativeKernelSettings}
+   * validation. Every certified record was produced with it on, so removing it changes nothing a
+   * user sees and removes a second route nobody should pick.
+   */
   @Override
   public boolean supportsGroupedAttention() {
-    return groupedAttentionEnabled
-        && library.supports(NativeKernelCapability.GROUPED_ATTENTION_F32);
+    return library.supports(NativeKernelCapability.GROUPED_ATTENTION_F32);
   }
 
   @Override
@@ -328,14 +328,15 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public boolean isEligible(GgufTensorType type, int batchSize, int rows, int cols) {
-    return eligibleBatch(batchSize) && supports(type);
+    return supports(type);
   }
 
   @Override
   public boolean supportsDual(GgufTensorType firstType, GgufTensorType secondType) {
-    return q5_0GroupEligible(firstType, secondType)
-        && supportsGrouped(firstType)
+    return supportsGrouped(firstType)
         && supportsGrouped(secondType)
+        && groupable(firstType)
+        && groupable(secondType)
         && compatibleGroup(firstType, secondType);
   }
 
@@ -347,7 +348,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int secondRows,
       int batchSize,
       int cols) {
-    return eligibleBatch(batchSize) && supportsDual(firstType, secondType);
+    return supportsDual(firstType, secondType);
   }
 
   @Override
@@ -382,10 +383,12 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   @Override
   public boolean supportsTriple(
       GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
-    return q5_0GroupEligible(firstType, secondType, thirdType)
-        && supportsGrouped(firstType)
+    return supportsGrouped(firstType)
         && supportsGrouped(secondType)
         && supportsGrouped(thirdType)
+        && groupable(firstType)
+        && groupable(secondType)
+        && groupable(thirdType)
         && compatibleGroup(firstType, secondType, thirdType);
   }
 
@@ -399,7 +402,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int thirdRows,
       int batchSize,
       int cols) {
-    return eligibleBatch(batchSize) && supportsTriple(firstType, secondType, thirdType);
+    return supportsTriple(firstType, secondType, thirdType);
   }
 
   @Override
@@ -443,8 +446,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   @Override
   public boolean isGroupedEligible(
       GgufTensorType[] types, int[] rows, int matrixCount, int batchSize, int cols) {
-    if (!eligibleBatch(batchSize)
-        || matrixCount < 2
+    if (matrixCount < 2
         || matrixCount > MAX_GROUPED_MATRICES
         || types == null
         || rows == null
@@ -457,7 +459,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     for (int index = 0; index < matrixCount; index++) {
       if (rows[index] < 1
           || !supportsGrouped(types[index])
-          || !q5_0GroupEligible(firstType, types[index])
+          || !groupable(types[index])
           || !compatibleGroup(firstType, types[index])) {
         return false;
       }
@@ -507,8 +509,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   @Override
   public boolean isIndependentEligible(
       GgufTensorType[] types, int[] rows, int matrixCount, int batchSize, int cols) {
-    if (!eligibleBatch(batchSize)
-        || matrixCount < 2
+    if (matrixCount < 2
         || matrixCount > MAX_GROUPED_MATRICES
         || types == null
         || rows == null
@@ -521,7 +522,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     for (int index = 0; index < matrixCount; index++) {
       if (rows[index] < 1
           || !supportsGrouped(types[index])
-          || !q5_0GroupEligible(firstType, types[index])
+          || !groupable(types[index])
           || !compatibleGroup(firstType, types[index])) {
         return false;
       }
@@ -562,10 +563,9 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     }
     GgufTensorType firstType = types[0];
     for (int index = 0; index < matrixCount; index++) {
-      if (!eligibleBatch(batchSizes[index])
-          || rows[index] < 1
+      if (rows[index] < 1
           || !supportsGrouped(types[index])
-          || !q5_0GroupEligible(firstType, types[index])
+          || !groupable(types[index])
           || !compatibleGroup(firstType, types[index])) {
         return false;
       }
@@ -826,10 +826,6 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     };
   }
 
-  private boolean eligibleBatch(int batchSize) {
-    return batchSize > 1 || (nativeDecode && batchSize == 1);
-  }
-
   private int validateGroupedProjection(
       float[] output,
       MemorySegment weights,
@@ -966,16 +962,19 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
             && library.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL));
   }
 
-  private boolean q5_0GroupEligible(GgufTensorType firstType, GgufTensorType secondType) {
-    return q5_0Grouped || (firstType != GgufTensorType.Q5_0 && secondType != GgufTensorType.Q5_0);
-  }
-
-  private boolean q5_0GroupEligible(
-      GgufTensorType firstType, GgufTensorType secondType, GgufTensorType thirdType) {
-    return q5_0Grouped
-        || (firstType != GgufTensorType.Q5_0
-            && secondType != GgufTensorType.Q5_0
-            && thirdType != GgufTensorType.Q5_0);
+  /**
+   * Whether a projection type may share one activation quantization with its group.
+   *
+   * <p>Every type the shim groups may, except Q5_0. On the controlled Qwen2.5-0.5B x86-64 profile
+   * fused grouping recovered worker-barrier overhead and still decoded slower than independent Q5_0
+   * projections — 37.33 against 38.94 tokens/s. This was a setting ({@code
+   * models.native.q5_0.grouped}) that defaulted to off; it is now simply the decision, because a
+   * route measured slower is not a route to offer. The figures are recorded in {@code
+   * backend-native/README.md} but have no committed raw artifact, so they are due a re-run under
+   * protocol before the grouped Q5_0 kernel is either adopted or deleted.
+   */
+  private static boolean groupable(GgufTensorType type) {
+    return type != GgufTensorType.Q5_0;
   }
 
   private boolean compatibleGroup(

@@ -38,10 +38,13 @@ class ControlledRagQualificationScriptTest {
         .contains("tuningSystemProperties: []")
         .contains("RAG_MODELS_BACKEND must be pure-java or rust-ffm")
         .contains("for option_source in JAVA_OPTS JAVA_TOOL_OPTIONS JDK_JAVA_OPTIONS _JAVA_OPTIONS")
-        .contains("must not contain Models tuning properties during qualification");
+        .contains("must not contain Models tuning properties during qualification")
+        .doesNotContain("-Dmodels.native.quantizedDecode");
 
     int defaultRun = script.indexOf("--output \"$DEFAULT_REPORT\"");
-    int tunedProperty = script.indexOf("-Dmodels.native.quantizedDecode=true");
+    // The tuned run's only remaining native tuning is the worker count: quantizedDecode was
+    // removed, so the library default already routes decode through the shim.
+    int tunedProperty = script.indexOf("-Dmodels.native.kernels.threads=$NATIVE_THREADS");
     int tunedRun = script.indexOf("--output \"$OUTPUT_DIR/models-$MODELS_BACKEND.json\"");
     assertThat(defaultRun).isPositive();
     assertThat(tunedProperty).isGreaterThan(defaultRun);

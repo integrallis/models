@@ -4,6 +4,82 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.54] - 2026-10-08
+
+### Changed
+
+- **The library default is now the fastest route it has, on every path.** Ten of the eleven
+  pure-Java plan optimizations are enabled when unset, against four before, and the Rust shim serves
+  every tensor type it reports a capability for at every batch size. Previously a faster route
+  existed behind a setting that defaulted to off, and the only thing that could turn it on was an
+  exactly-matching ModelJars performance profile — every published profile pins an exact
+  `cpu-model`, `processors` and usually an exact `vm-version`, and the published set covers two EC2
+  CPU models on Linux/amd64, so an ordinary host matched nothing and ran the slow route.
+
+  Routing single-token decode to the Java path instead of the shim measured **6.2x slower** on one
+  host and harness: 2.52 against 15.72 tok/s, OFFLINE against USABLE
+  (`benchmark-results/2026-09-23-prefill-budget/NOTES.md`). Worse, the qualification harness forced
+  that setting on, so every certified tier described a route users did not get. The measured path
+  and the shipped path are now the same one.
+
+- **`models.purejava.batchedAttentionScores`, `batchedAttentionValues`, `stagedQuantizedFfn`,
+  `stagedQuantizedLayer`, `blockMajorQ8Activations` and `parallelQ8FfnPreparation` are enabled when
+  unset.** Each was adopted on a measurement, not an assumption: greedy tokens were compared with
+  the setting on and off on Q4_0, Q8_0 and Q4_K artifacts, and for the two attention settings on
+  both the pure-Java and the `rust-ffm` path. All six generate **byte-identical tokens** either way,
+  so the faster route is free. Reproduce with `./gradlew :backend-java:defaultOffParityTest` and
+  `:backend-native:nativeAttentionParityTest`, each pointed at an artifact with
+  `-Dmodels.parity.model`. Both arms assert the planner reported the expected status before
+  comparing, so a setting that silently does nothing cannot pass as parity.
+
+- **`models.purejava.fusedGroupedAttention` stays off, and now says why from measurement.** The same
+  harness found it byte-identical on Q8_0 and Q4_K but **divergent at token 14** on
+  qwen2.5-coder-0.5b Q4_0. Greedy decoding is a discrete argmax, so the 1.4e-6 agreement its javadoc
+  already described flips a token whenever the top two candidates sit inside it. Adopting it is an
+  epoch change — every pinned greedy oracle re-run and the tier bands re-derived — not a default to
+  flip.
+
+- **`PureJavaPlanConfiguration.defaults()` delegates to the resolvers** instead of carrying a second
+  hand-maintained copy of every default. The two drifted the moment one moved.
+
+### Removed
+
+- **`models.native.quantizedDecode`, `models.native.q5_0.grouped`, `models.native.gatedDeltaNet`,
+  `models.native.loadWarmup` and `models.native.groupedAttention` are gone.** Each vetoed a Rust
+  kernel the shim had already reported a capability for. `models.native.kernels.threads` is now the
+  only native setting a deployment chooses.
+
+  **Setting a removed property is accepted and ignored, never rejected**, and the backend records it
+  under `native-ignored-removed-settings` so a report names it rather than leaving a reader believing
+  it still has an effect. Twenty-five published ModelJars profiles recommend `quantizedDecode=true`,
+  and a marker jar embeds its profile, so rejecting them would stop those models loading with no
+  catalogue edit able to reach a marker already on Maven Central.
+
+- **The `loadWarmup` prefill is gone with its setting.** Its experiment returned VOID
+  (`experiments/loadwarmup-first-generation/`), so it bought no measured speed while costing load
+  time against the readiness gate.
+
+- **Q5_0 projections always run independently**, and that is a decision rather than a setting:
+  grouping them decoded at 37.33 against 38.94 tok/s on the controlled Qwen2.5-0.5B x86-64 profile.
+  Those figures have no committed raw artifact and are due a re-run under protocol, after which the
+  grouped Q5_0 kernel is either adopted or deleted.
+
+- **MobileMoE's three `prefillInt8*` settings are gone.** Int8 activations are unconditional for the
+  attention-output and shared-expert projections, where they were already the default. QKV keeps f32
+  because making int8 unconditional there broke the 5.0e-4 batched-prefill against sequential-decode
+  agreement that `compactPackedLayoutExecutesWithoutPreparedWeights` holds — faster and wrong is not
+  a route. MobileMoE behaviour is unchanged.
+
+### Fixed
+
+- **The comparator no longer ranks on an engine's self-reported prefill counter.**
+  `RagComparatorAssessment` carries `timeToFirstTokenRatio`, taken by this harness on both arms.
+  Ollama's `prompt_eval_count / prompt_eval_duration` reports the whole prompt over the duration of
+  only the tokens left after prefix-cache reuse, which on 14 of 31 certified two-arm models implies a
+  throughput above the host's peak FLOP rate — 10.6x peak at worst. A ratio built on it measured
+  caching policy, not speed. Full audit in `benchmark-results/2026-10-08-prefill-metric-audit/`.
+
+
 ## [0.3.53] - 2026-10-07
 
 ### Removed

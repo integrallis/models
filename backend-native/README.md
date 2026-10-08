@@ -65,18 +65,31 @@ java \
 `models.native.kernels.threads` controls the worker-context size and defaults to
 the JVM-reported processor count.
 
-`models.native.quantizedDecode=true` allows eligible single-token quantized
-projections to use the native kernels. `models.native.gatedDeltaNet=true` moves
-only Qwen3.5's measured recurrence bottleneck through the same FFM boundary;
-the graph, convolution, attention, state ownership, tokenizer, and generation
-loop remain in Java. Both switches default to `false` unless an exact qualified
-ModelJar profile recommends them.
+There is one native route and no switch to choose it. The shim serves every
+tensor type it reports a capability for, at every batch size including
+single-token decode, and the Java path runs only where there is no capability.
+Qwen3.5's recurrence goes through the same FFM boundary whenever the loaded shim
+has it; the graph, convolution, attention, state ownership, tokenizer, and
+generation loop remain in Java.
 
-Q5_0 grouped projection dispatch is not enabled by default. On the controlled
-Qwen2.5-0.5B x86-64 profile, fused grouping recovered worker-barrier overhead but
-still decoded at 37.33 tokens/second versus 38.94 tokens/second for independent
-Q5_0 projections. `-Dmodels.native.q5_0.grouped=true` is therefore retained for
-controlled qualification runs and is not selected by release profiles.
+`models.native.quantizedDecode`, `models.native.gatedDeltaNet`,
+`models.native.q5_0.grouped` and `models.native.loadWarmup` were removed. Each
+vetoed a kernel the shim already had, and each defaulted to `false` unless an
+exactly-matching ModelJar profile supplied one -- which no ordinary host did,
+since every published profile pins an exact `cpu-model`, `processors` and usually
+an exact `vm-version`. Routing decode to the Java path instead measured 6.2x
+slower on one host and harness: 2.52 against 15.72 tokens/second, OFFLINE against
+USABLE. Meanwhile every certified qualification run forced the setting on, so the
+published tiers described a route users did not get. Setting a removed property
+now fails with a message saying it is gone, rather than being ignored.
+
+Q5_0 is the one exception, and it is a decision rather than a setting: Q5_0
+projections always run independently. On the controlled Qwen2.5-0.5B x86-64
+profile, fused grouping recovered worker-barrier overhead and still decoded at
+37.33 tokens/second against 38.94 for independent projections, so the grouped
+route is simply not taken. Those figures have no committed raw artifact and are
+due a re-run under protocol, after which the grouped Q5_0 kernel is either
+adopted or deleted.
 
 ## CI artifacts and private packages
 

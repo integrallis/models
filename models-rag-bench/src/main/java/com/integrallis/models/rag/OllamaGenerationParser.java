@@ -49,6 +49,21 @@ final class OllamaGenerationParser {
       inputTokens = event.path("prompt_eval_count").asInt(0);
       outputTokens = event.path("eval_count").asInt(0);
       long promptNanos = event.path("prompt_eval_duration").asLong(0);
+      // SELF-REPORTED, AND NOT COMPARABLE TO OURS. Do not build a prefill ratio on this.
+      //
+      // Ollama's `prompt_eval_count` is the whole prompt, while `prompt_eval_duration` covers only
+      // the tokens still evaluated after its prefix cache is applied, and it reports no cache
+      // split for us to correct with. The quotient therefore rises without bound as the cache
+      // hits: across the 31 certified two-arm models it implies a throughput ABOVE the host's peak
+      // FLOP rate on 14 of them, worst case 10.6x peak. It is kept only because the raw counters
+      // belong in the artifact, not because it measures prefill speed.
+      //
+      // Our own arm divides `cacheWriteInputTokens` by a prefill interval we time ourselves
+      // (InProcessGenerationClient), so the two quantities have different denominators AND
+      // different numerators. Comparing engines is what `RagComparatorAssessment` is for, and it
+      // uses only wall-clock figures taken by this harness on both arms.
+      //
+      // Full audit: benchmark-results/2026-10-08-prefill-metric-audit/NOTES.md
       prefillTokensPerSecond =
           inputTokens > 0 && promptNanos > 0 ? inputTokens * 1_000_000_000.0 / promptNanos : 0;
       loadMillis = event.path("load_duration").asLong(0) / 1_000_000.0;

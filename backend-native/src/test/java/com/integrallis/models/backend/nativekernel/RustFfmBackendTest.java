@@ -17,7 +17,6 @@ package com.integrallis.models.backend.nativekernel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,6 +34,7 @@ import com.integrallis.models.backend.purejava.plan.PureJavaExecutionPlan;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class RustFfmBackendTest {
@@ -45,18 +45,10 @@ class RustFfmBackendTest {
   }
 
   @Test
-  void resolvesNativeKernelSettingsFromModelProfileRecommendations() {
+  void resolvesTheWorkerCountFromModelProfileRecommendations() {
     NativeKernelSettings settings =
         NativeKernelSettings.resolve(
             Map.of(
-                RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
-                "true",
-                RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
-                "true",
-                RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
-                "true",
-                RustFfmBackend.LOAD_WARMUP_PROPERTY,
-                "true",
                 NativeKernelLibrary.THREAD_COUNT_PROPERTY,
                 "4",
                 "models.purejava.prefillBatchSize",
@@ -64,10 +56,6 @@ class RustFfmBackendTest {
             Map.of(),
             8);
 
-    assertThat(settings.nativeDecode()).isTrue();
-    assertThat(settings.q5_0Grouped()).isTrue();
-    assertThat(settings.gatedDeltaNet()).isTrue();
-    assertThat(settings.loadWarmup()).isTrue();
     assertThat(settings.threadCount()).isEqualTo(4);
   }
 
@@ -75,50 +63,11 @@ class RustFfmBackendTest {
   void deploymentPropertiesOverrideModelProfileRecommendations() {
     NativeKernelSettings settings =
         NativeKernelSettings.resolve(
-            Map.of(
-                RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
-                "true",
-                RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
-                "true",
-                RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
-                "true",
-                RustFfmBackend.LOAD_WARMUP_PROPERTY,
-                "true",
-                NativeKernelLibrary.THREAD_COUNT_PROPERTY,
-                "4"),
-            Map.of(
-                RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
-                "false",
-                RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
-                "false",
-                RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
-                "false",
-                RustFfmBackend.LOAD_WARMUP_PROPERTY,
-                "false",
-                NativeKernelLibrary.THREAD_COUNT_PROPERTY,
-                "8"),
+            Map.of(NativeKernelLibrary.THREAD_COUNT_PROPERTY, "4"),
+            Map.of(NativeKernelLibrary.THREAD_COUNT_PROPERTY, "8"),
             16);
 
-    assertThat(settings.nativeDecode()).isFalse();
-    assertThat(settings.q5_0Grouped()).isFalse();
-    assertThat(settings.gatedDeltaNet()).isFalse();
-    assertThat(settings.loadWarmup()).isFalse();
     assertThat(settings.threadCount()).isEqualTo(8);
-  }
-
-  @Test
-  void loadWarmupCompilesPrefillAndRestoresAnEmptySequence() {
-    PureJavaBackend delegate = mock(PureJavaBackend.class);
-    Tokenizer tokenizer = mock(Tokenizer.class);
-    int[] warmupTokens = {1, 2, 3};
-    when(delegate.tokenizer()).thenReturn(tokenizer);
-    when(tokenizer.encode(any(com.integrallis.models.api.ModelPrompt.class)))
-        .thenReturn(warmupTokens);
-
-    RustFfmBackend.warmup(delegate);
-
-    verify(delegate).prefill(warmupTokens, 0);
-    verify(delegate).reset();
   }
 
   @Test
@@ -238,9 +187,6 @@ class RustFfmBackendTest {
     RustGgufBatchedMatrixKernel kernel = mock(RustGgufBatchedMatrixKernel.class);
     when(kernel.implementation()).thenReturn("rust-test");
     when(kernel.threadCount()).thenReturn(4);
-    when(kernel.nativeDecodeEnabled()).thenReturn(true);
-    when(kernel.q5_0GroupedEnabled()).thenReturn(true);
-    when(kernel.supportsGatedDeltaNet()).thenReturn(true);
     BackendDiagnostics javaDiagnostics =
         new BackendDiagnostics("pure-java", "java-plan", Map.of("model", "nano"), List.of());
 
@@ -255,10 +201,11 @@ class RustFfmBackendTest {
         .containsEntry("kernel-implementation", "rust-test")
         .containsEntry("native-kernel-threads", "4")
         .containsEntry("native-quantized-decode", "true")
-        .containsEntry("native-q5-0-grouped", "true");
+        .containsEntry("native-q5-0-grouped", "false");
     assertThat(diagnostics.optimization("rust-q5-0-grouped-matmul"))
+        .as("Q5_0 grouping measured slower, so it is never taken")
         .hasValueSatisfying(
-            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
     assertThat(diagnostics.optimization("rust-quantized-decode"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
@@ -266,12 +213,17 @@ class RustFfmBackendTest {
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
     assertThat(diagnostics.optimization("rust-gated-delta-net"))
+        .as("the recurrence stays in Java until an epoch change adopts the shim's")
         .hasValueSatisfying(
-            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+            decision -> {
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
+              assertThat(decision.reason()).contains("2.0e-4");
+            });
   }
 
   @Test
-  void reportsDisabledOptionalNativeKernelControls() {
+  @DisplayName("routes not taken are reported with their reason, not as a missing capability")
+  void reportsRoutesNotTaken() {
     RustGgufBatchedMatrixKernel kernel = mock(RustGgufBatchedMatrixKernel.class);
     when(kernel.implementation()).thenReturn("rust-test");
     when(kernel.threadCount()).thenReturn(2);
@@ -284,14 +236,41 @@ class RustFfmBackendTest {
         .hasValueSatisfying(
             decision -> {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
-              assertThat(decision.reason()).contains("independent Q5_0 projections");
+              assertThat(decision.reason()).contains("run independently");
             });
-    assertThat(diagnostics.optimization("rust-quantized-decode"))
+    assertThat(diagnostics.optimization("rust-gated-delta-net"))
         .hasValueSatisfying(
             decision -> {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
-              assertThat(decision.reason())
-                  .contains(RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY);
+              assertThat(decision.reason()).contains("epoch change");
             });
+    // Decode is no longer something a setting can switch off, so it is never reported DISABLED.
+    assertThat(diagnostics.optimization("rust-quantized-decode"))
+        .hasValueSatisfying(
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
+    assertThat(diagnostics.environment()).containsEntry("native-quantized-decode", "true");
+  }
+
+  @Test
+  @DisplayName("no optimization decision mentions a removed setting")
+  void noDecisionMentionsARemovedSetting() {
+    RustGgufBatchedMatrixKernel kernel = mock(RustGgufBatchedMatrixKernel.class);
+    when(kernel.implementation()).thenReturn("rust-test");
+    when(kernel.threadCount()).thenReturn(2);
+
+    BackendDiagnostics diagnostics =
+        RustFfmBackend.diagnostics(
+            new BackendDiagnostics("pure-java", "java-plan", Map.of(), List.of()), kernel);
+
+    assertThat(diagnostics.optimizations())
+        .allSatisfy(
+            decision ->
+                assertThat(decision.reason() + decision.settings())
+                    .doesNotContain("models.native.quantizedDecode")
+                    .doesNotContain("models.native.q5_0.grouped")
+                    .doesNotContain("models.native.gatedDeltaNet")
+                    .doesNotContain("models.native.loadWarmup"));
+    assertThat(diagnostics.environment()).doesNotContainKey("native-load-warmup");
+    assertThat(diagnostics.optimization("load-warmup")).isEmpty();
   }
 }

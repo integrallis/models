@@ -72,7 +72,7 @@ while IFS= read -r job; do
   fi
   for fw in plain-java langchain4j spring-ai; do
     java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED \
-      -Dmodels.native.quantizedDecode=true $DECODE_THREAD_OPT -cp "$CP" \
+      $DECODE_THREAD_OPT -cp "$CP" \
       com.integrallis.models.rag.RagBenchmarkCli \
       --framework "$fw" --backend rust-ffm --backend-version "$PARITY_VERSION" \
       --model "$gguf" --model-id "$id" --workload "$wl" --prompt-template "$tpl" \

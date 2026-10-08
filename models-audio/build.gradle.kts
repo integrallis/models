@@ -63,7 +63,6 @@ tasks.register<Test>("sopranoIntegrationTest") {
     dependsOn(project(":backend-native").tasks.named("cargoBuildRelease"))
     jvmArgs("--enable-native-access=ALL-UNNAMED")
     systemProperty("models.soprano.test.nativeLibrary", sopranoNativeLibrary.get().asFile.absolutePath)
-    systemProperty("models.native.quantizedDecode", "true")
     providers.environmentVariable("MODELS_SOPRANO_JFR").orNull?.let { recording ->
         jvmArgs("-XX:StartFlightRecording=filename=$recording,settings=profile,dumponexit=true")
     }

@@ -1080,6 +1080,32 @@ tasks.register<Test>("sopranoGgufIntegrationTest") {
     maxHeapSize = "2g"
 }
 
+// Measures whether each default-off optimization changes generated tokens. Deliberately does NOT
+// depend on the model-fixture downloads: it takes one artifact already on disk via
+// -Dmodels.parity.model and self-skips without it, so the measurement can be re-run in minutes
+// instead of after a multi-gigabyte fetch.
+tasks.register<Test>("defaultOffParityTest") {
+    group = "verification"
+    description = "Compare generated tokens with each default-off optimization enabled"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("slow")
+    }
+    filter {
+        includeTestsMatching("*DefaultOffOptimizationParityTest*")
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "8g"
+    testLogging {
+        showStandardStreams = true
+    }
+    providers.systemProperty("models.parity.model").orNull?.let {
+        systemProperty("models.parity.model", it)
+    }
+}
+
 tasks.named<Test>("slowTest") {
     dependsOn(
         modelFixtures

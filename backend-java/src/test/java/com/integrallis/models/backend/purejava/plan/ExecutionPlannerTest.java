@@ -48,8 +48,10 @@ class ExecutionPlannerTest {
     assertThat(plan.prefillBatchSize()).isEqualTo(32);
     assertThat(plan.finalLayerPrefillPruning()).isTrue();
     assertThat(plan.finalLayerKvOnlyPrefill()).isTrue();
-    assertThat(plan.batchedAttentionValues()).isFalse();
-    assertThat(plan.batchedAttentionScores()).isFalse();
+    // Enabled when unset since 2026-10-08, measured byte-identical either way on Q4_0, Q8_0 and
+    // Q4_K across the pure-Java and rust-ffm paths.
+    assertThat(plan.batchedAttentionValues()).isTrue();
+    assertThat(plan.batchedAttentionScores()).isTrue();
     assertThat(plan.diagnostics().environment()).containsEntry("compiler", "hotspot-c2");
     assertThat(plan.diagnostics().environment())
         .containsEntry("vector-provider", "test-vector")
@@ -72,10 +74,10 @@ class ExecutionPlannerTest {
             });
     assertThat(plan.diagnostics().optimization("batched-attention-values"))
         .hasValueSatisfying(
-            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
     assertThat(plan.diagnostics().optimization("batched-attention-scores"))
         .hasValueSatisfying(
-            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));
+            decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
     assertThat(plan.diagnostics().optimization("final-layer-prefill-pruning"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
@@ -731,7 +733,7 @@ class ExecutionPlannerTest {
     assertThat(unsupported.diagnostics().optimization("staged-quantized-ffn"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.UNSUPPORTED));
-    assertThat(PureJavaPlanConfiguration.defaults().stagedQuantizedFfn()).isFalse();
+    assertThat(PureJavaPlanConfiguration.defaults().stagedQuantizedFfn()).isTrue();
   }
 
   @Test
@@ -783,7 +785,7 @@ class ExecutionPlannerTest {
             recommended);
     assertThat(mixed.stagedQuantizedLayer()).isTrue();
     assertThat(mixed.topology().stagedQuantizedFfnLayers()).isEqualTo(1);
-    assertThat(PureJavaPlanConfiguration.defaults().stagedQuantizedLayer()).isFalse();
+    assertThat(PureJavaPlanConfiguration.defaults().stagedQuantizedLayer()).isTrue();
   }
 
   @Test
@@ -815,7 +817,7 @@ class ExecutionPlannerTest {
         ExecutionPlanner.plan(
             runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q4_0), recommended);
     assertThat(q4.blockMajorQ8Activations()).isFalse();
-    assertThat(PureJavaPlanConfiguration.defaults().blockMajorQ8Activations()).isFalse();
+    assertThat(PureJavaPlanConfiguration.defaults().blockMajorQ8Activations()).isTrue();
   }
 
   @Test
@@ -1052,7 +1054,11 @@ class ExecutionPlannerTest {
                 PureJavaPlanConfiguration.STAGED_QUANTIZED_LAYER_PROPERTY,
                 "true",
                 PureJavaPlanConfiguration.PARALLEL_Q8_FFN_PREPARATION_PROPERTY,
-                "true"));
+                "true",
+                // Block-major activations are enabled when unset now, so withholding this arm's
+                // prerequisite takes an explicit false rather than an omission.
+                PureJavaPlanConfiguration.BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY,
+                "false"));
     PureJavaExecutionPlan packed =
         ExecutionPlanner.plan(
             runtime("graal-jvmci"), uniformTopology(GgufTensorType.Q8_0), withoutBlockMajor);
@@ -1063,7 +1069,7 @@ class ExecutionPlannerTest {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
               assertThat(decision.reason()).contains("block-major Q8 activations");
             });
-    assertThat(PureJavaPlanConfiguration.defaults().parallelQ8FfnPreparation()).isFalse();
+    assertThat(PureJavaPlanConfiguration.defaults().parallelQ8FfnPreparation()).isTrue();
   }
 
   @Test
@@ -1170,28 +1176,43 @@ class ExecutionPlannerTest {
         .hasMessageContaining("models.purejava.finalLayerKvOnlyPrefill");
     assertThat(PureJavaPlanConfiguration.finalLayerKvOnlyPrefill(null)).isTrue();
     assertThat(PureJavaPlanConfiguration.finalLayerKvOnlyPrefill("false")).isFalse();
-    assertThat(PureJavaPlanConfiguration.batchedAttentionValues(null)).isFalse();
+    // Unset means enabled since 2026-10-08: measured byte-identical either way, so the faster
+    // route is free. See the resolver's javadoc for the artifacts and backends.
+    assertThat(PureJavaPlanConfiguration.batchedAttentionValues(null)).isTrue();
     assertThat(PureJavaPlanConfiguration.batchedAttentionValues("true")).isTrue();
+    assertThat(PureJavaPlanConfiguration.batchedAttentionValues("false")).isFalse();
     assertThatThrownBy(() -> PureJavaPlanConfiguration.batchedAttentionValues("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.batchedAttentionValues");
-    assertThat(PureJavaPlanConfiguration.batchedAttentionScores(null)).isFalse();
+    // Unset means enabled since 2026-10-08: measured byte-identical either way, so the faster
+    // route is free. See the resolver's javadoc for the artifacts and backends.
+    assertThat(PureJavaPlanConfiguration.batchedAttentionScores(null)).isTrue();
     assertThat(PureJavaPlanConfiguration.batchedAttentionScores("true")).isTrue();
+    assertThat(PureJavaPlanConfiguration.batchedAttentionScores("false")).isFalse();
     assertThatThrownBy(() -> PureJavaPlanConfiguration.batchedAttentionScores("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.batchedAttentionScores");
-    assertThat(PureJavaPlanConfiguration.stagedQuantizedFfn(null)).isFalse();
+    // Unset means enabled since 2026-10-08: measured byte-identical either way, so the faster
+    // route is free. See the resolver's javadoc for the artifacts and backends.
+    assertThat(PureJavaPlanConfiguration.stagedQuantizedFfn(null)).isTrue();
     assertThat(PureJavaPlanConfiguration.stagedQuantizedFfn("true")).isTrue();
+    assertThat(PureJavaPlanConfiguration.stagedQuantizedFfn("false")).isFalse();
     assertThatThrownBy(() -> PureJavaPlanConfiguration.stagedQuantizedFfn("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.stagedQuantizedFfn");
-    assertThat(PureJavaPlanConfiguration.stagedQuantizedLayer(null)).isFalse();
+    // Unset means enabled since 2026-10-08: measured byte-identical either way, so the faster
+    // route is free. See the resolver's javadoc for the artifacts and backends.
+    assertThat(PureJavaPlanConfiguration.stagedQuantizedLayer(null)).isTrue();
     assertThat(PureJavaPlanConfiguration.stagedQuantizedLayer("true")).isTrue();
+    assertThat(PureJavaPlanConfiguration.stagedQuantizedLayer("false")).isFalse();
     assertThatThrownBy(() -> PureJavaPlanConfiguration.stagedQuantizedLayer("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.stagedQuantizedLayer");
-    assertThat(PureJavaPlanConfiguration.blockMajorQ8Activations(null)).isFalse();
+    // Unset means enabled since 2026-10-08: measured byte-identical either way, so the faster
+    // route is free. See the resolver's javadoc for the artifacts and backends.
+    assertThat(PureJavaPlanConfiguration.blockMajorQ8Activations(null)).isTrue();
     assertThat(PureJavaPlanConfiguration.blockMajorQ8Activations("true")).isTrue();
+    assertThat(PureJavaPlanConfiguration.blockMajorQ8Activations("false")).isFalse();
     assertThatThrownBy(() -> PureJavaPlanConfiguration.blockMajorQ8Activations("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.blockMajorQ8Activations");
@@ -1202,8 +1223,11 @@ class ExecutionPlannerTest {
     assertThatThrownBy(() -> PureJavaPlanConfiguration.q8BlockMajorKernel("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.q8BlockMajorKernel");
-    assertThat(PureJavaPlanConfiguration.parallelQ8FfnPreparation(null)).isFalse();
+    // Unset means enabled since 2026-10-08: measured byte-identical either way, so the faster
+    // route is free. See the resolver's javadoc for the artifacts and backends.
+    assertThat(PureJavaPlanConfiguration.parallelQ8FfnPreparation(null)).isTrue();
     assertThat(PureJavaPlanConfiguration.parallelQ8FfnPreparation("true")).isTrue();
+    assertThat(PureJavaPlanConfiguration.parallelQ8FfnPreparation("false")).isFalse();
     assertThatThrownBy(() -> PureJavaPlanConfiguration.parallelQ8FfnPreparation("sometimes"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("models.purejava.parallelQ8FfnPreparation");

@@ -44,20 +44,14 @@ class Gemma4NativeLargeModelFixtureSlowTest {
     assertThat(Files.size(model)).isEqualTo(FILE_SIZE);
 
     String previousContext = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
-    String previousNativeDecode =
-        System.getProperty(RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY);
-    String previousLoadWarmup = System.getProperty(RustFfmBackend.LOAD_WARMUP_PROPERTY);
     System.setProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "128");
-    System.setProperty(RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY, "true");
-    System.setProperty(RustFfmBackend.LOAD_WARMUP_PROPERTY, "true");
 
     long loadStarted = System.nanoTime();
     try (RustFfmBackend backend = RustFfmBackend.load(model)) {
       double loadMillis = elapsedMillis(loadStarted);
       assertThat(backend.diagnostics().environment())
           .containsEntry("kernel-runtime", "rust-ffm")
-          .containsEntry("native-quantized-decode", "true")
-          .containsEntry("native-load-warmup", "true");
+          .containsEntry("native-quantized-decode", "true");
 
       ModelPrompt prompt = ChatTemplate.GEMMA4.render(List.of(ChatMessage.user("Hello")));
       int[] promptTokens = backend.tokenizer().encode(prompt);
@@ -92,9 +86,6 @@ class Gemma4NativeLargeModelFixtureSlowTest {
           format(decodeMillis));
     } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previousContext);
-      restoreSystemProperty(
-          RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY, previousNativeDecode);
-      restoreSystemProperty(RustFfmBackend.LOAD_WARMUP_PROPERTY, previousLoadWarmup);
     }
   }
 

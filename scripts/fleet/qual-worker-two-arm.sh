@@ -264,7 +264,6 @@ while IFS= read -r job; do
     done
     if [ "$ok" = "1" ]; then
       java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED \
-        -Dmodels.native.quantizedDecode=true \
         -cp "$CP" \
         com.integrallis.models.rag.RagBenchmarkCli \
         --framework plain-java --backend rust-ffm --backend-version "$BACKEND_VERSION" \
@@ -295,7 +294,6 @@ while IFS= read -r job; do
     ARMS="$ARMS --max-tokens 256 --warmups 1 --iterations 3"
 
     java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED \
-      -Dmodels.native.quantizedDecode=true \
       $DECODE_THREAD_OPT \
       -cp "$CP" \
       com.integrallis.models.rag.RagBenchmarkCli \
