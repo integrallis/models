@@ -284,6 +284,30 @@ tasks.withType<Test>().configureEach {
     )
 }
 
+// The shipped-path twin of :backend-java:defaultOffParityTest. No fixture downloads: point it at an
+// artifact already on disk and the built shim.
+tasks.register<Test>("nativeAttentionParityTest") {
+    group = "verification"
+    description = "Compare generated tokens with batched attention enabled on the rust-ffm path"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("slow")
+    }
+    filter {
+        includeTestsMatching("*NativeAttentionParityTest*")
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "8g"
+    testLogging {
+        showStandardStreams = true
+    }
+    for (property in listOf("models.parity.model", "models.native.kernels.library")) {
+        providers.systemProperty(property).orNull?.let { systemProperty(property, it) }
+    }
+}
+
 tasks.register<Test>("gemma426BA4BNativeSlowTest") {
     group = "verification"
     description = "Run the pinned Gemma 4 26B-A4B Q4_K_M Rust/FFM qualification test"

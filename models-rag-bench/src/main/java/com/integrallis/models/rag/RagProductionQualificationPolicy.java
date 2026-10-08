@@ -257,6 +257,10 @@ public final class RagProductionQualificationPolicy {
     double endToEndRatio =
         ratio(
             candidate.summary().endToEndMillis().p95(), baseline.summary().endToEndMillis().p95());
+    // Wall clock on our timer for both arms, so it is comparable across engines regardless of what
+    // counters they report. Recorded, not gated -- see RagComparatorAssessment.
+    double timeToFirstTokenRatio =
+        ratio(candidate.summary().ttftMillis().p95(), baseline.summary().ttftMillis().p95());
 
     List<String> failures = new ArrayList<>();
     if (decodeRatio < threshold.minimumDecodeRatio()) {
@@ -269,6 +273,7 @@ public final class RagProductionQualificationPolicy {
         baseline.backend(),
         decodeRatio,
         endToEndRatio,
+        timeToFirstTokenRatio,
         threshold.minimumDecodeRatio(),
         threshold.maximumEndToEndRatio(),
         failures.isEmpty(),

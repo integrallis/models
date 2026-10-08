@@ -32,8 +32,17 @@ A performance profile is the result of benchmarking one model artifact
 on a known runtime. It records the configuration that improved
 throughput or latency while preserving the model's expected output.
 Profile matching lets Models reuse that result only when the current
-deployment is equivalent to the environment that produced it. When no
-profile matches, Models uses its conservative default plan.
+deployment is equivalent to the environment that produced it.
+
+*A profile is not how performance reaches a deployment.* Every setting
+listed below whose faster route was measured byte-identical is enabled
+when unset, so an unmatched host gets it anyway. That was not always so:
+until 0.3.54 seven of these defaulted to off, and the only thing that
+could enable them was an exactly-matching profile — and because a
+selector pins an exact `cpu-model`, `processors` and usually an exact
+`vm-version`, almost no deployment matched one. A profile now carries
+only what a measurement found better *than* the default for one exact
+artifact, which is what it was always meant to mean.
 
 The following fields establish that equivalence:
 
@@ -86,43 +95,47 @@ final-layer FFN work to requested output rows
 rows while computing Q/output/FFN only where needed
 
 |`models.purejava.batchedAttentionScores` |Batch exact attention-score
-dot products
+dot products. *Enabled when unset* since 0.3.54: measured byte-identical
+on Q4_0, Q8_0 and Q4_K artifacts across both backends
 
 |`models.purejava.batchedAttentionValues` |Batch cached value-row
-accumulation
+accumulation. *Enabled when unset* on the same evidence
 
 |`models.purejava.stagedQuantizedFfn` |Use a measured staged
-Q4_0/Q8_0 FFN schedule
+Q4_0/Q8_0 FFN schedule. *Enabled when unset*; the `rust-ffm` path still
+forces it off, because the shim owns those projections
 
 |`models.purejava.stagedQuantizedLayer` |Retain a wider staged quantized
-layer schedule
+layer schedule. *Enabled when unset*, same exception
 
 |`models.purejava.blockMajorQ8Activations` |Store staged Q8_0
-activations in block-major order
+activations in block-major order. *Enabled when unset*
 
 |`models.purejava.q8BlockMajorKernel` |Select `scattered`,
 `row-accumulated`, or `float-lane-accumulated` Q8_0 arithmetic
 
 |`models.purejava.parallelQ8FfnPreparation` |Prepare eligible Q8_0 FFN
-activations in parallel
+activations in parallel. *Enabled when unset*; it also requires the
+staged layer plan and block-major activations, and reports `DISABLED`
+with that reason when either is withheld
 
 |`models.purejava.maxContextLength` |Impose a lower hard sequence-length
 limit
-
-|`models.native.quantizedDecode` |Use eligible Models-owned native
-quantized projection kernels during single-token decode
-
-|`models.native.gatedDeltaNet` |Use the Models-owned FFM recurrence
-kernel for an exact profiled Qwen3.5 artifact; all surrounding graph and
-state ownership remain in Java
 
 |`models.native.kernels.threads` |Set the bounded native worker-context
 size used by qualified projection and recurrence profiles
 |===
 
-Automatic selection remains restricted to exact measured profiles.
-Ordinary loads use conservative defaults, including the `widened` Q4
-kernel.
+`models.native.quantizedDecode`, `models.native.gatedDeltaNet`,
+`models.native.q5_0.grouped` and `models.native.loadWarmup` were removed.
+Each vetoed a Rust kernel the shim had already reported a capability for,
+and each defaulted to off unless an exactly-matching ModelJar profile
+supplied it -- so an ordinary host ran the slow route. Sending decode to
+the Java path cost 6.2x on one host and harness, 2.52 against 15.72
+tokens/s. The shim now serves every tensor type it reports a capability
+for, decode included, and the Java path remains only where there is no
+capability. Setting one of the removed properties now fails with a message
+saying so rather than being ignored.
 
 == Grouped Projection Paths
 

@@ -639,7 +639,10 @@ class NativeKernelLibraryTest {
         assertThat(actual).containsExactly(expected);
       }
       assertThat(kernel.implementation()).isEqualTo("rust-ffm-quantized-v13");
-      assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 2, 64)).isFalse();
+      // Batch one is decode. It used to be ineligible unless models.native.quantizedDecode was
+      // set, which sent every decode step to the Java path at 6.2x the cost; the setting is gone
+      // and the shim serves any batch size for a type it supports.
+      assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 2, 64)).isTrue();
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 2, 2, 64)).isTrue();
       assertThat(kernel.planRecommendations())
           .containsEntry(PureJavaPlanConfiguration.GROUPED_PROJECTIONS_PROPERTY, "true")
@@ -649,10 +652,8 @@ class NativeKernelLibraryTest {
   }
 
   @Test
-  void profiledNativeDecodeMakesSingleTokenProjectionsEligible() {
-    try (RustGgufBatchedMatrixKernel kernel =
-        RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {
-      assertThat(kernel.nativeDecodeEnabled()).isTrue();
+  void singleTokenProjectionsAreAlwaysEligible() {
+    try (RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
       assertThat(kernel.isEligible(GgufTensorType.Q4_0, 1, 128, 64)).isTrue();
       assertThat(kernel.isDualEligible(GgufTensorType.Q4_0, 128, GgufTensorType.Q4_0, 128, 1, 64))
           .isTrue();
@@ -671,33 +672,27 @@ class NativeKernelLibraryTest {
   }
 
   @Test
-  void profiledSettingsConfigureDecodeGroupingAndWorkerCountTogether() {
-    NativeKernelSettings settings = new NativeKernelSettings(true, true, true, false, 4);
+  void profiledSettingsConfigureTheWorkerCount() {
+    NativeKernelSettings settings = new NativeKernelSettings(4);
 
     try (RustGgufBatchedMatrixKernel kernel =
         RustGgufBatchedMatrixKernel.open(libraryPath(), settings)) {
-      assertThat(kernel.nativeDecodeEnabled()).isTrue();
-      assertThat(kernel.q5_0GroupedEnabled()).isTrue();
-      assertThat(kernel.supportsGatedDeltaNet()).isTrue();
       assertThat(kernel.threadCount()).isEqualTo(4);
+      // Capability, not configuration, decides what the shim serves -- with two routes deliberately
+      // not taken: the recurrence, because adopting it would change bytes published records claim,
+      // and grouped Q5_0, because it measured slower. Both are decisions in code, not settings.
+      assertThat(kernel.supportsQ5_0Grouped()).as("the shim has the kernel").isTrue();
+      assertThat(kernel.supportsGatedDeltaNet()).as("but it is not routed to").isFalse();
     }
   }
 
   @Test
-  void unqualifiedGatedDeltaNetKernelRemainsDisabled() {
-    NativeKernelSettings settings = new NativeKernelSettings(true, true, false, false, 4);
-
-    try (RustGgufBatchedMatrixKernel kernel =
-        RustGgufBatchedMatrixKernel.open(libraryPath(), settings)) {
-      assertThat(kernel.supportsGatedDeltaNet()).isFalse();
-    }
-  }
-
-  @Test
-  void unprofiledQ5_0GroupingIsNotEligible() {
-    try (RustGgufBatchedMatrixKernel kernel =
-        RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {
+  void q5_0ProjectionsAreNeverGrouped() {
+    try (RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
       assertThat(kernel.supports(GgufTensorType.Q5_0)).isTrue();
+      // The shim can group Q5_0; we do not, because grouping it decoded slower than independent
+      // projections on the controlled profile. One route, chosen by measurement.
+      assertThat(kernel.supportsQ5_0Grouped()).isTrue();
       assertThat(kernel.supportsDual(GgufTensorType.Q5_0, GgufTensorType.Q5_0)).isFalse();
       assertThat(
               kernel.supportsTriple(GgufTensorType.Q5_0, GgufTensorType.Q5_0, GgufTensorType.Q5_0))
@@ -761,8 +756,7 @@ class NativeKernelLibraryTest {
     float[] actual = new float[rows];
 
     try (Arena arena = Arena.ofConfined();
-        RustGgufBatchedMatrixKernel kernel =
-            RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
       MemorySegment weights = arena.allocate(rows * cols / 32L * 22L);
       fillQ5_0Weights(weights, rows, cols);
       referenceQ5_0F32BatchedMatmul(weights, input, batchSize, rows, cols, expected);
@@ -959,8 +953,7 @@ class NativeKernelLibraryTest {
     float[] input = inputs(batchSize, cols);
 
     try (Arena arena = Arena.ofConfined();
-        RustGgufBatchedMatrixKernel kernel =
-            RustGgufBatchedMatrixKernel.open(libraryPath(), false, true)) {
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
       MemorySegment[] weights = new MemorySegment[rowCounts.length];
       float[][] expected = new float[rowCounts.length][];
       float[][] actual = new float[rowCounts.length][];
@@ -974,6 +967,10 @@ class NativeKernelLibraryTest {
             weights[index], input, batchSize, rows, cols, expected[index]);
       }
 
+      // The grouped Q5_0 kernel is correct, which the numerics below check, but the shipping path
+      // does not route to it: grouping Q5_0 decoded slower than independent projections on the
+      // controlled profile. The kernel is a deletion candidate once that measurement is re-run
+      // with a committed artifact.
       assertThat(
               kernel.isTripleEligible(
                   GgufTensorType.Q5_0,
@@ -984,7 +981,7 @@ class NativeKernelLibraryTest {
                   rowCounts[2],
                   batchSize,
                   cols))
-          .isTrue();
+          .isFalse();
       kernel.multiplyTriple(
           actual[0],
           weights[0],
@@ -1081,8 +1078,7 @@ class NativeKernelLibraryTest {
     float[] input = inputs(batchSize, cols);
 
     try (Arena arena = Arena.ofConfined();
-        RustGgufBatchedMatrixKernel kernel =
-            RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
       MemorySegment[] weights = new MemorySegment[matrixCount];
       float[][] expected = new float[matrixCount][];
       float[][] actual = new float[matrixCount][];
@@ -1115,8 +1111,7 @@ class NativeKernelLibraryTest {
     GgufTensorType[] types = new GgufTensorType[matrixCount];
 
     try (Arena arena = Arena.ofConfined();
-        RustGgufBatchedMatrixKernel kernel =
-            RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
       MemorySegment[] weights = new MemorySegment[matrixCount];
       float[][] inputs = new float[matrixCount][];
       float[][] expected = new float[matrixCount][];
@@ -1155,8 +1150,7 @@ class NativeKernelLibraryTest {
     GgufTensorType[] types = new GgufTensorType[matrixCount];
 
     try (Arena arena = Arena.ofConfined();
-        RustGgufBatchedMatrixKernel kernel =
-            RustGgufBatchedMatrixKernel.open(libraryPath(), true)) {
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
       MemorySegment[] weights = new MemorySegment[matrixCount];
       float[][] inputs = new float[matrixCount][];
       float[][] expected = new float[matrixCount][];

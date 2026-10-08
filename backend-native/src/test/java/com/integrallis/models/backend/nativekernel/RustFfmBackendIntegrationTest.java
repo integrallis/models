@@ -111,10 +111,7 @@ class RustFfmBackendIntegrationTest {
     Path library = Path.of(System.getProperty(RustFfmBackend.LIBRARY_PATH_PROPERTY));
     assertThat(library).isRegularFile();
     String previousContext = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
-    String previousNativeDecode =
-        System.getProperty(RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY);
     System.setProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "128");
-    System.setProperty(RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY, "true");
 
     try (RustFfmBackend backend = RustFfmBackend.load(MINICPM5_MODEL_PATH, library)) {
       assertThat(backend.diagnostics().optimization("rust-q4-k-batched-matmul")).isPresent();
@@ -130,8 +127,6 @@ class RustFfmBackendIntegrationTest {
           .containsExactly(5028, 6706, 5018, 1735);
     } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previousContext);
-      restoreSystemProperty(
-          RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY, previousNativeDecode);
     }
   }
 
@@ -142,7 +137,7 @@ class RustFfmBackendIntegrationTest {
     assertThat(library).isRegularFile();
 
     try (Arena arena = Arena.ofShared();
-        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(library, true)) {
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(library)) {
       var file = GgufParser.parse(MINICPM5_MODEL_PATH, arena);
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
@@ -169,7 +164,7 @@ class RustFfmBackendIntegrationTest {
     assertThat(library).isRegularFile();
 
     try (Arena arena = Arena.ofShared();
-        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(library, true)) {
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(library)) {
       var file = GgufParser.parse(DEEPSEEK_CODER_MODEL_PATH, arena);
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);

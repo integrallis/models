@@ -20,7 +20,6 @@ import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.InferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.backend.nativekernel.RustFfmBackend;
-import com.integrallis.models.backend.nativekernel.RustGgufBatchedMatrixKernel;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.langchain4j.ModelsChatModel;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
@@ -140,7 +139,6 @@ public final class FrameworkExerciseCli {
         SamplingOptions.builder().temperature(0.0f).topP(1.0f).maxTokens(maxTokens).build();
 
     System.setProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, Integer.toString(context));
-    System.setProperty(RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY, "true");
 
     Map<String, Object> report = new LinkedHashMap<>();
     report.put("schemaVersion", 1);
@@ -156,12 +154,13 @@ public final class FrameworkExerciseCli {
     // would
     // let evidence claim the native path while the pure-Java one ran.
     try (InferenceBackend backend = openBackend(backendId, model)) {
-      // The same argument applies to the settings, and a two-arm run is useless without them. An
-      // arm that varies `-Dmodels.native.loadWarmup` produced a report that recorded neither the
-      // property nor the resolved diagnostic, so the arm could not be shown to have differed from
-      // its control at all, and a run that flipped four of five subjects had to be discarded for
-      // want of evidence that the switch did anything. A toggle that is not in the artifact is not
-      // observable, and an ablation of it is not a measurement.
+      // The same argument applies to the settings. This harness used to force
+      // `models.native.quantizedDecode=true` here, which meant every certified report described a
+      // route a user did not get: the setting defaulted to off unless an exactly-matching ModelJar
+      // profile supplied it. The setting no longer exists -- the shim serves every tensor type it
+      // reports a capability for -- so the measured path and the shipped path are the same one, and
+      // `recordConfiguration` still writes the resolved diagnostics so a report can be checked
+      // rather than believed.
       recordConfiguration(report, backend.diagnostics(), System.getProperties());
       RuntimeTextGenerationModel plain = new RuntimeTextGenerationModel(backend);
       ModelsChatModel langchain = new ModelsChatModel(backend, template, options);

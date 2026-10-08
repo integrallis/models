@@ -39,10 +39,7 @@ class Qwen3NativeLargeModelFixtureSlowTest {
     assertThat(Files.size(model)).isEqualTo(FILE_SIZE);
 
     String previousContext = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
-    String previousNativeDecode =
-        System.getProperty(RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY);
     System.setProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "128");
-    System.setProperty(RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY, "true");
 
     try (RustFfmBackend backend = RustFfmBackend.load(model)) {
       assertThat(backend.diagnostics().environment())
@@ -56,8 +53,6 @@ class Qwen3NativeLargeModelFixtureSlowTest {
           .containsExactly(EXPECTED_GENERATED_TOKENS);
     } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previousContext);
-      restoreSystemProperty(
-          RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY, previousNativeDecode);
     }
   }
 

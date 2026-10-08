@@ -1,0 +1,37 @@
+# Verbatim capture of the RunPod pod log for pod tlzsqq6skesgy1, read back via
+# runpod stream-pod-logs. The pod ran experiments/prefill-repack-tile/pod-runner.sh as its
+# container entrypoint; no credentials were placed on the pod and every input was public
+# (llama.cpp at a5822222909b785f23ddc74ce3c8f85bd0e38562 from GitHub, the model from Hugging Face).
+# summarize.py parses the RESULT lines below; do not edit them.
+===== HOST =====
+CPU(s):                               48
+Model name:                           AMD Ryzen Threadripper 7960X 24-Cores
+Thread(s) per core:                   2
+Socket(s):                            1
+CPU max MHz:                          5362.0000
+avx512 flags: avx512_bf16 avx512_bitalg avx512_vbmi2 avx512_vnni avx512_vpopcntdq avx512bw avx512cd avx512dq avx512f avx512ifma avx512vbmi avx512vl
+amx flags   :
+avx2        : yes
+nproc: 16
+llama.cpp at a582222
+GGML_CPU_REPACK:BOOL=ON
+built on
+GGML_CPU_REPACK:BOOL=OFF
+built off
+model bytes: 807694464
+model sha256: 6f85a640a97cf2bf5b8e764087b1e83da0fdb51d7c9fab7d0fece9385611df83
+===== p1024, threads=16, reps=3, interleaved x3 =====
+RESULT p=1024 pass=1 repack=on tok_s=623.653 0.145
+RESULT p=1024 pass=1 repack=off tok_s=361.309 0.254
+RESULT p=1024 pass=2 repack=on tok_s=622.190 2.728
+RESULT p=1024 pass=2 repack=off tok_s=362.188 0.271
+RESULT p=1024 pass=3 repack=on tok_s=623.599 0.300
+RESULT p=1024 pass=3 repack=off tok_s=360.728 0.273
+===== p4096, threads=16, reps=3, interleaved x3 =====
+RESULT p=4096 pass=1 repack=on tok_s=453.896 18.949
+RESULT p=4096 pass=1 repack=off tok_s=307.357 2.111
+RESULT p=4096 pass=2 repack=on tok_s=459.398 4.007
+RESULT p=4096 pass=2 repack=off tok_s=307.367 3.037
+RESULT p=4096 pass=3 repack=on tok_s=463.775 9.815
+RESULT p=4096 pass=3 repack=off tok_s=308.449 2.333
+===== AB COMPLETE =====

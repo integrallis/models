@@ -205,10 +205,15 @@ if ! jq -e \
   echo "library-default correctness smoke failed: $DEFAULT_REPORT" >&2
   exit 1
 fi
+# The library default IS the fast path now: models.native.quantizedDecode was removed, so the shim
+# serves decode whenever it reports the capability. This used to assert "false" to prove the
+# correctness phase ran unturned; that intent is carried by the empty tuningSystemProperties check
+# above, and asserting "true" here now catches a shim that silently fell back to the Java decode
+# path instead.
 if [[ "$MODELS_BACKEND" == "rust-ffm" ]] &&
-   ! jq -e '.backendDiagnostics.environment["native-quantized-decode"] == "false"' \
+   ! jq -e '.backendDiagnostics.environment["native-quantized-decode"] == "true"' \
      "$DEFAULT_REPORT" >/dev/null; then
-  echo "default smoke unexpectedly enabled models.native.quantizedDecode" >&2
+  echo "default smoke did not route decode through the Rust shim" >&2
   exit 1
 fi
 DEFAULT_REPORT_SHA=$(sha256sum "$DEFAULT_REPORT" | awk '{print $1}')
@@ -236,7 +241,8 @@ jq -n \
 # recorded tuning. It cannot compensate for a failed default-correctness smoke.
 export JAVA_OPTS="$DEFAULT_JAVA_OPTS"
 if [[ "$MODELS_BACKEND" == "rust-ffm" ]]; then
-  export JAVA_OPTS="$JAVA_OPTS -Dmodels.native.quantizedDecode=true"
+  # models.native.quantizedDecode was removed: the shim serves decode unconditionally, and passing
+  # the property now fails at load. The thread count is the only native setting left.
   export JAVA_OPTS="$JAVA_OPTS -Dmodels.native.kernels.threads=$NATIVE_THREADS"
 fi
 if [[ -n "${RAG_TUNED_JAVA_OPTS:-}" ]]; then

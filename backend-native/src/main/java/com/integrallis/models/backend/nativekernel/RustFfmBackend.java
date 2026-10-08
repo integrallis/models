@@ -22,7 +22,6 @@ import com.integrallis.models.api.GroupedDecisionBackend;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
-import com.integrallis.models.api.ModelPrompt;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.api.ResumableInferenceBackend;
@@ -50,7 +49,6 @@ public final class RustFfmBackend
         BatchInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
-  public static final String LOAD_WARMUP_PROPERTY = "models.native.loadWarmup";
   public static final String PLAN_VERSION = "rust-ffm-v13";
 
   /** The recorded decision this backend's grouping break-even turns on. */
@@ -97,11 +95,8 @@ public final class RustFfmBackend
     RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath, settings);
     PureJavaBackend engine = PureJavaBackend.load(modelPath, backendConfiguration, kernel);
     try {
-      if (settings.loadWarmup()) {
-        warmup(engine);
-      }
       return new RustFfmBackend(
-          engine, diagnostics(engine.diagnostics(), kernel, settings.loadWarmup()));
+          engine, diagnostics(engine.diagnostics(), kernel, settings.ignoredRemovedSettings()));
     } catch (RuntimeException | Error failure) {
       try {
         engine.close();
@@ -154,20 +149,6 @@ public final class RustFfmBackend
     RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath, settings);
     return PureJavaBackend.loadActivatedAdapter(
         modelPath, adapterDirectory, backendConfiguration, kernel);
-  }
-
-  static void warmup(PureJavaBackend delegate) {
-    Objects.requireNonNull(delegate, "delegate");
-    Tokenizer tokenizer = delegate.tokenizer();
-    int[] tokens = tokenizer.encode(ModelPrompt.text("Compile the in-process inference path."));
-    if (tokens.length < 2) {
-      tokens = new int[] {tokenizer.bosToken(), tokenizer.bosToken()};
-    }
-    try {
-      delegate.prefill(tokens, 0);
-    } finally {
-      delegate.reset();
-    }
   }
 
   @Override
@@ -363,11 +344,19 @@ public final class RustFfmBackend
 
   static BackendDiagnostics diagnostics(
       BackendDiagnostics javaDiagnostics, RustGgufBatchedMatrixKernel kernel) {
-    return diagnostics(javaDiagnostics, kernel, false);
+    return diagnostics(javaDiagnostics, kernel, List.of());
   }
 
-  private static BackendDiagnostics diagnostics(
-      BackendDiagnostics javaDiagnostics, RustGgufBatchedMatrixKernel kernel, boolean loadWarmup) {
+  /**
+   * @param ignoredRemovedSettings settings a profile or deployment asked for that no longer exist.
+   *     Recorded rather than dropped: each named a faster route the shim now takes unconditionally,
+   *     so the caller got what it asked for, but a report that did not say so would leave a reader
+   *     believing a setting still has an effect.
+   */
+  static BackendDiagnostics diagnostics(
+      BackendDiagnostics javaDiagnostics,
+      RustGgufBatchedMatrixKernel kernel,
+      List<String> ignoredRemovedSettings) {
     Map<String, String> environment = new LinkedHashMap<>(javaDiagnostics.environment());
     environment.put("transformer-runtime", "java");
     environment.put("kernel-runtime", "rust-ffm");
@@ -379,21 +368,15 @@ public final class RustFfmBackend
         "native-kernel-poll-millis",
         kernel.supportsPollBudget() ? Long.toString(kernel.pollMillis()) : "unsupported");
     environment.put("java-executor-poll-millis", Long.toString(VectorUtil.ggufPollMillis()));
-    environment.put(NATIVE_DECODE_ENVIRONMENT_KEY, Boolean.toString(kernel.nativeDecodeEnabled()));
+    environment.put(NATIVE_DECODE_ENVIRONMENT_KEY, "true");
+    if (!ignoredRemovedSettings.isEmpty()) {
+      environment.put("native-ignored-removed-settings", String.join(",", ignoredRemovedSettings));
+    }
     environment.put(
         "native-grouped-attention", Boolean.toString(kernel.supportsGroupedAttention()));
-    environment.put("native-q5-0-grouped", Boolean.toString(kernel.q5_0GroupedEnabled()));
-    environment.put("native-gated-delta-net", Boolean.toString(kernel.gatedDeltaNetEnabled()));
-    environment.put("native-load-warmup", Boolean.toString(loadWarmup));
+    environment.put("native-q5-0-grouped", "false");
+    environment.put("native-gated-delta-net", Boolean.toString(kernel.supportsGatedDeltaNet()));
     List<OptimizationDecision> optimizations = new ArrayList<>(javaDiagnostics.optimizations());
-    optimizations.add(
-        new OptimizationDecision(
-            "load-warmup",
-            loadWarmup ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
-            loadWarmup
-                ? "one resettable prefill executes during model loading so the first request does not pay JIT compilation cost"
-                : "disabled by " + LOAD_WARMUP_PROPERTY,
-            Map.of("property", LOAD_WARMUP_PROPERTY, "sequence-state", "reset-after-warmup")));
     optimizations.add(
         nativeQuantizedDecision(
             "rust-q4-0-batched-matmul",
@@ -425,71 +408,46 @@ public final class RustFfmBackend
     optimizations.add(
         new OptimizationDecision(
             "rust-gated-delta-net",
-            kernel.supportsGatedDeltaNet()
-                ? OptimizationStatus.ENABLED
-                : kernel.gatedDeltaNetEnabled()
-                    ? OptimizationStatus.UNSUPPORTED
-                    : OptimizationStatus.DISABLED,
-            kernel.supportsGatedDeltaNet()
-                ? "Qwen 3.5 recurrence executes on one AVX2/FMA caller thread without waking matrix workers"
-                : kernel.gatedDeltaNetEnabled()
-                    ? "loaded native kernel has no Gated DeltaNet recurrence"
-                    : "disabled by " + RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
+            OptimizationStatus.DISABLED,
+            "the Qwen 3.5 recurrence stays in Java: the shim's chunked recurrence agrees only to"
+                + " 2.0e-4 relative, every certified Qwen 3.5 record was produced with the Java one,"
+                + " and whether the shim is faster here is unmeasured. Adopting it is an epoch"
+                + " change, not a setting",
             Map.of(
                 "abi",
                 Integer.toString(NativeKernelLibrary.ABI_VERSION),
                 "boundary",
                 "panama-ffm-critical",
-                "property",
-                RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
                 "state",
                 "caller-owned-java-array")));
     optimizations.add(
         new OptimizationDecision(
             "rust-grouped-gated-delta-net",
-            kernel.supportsGroupedGatedDeltaNet()
-                ? OptimizationStatus.ENABLED
-                : kernel.gatedDeltaNetEnabled()
-                    ? OptimizationStatus.UNSUPPORTED
-                    : OptimizationStatus.DISABLED,
-            kernel.supportsGroupedGatedDeltaNet()
-                ? "a group of questions advances every branch's recurrence in one launch across the worker pool"
-                : kernel.gatedDeltaNetEnabled()
-                    ? "loaded native kernel advances only one sequence per launch"
-                    : "disabled by " + RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
+            OptimizationStatus.DISABLED,
+            "unrouted for the same reason as rust-gated-delta-net: adopting it would change the"
+                + " bytes published Qwen 3.5 records claim",
             Map.of(
                 "abi",
                 Integer.toString(NativeKernelLibrary.ABI_VERSION),
                 "boundary",
                 "panama-ffm-critical",
-                "property",
-                RustGgufBatchedMatrixKernel.GATED_DELTA_NET_PROPERTY,
                 "state",
                 "branch-major-caller-owned-java-array")));
     optimizations.add(
         new OptimizationDecision(
             "rust-q5-0-grouped-matmul",
-            kernel.q5_0GroupedEnabled() ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
-            kernel.q5_0GroupedEnabled()
-                ? "explicitly enabled for profile qualification"
-                : "controlled Qwen2.5-0.5B profiling favored independent Q5_0 projections",
-            Map.of(
-                "property",
-                RustGgufBatchedMatrixKernel.Q5_0_GROUPED_PROPERTY,
-                "qualification",
-                "model-and-platform-specific")));
+            OptimizationStatus.DISABLED,
+            "Q5_0 projections run independently: grouping them decoded slower on the controlled"
+                + " Qwen2.5-0.5B x86-64 profile, 37.33 against 38.94 tokens/s. Not a setting --"
+                + " the slower route is simply not taken",
+            Map.of("evidence", "backend-native/README.md", "raw-artifact", "none-committed")));
     optimizations.add(
         new OptimizationDecision(
             "rust-quantized-decode",
-            kernel.nativeDecodeEnabled() ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
-            kernel.nativeDecodeEnabled()
-                ? "single-token Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K projections execute in the Models Rust kernel"
-                : "disabled by " + RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
-            Map.of(
-                "property",
-                RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY,
-                "transformer",
-                "java")));
+            OptimizationStatus.ENABLED,
+            "single-token projections execute in the Models Rust kernel for every tensor type it"
+                + " supports; the per-type decisions above report any type it does not",
+            Map.of("transformer", "java")));
     return new BackendDiagnostics("rust-ffm", PLAN_VERSION, environment, optimizations);
   }
 

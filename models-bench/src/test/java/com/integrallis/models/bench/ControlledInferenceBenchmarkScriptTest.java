@@ -47,7 +47,7 @@ class ControlledInferenceBenchmarkScriptTest {
     assertThat(script)
         .contains("MODELS_BACKEND=${BENCH_MODELS_BACKEND:-rust-ffm}")
         .contains("pure-java|rust-ffm")
-        .contains("models.native.quantizedDecode=true")
+        .doesNotContain("-Dmodels.native.quantizedDecode")
         .contains("models.native.kernels.threads=$THREADS")
         .contains("-XX:ActiveProcessorCount=$THREADS")
         .contains("--model \"$MODEL_PATH\"")

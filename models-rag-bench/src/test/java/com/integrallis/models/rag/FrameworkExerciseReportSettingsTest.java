@@ -28,28 +28,25 @@ import org.junit.jupiter.api.Test;
 /**
  * The exercise report has to state the configuration it ran under.
  *
- * <p>A two-arm run that varied {@code -Dmodels.native.loadWarmup} produced reports recording
- * neither the property nor any resolved backend diagnostic, so the treatment arm could not be shown
- * to have differed from its control. Four of five subjects changed verdict and the result had to be
- * discarded, because "the switch worked" and "the switch did nothing and the flaky case did not
- * fire" leave an identical artifact. An ablation whose toggle is absent from the evidence is not a
- * measurement, and these tests exist so that cannot recur silently.
+ * <p>A two-arm run that varied a native setting produced reports recording neither the property nor
+ * any resolved backend diagnostic, so the treatment arm could not be shown to have differed from
+ * its control. Four of five subjects changed verdict and the result had to be discarded, because
+ * "the switch worked" and "the switch did nothing and the flaky case did not fire" leave an
+ * identical artifact. An ablation whose toggle is absent from the evidence is not a measurement,
+ * and these tests exist so that cannot recur silently.
  */
 @Tag("unit")
 class FrameworkExerciseReportSettingsTest {
 
   private static BackendDiagnostics diagnostics() {
     return new BackendDiagnostics(
-        "rust-ffm",
-        "plan-7",
-        Map.of("native-load-warmup", "true", "native-quantized-decode", "false"),
-        List.of());
+        "rust-ffm", "plan-7", Map.of("native-quantized-decode", "true"), List.of());
   }
 
   @Test
   void recordsEveryModelsPropertyInForceSoAnArmCanBeToldFromItsControl() {
     Properties properties = new Properties();
-    properties.setProperty("models.native.loadWarmup", "true");
+    properties.setProperty("models.native.kernels.threads", "8");
     properties.setProperty("models.native.threadCount", "8");
     properties.setProperty("unrelated.property", "ignored");
 
@@ -59,7 +56,7 @@ class FrameworkExerciseReportSettingsTest {
     @SuppressWarnings("unchecked")
     Map<String, String> tuning = (Map<String, String>) report.get("modelsSystemProperties");
     assertThat(tuning)
-        .containsEntry("models.native.loadWarmup", "true")
+        .containsEntry("models.native.kernels.threads", "8")
         .containsEntry("models.native.threadCount", "8");
     assertThat(tuning).doesNotContainKey("unrelated.property");
   }
@@ -87,9 +84,7 @@ class FrameworkExerciseReportSettingsTest {
     Map<String, String> environment = (Map<String, String>) report.get("backendEnvironment");
     // This is the half that catches a silent fallback: the requested name was always recorded, the
     // resolved diagnostics were not.
-    assertThat(environment)
-        .containsEntry("native-load-warmup", "true")
-        .containsEntry("native-quantized-decode", "false");
+    assertThat(environment).containsEntry("native-quantized-decode", "true");
   }
 
   @Test

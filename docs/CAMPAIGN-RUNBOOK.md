@@ -217,13 +217,16 @@ changed unless it carries `defaultConfigurationSmoke`. The record asserts a run 
 library defaults*:
 
 - no `-Dmodels.*` property of any kind (`tuningSystemProperties` must be empty)
-- `backendDiagnostics.environment["native-quantized-decode"] == "false"`
+- `backendDiagnostics.environment["native-quantized-decode"] == "true"` -- the library default is
+  now the Rust decode path; `models.native.quantizedDecode` was removed, so a `"false"` here means
+  the shim fell back and the run is not measuring what it claims
 - `warmups == 0`, `iterations == 1`, `generationControls.promptCache == "longest-common-prefix"`
 - `correctAnswerRate == 1` **and** `abstentionAccuracy == 1`, with `failures` empty
 
-The qualification runs cannot stand in for this: they deliberately enable `quantizedDecode` and a
-tuned decode thread count, and they qualify at `modelAnswerCorrectRate >= 0.90`, not at a perfect
-pipeline score. `scripts/run-controlled-rag-qualification.sh` already emits exactly this record; the
+The qualification runs cannot stand in for this: they use a tuned decode thread count and qualify
+at `modelAnswerCorrectRate >= 0.90`, not at a perfect pipeline score. They used to also force
+`quantizedDecode` on, which meant every certified tier described a route an ordinary host did not
+get; that setting is gone and the measured path and the shipped path are now the same one. `scripts/run-controlled-rag-qualification.sh` already emits exactly this record; the
 fleet equivalent must reproduce its jq predicate rather than invent one.
 
 The gate fetches the report over plain HTTP from

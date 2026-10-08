@@ -121,7 +121,7 @@ MODELS_VERSION="models@$MODELS_COMMIT com.integrallis:vectors-core@$VECTORS_VERS
 
 BENCHMARK_JVM_OPTIONS="-XX:ActiveProcessorCount=$THREADS"
 if [[ "$MODELS_BACKEND" == rust-ffm ]]; then
-  BENCHMARK_JVM_OPTIONS="$BENCHMARK_JVM_OPTIONS -Dmodels.native.quantizedDecode=true"
+  # models.native.quantizedDecode was removed; decode always runs in the shim.
   BENCHMARK_JVM_OPTIONS="$BENCHMARK_JVM_OPTIONS -Dmodels.native.kernels.threads=$THREADS"
 fi
 export MODELS_BENCH_OPTS="${MODELS_BENCH_OPTS:-} $BENCHMARK_JVM_OPTIONS"

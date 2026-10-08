@@ -43,7 +43,7 @@ class RustFfmQ5KLargeModelTest {
     assertThat(library).isRegularFile();
 
     try (Arena arena = Arena.ofShared();
-        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(library, true)) {
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(library)) {
       var file = GgufParser.parse(SQLCODER_MODEL_PATH, arena);
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights.LayerWeights layer = LlamaWeights.fromGgufFile(file, config).layer(0);

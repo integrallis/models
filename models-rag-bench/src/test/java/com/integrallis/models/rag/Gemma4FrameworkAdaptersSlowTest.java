@@ -19,7 +19,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.backend.nativekernel.RustFfmBackend;
-import com.integrallis.models.backend.nativekernel.RustGgufBatchedMatrixKernel;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.langchain4j.ModelsChatModel;
 import com.integrallis.models.runtime.RuntimeTextGenerationModel;
@@ -52,8 +51,6 @@ class Gemma4FrameworkAdaptersSlowTest {
           .build();
 
   private String previousContext;
-  private String previousNativeDecode;
-  private String previousLoadWarmup;
   private RustFfmBackend backend;
 
   @BeforeAll
@@ -63,11 +60,7 @@ class Gemma4FrameworkAdaptersSlowTest {
     assertThat(fileSize(model)).isEqualTo(FILE_SIZE);
 
     previousContext = System.getProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY);
-    previousNativeDecode = System.getProperty(RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY);
-    previousLoadWarmup = System.getProperty(RustFfmBackend.LOAD_WARMUP_PROPERTY);
     System.setProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "512");
-    System.setProperty(RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY, "true");
-    System.setProperty(RustFfmBackend.LOAD_WARMUP_PROPERTY, "true");
     backend = RustFfmBackend.load(model);
   }
 
@@ -79,9 +72,6 @@ class Gemma4FrameworkAdaptersSlowTest {
       }
     } finally {
       restoreSystemProperty(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, previousContext);
-      restoreSystemProperty(
-          RustGgufBatchedMatrixKernel.NATIVE_DECODE_PROPERTY, previousNativeDecode);
-      restoreSystemProperty(RustFfmBackend.LOAD_WARMUP_PROPERTY, previousLoadWarmup);
     }
   }
 

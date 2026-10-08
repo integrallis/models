@@ -179,9 +179,6 @@ public final class MobileMoeForwardPass {
   private final MobileMoeWeights weights;
   private final int maxSequenceLength;
   private final int prefillBatchSize;
-  private final boolean prefillInt8Qkv;
-  private final boolean prefillInt8AttentionOutput;
-  private final boolean prefillInt8Shared;
 
   private MobileMoeForwardPass(
       MobileMoeHuggingFaceConfig config, MobileMoeWeights weights, int maxSequenceLength) {
@@ -202,13 +199,6 @@ public final class MobileMoeForwardPass {
           "models.mobilemoe.prefillBatchSize must be positive: " + requestedBatchSize);
     }
     prefillBatchSize = Math.min(requestedBatchSize, maxSequenceLength);
-    prefillInt8Qkv =
-        Boolean.parseBoolean(System.getProperty("models.mobilemoe.prefillInt8Qkv", "false"));
-    prefillInt8AttentionOutput =
-        Boolean.parseBoolean(
-            System.getProperty("models.mobilemoe.prefillInt8AttentionOutput", "true"));
-    prefillInt8Shared =
-        Boolean.parseBoolean(System.getProperty("models.mobilemoe.prefillInt8Shared", "true"));
   }
 
   /** Loads the complete MobileMoE QAT graph from a mapped Safetensors source. */
@@ -373,21 +363,13 @@ public final class MobileMoeForwardPass {
           batch.value,
           batch.quantizedActivation,
           batch.quantizedActivationScales);
-    } else if (prefillInt8Qkv) {
-      quantizeBatch(batch, batch.normalized, batchSize, hiddenSize);
-      layer
-          .query()
-          .multiplyBatchPreparedInt8(
-              batch.quantizedActivation, batch.quantizedActivationScales, batchSize, batch.query);
-      layer
-          .key()
-          .multiplyBatchPreparedInt8(
-              batch.quantizedActivation, batch.quantizedActivationScales, batchSize, batch.key);
-      layer
-          .value()
-          .multiplyBatchPreparedInt8(
-              batch.quantizedActivation, batch.quantizedActivationScales, batchSize, batch.value);
     } else {
+      // QKV prefill keeps f32 activations. This was `models.mobilemoe.prefillInt8Qkv`, default
+      // off, and the default was right: quantizing the activation here pushes batched prefill past
+      // the 5.0e-4 agreement with sequential decode that
+      // `compactPackedLayoutExecutesWithoutPreparedWeights` holds for the packed-int4 layout, which
+      // the attention-output and shared-expert projections stay inside. Faster and wrong is not a
+      // route, so there is no switch -- just the one that agrees.
       layer.query().multiplyBatch(batch.normalized, batchSize, batch.query);
       layer.key().multiplyBatch(batch.normalized, batchSize, batch.key);
       layer.value().multiplyBatch(batch.normalized, batchSize, batch.value);
@@ -446,7 +428,7 @@ public final class MobileMoeForwardPass {
               batch.projectedAttention,
               batch.quantizedActivation,
               batch.quantizedActivationScales);
-    } else if (prefillInt8AttentionOutput) {
+    } else {
       quantizeBatch(batch, batch.attention, batchSize, queryDimension);
       layer
           .output()
@@ -455,8 +437,6 @@ public final class MobileMoeForwardPass {
               batch.quantizedActivationScales,
               batchSize,
               batch.projectedAttention);
-    } else {
-      layer.output().multiplyBatch(batch.attention, batchSize, batch.projectedAttention);
     }
     addBatch(batch.hidden, batch.projectedAttention, batchSize, hiddenSize);
 
@@ -768,7 +748,7 @@ public final class MobileMoeForwardPass {
           batch.sharedUp,
           batch.quantizedActivation,
           batch.quantizedActivationScales);
-    } else if (prefillInt8Shared) {
+    } else {
       quantizeBatch(batch, batch.normalized, batchSize, hiddenSize);
       shared
           .gate()
@@ -784,9 +764,6 @@ public final class MobileMoeForwardPass {
               batch.quantizedActivationScales,
               batchSize,
               batch.sharedUp);
-    } else {
-      shared.gate().multiplyBatch(batch.normalized, batchSize, batch.sharedGate);
-      shared.up().multiplyBatch(batch.normalized, batchSize, batch.sharedUp);
     }
     int sharedWidth = config.sharedIntermediateSize();
     for (int token = 0; token < batchSize; token++) {
@@ -805,7 +782,7 @@ public final class MobileMoeForwardPass {
               batch.sharedOutput,
               batch.quantizedActivation,
               batch.quantizedActivationScales);
-    } else if (prefillInt8Shared) {
+    } else {
       quantizeBatch(batch, batch.sharedActivated, batchSize, sharedWidth);
       shared
           .down()
@@ -814,8 +791,6 @@ public final class MobileMoeForwardPass {
               batch.quantizedActivationScales,
               batchSize,
               batch.sharedOutput);
-    } else {
-      shared.down().multiplyBatch(batch.sharedActivated, batchSize, batch.sharedOutput);
     }
   }
 
