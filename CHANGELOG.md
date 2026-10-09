@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.55] - 2026-10-09
+
 ### Added
 
 - **LFM2.5-Embedding-350M loads and qualifies.** All seven published artifacts were unservable: five
