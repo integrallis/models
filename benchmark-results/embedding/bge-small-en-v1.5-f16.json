@@ -1,0 +1,68 @@
+{
+  "workload" : "oracle-equivalence-v1",
+  "model" : "BGE Small EN v1.5 GGUF F16",
+  "backend" : "pure-java",
+  "artifactSha256" : "f0b2fef971e8366438bfd2d9aefea1b0115919389448806d290237f638bae999",
+  "artifactSizeBytes" : 67308128,
+  "probeSetSha256" : "a25952a4cb80e57c099291dda9b44ad2b713c0688c386015a1e0000bf6fbf8b9",
+  "probes" : 8,
+  "embeddingDimension" : 384,
+  "pooling" : "cls",
+  "normalized" : true,
+  "oracleBackend" : "llama.cpp",
+  "oracleVersion" : "a5822222909b785f23ddc74ce3c8f85bd0e38562",
+  "minimumOracleCosine" : 0.9999988205254038,
+  "meanOracleCosine" : 0.9999991839175559,
+  "maxComponentDelta" : 4.7409534454345703E-4,
+  "maxNormDeviation" : 4.709081458109665E-9,
+  "minimumOracleCosineFloor" : 0.999,
+  "maxNormDeviationFloor" : 0.001,
+  "normalizationHeld" : true,
+  "qualified" : true,
+  "perProbe" : [ {
+    "probe" : "The cat sat on the mat.",
+    "cosine" : 0.999998999978907,
+    "embedMillis" : 420.163052
+  }, {
+    "probe" : "How do I reset my password?",
+    "cosine" : 0.9999996029541672,
+    "embedMillis" : 228.501341
+  }, {
+    "probe" : "Quantum chromodynamics describes the strong interaction.",
+    "cosine" : 0.9999993885479918,
+    "embedMillis" : 336.206274
+  }, {
+    "probe" : "a",
+    "cosine" : 0.9999994267810347,
+    "embedMillis" : 73.309181
+  }, {
+    "probe" : "The quick brown fox jumps over the lazy dog near the riverbank at dawn while birds sing overhead.",
+    "cosine" : 0.9999988205254038,
+    "embedMillis" : 487.942351
+  }, {
+    "probe" : "Database backups are retained for 30 days.",
+    "cosine" : 0.9999989242879791,
+    "embedMillis" : 267.135636
+  }, {
+    "probe" : "def add(a, b): return a + b",
+    "cosine" : 0.9999993873248542,
+    "embedMillis" : 313.978568
+  }, {
+    "probe" : "¿Dónde está la biblioteca?",
+    "cosine" : 0.9999989209401098,
+    "embedMillis" : 304.185776
+  } ],
+  "environment" : {
+    "host" : "Brians-MacBook-Pro.local",
+    "osName" : "Mac OS X",
+    "osVersion" : "26.6.2",
+    "architecture" : "x86_64",
+    "cpuModel" : "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+    "processors" : 12,
+    "physicalMemoryBytes" : 34359738368,
+    "maxHeapBytes" : 8589934592,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  }
+}
