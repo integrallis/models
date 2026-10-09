@@ -177,6 +177,73 @@ class DequantizerTest {
   }
 
   @Nested
+  class Q4_1 {
+
+    /**
+     * Pins the one thing {@code Q4_1} does differently from {@code Q4_0}, which is also the one
+     * thing that fails silently: the value is {@code q * d + m} with an unsigned quant, where
+     * {@code Q4_0} centres its quants by subtracting eight. Applying that bias here would shift
+     * every weight in the block by {@code -8 * d} and still produce plausible text.
+     */
+    @Test
+    void appliesMinimumRatherThanCentringTheQuant() {
+      // d = 1.0 (0x3C00), m = -3.0 (0xC200), every nibble zero.
+      byte[] block = new byte[20];
+      ByteBuffer buffer = ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN);
+      buffer.putShort(0, (short) 0x3C00);
+      buffer.putShort(2, (short) 0xC200);
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment segment = arena.allocate(20);
+        MemorySegment.copy(block, 0, segment, ValueLayout.JAVA_BYTE, 0, 20);
+        float[] dst = new float[32];
+        new Q4_1Dequantizer().dequantize(segment, 0, dst, 0, 32);
+        for (float value : dst) {
+          // 0 * 1.0 + (-3.0). A Q4_0-style centring bias would have produced -8.0.
+          assertThat(value).isEqualTo(-3.0f);
+        }
+      }
+    }
+
+    @Test
+    void splitsLowAndHighNibblesAcrossTheBlockHalves() {
+      // d = 1.0, m = 0.0, nibble byte 0 = 0x9C -> low 0xC = 12, high 0x9 = 9.
+      byte[] block = new byte[20];
+      ByteBuffer buffer = ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN);
+      buffer.putShort(0, (short) 0x3C00);
+      block[4] = (byte) 0x9C;
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment segment = arena.allocate(20);
+        MemorySegment.copy(block, 0, segment, ValueLayout.JAVA_BYTE, 0, 20);
+        float[] dst = new float[32];
+        new Q4_1Dequantizer().dequantize(segment, 0, dst, 0, 32);
+        assertThat(dst[0]).as("low nibble is element j").isEqualTo(12.0f);
+        assertThat(dst[16]).as("high nibble is element j + 16, not j + 1").isEqualTo(9.0f);
+        assertThat(dst[1]).isEqualTo(0.0f);
+      }
+    }
+
+    @Test
+    void reachesTheFullFourBitRangeAndIsUnsigned() {
+      // d = 1.0, m = 0.0, nibble byte = 0xFF -> both halves 15, the maximum. Unsigned: a signed
+      // read would give -1.
+      byte[] block = new byte[20];
+      ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN).putShort(0, (short) 0x3C00);
+      block[4] = (byte) 0xFF;
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment segment = arena.allocate(20);
+        MemorySegment.copy(block, 0, segment, ValueLayout.JAVA_BYTE, 0, 20);
+        float[] dst = new float[32];
+        new Q4_1Dequantizer().dequantize(segment, 0, dst, 0, 32);
+        assertThat(dst[0]).isEqualTo(15.0f);
+        assertThat(dst[16]).isEqualTo(15.0f);
+      }
+    }
+  }
+
+  @Nested
   class Q5_1 {
 
     /**

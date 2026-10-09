@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.gguf;
 import com.integrallis.models.backend.purejava.quant.F16Dequantizer;
 import com.integrallis.models.backend.purejava.quant.Mxfp4Dequantizer;
 import com.integrallis.models.backend.purejava.quant.Q4_0Dequantizer;
+import com.integrallis.models.backend.purejava.quant.Q4_1Dequantizer;
 import com.integrallis.models.backend.purejava.quant.Q5_1Dequantizer;
 import com.integrallis.models.backend.purejava.quant.Q8_0Dequantizer;
 import com.integrallis.models.backend.purejava.quant.TernaryDequantizer;
@@ -88,6 +89,7 @@ public final class GgufTensorValues {
       }
       case Q4_0 -> new Q4_0Dequantizer().dequantize(source, sourceOffset, output, 0, count);
       case Q5_0 -> VectorUtil.ggufQ5_0Dequantize(source, sourceOffset, output, 0, count);
+      case Q4_1 -> new Q4_1Dequantizer().dequantize(source, sourceOffset, output, 0, count);
       case Q5_1 -> new Q5_1Dequantizer().dequantize(source, sourceOffset, output, 0, count);
       case Q8_0 -> new Q8_0Dequantizer().dequantize(source, sourceOffset, output, 0, count);
       case Q4_K -> VectorUtil.ggufQ4_KDequantize(source, sourceOffset, output, 0, count);

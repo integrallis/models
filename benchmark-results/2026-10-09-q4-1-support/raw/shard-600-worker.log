@@ -1,0 +1,550 @@
++ STATUS=STARTED
+++ cat /sys/devices/virtual/dmi/id/product_uuid
+++ head -c 8
++ say 'boot shard=600 instance=ec2b2f40'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:32:47 'boot shard=600 instance=ec2b2f40'
+[qual 19:32:47] boot shard=600 instance=ec2b2f40
++ trap finish EXIT
++ mkdir -p /work/models /work/out /opt/jdk
+++ curl -s -o /dev/null -w '%{http_code}' --max-time 25 https://s3.amazonaws.com
++ EGRESS_CODE=307
++ '[' 307 = 000 ']'
++ '[' -z 307 ']'
++ say 'egress ok (s3 root http=307)'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:32:47 'egress ok (s3 root http=307)'
+[qual 19:32:47] egress ok (s3 root http=307)
++ export DEBIAN_FRONTEND=noninteractive
++ DEBIAN_FRONTEND=noninteractive
++ apt-get update -qq
++ apt-get install -y -qq unzip python3
+
+Running kernel seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
++ command -v aws
++ say 'installing aws cli from the bundled installer'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:33:00 'installing aws cli from the bundled installer'
+[qual 19:33:00] installing aws cli from the bundled installer
++ curl -sfL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscli.zip
++ cd /tmp
++ unzip -qo awscli.zip
++ ./aws/install --update
++ hash -r
++ command -v aws
+++ aws --version
+++ head -c 40
++ say 'aws aws-cli/2.37.12 Python/3.14.6 Linux/7.0.'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:33:03 'aws aws-cli/2.37.12 Python/3.14.6 Linux/7.0.'
+[qual 19:33:03] aws aws-cli/2.37.12 Python/3.14.6 Linux/7.0.
++ command -v python3
++ curl -sfL https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jdk/hotspot/normal/eclipse -o /tmp/jdk.tgz
++ tar xzf /tmp/jdk.tgz -C /opt/jdk --strip-components=1
++ export JAVA_HOME=/opt/jdk
++ JAVA_HOME=/opt/jdk
++ export PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
++ PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
++ '[' -x /opt/jdk/bin/java ']'
+++ /opt/jdk/bin/java -version
+++ head -1
++ say 'jdk openjdk version "25.0.4.1" 2026-08-18 LTS'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:33:06 'jdk openjdk version "25.0.4.1" 2026-08-18 LTS'
+[qual 19:33:06] jdk openjdk version "25.0.4.1" 2026-08-18 LTS
++ cd /work
++ aws s3 cp s3://models-qual-077051030817/payload/models-rag-bench-0.3.55-v24.tar . --only-show-errors
++ aws s3 cp s3://models-qual-077051030817/payload/models-kernels-linux-x86_64.jar . --only-show-errors
++ aws s3 cp s3://models-qual-077051030817/payload/fleet-shard-600.json /work/shard.json --only-show-errors
++ '[' -s models-rag-bench-0.3.55-v24.tar ']'
++ '[' -s /work/models-kernels-linux-x86_64.jar ']'
++ '[' -s /work/shard.json ']'
++ tar xf models-rag-bench-0.3.55-v24.tar
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+tar: Ignoring unknown extended header keyword 'LIBARCHIVE.xattr.com.apple.provenance'
+++ ls -d /work/models-rag-bench-0.3.55/
+++ head -1
++ DIST=/work/models-rag-bench-0.3.55/
++ CP='/work/models-rag-bench-0.3.55//lib/*:/work/models-kernels-linux-x86_64.jar'
+++ python3 -c 'import json;print(len(json.load(open('\''/work/shard.json'\''))))'
++ JOBS=5
++ say 'payload ok, 5 jobs'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:33:09 'payload ok, 5 jobs'
+[qual 19:33:09] payload ok, 5 jobs
+++ nproc
++ THREADS=16
++ DECODE_THREAD_DEFAULT=
++ BACKEND_VERSION=models@0.3.55+v24-09e2c075d9f0
++ STATUS=RUNNING
++ export PATH=/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin:/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
++ PATH=/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin:/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
++ export HOME=/root
++ HOME=/root
++ export OLLAMA_MODELS=/work/ollama
++ OLLAMA_MODELS=/work/ollama
++ mkdir -p /work/ollama
++ curl -fsSL https://ollama.com/install.sh
++ sh
+++ command -v ollama
++ say 'ollama install exit=0 path=/usr/local/bin/ollama home=/root'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:33:18 'ollama install exit=0 path=/usr/local/bin/ollama home=/root'
+[qual 19:33:18] ollama install exit=0 path=/usr/local/bin/ollama home=/root
++ OLLAMA_HOST=127.0.0.1:11434
++ OLLAMA_MAX_LOADED_MODELS=1
++ nohup ollama serve
+++ seq 1 90
++ for attempt in $(seq 1 90)
++ curl -s -o /dev/null http://127.0.0.1:11434/api/tags
++ sleep 2
++ for attempt in $(seq 1 90)
++ curl -s -o /dev/null http://127.0.0.1:11434/api/tags
++ break
++ aws s3 cp /work/out/ollama-install.log s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ aws s3 cp /work/out/ollama-serve.log s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ curl -s -o /dev/null http://127.0.0.1:11434/api/tags
+++ ollama --version
+++ head -1
++ say 'ollama ready (ollama version is 0.40.2)'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:33:21 'ollama ready (ollama version is 0.40.2)'
+[qual 19:33:21] ollama ready (ollama version is 0.40.2)
++ OLLAMA_READY=1
++ SUPPORTED_ARCH='llama gemma gemma2 gemma4 phi3 mistral3 hunyuan-dense lfm2 qwen2 qwen3 qwen3moe granite smollm3 gemma3 gemma-embedding qwen35 qwen35moe qwen3next gemma3n deepseek2 gpt-oss mobilemoe needle2'
++ MAX_ARTIFACT_BYTES=22000000000
++ done_n=0
++ python3 -c '
+import json
+for j in json.load(open('\''/work/shard.json'\'')): print(json.dumps(j))
+'
++ sleep 18000
++ IFS=
++ read -r job
++ '[' -f /work/out/STOP ']'
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''id'\''])' '{"id": "qwen2_5_math_1_5b_instruct_q4_0", "uri": "https://huggingface.co/bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF/resolve/951ed2aea09c43e331c612e74d83e4a23ca98e3b/Qwen2.5-Math-1.5B-Instruct-Q4_0.gguf", "tpl": "chatml", "gb": 0.87, "arch": "qwen2", "wl": "general", "dt": 8}'
++ id=qwen2_5_math_1_5b_instruct_q4_0
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''uri'\''])' '{"id": "qwen2_5_math_1_5b_instruct_q4_0", "uri": "https://huggingface.co/bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF/resolve/951ed2aea09c43e331c612e74d83e4a23ca98e3b/Qwen2.5-Math-1.5B-Instruct-Q4_0.gguf", "tpl": "chatml", "gb": 0.87, "arch": "qwen2", "wl": "general", "dt": 8}'
++ uri=https://huggingface.co/bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF/resolve/951ed2aea09c43e331c612e74d83e4a23ca98e3b/Qwen2.5-Math-1.5B-Instruct-Q4_0.gguf
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''tpl'\''])' '{"id": "qwen2_5_math_1_5b_instruct_q4_0", "uri": "https://huggingface.co/bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF/resolve/951ed2aea09c43e331c612e74d83e4a23ca98e3b/Qwen2.5-Math-1.5B-Instruct-Q4_0.gguf", "tpl": "chatml", "gb": 0.87, "arch": "qwen2", "wl": "general", "dt": 8}'
++ tpl=chatml
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''arch'\'','\'''\''))' '{"id": "qwen2_5_math_1_5b_instruct_q4_0", "uri": "https://huggingface.co/bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF/resolve/951ed2aea09c43e331c612e74d83e4a23ca98e3b/Qwen2.5-Math-1.5B-Instruct-Q4_0.gguf", "tpl": "chatml", "gb": 0.87, "arch": "qwen2", "wl": "general", "dt": 8}'
++ arch=qwen2
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''dt'\'') or '\'''\'')' '{"id": "qwen2_5_math_1_5b_instruct_q4_0", "uri": "https://huggingface.co/bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF/resolve/951ed2aea09c43e331c612e74d83e4a23ca98e3b/Qwen2.5-Math-1.5B-Instruct-Q4_0.gguf", "tpl": "chatml", "gb": 0.87, "arch": "qwen2", "wl": "general", "dt": 8}'
++ dt=8
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''wl'\'') or '\''general'\'')' '{"id": "qwen2_5_math_1_5b_instruct_q4_0", "uri": "https://huggingface.co/bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF/resolve/951ed2aea09c43e331c612e74d83e4a23ca98e3b/Qwen2.5-Math-1.5B-Instruct-Q4_0.gguf", "tpl": "chatml", "gb": 0.87, "arch": "qwen2", "wl": "general", "dt": 8}'
++ wl=general
++ '[' -z 8 ']'
++ DECODE_THREAD_OPT=
++ '[' -n 8 ']'
++ DECODE_THREAD_OPT=-Dmodels.native.kernels.decodeThreads=8
++ gguf=/work/models/qwen2_5_math_1_5b_instruct_q4_0.gguf
+++ date +%s
++ T0=1791574401
++ case " $SUPPORTED_ARCH " in
+++ python3 -c 'import json,sys;print('\'' '\''.join(json.loads(sys.argv[1]).get('\''files'\'') or []))' '{"id": "qwen2_5_math_1_5b_instruct_q4_0", "uri": "https://huggingface.co/bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF/resolve/951ed2aea09c43e331c612e74d83e4a23ca98e3b/Qwen2.5-Math-1.5B-Instruct-Q4_0.gguf", "tpl": "chatml", "gb": 0.87, "arch": "qwen2", "wl": "general", "dt": 8}'
++ files=
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''bytes'\'',0))' '{"id": "qwen2_5_math_1_5b_instruct_q4_0", "uri": "https://huggingface.co/bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF/resolve/951ed2aea09c43e331c612e74d83e4a23ca98e3b/Qwen2.5-Math-1.5B-Instruct-Q4_0.gguf", "tpl": "chatml", "gb": 0.87, "arch": "qwen2", "wl": "general", "dt": 8}'
++ bytes=0
++ '[' 0 = 0 ']'
++ '[' -z '' ']'
+++ curl -sIL https://huggingface.co/bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF/resolve/951ed2aea09c43e331c612e74d83e4a23ca98e3b/Qwen2.5-Math-1.5B-Instruct-Q4_0.gguf
+++ awk 'BEGIN{IGNORECASE=1} /^content-length:/ {v=$2} END{gsub(/\r/,"",v); print v+0}'
++ bytes=937535808
++ say 'qwen2_5_math_1_5b_instruct_q4_0: HEAD reports 937535808 bytes'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:33:21 'qwen2_5_math_1_5b_instruct_q4_0: HEAD reports 937535808 bytes'
+[qual 19:33:21] qwen2_5_math_1_5b_instruct_q4_0: HEAD reports 937535808 bytes
++ '[' 937535808 -gt 22000000000 ']'
++ '[' -n '' ']'
++ say 'start qwen2_5_math_1_5b_instruct_q4_0 (arch=qwen2 workload=general decodeThreads=8)'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:33:21 'start qwen2_5_math_1_5b_instruct_q4_0 (arch=qwen2 workload=general decodeThreads=8)'
+[qual 19:33:21] start qwen2_5_math_1_5b_instruct_q4_0 (arch=qwen2 workload=general decodeThreads=8)
++ curl -sfL https://huggingface.co/bartowski/Qwen2.5-Math-1.5B-Instruct-GGUF/resolve/951ed2aea09c43e331c612e74d83e4a23ca98e3b/Qwen2.5-Math-1.5B-Instruct-Q4_0.gguf -o /work/models/qwen2_5_math_1_5b_instruct_q4_0.gguf
++ ARMS='--workload general --prompt-template chatml --context 2048 --threads 16'
++ ARMS='--workload general --prompt-template chatml --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3'
++ java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Dmodels.native.kernels.decodeThreads=8 -cp '/work/models-rag-bench-0.3.55//lib/*:/work/models-kernels-linux-x86_64.jar' com.integrallis.models.rag.RagBenchmarkCli --framework plain-java --backend rust-ffm --backend-version models@0.3.55+v24-09e2c075d9f0 --model /work/models/qwen2_5_math_1_5b_instruct_q4_0.gguf --model-id qwen2_5_math_1_5b_instruct_q4_0 --workload general --prompt-template chatml --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3 --output /work/out/qwen2_5_math_1_5b_instruct_q4_0.json
++ rc=1
++ '[' 1 = 0 ']'
+++ date +%s
++ printf '%s\trc%s\t%s\n' qwen2_5_math_1_5b_instruct_q4_0 1 14
+++ date +%s
++ say 'done qwen2_5_math_1_5b_instruct_q4_0 rc=1 in 14s'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:33:35 'done qwen2_5_math_1_5b_instruct_q4_0 rc=1 in 14s'
+[qual 19:33:35] done qwen2_5_math_1_5b_instruct_q4_0 rc=1 in 14s
++ aws s3 cp /work/out/qwen2_5_math_1_5b_instruct_q4_0.json s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ aws s3 cp /work/out/qwen2_5_math_1_5b_instruct_q4_0.log s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ rm -f /work/models/qwen2_5_math_1_5b_instruct_q4_0.gguf
++ done_n=1
++ IFS=
++ read -r job
++ '[' -f /work/out/STOP ']'
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''id'\''])' '{"id": "eurollm_1_7b_instruct_q4_k_s", "uri": "https://huggingface.co/mradermacher/EuroLLM-1.7B-Instruct-GGUF/resolve/2951f08f66429c934c8b01a94347161362430808/EuroLLM-1.7B-Instruct.Q4_K_S.gguf", "tpl": "chatml", "gb": 0.94, "arch": "llama", "wl": "general", "dt": 8}'
++ id=eurollm_1_7b_instruct_q4_k_s
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''uri'\''])' '{"id": "eurollm_1_7b_instruct_q4_k_s", "uri": "https://huggingface.co/mradermacher/EuroLLM-1.7B-Instruct-GGUF/resolve/2951f08f66429c934c8b01a94347161362430808/EuroLLM-1.7B-Instruct.Q4_K_S.gguf", "tpl": "chatml", "gb": 0.94, "arch": "llama", "wl": "general", "dt": 8}'
++ uri=https://huggingface.co/mradermacher/EuroLLM-1.7B-Instruct-GGUF/resolve/2951f08f66429c934c8b01a94347161362430808/EuroLLM-1.7B-Instruct.Q4_K_S.gguf
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''tpl'\''])' '{"id": "eurollm_1_7b_instruct_q4_k_s", "uri": "https://huggingface.co/mradermacher/EuroLLM-1.7B-Instruct-GGUF/resolve/2951f08f66429c934c8b01a94347161362430808/EuroLLM-1.7B-Instruct.Q4_K_S.gguf", "tpl": "chatml", "gb": 0.94, "arch": "llama", "wl": "general", "dt": 8}'
++ tpl=chatml
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''arch'\'','\'''\''))' '{"id": "eurollm_1_7b_instruct_q4_k_s", "uri": "https://huggingface.co/mradermacher/EuroLLM-1.7B-Instruct-GGUF/resolve/2951f08f66429c934c8b01a94347161362430808/EuroLLM-1.7B-Instruct.Q4_K_S.gguf", "tpl": "chatml", "gb": 0.94, "arch": "llama", "wl": "general", "dt": 8}'
++ arch=llama
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''dt'\'') or '\'''\'')' '{"id": "eurollm_1_7b_instruct_q4_k_s", "uri": "https://huggingface.co/mradermacher/EuroLLM-1.7B-Instruct-GGUF/resolve/2951f08f66429c934c8b01a94347161362430808/EuroLLM-1.7B-Instruct.Q4_K_S.gguf", "tpl": "chatml", "gb": 0.94, "arch": "llama", "wl": "general", "dt": 8}'
++ dt=8
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''wl'\'') or '\''general'\'')' '{"id": "eurollm_1_7b_instruct_q4_k_s", "uri": "https://huggingface.co/mradermacher/EuroLLM-1.7B-Instruct-GGUF/resolve/2951f08f66429c934c8b01a94347161362430808/EuroLLM-1.7B-Instruct.Q4_K_S.gguf", "tpl": "chatml", "gb": 0.94, "arch": "llama", "wl": "general", "dt": 8}'
++ wl=general
++ '[' -z 8 ']'
++ DECODE_THREAD_OPT=
++ '[' -n 8 ']'
++ DECODE_THREAD_OPT=-Dmodels.native.kernels.decodeThreads=8
++ gguf=/work/models/eurollm_1_7b_instruct_q4_k_s.gguf
+++ date +%s
++ T0=1791574417
++ case " $SUPPORTED_ARCH " in
+++ python3 -c 'import json,sys;print('\'' '\''.join(json.loads(sys.argv[1]).get('\''files'\'') or []))' '{"id": "eurollm_1_7b_instruct_q4_k_s", "uri": "https://huggingface.co/mradermacher/EuroLLM-1.7B-Instruct-GGUF/resolve/2951f08f66429c934c8b01a94347161362430808/EuroLLM-1.7B-Instruct.Q4_K_S.gguf", "tpl": "chatml", "gb": 0.94, "arch": "llama", "wl": "general", "dt": 8}'
++ files=
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''bytes'\'',0))' '{"id": "eurollm_1_7b_instruct_q4_k_s", "uri": "https://huggingface.co/mradermacher/EuroLLM-1.7B-Instruct-GGUF/resolve/2951f08f66429c934c8b01a94347161362430808/EuroLLM-1.7B-Instruct.Q4_K_S.gguf", "tpl": "chatml", "gb": 0.94, "arch": "llama", "wl": "general", "dt": 8}'
++ bytes=0
++ '[' 0 = 0 ']'
++ '[' -z '' ']'
+++ curl -sIL https://huggingface.co/mradermacher/EuroLLM-1.7B-Instruct-GGUF/resolve/2951f08f66429c934c8b01a94347161362430808/EuroLLM-1.7B-Instruct.Q4_K_S.gguf
+++ awk 'BEGIN{IGNORECASE=1} /^content-length:/ {v=$2} END{gsub(/\r/,"",v); print v+0}'
++ bytes=1008358624
++ say 'eurollm_1_7b_instruct_q4_k_s: HEAD reports 1008358624 bytes'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:33:37 'eurollm_1_7b_instruct_q4_k_s: HEAD reports 1008358624 bytes'
+[qual 19:33:37] eurollm_1_7b_instruct_q4_k_s: HEAD reports 1008358624 bytes
++ '[' 1008358624 -gt 22000000000 ']'
++ '[' -n '' ']'
++ say 'start eurollm_1_7b_instruct_q4_k_s (arch=llama workload=general decodeThreads=8)'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:33:37 'start eurollm_1_7b_instruct_q4_k_s (arch=llama workload=general decodeThreads=8)'
+[qual 19:33:37] start eurollm_1_7b_instruct_q4_k_s (arch=llama workload=general decodeThreads=8)
++ curl -sfL https://huggingface.co/mradermacher/EuroLLM-1.7B-Instruct-GGUF/resolve/2951f08f66429c934c8b01a94347161362430808/EuroLLM-1.7B-Instruct.Q4_K_S.gguf -o /work/models/eurollm_1_7b_instruct_q4_k_s.gguf
++ ARMS='--workload general --prompt-template chatml --context 2048 --threads 16'
++ ARMS='--workload general --prompt-template chatml --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3'
++ java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Dmodels.native.kernels.decodeThreads=8 -cp '/work/models-rag-bench-0.3.55//lib/*:/work/models-kernels-linux-x86_64.jar' com.integrallis.models.rag.RagBenchmarkCli --framework plain-java --backend rust-ffm --backend-version models@0.3.55+v24-09e2c075d9f0 --model /work/models/eurollm_1_7b_instruct_q4_k_s.gguf --model-id eurollm_1_7b_instruct_q4_k_s --workload general --prompt-template chatml --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3 --output /work/out/eurollm_1_7b_instruct_q4_k_s.json
++ rc=0
++ '[' 0 = 0 ']'
++ '[' 1 = 1 ']'
++ printf 'FROM %s\n' /work/models/eurollm_1_7b_instruct_q4_k_s.gguf
++ ollama create qual-eurollm_1_7b_instruct_q4_k_s -f /work/Modelfile
+++ ollama --version
+++ head -1
+++ tr -d '\n'
++ java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -cp '/work/models-rag-bench-0.3.55//lib/*:/work/models-kernels-linux-x86_64.jar' com.integrallis.models.rag.RagBenchmarkCli --framework plain-java --backend ollama --backend-version 'ollama@ollama version is 0.40.2' --model qual-eurollm_1_7b_instruct_q4_k_s --artifact /work/models/eurollm_1_7b_instruct_q4_k_s.gguf --model-id eurollm_1_7b_instruct_q4_k_s --workload general --prompt-template chatml --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3 --output /work/out/eurollm_1_7b_instruct_q4_k_s.comparator.json
++ crc=0
++ '[' 0 = 0 ']'
++ java -cp '/work/models-rag-bench-0.3.55//lib/*:/work/models-kernels-linux-x86_64.jar' com.integrallis.models.rag.RagQualificationCli --candidate /work/out/eurollm_1_7b_instruct_q4_k_s.json --comparator /work/out/eurollm_1_7b_instruct_q4_k_s.comparator.json --output /work/out/eurollm_1_7b_instruct_q4_k_s.verdict.json
+++ python3 -c 'import json;print(json.load(open('\''/work/out/eurollm_1_7b_instruct_q4_k_s.verdict.json'\''))['\''qualification'\'']['\''verdict'\''])'
++ verdict=FAILED_MODEL_CONTRIBUTION_GATE
++ say 'verdict eurollm_1_7b_instruct_q4_k_s: FAILED_MODEL_CONTRIBUTION_GATE'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:35:21 'verdict eurollm_1_7b_instruct_q4_k_s: FAILED_MODEL_CONTRIBUTION_GATE'
+[qual 19:35:21] verdict eurollm_1_7b_instruct_q4_k_s: FAILED_MODEL_CONTRIBUTION_GATE
++ printf '%s\tverdict\t%s\n' eurollm_1_7b_instruct_q4_k_s FAILED_MODEL_CONTRIBUTION_GATE
++ aws s3 cp /work/out/eurollm_1_7b_instruct_q4_k_s.comparator.json s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ aws s3 cp /work/out/eurollm_1_7b_instruct_q4_k_s.verdict.json s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ ollama rm qual-eurollm_1_7b_instruct_q4_k_s
++ aws s3 cp /work/out/eurollm_1_7b_instruct_q4_k_s.ollama.log s3://models-qual-077051030817/results/shard-600/ --only-show-errors
+++ date +%s
++ printf '%s\trc%s\t%s\n' eurollm_1_7b_instruct_q4_k_s 0 106
+++ date +%s
++ say 'done eurollm_1_7b_instruct_q4_k_s rc=0 in 106s'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:35:23 'done eurollm_1_7b_instruct_q4_k_s rc=0 in 106s'
+[qual 19:35:23] done eurollm_1_7b_instruct_q4_k_s rc=0 in 106s
++ aws s3 cp /work/out/eurollm_1_7b_instruct_q4_k_s.json s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ aws s3 cp /work/out/eurollm_1_7b_instruct_q4_k_s.log s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ rm -f /work/models/eurollm_1_7b_instruct_q4_k_s.gguf
++ done_n=2
++ IFS=
++ read -r job
++ '[' -f /work/out/STOP ']'
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''id'\''])' '{"id": "phi_4_mini_instruct_q4_0", "uri": "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/7ff82c2aaa4dde30121698a973765f39be5288c0/microsoft_Phi-4-mini-instruct-Q4_0.gguf", "tpl": "phi3", "gb": 2.17, "arch": "phi3", "wl": "general", "dt": 8}'
++ id=phi_4_mini_instruct_q4_0
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''uri'\''])' '{"id": "phi_4_mini_instruct_q4_0", "uri": "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/7ff82c2aaa4dde30121698a973765f39be5288c0/microsoft_Phi-4-mini-instruct-Q4_0.gguf", "tpl": "phi3", "gb": 2.17, "arch": "phi3", "wl": "general", "dt": 8}'
++ uri=https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/7ff82c2aaa4dde30121698a973765f39be5288c0/microsoft_Phi-4-mini-instruct-Q4_0.gguf
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''tpl'\''])' '{"id": "phi_4_mini_instruct_q4_0", "uri": "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/7ff82c2aaa4dde30121698a973765f39be5288c0/microsoft_Phi-4-mini-instruct-Q4_0.gguf", "tpl": "phi3", "gb": 2.17, "arch": "phi3", "wl": "general", "dt": 8}'
++ tpl=phi3
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''arch'\'','\'''\''))' '{"id": "phi_4_mini_instruct_q4_0", "uri": "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/7ff82c2aaa4dde30121698a973765f39be5288c0/microsoft_Phi-4-mini-instruct-Q4_0.gguf", "tpl": "phi3", "gb": 2.17, "arch": "phi3", "wl": "general", "dt": 8}'
++ arch=phi3
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''dt'\'') or '\'''\'')' '{"id": "phi_4_mini_instruct_q4_0", "uri": "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/7ff82c2aaa4dde30121698a973765f39be5288c0/microsoft_Phi-4-mini-instruct-Q4_0.gguf", "tpl": "phi3", "gb": 2.17, "arch": "phi3", "wl": "general", "dt": 8}'
++ dt=8
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''wl'\'') or '\''general'\'')' '{"id": "phi_4_mini_instruct_q4_0", "uri": "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/7ff82c2aaa4dde30121698a973765f39be5288c0/microsoft_Phi-4-mini-instruct-Q4_0.gguf", "tpl": "phi3", "gb": 2.17, "arch": "phi3", "wl": "general", "dt": 8}'
++ wl=general
++ '[' -z 8 ']'
++ DECODE_THREAD_OPT=
++ '[' -n 8 ']'
++ DECODE_THREAD_OPT=-Dmodels.native.kernels.decodeThreads=8
++ gguf=/work/models/phi_4_mini_instruct_q4_0.gguf
+++ date +%s
++ T0=1791574525
++ case " $SUPPORTED_ARCH " in
+++ python3 -c 'import json,sys;print('\'' '\''.join(json.loads(sys.argv[1]).get('\''files'\'') or []))' '{"id": "phi_4_mini_instruct_q4_0", "uri": "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/7ff82c2aaa4dde30121698a973765f39be5288c0/microsoft_Phi-4-mini-instruct-Q4_0.gguf", "tpl": "phi3", "gb": 2.17, "arch": "phi3", "wl": "general", "dt": 8}'
++ files=
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''bytes'\'',0))' '{"id": "phi_4_mini_instruct_q4_0", "uri": "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/7ff82c2aaa4dde30121698a973765f39be5288c0/microsoft_Phi-4-mini-instruct-Q4_0.gguf", "tpl": "phi3", "gb": 2.17, "arch": "phi3", "wl": "general", "dt": 8}'
++ bytes=0
++ '[' 0 = 0 ']'
++ '[' -z '' ']'
+++ curl -sIL https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/7ff82c2aaa4dde30121698a973765f39be5288c0/microsoft_Phi-4-mini-instruct-Q4_0.gguf
+++ awk 'BEGIN{IGNORECASE=1} /^content-length:/ {v=$2} END{gsub(/\r/,"",v); print v+0}'
++ bytes=2331442560
++ say 'phi_4_mini_instruct_q4_0: HEAD reports 2331442560 bytes'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:35:25 'phi_4_mini_instruct_q4_0: HEAD reports 2331442560 bytes'
+[qual 19:35:25] phi_4_mini_instruct_q4_0: HEAD reports 2331442560 bytes
++ '[' 2331442560 -gt 22000000000 ']'
++ '[' -n '' ']'
++ say 'start phi_4_mini_instruct_q4_0 (arch=phi3 workload=general decodeThreads=8)'
+++ date -u +%H:%M:%S
++ tee -a /var/log/qual-worker.log
++ printf '[qual %s] %s\n' 19:35:25 'start phi_4_mini_instruct_q4_0 (arch=phi3 workload=general decodeThreads=8)'
+[qual 19:35:25] start phi_4_mini_instruct_q4_0 (arch=phi3 workload=general decodeThreads=8)
++ curl -sfL https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/7ff82c2aaa4dde30121698a973765f39be5288c0/microsoft_Phi-4-mini-instruct-Q4_0.gguf -o /work/models/phi_4_mini_instruct_q4_0.gguf
++ ARMS='--workload general --prompt-template phi3 --context 2048 --threads 16'
++ ARMS='--workload general --prompt-template phi3 --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3'
++ java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Dmodels.native.kernels.decodeThreads=8 -cp '/work/models-rag-bench-0.3.55//lib/*:/work/models-kernels-linux-x86_64.jar' com.integrallis.models.rag.RagBenchmarkCli --framework plain-java --backend rust-ffm --backend-version models@0.3.55+v24-09e2c075d9f0 --model /work/models/phi_4_mini_instruct_q4_0.gguf --model-id phi_4_mini_instruct_q4_0 --workload general --prompt-template phi3 --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3 --output /work/out/phi_4_mini_instruct_q4_0.json
++ rc=1
++ '[' 1 = 0 ']'
+++ date +%s
++ printf '%s\trc%s\t%s\n' phi_4_mini_instruct_q4_0 1 22
+++ date +%s
++ say 'done phi_4_mini_instruct_q4_0 rc=1 in 22s'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:35:47 'done phi_4_mini_instruct_q4_0 rc=1 in 22s'
+[qual 19:35:47] done phi_4_mini_instruct_q4_0 rc=1 in 22s
++ aws s3 cp /work/out/phi_4_mini_instruct_q4_0.json s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ aws s3 cp /work/out/phi_4_mini_instruct_q4_0.log s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ rm -f /work/models/phi_4_mini_instruct_q4_0.gguf
++ done_n=3
++ IFS=
++ read -r job
++ '[' -f /work/out/STOP ']'
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''id'\''])' '{"id": "fin_r1_7b_q4_0", "uri": "https://huggingface.co/bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF/resolve/61b412864cc5df96e415808920451a9856d7b078/SUFE-AIFLM-Lab_Fin-R1-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ id=fin_r1_7b_q4_0
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''uri'\''])' '{"id": "fin_r1_7b_q4_0", "uri": "https://huggingface.co/bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF/resolve/61b412864cc5df96e415808920451a9856d7b078/SUFE-AIFLM-Lab_Fin-R1-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ uri=https://huggingface.co/bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF/resolve/61b412864cc5df96e415808920451a9856d7b078/SUFE-AIFLM-Lab_Fin-R1-Q4_0.gguf
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''tpl'\''])' '{"id": "fin_r1_7b_q4_0", "uri": "https://huggingface.co/bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF/resolve/61b412864cc5df96e415808920451a9856d7b078/SUFE-AIFLM-Lab_Fin-R1-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ tpl=chatml-no-think
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''arch'\'','\'''\''))' '{"id": "fin_r1_7b_q4_0", "uri": "https://huggingface.co/bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF/resolve/61b412864cc5df96e415808920451a9856d7b078/SUFE-AIFLM-Lab_Fin-R1-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ arch=qwen2
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''dt'\'') or '\'''\'')' '{"id": "fin_r1_7b_q4_0", "uri": "https://huggingface.co/bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF/resolve/61b412864cc5df96e415808920451a9856d7b078/SUFE-AIFLM-Lab_Fin-R1-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ dt=8
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''wl'\'') or '\''general'\'')' '{"id": "fin_r1_7b_q4_0", "uri": "https://huggingface.co/bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF/resolve/61b412864cc5df96e415808920451a9856d7b078/SUFE-AIFLM-Lab_Fin-R1-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ wl=general
++ '[' -z 8 ']'
++ DECODE_THREAD_OPT=
++ '[' -n 8 ']'
++ DECODE_THREAD_OPT=-Dmodels.native.kernels.decodeThreads=8
++ gguf=/work/models/fin_r1_7b_q4_0.gguf
+++ date +%s
++ T0=1791574548
++ case " $SUPPORTED_ARCH " in
+++ python3 -c 'import json,sys;print('\'' '\''.join(json.loads(sys.argv[1]).get('\''files'\'') or []))' '{"id": "fin_r1_7b_q4_0", "uri": "https://huggingface.co/bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF/resolve/61b412864cc5df96e415808920451a9856d7b078/SUFE-AIFLM-Lab_Fin-R1-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ files=
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''bytes'\'',0))' '{"id": "fin_r1_7b_q4_0", "uri": "https://huggingface.co/bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF/resolve/61b412864cc5df96e415808920451a9856d7b078/SUFE-AIFLM-Lab_Fin-R1-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ bytes=0
++ '[' 0 = 0 ']'
++ '[' -z '' ']'
+++ curl -sIL https://huggingface.co/bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF/resolve/61b412864cc5df96e415808920451a9856d7b078/SUFE-AIFLM-Lab_Fin-R1-Q4_0.gguf
+++ awk 'BEGIN{IGNORECASE=1} /^content-length:/ {v=$2} END{gsub(/\r/,"",v); print v+0}'
++ bytes=4444121152
++ say 'fin_r1_7b_q4_0: HEAD reports 4444121152 bytes'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:35:48 'fin_r1_7b_q4_0: HEAD reports 4444121152 bytes'
+[qual 19:35:48] fin_r1_7b_q4_0: HEAD reports 4444121152 bytes
++ '[' 4444121152 -gt 22000000000 ']'
++ '[' -n '' ']'
++ say 'start fin_r1_7b_q4_0 (arch=qwen2 workload=general decodeThreads=8)'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:35:48 'start fin_r1_7b_q4_0 (arch=qwen2 workload=general decodeThreads=8)'
+[qual 19:35:48] start fin_r1_7b_q4_0 (arch=qwen2 workload=general decodeThreads=8)
++ curl -sfL https://huggingface.co/bartowski/SUFE-AIFLM-Lab_Fin-R1-GGUF/resolve/61b412864cc5df96e415808920451a9856d7b078/SUFE-AIFLM-Lab_Fin-R1-Q4_0.gguf -o /work/models/fin_r1_7b_q4_0.gguf
++ ARMS='--workload general --prompt-template chatml-no-think --context 2048 --threads 16'
++ ARMS='--workload general --prompt-template chatml-no-think --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3'
++ java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Dmodels.native.kernels.decodeThreads=8 -cp '/work/models-rag-bench-0.3.55//lib/*:/work/models-kernels-linux-x86_64.jar' com.integrallis.models.rag.RagBenchmarkCli --framework plain-java --backend rust-ffm --backend-version models@0.3.55+v24-09e2c075d9f0 --model /work/models/fin_r1_7b_q4_0.gguf --model-id fin_r1_7b_q4_0 --workload general --prompt-template chatml-no-think --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3 --output /work/out/fin_r1_7b_q4_0.json
++ rc=1
++ '[' 1 = 0 ']'
+++ date +%s
++ printf '%s\trc%s\t%s\n' fin_r1_7b_q4_0 1 68
+++ date +%s
++ say 'done fin_r1_7b_q4_0 rc=1 in 68s'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:36:56 'done fin_r1_7b_q4_0 rc=1 in 68s'
+[qual 19:36:56] done fin_r1_7b_q4_0 rc=1 in 68s
++ aws s3 cp /work/out/fin_r1_7b_q4_0.json s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ aws s3 cp /work/out/fin_r1_7b_q4_0.log s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ rm -f /work/models/fin_r1_7b_q4_0.gguf
++ done_n=4
++ IFS=
++ read -r job
++ '[' -f /work/out/STOP ']'
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''id'\''])' '{"id": "huatuogpt_o1_7b_q4_0", "uri": "https://huggingface.co/bartowski/HuatuoGPT-o1-7B-GGUF/resolve/5b481e71fa41e2ccffdd863dc01f27be48075bd1/HuatuoGPT-o1-7B-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ id=huatuogpt_o1_7b_q4_0
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''uri'\''])' '{"id": "huatuogpt_o1_7b_q4_0", "uri": "https://huggingface.co/bartowski/HuatuoGPT-o1-7B-GGUF/resolve/5b481e71fa41e2ccffdd863dc01f27be48075bd1/HuatuoGPT-o1-7B-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ uri=https://huggingface.co/bartowski/HuatuoGPT-o1-7B-GGUF/resolve/5b481e71fa41e2ccffdd863dc01f27be48075bd1/HuatuoGPT-o1-7B-Q4_0.gguf
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''tpl'\''])' '{"id": "huatuogpt_o1_7b_q4_0", "uri": "https://huggingface.co/bartowski/HuatuoGPT-o1-7B-GGUF/resolve/5b481e71fa41e2ccffdd863dc01f27be48075bd1/HuatuoGPT-o1-7B-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ tpl=chatml-no-think
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''arch'\'','\'''\''))' '{"id": "huatuogpt_o1_7b_q4_0", "uri": "https://huggingface.co/bartowski/HuatuoGPT-o1-7B-GGUF/resolve/5b481e71fa41e2ccffdd863dc01f27be48075bd1/HuatuoGPT-o1-7B-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ arch=qwen2
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''dt'\'') or '\'''\'')' '{"id": "huatuogpt_o1_7b_q4_0", "uri": "https://huggingface.co/bartowski/HuatuoGPT-o1-7B-GGUF/resolve/5b481e71fa41e2ccffdd863dc01f27be48075bd1/HuatuoGPT-o1-7B-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ dt=8
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''wl'\'') or '\''general'\'')' '{"id": "huatuogpt_o1_7b_q4_0", "uri": "https://huggingface.co/bartowski/HuatuoGPT-o1-7B-GGUF/resolve/5b481e71fa41e2ccffdd863dc01f27be48075bd1/HuatuoGPT-o1-7B-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ wl=general
++ '[' -z 8 ']'
++ DECODE_THREAD_OPT=
++ '[' -n 8 ']'
++ DECODE_THREAD_OPT=-Dmodels.native.kernels.decodeThreads=8
++ gguf=/work/models/huatuogpt_o1_7b_q4_0.gguf
+++ date +%s
++ T0=1791574618
++ case " $SUPPORTED_ARCH " in
+++ python3 -c 'import json,sys;print('\'' '\''.join(json.loads(sys.argv[1]).get('\''files'\'') or []))' '{"id": "huatuogpt_o1_7b_q4_0", "uri": "https://huggingface.co/bartowski/HuatuoGPT-o1-7B-GGUF/resolve/5b481e71fa41e2ccffdd863dc01f27be48075bd1/HuatuoGPT-o1-7B-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ files=
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''bytes'\'',0))' '{"id": "huatuogpt_o1_7b_q4_0", "uri": "https://huggingface.co/bartowski/HuatuoGPT-o1-7B-GGUF/resolve/5b481e71fa41e2ccffdd863dc01f27be48075bd1/HuatuoGPT-o1-7B-Q4_0.gguf", "tpl": "chatml-no-think", "gb": 4.14, "arch": "qwen2", "wl": "general", "dt": 8}'
++ bytes=0
++ '[' 0 = 0 ']'
++ '[' -z '' ']'
+++ curl -sIL https://huggingface.co/bartowski/HuatuoGPT-o1-7B-GGUF/resolve/5b481e71fa41e2ccffdd863dc01f27be48075bd1/HuatuoGPT-o1-7B-Q4_0.gguf
+++ awk 'BEGIN{IGNORECASE=1} /^content-length:/ {v=$2} END{gsub(/\r/,"",v); print v+0}'
++ bytes=4444122272
++ say 'huatuogpt_o1_7b_q4_0: HEAD reports 4444122272 bytes'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:36:59 'huatuogpt_o1_7b_q4_0: HEAD reports 4444122272 bytes'
+[qual 19:36:59] huatuogpt_o1_7b_q4_0: HEAD reports 4444122272 bytes
++ '[' 4444122272 -gt 22000000000 ']'
++ '[' -n '' ']'
++ say 'start huatuogpt_o1_7b_q4_0 (arch=qwen2 workload=general decodeThreads=8)'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:36:59 'start huatuogpt_o1_7b_q4_0 (arch=qwen2 workload=general decodeThreads=8)'
+[qual 19:36:59] start huatuogpt_o1_7b_q4_0 (arch=qwen2 workload=general decodeThreads=8)
++ curl -sfL https://huggingface.co/bartowski/HuatuoGPT-o1-7B-GGUF/resolve/5b481e71fa41e2ccffdd863dc01f27be48075bd1/HuatuoGPT-o1-7B-Q4_0.gguf -o /work/models/huatuogpt_o1_7b_q4_0.gguf
++ ARMS='--workload general --prompt-template chatml-no-think --context 2048 --threads 16'
++ ARMS='--workload general --prompt-template chatml-no-think --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3'
++ java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Dmodels.native.kernels.decodeThreads=8 -cp '/work/models-rag-bench-0.3.55//lib/*:/work/models-kernels-linux-x86_64.jar' com.integrallis.models.rag.RagBenchmarkCli --framework plain-java --backend rust-ffm --backend-version models@0.3.55+v24-09e2c075d9f0 --model /work/models/huatuogpt_o1_7b_q4_0.gguf --model-id huatuogpt_o1_7b_q4_0 --workload general --prompt-template chatml-no-think --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3 --output /work/out/huatuogpt_o1_7b_q4_0.json
++ rc=1
++ '[' 1 = 0 ']'
+++ date +%s
++ printf '%s\trc%s\t%s\n' huatuogpt_o1_7b_q4_0 1 62
+++ date +%s
++ say 'done huatuogpt_o1_7b_q4_0 rc=1 in 62s'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:38:00 'done huatuogpt_o1_7b_q4_0 rc=1 in 62s'
+[qual 19:38:00] done huatuogpt_o1_7b_q4_0 rc=1 in 62s
++ aws s3 cp /work/out/huatuogpt_o1_7b_q4_0.json s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ aws s3 cp /work/out/huatuogpt_o1_7b_q4_0.log s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ rm -f /work/models/huatuogpt_o1_7b_q4_0.gguf
++ done_n=5
++ IFS=
++ read -r job
++ aws s3 cp /work/out/progress.tsv s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ STATUS=SHARD_COMPLETE
++ say 'shard complete: 5 jobs'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:38:03 'shard complete: 5 jobs'
+[qual 19:38:03] shard complete: 5 jobs
++ finish
++ rc=0
++ say 'FINAL_STATUS=SHARD_COMPLETE exit=0'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 19:38:03 'FINAL_STATUS=SHARD_COMPLETE exit=0'
+[qual 19:38:03] FINAL_STATUS=SHARD_COMPLETE exit=0
++ command -v aws
++ echo SHARD_COMPLETE
++ aws s3 cp /work/out/STATUS s3://models-qual-077051030817/results/shard-600/ --only-show-errors
++ aws s3 cp /var/log/qual-worker.log s3://models-qual-077051030817/results/shard-600/qual-worker-600.log --only-show-errors

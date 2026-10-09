@@ -1335,6 +1335,49 @@ class TensorOpsTest {
     }
 
     @Test
+    void q4_1SingleTokenAndBatchedPathsAgree() {
+      // Same contract as Q5_1: both dispatches run one routine, so a decoder and an embedder on
+      // the same weights agree exactly rather than closely. Two rows and a batch of two, because
+      // one row cannot fail on a row-stride mistake and a batch of one cannot fail on a batch one.
+      int cols = 64;
+      int rows = 2;
+      byte[] weights = new byte[rows * 2 * 20];
+      ByteBuffer buffer = ByteBuffer.wrap(weights).order(ByteOrder.LITTLE_ENDIAN);
+      for (int block = 0; block < rows * 2; block++) {
+        int base = block * 20;
+        buffer.putShort(base, (short) (block % 2 == 0 ? 0x3C00 : 0x3800));
+        // The minimum alternates sign so the term Q4_0 does not have cannot cancel out.
+        buffer.putShort(base + 2, (short) ((block % 2 == 0 ? 0x0000 : 0x8000) | 0x3400));
+        for (int i = 0; i < 16; i++) {
+          weights[base + 4 + i] = (byte) ((i * 11 + block * 7 + 1) & 0xFF);
+        }
+      }
+
+      float[] x = new float[2 * cols];
+      for (int i = 0; i < x.length; i++) {
+        x[i] = (i % 11) * 0.125f - 0.75f;
+      }
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, weights);
+
+        float[] batched = new float[2 * rows];
+        TensorOps.ggufExactBatchedMatmul(
+            batched, x, qWeight, GgufTensorType.Q4_1, 2, rows, cols, new float[cols]);
+
+        float[] single = new float[rows];
+        TensorOps.quantizedMatmul(single, x, qWeight, GgufTensorType.Q4_1, rows, cols);
+
+        for (int row = 0; row < rows; row++) {
+          assertThat(single[row]).as("row %s", row).isEqualTo(batched[row]);
+        }
+        assertThat(batched[rows])
+            .as("the second batch element must differ, or the fixture proves nothing")
+            .isNotEqualTo(batched[0]);
+      }
+    }
+
+    @Test
     void q5_1SingleTokenAndBatchedPathsAgree() {
       // Q5_1 reached the batched dispatch when the mixed-quantization embedding artifacts needed
       // it and the single-token dispatch had no case at all, so a decoder carrying a Q5_1 tensor
