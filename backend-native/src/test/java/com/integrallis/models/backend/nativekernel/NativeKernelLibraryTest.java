@@ -46,6 +46,7 @@ class NativeKernelLibraryTest {
       assertThat(kernels.supports(NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q5_0_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q5_0_F32_GROUPED_BATCHED_MATMUL)).isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q5_1_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL)).isTrue();
@@ -743,6 +744,108 @@ class NativeKernelLibraryTest {
       kernel.multiply(actual, input, weights, GgufTensorType.Q5_0, batchSize, rows, cols);
 
       assertClose(actual, expected, BLOCK_QUANT_REDUCTION_TOLERANCE);
+    }
+  }
+
+  /**
+   * The Q5_1 shim must equal the Java kernel <b>exactly</b>, not within a tolerance.
+   *
+   * <p>Every other quantized shim here is compared within a block-quantization tolerance, because
+   * the shim dots in Q8_0 or Q8_K integers where the reference dots in F32, so the two legitimately
+   * differ in the last bits. Q5_1 is the one format whose shim reproduces the Java arithmetic
+   * instead of approximating it -- it dequantizes the row and folds along {@code PinnedReduction}'s
+   * pinned order -- because Q5_1's minimum term needs activation block sums that nothing on the
+   * Java side carries. Equality is therefore the contract: whether a host loaded the shim must not
+   * change a published vector. A tolerance here would pass on exactly the divergence the design
+   * exists to prevent.
+   */
+  @Test
+  void reusableGgufKernelComputesQ5_1BatchedMatrixMultiplicationExactly() {
+    int batchSize = 3;
+    int rows = 5;
+    int cols = 64;
+    float[] input = inputs(batchSize, cols);
+    float[] expected = new float[batchSize * rows];
+    float[] actual = new float[batchSize * rows];
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment weights = arena.allocate(rows * cols / 32L * 24L);
+      fillQ5_1Weights(weights, rows, cols);
+      TensorOps.ggufExactBatchedMatmul(
+          expected, input, weights, GgufTensorType.Q5_1, batchSize, rows, cols, new float[cols]);
+
+      assertThat(kernel.supports(GgufTensorType.Q5_1)).isTrue();
+      // No grouped counterpart: grouping shares one quantized activation between matrices and this
+      // format has none to share. The shim refuses such a group outright rather than reading an
+      // empty activation slice and returning zeros.
+      assertThat(kernel.supportsDual(GgufTensorType.Q5_1, GgufTensorType.Q5_1)).isFalse();
+      kernel.multiply(actual, input, weights, GgufTensorType.Q5_1, batchSize, rows, cols);
+
+      for (int index = 0; index < actual.length; index++) {
+        assertThat(actual[index]).as("output[%s]", index).isEqualTo(expected[index]);
+      }
+      assertThat(actual[0])
+          .as("a fixture whose outputs are all zero would pass equality and prove nothing")
+          .isNotEqualTo(0.0f);
+    }
+  }
+
+  @Test
+  void reusableGgufKernelComputesQ5_1SingleTokenProjectionExactly() {
+    int batchSize = 1;
+    int rows = 5;
+    int cols = 256;
+    float[] input = inputs(batchSize, cols);
+    float[] expected = new float[rows];
+    float[] actual = new float[rows];
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment weights = arena.allocate(rows * cols / 32L * 24L);
+      fillQ5_1Weights(weights, rows, cols);
+      TensorOps.ggufExactBatchedMatmul(
+          expected, input, weights, GgufTensorType.Q5_1, batchSize, rows, cols, new float[cols]);
+
+      kernel.multiply(actual, input, weights, GgufTensorType.Q5_1, batchSize, rows, cols);
+
+      for (int index = 0; index < rows; index++) {
+        assertThat(actual[index]).as("output[%s]", index).isEqualTo(expected[index]);
+      }
+    }
+  }
+
+  /**
+   * Q5_1 blocks varied on every axis the kernel reads.
+   *
+   * <p>The scale, the minimum and the fifth-bit plane all change per block on purpose: a fixture
+   * with one scale, a zero minimum or an empty bit plane cannot fail on the three things that
+   * distinguish Q5_1 from Q5_0.
+   */
+  private static void fillQ5_1Weights(MemorySegment weights, int rows, int cols) {
+    int blocksPerRow = cols / 32;
+    for (int row = 0; row < rows; row++) {
+      for (int block = 0; block < blocksPerRow; block++) {
+        long base = (long) (row * blocksPerRow + block) * 24L;
+        int index = row * blocksPerRow + block;
+        // 0x3000..0x33ff is a positive f16 near 0.125..0.25; the minimum alternates sign so the
+        // term that Q5_0 does not have cannot cancel out of the comparison.
+        short scale = (short) (0x3000 | ((index * 37) & 0x03FF));
+        short minimum =
+            (short) (((index % 2) == 0 ? 0x0000 : 0x8000) | 0x3000 | ((index * 53) & 0x03FF));
+        weights.set(
+            ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN), base, scale);
+        weights.set(
+            ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN), base + 2, minimum);
+        weights.set(
+            ValueLayout.JAVA_INT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN),
+            base + 4,
+            index * 0x9E37_79B9);
+        for (int nibble = 0; nibble < 16; nibble++) {
+          weights.set(
+              ValueLayout.JAVA_BYTE, base + 8 + nibble, (byte) ((index * 13 + nibble * 29) & 0xFF));
+        }
+      }
     }
   }
 

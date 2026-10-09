@@ -41,7 +41,18 @@ public enum NativeKernelCapability {
   /** The worker pool's poll budget before parking is settable per context. */
   POLL_BUDGET(1L << 21),
   /** Several sequences advance one token each in one launch, against one recurrent state apiece. */
-  GROUPED_GATED_DELTA_NET_F32(1L << 22);
+  GROUPED_GATED_DELTA_NET_F32(1L << 22),
+  /**
+   * Q5_1 rows against F32 activations rather than quantized ones.
+   *
+   * <p>Q5_1 carries a per-block minimum instead of centring its quants, and the minimum term needs
+   * the activation block sums that a Q8_1 activation would carry and a Q8_0 one does not. Rather
+   * than give one format a second arithmetic, the shim reproduces what the Java kernel does:
+   * dequantize the row and fold it in F32 along {@code PinnedReduction}'s pinned order. There is
+   * deliberately no grouped counterpart -- grouping exists to share one quantized activation
+   * between matrices, and this format has none to share.
+   */
+  Q5_1_F32_BATCHED_MATMUL(1L << 23);
 
   private final long mask;
 

@@ -61,6 +61,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private static final int FORMAT_Q6_K = 3;
   private static final int FORMAT_Q5_K = 4;
   private static final int FORMAT_Q5_0 = 5;
+  private static final int FORMAT_Q5_1 = 6;
   private static final Linker LINKER = Linker.nativeLinker();
   private static final FunctionDescriptor ABI_VERSION_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_INT);
@@ -613,6 +614,23 @@ public final class NativeKernelLibrary implements AutoCloseable {
         output);
   }
 
+  /** Computes a batch-major {@code input[batch, cols] * weights[rows, cols]} Q5_1 projection. */
+  public void q5_1F32BatchedMatmul(
+      MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
+    f32BatchedMatmul(
+        "Q5_1",
+        FORMAT_Q5_1,
+        32,
+        24L,
+        NativeKernelCapability.Q5_1_F32_BATCHED_MATMUL,
+        weights,
+        input,
+        batchSize,
+        rows,
+        cols,
+        output);
+  }
+
   /** Computes a batch-major {@code input[batch, cols] * weights[rows, cols]} Q4_K projection. */
   public void q4_KF32BatchedMatmul(
       MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
@@ -728,6 +746,31 @@ public final class NativeKernelLibrary implements AutoCloseable {
         "Q5_0",
         FORMAT_Q5_0,
         NativeKernelCapability.Q5_0_F32_BATCHED_MATMUL,
+        weights,
+        weightBytes,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        rows,
+        cols);
+  }
+
+  void q5_1F32BatchedMatmul(
+      MemorySegment weights,
+      long weightBytes,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int batchSize,
+      int rows,
+      int cols) {
+    invokeBatched(
+        "Q5_1",
+        FORMAT_Q5_1,
+        NativeKernelCapability.Q5_1_F32_BATCHED_MATMUL,
         weights,
         weightBytes,
         nativeInput,

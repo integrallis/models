@@ -11,6 +11,27 @@ The native boundary is a versioned C ABI implemented by the Models-owned
 ABI 5 supports Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K batched projections,
 grouped dispatch, and the bounded float32 Gated DeltaNet recurrence used by
 Qwen3.5. Mixed Q4_K/Q5_K/Q6_K groups share one Q8_K activation quantization.
+
+Q5_1 was added at ABI 6 and is the one format that dots against **F32**
+activations rather than quantized ones. Every other kernel here dots in Q8_0 or
+Q8_K integers, which is what lets a shim and the Java kernel agree bit for bit:
+integer accumulation is exact, so partitioning rows across workers cannot move a
+result. Q5_1 carries a per-block minimum instead of centring its quants, and
+that minimum term needs the activation block sums a Q8_1 activation would carry
+and nothing on the Java side does. Rather than give one format a second
+arithmetic -- which would make a published vector depend on whether a host
+loaded the shim -- the Q5_1 kernel reproduces the Java one: it dequantizes the
+row and folds in F32 along `PinnedReduction.dot`'s pinned order, with `q * d + m`
+left unfused because Java writes it unfused. There is deliberately no grouped
+Q5_1 kernel, since grouping exists to share one quantized activation and this
+format has none; a group containing it is refused with `STATUS_INVALID_SHAPE`.
+Parity is asserted as equality rather than a tolerance, in the Rust tests
+(scalar against AVX2) and in `NativeKernelLibraryTest` (shim against
+`TensorOps.ggufExactBatchedMatmul`). Measured 1.4-2.2x against the Java kernel
+at the shapes the artifacts use, with **no observable end-to-end effect** on
+short-probe embedding; see
+`benchmark-results/2026-10-08-q5-1-rust-shim/NOTES.md`, which publishes that
+null alongside the kernel figures.
 Its x86-64 path uses format-specialized AVX2/FMA integer dots, vectorized Q8_0
 activation preparation, batched weight reuse, reusable activation scratch, and
 an explicitly owned persistent worker context. Scalar kernels remain available
