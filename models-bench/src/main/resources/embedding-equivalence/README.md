@@ -101,3 +101,15 @@ Cosine is scale-invariant, so an unnormalized runtime agrees with a normalized r
 product as a cosine shortcut and depends on unit length, hence the second floor.
 
 The gate takes the worst probe: averaging lets one broken case hide behind seven good ones.
+
+## A reference is not a qualification
+
+`references.txt` lists every artifact an oracle run has been captured for, which is not the same
+set as the artifacts this runtime can serve. The nine `jina-embeddings-v2-base-code` references are
+the standing example: the oracle produced them, and `GgufEmbeddingBackend` then refused the
+artifact with `Unsupported GGUF architecture: jina-bert-v2`. They are kept rather than deleted
+because the oracle side of the comparison is done and pinned — re-running it would be re-deriving
+work already committed — but they are evidence of a *pending* comparison, not a passed one.
+
+Qualification is what the gate prints and what the catalog records. A reference file on its own
+says only that the oracle was asked.

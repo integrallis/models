@@ -4,8 +4,22 @@ Written because the same facts were rediscovered three times across context comp
 costing hours of fleet spend. Everything here was paid for once. Read it before touching the fleet,
 the qualification policy, or the catalog.
 
-**Standing mandate: grow the ModelJars catalog to 100 usable models.** It is 44 (34 RAG + 5
-embedding + 2 reranking + 2 speech + 1 component) against 128 candidates in `catalog/models.json`.
+**Standing mandate: grow the ModelJars catalog to 100 usable models.** As of 2026-10-08 it is **76
+unique qualified model ids** against 454 candidates in `catalog/models.json`: 65 RAG + 3 tool + 5
+embedding + 2 reranking + 2 speech + 1 component, which sums to 78 because two ids
+(`qwen3_1_7b_q8_0`, `qwen3_8b_q4_k_m`) are qualified on both the RAG and tool workloads. Count the
+**union of model ids**, never the sum of the manifests, or a model qualified on two workloads is
+counted twice. The earlier figure in this runbook said 44 against 128 candidates and was two
+campaigns stale; derive it instead of reading it:
+
+    # in modeljars
+    node -e 'const f=p=>JSON.parse(require("fs").readFileSync("catalog/"+p));
+      const q=(p,g=e=>e.qualified===true)=>f(p).entries.filter(g).map(e=>e.modelId);
+      const all=new Set([...q("qualifications.json"),
+        ...q("tool-qualifications.json",e=>e.summary?.qualified===true),
+        ...q("embedding-qualifications.json"), ...q("reranking-qualifications.json"),
+        ...q("speech-qualifications.json"), ...q("component-qualifications.json")]);
+      console.log(all.size)'
 
 ## What the catalog is for
 
@@ -211,10 +225,17 @@ Qualifying a model and publishing it are separate achievements. Everything below
 running the gates locally against a branch that looked ready to merge; every one of them would
 otherwise have failed after the merge, when the fix is expensive.
 
-**1. Every newly qualified model needs a default-configuration smoke record.**
+**1. Every newly qualified model needs a default-configuration smoke record — on the RAG manifest.**
 `tools/qualification-smoke-gate.mjs` in modeljars refuses any entry that is new or whose evidence
-changed unless it carries `defaultConfigurationSmoke`. The record asserts a run under the *public
-library defaults*:
+changed unless it carries `defaultConfigurationSmoke`. Read "entry" as *an entry of
+`catalog/qualifications.json`*: `model-artifacts.yml` invokes the gate with
+`--current catalog/qualifications.json` and nothing else, and its predicates
+(`correctAnswerRate`, `abstentionAccuracy`) only mean something for the generation workload. The
+embedding, reranking, speech and component manifests reach `plan-model-publications.mjs` instead,
+which checks that each entry names a catalog model and that its `artifactSha256` and
+`artifactSizeBytes` agree with `catalog/models.json`. An embedding entry therefore carries no
+smoke record, and the five that predate this note do not have one. The record asserts a run under
+the *public library defaults*:
 
 - no `-Dmodels.*` property of any kind (`tuningSystemProperties` must be empty)
 - `backendDiagnostics.environment["native-quantized-decode"] == "true"` -- the library default is
