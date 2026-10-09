@@ -42,6 +42,25 @@ All notable changes to models are documented here.
   is published because it is complete, verified and independently useful, not because the feature
   it belongs to is done.
 
+### Unchanged — `backend-cuda` device gates
+
+`RELEASING.md` requires a release to state `backend-cuda`'s numeric state rather than let its
+presence imply one. `backend-cuda` has **zero file changes** in 0.3.56, and its gates were **not
+re-run for this release**. Where they last ran:
+
+| gate | result | when and where | evidence |
+| --- | --- | --- | --- |
+| G1 token parity (no tolerance) | **passed** — 1280/1280 token ids identical across 20 prompts | 2026-10-07, RTX 4090 at compute capability 8.9, Granite 4.1 3B Q4_K_M | `benchmark-results/2026-10-07-g1-parity` |
+| G4 decode speed | **passed** — 6.184x against a 3.00x gate, 31.26 vs 5.06 tok/s | same host and model | `benchmark-results/2026-10-07-g4-dualpath` |
+
+Two limits carried forward verbatim from that evidence rather than softened. **One host and one
+model**: the `sm_80` module serves compute capability 8.0 and above, but G1 has no tolerance and a
+single host does not establish hardware independence — it has not been re-run on an A40 or L40S,
+so G1 is not established across the qualifying profiles. And shipping the jar does not activate
+anything: there is no `META-INF/services` entry, a consumer has to call
+`CudaGgufBatchedMatrixKernel.open()` and inject the kernel, and `-Dmodels.cuda.disabled=true` is a
+kill switch on top of that.
+
 ## [0.3.55] - 2026-10-09
 
 ### Added
