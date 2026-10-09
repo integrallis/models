@@ -165,6 +165,28 @@ public final class Lfm2ForwardPass {
    * @return the logits, valid until the next call
    */
   public float[] forward(int token, int position) {
+    return forwardInternal(token, position, true);
+  }
+
+  /**
+   * Advances one token and returns the final-norm activation instead of the vocabulary logits.
+   *
+   * <p>Same contract as {@code LlamaForwardPass.hiddenState}: the activation the output projection
+   * would consume, with that projection skipped. Skipping it is the whole saving, since it is the
+   * widest matmul in the pass, and it is what an embedding needs — LFM2.5-Embedding is an {@code
+   * lfm2} decoder, so without this its seven published artifacts cannot be embedded at all.
+   *
+   * <p>The returned array is backend-owned scratch, valid until the next call. Copy it to keep it.
+   *
+   * @param token token id to advance with
+   * @param position sequential position for the token
+   * @return the final-norm activation, owned by this pass
+   */
+  public float[] hiddenState(int token, int position) {
+    return forwardInternal(token, position, false);
+  }
+
+  private float[] forwardInternal(int token, int position, boolean projectLogits) {
     if (position != nextPosition) {
       throw new IllegalArgumentException(
           "position must be sequential: expected " + nextPosition + ", got " + position);
@@ -198,6 +220,9 @@ public final class Lfm2ForwardPass {
     nextPosition++;
     // The final norm is the tensor named token_embd_norm; see Lfm2Weights.
     TensorOps.rmsNorm(normalized, state, weights.outputNorm(), dim, config.rmsNormEpsilon());
+    if (!projectLogits) {
+      return normalized;
+    }
     project(
         weights.outputProjection(),
         weights.outputProjectionType(),

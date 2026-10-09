@@ -59,6 +59,80 @@ public final class Lfm2ShortConv {
   private Lfm2ShortConv() {}
 
   /**
+   * Applies the short convolution to a whole sequence as a centred window.
+   *
+   * <p>This is the {@code !hparams.causal_attn} branch of llama.cpp's {@code
+   * build_shortconv_block}, and it is a different operator from {@link #applyToken}, not a batched
+   * form of it. The reference pads the gated sequence symmetrically -- {@code pad = (l_cache - 1) /
+   * 2} columns on each side -- so {@code ggml_ssm_conv}'s window over {@code n + 2 * pad} columns
+   * yields one output per token centred on that token, seeing {@code pad} tokens each way. The
+   * causal path instead prepends the recurrent state, so its window only ever looks backwards.
+   * Running the causal operator on a bidirectional model produces a plausible vector that is simply
+   * not the model's.
+   *
+   * <p>The left padding is the reference's view of the last {@code pad} columns of the conv state.
+   * A sequence encoder holds no state between sequences, so that view is zeros, and this method
+   * takes no state parameter rather than taking one it would require to be zero.
+   *
+   * @param projected the {@code in_proj} output for every position, {@code sequenceLength} rows of
+   *     {@code 3 * dim} as b, c, x
+   * @param sequenceLength number of positions
+   * @param dim the model width
+   * @param kernel the depthwise taps, {@code lCache * dim}, tap-contiguous per channel
+   * @param lCache the convolution width; must be odd, since an even width has no centre and the
+   *     reference's symmetric padding would not line up with its window
+   * @param gated receives {@code sequenceLength * dim} values, the convolution gated by c
+   */
+  public static void applyCentered(
+      float[] projected, int sequenceLength, int dim, float[] kernel, int lCache, float[] gated) {
+    Objects.requireNonNull(projected, "projected");
+    Objects.requireNonNull(kernel, "kernel");
+    Objects.requireNonNull(gated, "gated");
+    if (lCache < 2) {
+      throw new IllegalArgumentException("lCache must be at least 2, was " + lCache);
+    }
+    if (lCache % 2 == 0) {
+      throw new IllegalArgumentException("a centred window needs an odd l_cache, was " + lCache);
+    }
+    if (sequenceLength <= 0) {
+      throw new IllegalArgumentException("sequenceLength must be > 0, was " + sequenceLength);
+    }
+    if (projected.length < (long) sequenceLength * 3 * dim) {
+      throw new IllegalArgumentException(
+          "projected must hold " + sequenceLength + " * 3 * " + dim + " values");
+    }
+    if (kernel.length < (long) lCache * dim) {
+      throw new IllegalArgumentException(
+          "kernel must hold " + lCache + " * " + dim + " values, was " + kernel.length);
+    }
+    if (gated.length < (long) sequenceLength * dim) {
+      throw new IllegalArgumentException(
+          "gated must hold " + sequenceLength + " * " + dim + " values");
+    }
+
+    int pad = (lCache - 1) / 2;
+    int stride = 3 * dim;
+    for (int channel = 0; channel < dim; channel++) {
+      int kernelBase = channel * lCache;
+      for (int position = 0; position < sequenceLength; position++) {
+        float sum = 0.0f;
+        for (int tap = 0; tap < lCache; tap++) {
+          // Tap 0 multiplies the furthest-back column of the padded window, exactly as in the
+          // causal path; with the padding the window starts pad tokens before this one.
+          int source = position + tap - pad;
+          if (source < 0 || source >= sequenceLength) {
+            continue;
+          }
+          int sourceBase = source * stride;
+          float bx = projected[sourceBase + channel] * projected[sourceBase + 2 * dim + channel];
+          sum += kernel[kernelBase + tap] * bx;
+        }
+        gated[position * dim + channel] = projected[position * stride + dim + channel] * sum;
+      }
+    }
+  }
+
+  /**
    * Applies one token of the short convolution and advances the state.
    *
    * @param projected the {@code in_proj} output, {@code 3 * dim} values as b, c, x

@@ -41,7 +41,42 @@ public record Lfm2Config(
     int hiddenDim,
     float ropeTheta,
     float rmsNormEpsilon,
-    int shortConvCache) {
+    int shortConvCache,
+    boolean causalAttention,
+    Pooling pooling) {
+
+  /**
+   * Sequence reduction declared by {@code lfm2.pooling_type}, using GGUF's own codes.
+   *
+   * <p>{@code NONE} is code zero and is what a generative LFM2 carries: it reduces nothing and
+   * emits one vector per token. The others match {@code llama_pooling_type} in llama.cpp.
+   */
+  public enum Pooling {
+    NONE(0),
+    MEAN(1),
+    CLS(2),
+    LAST(3),
+    RANK(4);
+
+    private final int code;
+
+    Pooling(int code) {
+      this.code = code;
+    }
+
+    public int code() {
+      return code;
+    }
+
+    static Pooling fromCode(int code) {
+      for (Pooling value : values()) {
+        if (value.code == code) {
+          return value;
+        }
+      }
+      throw new IllegalArgumentException("unsupported LFM2 pooling type: " + code);
+    }
+  }
 
   public Lfm2Config {
     positive("embeddingDim", embeddingDim);
@@ -86,6 +121,16 @@ public record Lfm2Config(
     if (!anyAttention) {
       throw new IllegalArgumentException("LFM2 must carry at least one attention layer");
     }
+    Objects.requireNonNull(pooling, "pooling");
+    // A bidirectional LFM2 is an embedding model -- that is the only thing dropping the causal
+    // mask is for -- so one that declares no reduction is a file we cannot serve either way: not
+    // generatively, because its attention sees the future, and not as an embedder, because it has
+    // not said how to reduce the sequence. Refusing at load beats emitting position zero and
+    // calling it the embedding.
+    if (!causalAttention && pooling == Pooling.NONE) {
+      throw new IllegalArgumentException(
+          "lfm2.attention.causal is false but lfm2.pooling_type declares no pooling");
+    }
   }
 
   /** Parses the text-only LFM2 GGUF contract. */
@@ -121,7 +166,25 @@ public record Lfm2Config(
         requiredInt(metadata, "lfm2.feed_forward_length"),
         requiredFloat(metadata, "lfm2.rope.freq_base"),
         requiredFloat(metadata, "lfm2.attention.layer_norm_rms_epsilon"),
-        requiredInt(metadata, "lfm2.shortconv.l_cache"));
+        requiredInt(metadata, "lfm2.shortconv.l_cache"),
+        // Optional, and true when absent: the same default llama.cpp carries in llama_hparams
+        // (causal_attn = true, llama-hparams.h:182) and reads generically for every architecture
+        // (llama-model.cpp:1069), which is why LFM2.5-Embedding's attention.causal=false applies
+        // to lfm2 without any lfm2-specific handling on the reference side.
+        metadata.getBool("lfm2.attention.causal").orElse(true),
+        Pooling.fromCode(metadata.getUint32("lfm2.pooling_type").orElse(Pooling.NONE.code())));
+  }
+
+  /**
+   * Whether this file is a whole-sequence encoder rather than a decoder.
+   *
+   * <p>Dropping the causal mask changes two operators, not one: attention spans the whole sequence,
+   * and the short convolution becomes a centred window with symmetric zero padding instead of a
+   * shift register over the past. Both are read from llama.cpp's {@code build_shortconv_block} and
+   * {@code build_attn}.
+   */
+  public boolean encodesWholeSequence() {
+    return !causalAttention;
   }
 
   /** Whether this layer attends; the alternative is a short convolution. */

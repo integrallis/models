@@ -73,6 +73,16 @@ final class Lfm2DecoderAdapter implements PureJavaDecoder {
   }
 
   @Override
+  public float[] hiddenState(int token, int position) {
+    return forwardPass.hiddenState(token, position);
+  }
+
+  @Override
+  public boolean supportsHiddenState() {
+    return true;
+  }
+
+  @Override
   public float[] forward(int token, int position) {
     float[] logits = forwardPass.forward(token, position);
     // After the call, so a rejected position does not leave a token recorded for it.

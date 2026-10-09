@@ -48,6 +48,12 @@ final class Lfm2Weights {
   private static final Set<GgufTensorType> MATRIX_TYPES =
       Set.of(
           GgufTensorType.F32,
+          // LFM2.5-Embedding publishes F16 and BF16 artifacts alongside its quants, and both were
+          // rejected at load. TensorOps.ggufMatmul -- the only projection route this architecture
+          // takes, see Lfm2ForwardPass.project -- already dispatches both: F16 through
+          // multiplyF16Batch at a batch of one, BF16 through BFloat16Matrix.
+          GgufTensorType.F16,
+          GgufTensorType.BF16,
           GgufTensorType.Q4_0,
           GgufTensorType.Q5_0,
           GgufTensorType.Q8_0,
@@ -153,6 +159,34 @@ final class Lfm2Weights {
 
   float[] outputNorm() {
     return outputNorm;
+  }
+
+  /**
+   * The widest Q4_0 projection in the model, which sizes the batched kernel's lane scratch.
+   *
+   * <p>Zero when the file carries no Q4_0 matrix, in which case no lane scratch is needed at all.
+   */
+  int maxQ40ProjectionRows() {
+    int rows = 0;
+    for (LayerWeights layer : layers) {
+      rows = maxQ40Rows(rows, layer.gateProjection());
+      rows = maxQ40Rows(rows, layer.upProjection());
+      rows = maxQ40Rows(rows, layer.downProjection());
+      rows = maxQ40Rows(rows, layer.queryProjection());
+      rows = maxQ40Rows(rows, layer.keyProjection());
+      rows = maxQ40Rows(rows, layer.valueProjection());
+      rows = maxQ40Rows(rows, layer.attentionOutputProjection());
+      rows = maxQ40Rows(rows, layer.shortConvInProjection());
+      rows = maxQ40Rows(rows, layer.shortConvOutProjection());
+    }
+    return rows;
+  }
+
+  private static int maxQ40Rows(int rows, Matrix matrix) {
+    if (matrix == null || matrix.type() != GgufTensorType.Q4_0) {
+      return rows;
+    }
+    return Math.max(rows, matrix.rows());
   }
 
   /** The vocabulary projection, which is the embedding table: LFM2 ties them. */
