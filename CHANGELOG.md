@@ -4,6 +4,33 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **LFM2.5-Embedding-350M loads and qualifies.** All seven published artifacts were unservable: five
+  were refused because the `lfm2` decoder exposed no hidden state, and the F16 and BF16 pair was
+  refused at `Lfm2Weights.MATRIX_TYPES`. Both are fixed, but loading them only revealed the real
+  cause — the artifact declares `lfm2.attention.causal = false` and `lfm2.pooling_type = 2`, and
+  llama.cpp reads the causality key generically for every architecture
+  (`src/llama-model.cpp:1069`, default `true` at `src/llama-hparams.h:182`), so the oracle runs
+  this file bidirectionally. The causal decoder returned worst-probe cosine **0.03** on all seven.
+  `Lfm2SequenceEncoder` now runs a non-causal `lfm2` layer-major over the whole sequence, and
+  `Lfm2ShortConv.applyCentered` implements the centred window with symmetric zero padding that
+  llama.cpp's `build_shortconv_block` uses when causality is off — a different operator from the
+  causal shift register, not a batched form of it. F16 reproduces at **0.9999994**, BF16 at
+  0.9999915, Q8_0 at 0.9997380 and Q4_0 at 0.9997358. The three K-quant artifacts remain
+  NOT_REPRODUCED at 0.9983-0.9987; the floor was not moved to admit them, and two explanations for
+  the gap were measured and refuted. See
+  `benchmark-results/embedding/2026-10-08-lfm2-bidirectional/NOTES.md`.
+
+- **Q5_1 projections, in Java and in the Rust shim.** Q5_1 appears as the dominant matmul type in
+  the `Q5_K_S` and `Q5_K_M` builds of several embedding artifacts — 30 of 37 matmul tensors, 65.5%
+  of matmul weights in all-MiniLM-L6-v2 Q5_K_S — and was previously unloadable, so those files
+  could not be qualified at all. The single-token and batched Java paths are one routine, so a
+  decoder and an embedder on the same weights agree exactly rather than closely. The shim
+  reproduces the Java arithmetic bit for bit instead of approximating it, and publishes a kernel
+  speedup of 1.4-2.2x together with the finding that it has **no observable end-to-end effect** on
+  short-probe embedding. See `benchmark-results/2026-10-08-q5-1-rust-shim/NOTES.md`.
+
 ## [0.3.54] - 2026-10-08
 
 ### Changed

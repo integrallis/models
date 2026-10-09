@@ -123,6 +123,54 @@ class Lfm2ConfigTest {
         .hasMessageContaining("one entry per layer");
   }
 
+  @Test
+  void treatsAFileWithNoCausalityKeyAsADecoder() {
+    Lfm2Config config = Lfm2Config.fromMetadata(new GgufMetadata(entries()));
+
+    assertThat(config.causalAttention())
+        .describedAs(
+            "llama_hparams initialises causal_attn to true and reads the key as optional, so an"
+                + " absent key must not turn a generative model into an encoder")
+        .isTrue();
+    assertThat(config.encodesWholeSequence()).isFalse();
+    assertThat(config.pooling()).isEqualTo(Lfm2Config.Pooling.NONE);
+  }
+
+  @Test
+  void readsTheBidirectionalEmbeddingContract() {
+    Map<String, GgufMetadataValue> entries = entries();
+    entries.put("lfm2.attention.causal", new GgufMetadataValue.BoolValue(false));
+    entries.put("lfm2.pooling_type", new GgufMetadataValue.Uint32Value(2));
+
+    Lfm2Config config = Lfm2Config.fromMetadata(new GgufMetadata(entries));
+
+    // The two keys LFM2.5-Embedding-350M publishes, read from that artifact.
+    assertThat(config.causalAttention()).isFalse();
+    assertThat(config.encodesWholeSequence()).isTrue();
+    assertThat(config.pooling()).isEqualTo(Lfm2Config.Pooling.CLS);
+  }
+
+  @Test
+  void refusesABidirectionalFileThatDeclaresNoPooling() {
+    Map<String, GgufMetadataValue> entries = entries();
+    entries.put("lfm2.attention.causal", new GgufMetadataValue.BoolValue(false));
+
+    assertThatThrownBy(() -> Lfm2Config.fromMetadata(new GgufMetadata(entries)))
+        .describedAs("such a file can be served neither generatively nor as an embedder")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("declares no pooling");
+  }
+
+  @Test
+  void refusesAPoolingCodeItCannotName() {
+    Map<String, GgufMetadataValue> entries = entries();
+    entries.put("lfm2.pooling_type", new GgufMetadataValue.Uint32Value(9));
+
+    assertThatThrownBy(() -> Lfm2Config.fromMetadata(new GgufMetadata(entries)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("unsupported LFM2 pooling type: 9");
+  }
+
   private static Map<String, GgufMetadataValue> entries() {
     Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
     entries.put("general.architecture", new GgufMetadataValue.StringValue("lfm2"));

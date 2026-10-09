@@ -39,5 +39,14 @@ public enum Pooling {
    * <p>Correct for encoder models with bidirectional attention, where every position sees the whole
    * input. Costs a hidden state per token rather than just the last.
    */
-  MEAN
+  MEAN,
+  /**
+   * The first position's state, which GGUF records as {@code pooling_type} 2.
+   *
+   * <p>Needed on the decoder path, not only the encoder one: LFM2.5-Embedding is an {@code lfm2}
+   * decoder whose own metadata asks for CLS, and without this its seven published artifacts cannot
+   * be embedded at all. The encoder path already honoured CLS because {@code BertConfig} reads the
+   * same metadata; this enum is what the decoder path chooses from.
+   */
+  CLS
 }

@@ -248,6 +248,7 @@ public final class EmbeddingEquivalenceCli {
     return switch (value) {
       case "last-token" -> Pooling.LAST_TOKEN;
       case "mean" -> Pooling.MEAN;
+      case "cls" -> Pooling.CLS;
       default -> throw new IllegalArgumentException("unsupported pooling: " + value);
     };
   }

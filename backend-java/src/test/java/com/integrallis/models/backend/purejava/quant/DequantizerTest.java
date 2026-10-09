@@ -175,4 +175,77 @@ class DequantizerTest {
       assertThat(dst[2]).isEqualTo(0.5f);
     }
   }
+
+  @Nested
+  class Q5_1 {
+
+    /**
+     * Pins the three things {@code Q5_1} does differently from {@code Q4_0} and {@code Q5_0}, each
+     * transcribed from {@code dequantize_row_q5_1} in llama.cpp rather than derived: the value is
+     * {@code q * d + m} with an unsigned quant and no centring bias, the fifth bits live in a
+     * separate four-byte {@code qh} word, and element {@code j + 16} takes bit {@code j + 16} of it
+     * rather than a bit adjacent to its own nibble.
+     */
+    @Test
+    void appliesMinimumRatherThanCentringTheQuant() {
+      // d = 1.0 (0x3C00), m = -3.0 (0xC200), qh = 0 so every fifth bit is clear, nibbles all 0.
+      byte[] block = new byte[24];
+      ByteBuffer buffer = ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN);
+      buffer.putShort(0, (short) 0x3C00);
+      buffer.putShort(2, (short) 0xC200);
+
+      var segment = Arena.ofConfined().allocate(24);
+      MemorySegment.copy(block, 0, segment, ValueLayout.JAVA_BYTE, 0, 24);
+
+      float[] dst = new float[32];
+      new Q5_1Dequantizer().dequantize(segment, 0, dst, 0, 32);
+
+      // 0 * 1.0 + (-3.0). A Q4_0-style centring bias would have produced -8.0 here.
+      for (float value : dst) {
+        assertThat(value).isEqualTo(-3.0f);
+      }
+    }
+
+    @Test
+    void readsTheFifthBitFromTheHighWordForBothHalves() {
+      // d = 1.0, m = 0.0, nibble byte 0 = 0x21 (lo=1, hi=2).
+      // qh bit 0 set    -> element 0 gains 16  -> 1 + 16 = 17
+      // qh bit 16 set   -> element 16 gains 16 -> 2 + 16 = 18
+      byte[] block = new byte[24];
+      ByteBuffer buffer = ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN);
+      buffer.putShort(0, (short) 0x3C00);
+      buffer.putShort(2, (short) 0x0000);
+      buffer.putInt(4, (1 << 0) | (1 << 16));
+      block[8] = (byte) 0x21;
+
+      var segment = Arena.ofConfined().allocate(24);
+      MemorySegment.copy(block, 0, segment, ValueLayout.JAVA_BYTE, 0, 24);
+
+      float[] dst = new float[32];
+      new Q5_1Dequantizer().dequantize(segment, 0, dst, 0, 32);
+
+      assertThat(dst[0]).as("low nibble plus its fifth bit").isEqualTo(17.0f);
+      assertThat(dst[16]).as("high nibble plus bit j+16, not an adjacent bit").isEqualTo(18.0f);
+      assertThat(dst[1]).as("an unset fifth bit leaves the nibble alone").isEqualTo(0.0f);
+    }
+
+    @Test
+    void reachesTheFullFiveBitRange() {
+      // d = 1.0, m = 0.0, nibble byte = 0xFF, both fifth bits set -> 15 + 16 = 31, the maximum.
+      byte[] block = new byte[24];
+      ByteBuffer buffer = ByteBuffer.wrap(block).order(ByteOrder.LITTLE_ENDIAN);
+      buffer.putShort(0, (short) 0x3C00);
+      buffer.putInt(4, (1 << 0) | (1 << 16));
+      block[8] = (byte) 0xFF;
+
+      var segment = Arena.ofConfined().allocate(24);
+      MemorySegment.copy(block, 0, segment, ValueLayout.JAVA_BYTE, 0, 24);
+
+      float[] dst = new float[32];
+      new Q5_1Dequantizer().dequantize(segment, 0, dst, 0, 32);
+
+      assertThat(dst[0]).isEqualTo(31.0f);
+      assertThat(dst[16]).isEqualTo(31.0f);
+    }
+  }
 }

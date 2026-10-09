@@ -1335,6 +1335,52 @@ class TensorOpsTest {
     }
 
     @Test
+    void q5_1SingleTokenAndBatchedPathsAgree() {
+      // Q5_1 reached the batched dispatch when the mixed-quantization embedding artifacts needed
+      // it and the single-token dispatch had no case at all, so a decoder carrying a Q5_1 tensor
+      // threw where an embedder succeeded. Two rows and a batch of two, because one row cannot
+      // fail on a row-stride mistake and a batch of one cannot fail on a batch-stride one.
+      int cols = 64;
+      int rows = 2;
+      byte[] weights = new byte[rows * 2 * 24];
+      ByteBuffer buffer = ByteBuffer.wrap(weights).order(ByteOrder.LITTLE_ENDIAN);
+      for (int block = 0; block < rows * 2; block++) {
+        int base = block * 24;
+        buffer.putShort(base, (short) (block % 2 == 0 ? 0x3C00 : 0x3800));
+        buffer.putShort(base + 2, (short) (block % 2 == 0 ? 0xC200 : 0x4100));
+        buffer.putInt(base + 4, 0x3C5A_A5C3 + block);
+        for (int i = 0; i < 16; i++) {
+          weights[base + 8 + i] = (byte) ((i * 13 + block * 7 + 1) & 0xFF);
+        }
+      }
+
+      float[] x = new float[2 * cols];
+      for (int i = 0; i < x.length; i++) {
+        x[i] = (i % 11) * 0.125f - 0.75f;
+      }
+
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment qWeight = copy(arena, weights);
+
+        float[] batched = new float[2 * rows];
+        TensorOps.ggufExactBatchedMatmul(
+            batched, x, qWeight, GgufTensorType.Q5_1, 2, rows, cols, new float[cols]);
+
+        float[] single = new float[rows];
+        TensorOps.quantizedMatmul(single, x, qWeight, GgufTensorType.Q5_1, rows, cols);
+
+        for (int row = 0; row < rows; row++) {
+          // Exactly, not closely: a decoder and an embedder on the same weights must not disagree
+          // in the last bits because of which dispatch they took.
+          assertThat(single[row]).as("row %s", row).isEqualTo(batched[row]);
+        }
+        assertThat(batched[rows])
+            .as("the second batch element must not equal the first, or the fixture proves nothing")
+            .isNotEqualTo(batched[0]);
+      }
+    }
+
+    @Test
     void rejectsNonBlockAlignedQ4_0Dimensions() {
       try (Arena arena = Arena.ofConfined()) {
         MemorySegment qWeight = copy(arena, q4Block(1.0f));

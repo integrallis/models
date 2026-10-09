@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.ops;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
 import com.integrallis.models.backend.purejava.quant.Mxfp4Dequantizer;
+import com.integrallis.models.backend.purejava.quant.Q5_1Dequantizer;
 import com.integrallis.vectors.core.BFloat16Matrix;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
@@ -178,6 +179,7 @@ public final class TensorOps {
       float[] out, float[] x, MemorySegment qWeight, GgufTensorType type, int rows, int cols) {
     if (type == GgufTensorType.Q4_0
         || type == GgufTensorType.Q5_0
+        || type == GgufTensorType.Q5_1
         || type == GgufTensorType.Q8_0
         || type == GgufTensorType.Q4_K
         || type == GgufTensorType.Q5_K
@@ -295,6 +297,29 @@ public final class TensorOps {
     for (int row = from; row < to; row++) {
       out[row] = Mxfp4Dequantizer.dotProduct(qWeight, row * rowBytes, x, 0, cols);
     }
+  }
+
+  /**
+   * Single-token Q5_1 projection, which is the batched one at a batch of one.
+   *
+   * <p>Deliberately not a hand-written scalar dot product. Q5_1's own factored form -- scale times
+   * the sum of {@code q * x} plus minimum times the sum of {@code x} -- is a different fold order
+   * from {@link PinnedReduction#dot}, so a decoder and an embedder running the same weights would
+   * have disagreed in the last bits depending on which dispatch they took. This codebase has
+   * already paid for a reduction whose order depended on something other than the data; see the
+   * width switch {@code PinnedReduction} exists to remove. Routing both batch sizes through one
+   * routine makes the two agree exactly rather than closely.
+   */
+  private static void q5_1Matmul(
+      float[] out, float[] x, MemorySegment qWeight, int rows, int cols) {
+    if (cols % Q5_1Dequantizer.BLOCK_SIZE != 0) {
+      throw new IllegalArgumentException(
+          "Q5_1 row length must be a multiple of "
+              + Q5_1Dequantizer.BLOCK_SIZE
+              + ", but was "
+              + cols);
+    }
+    ggufExactBatchedMatmul(out, x, qWeight, GgufTensorType.Q5_1, 1, rows, cols, new float[cols]);
   }
 
   /**
@@ -467,6 +492,11 @@ public final class TensorOps {
           VectorUtil.ggufQ6_KQ8_KBatchDotProduct(
               x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
       case MXFP4 -> mxfp4Matmul(out, x, qWeight, rows, cols);
+      // Exact, like the batched Q5_1 path: the reference's integer kernel pairs Q5_1 with Q8_1
+      // activations because it needs their block sums for the minimum term, and nothing on this
+      // side carries a Q8_1 block sum. Dequantizing the row costs the same read either way and
+      // skips the activation quantization rather than approximating it.
+      case Q5_1 -> q5_1Matmul(out, x, qWeight, rows, cols);
       default -> throw new UnsupportedOperationException("GGUF matmul not supported for: " + type);
     }
   }
@@ -1397,6 +1427,7 @@ public final class TensorOps {
         || type == GgufTensorType.Q4_0
         || type == GgufTensorType.BF16
         || type == GgufTensorType.Q5_0
+        || type == GgufTensorType.Q5_1
         || type == GgufTensorType.Q8_0
         || type == GgufTensorType.Q4_K
         || type == GgufTensorType.Q5_K
@@ -1559,6 +1590,14 @@ public final class TensorOps {
               quantizedActivations,
               quantizedActivationScales,
               q6BatchedKernel);
+      // Q5_1 carries a per-block minimum rather than a centred quant, so it has no Qx-by-Q8
+      // kernel: the Q8 activation path folds a bias it cannot express. It therefore takes the
+      // exact mapped-weight route, dequantizing one weight row at a time against F32 activations.
+      // Correct and allocation-free, and it is what makes the mixed-quantization embedding
+      // artifacts loadable at all -- all-MiniLM-L6-v2 and granite-embedding-107m carry Q5_1
+      // attention tensors at Q4_K_S, Q5_K_S and Q5_K_M.
+      case Q5_1 ->
+          ggufExactBatchedMatmul(out, x, qWeight, type, batchSize, rows, cols, new float[cols]);
       default -> throw new AssertionError("unhandled batched matmul type: " + type);
     }
   }

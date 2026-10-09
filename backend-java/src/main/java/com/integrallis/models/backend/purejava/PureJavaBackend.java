@@ -57,6 +57,7 @@ import com.integrallis.models.backend.purejava.huggingface.Qwen2HuggingFaceConfi
 import com.integrallis.models.backend.purejava.internal.ModelMemoryArena;
 import com.integrallis.models.backend.purejava.lfm2.Lfm2Config;
 import com.integrallis.models.backend.purejava.lfm2.Lfm2ForwardPass;
+import com.integrallis.models.backend.purejava.lfm2.Lfm2SequenceEncoder;
 import com.integrallis.models.backend.purejava.llama.DenseProjectionHead;
 import com.integrallis.models.backend.purejava.llama.EncoderForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
@@ -1007,8 +1008,14 @@ public final class PureJavaBackend
             planConfiguration,
             batchedMatrixKernel);
     int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
+    // An lfm2 file that declares attention.causal = false is an encoder, and the decoder cannot
+    // serve it: its attention would mask away the tokens the model was trained to see and its
+    // convolution would look only backwards. Measured against llama.cpp, the decoder returned
+    // worst-probe cosine 0.03 on all seven LFM2.5-Embedding artifacts.
     PureJavaDecoder decoder =
-        new Lfm2DecoderAdapter(Lfm2ForwardPass.fromGgufFile(file, config, contextCapacity));
+        config.encodesWholeSequence()
+            ? new EncoderDecoderAdapter(Lfm2SequenceEncoder.fromGgufFile(file, config))
+            : new Lfm2DecoderAdapter(Lfm2ForwardPass.fromGgufFile(file, config, contextCapacity));
     ModelMetadata metadata =
         new ModelMetadata(
             "lfm2",

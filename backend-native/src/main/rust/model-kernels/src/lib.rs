@@ -89,6 +89,16 @@ const CAPABILITY_POLL_BUDGET: u64 = 1 << 21;
 /// Several independent sequences advance one token each in one launch, against one recurrent
 /// state apiece. This is what lets a group of questions about one piece of evidence use the pool.
 const CAPABILITY_GROUPED_GATED_DELTA_NET_F32: u64 = 1 << 22;
+/// Q5_1 rows against **F32** activations, not quantized ones.
+///
+/// Every other quantized format here dots against a Q8_0 or Q8_K activation, because integer
+/// accumulation is exact and therefore folds in any order -- which is what lets the shim and the
+/// Java kernel agree bit for bit. Q5_1 carries a per-block minimum rather than centring its
+/// quants, so the reference pairs it with Q8_1 for the block sums that minimum needs, and nothing
+/// on the Java side carries a Q8_1 block sum. Rather than invent a second arithmetic for one
+/// format, this reproduces what Java does: dequantize the row and dot in F32 along
+/// `PinnedReduction`'s pinned fold order. The parity test asserts equality, not closeness.
+const CAPABILITY_Q5_1_F32_BATCHED_MATMUL: u64 = 1 << 23;
 
 const STATUS_OK: i32 = 0;
 const STATUS_NULL_POINTER: i32 = 1;
@@ -101,6 +111,7 @@ const QK_K: usize = 256;
 const Q8_K_SUM_BLOCK: usize = 16;
 const Q4_0_BLOCK_BYTES: usize = 18;
 const Q5_0_BLOCK_BYTES: usize = 22;
+const Q5_1_BLOCK_BYTES: usize = 24;
 const Q8_0_BLOCK_BYTES: usize = 34;
 const Q4_K_BLOCK_BYTES: usize = 144;
 const Q5_K_BLOCK_BYTES: usize = 176;
@@ -179,6 +190,9 @@ enum DotKernel {
     Q5Avx2,
     #[cfg(target_arch = "aarch64")]
     Q5Neon,
+    Q5_1,
+    #[cfg(target_arch = "x86_64")]
+    Q5_1Avx2,
     Q8,
     #[cfg(target_arch = "x86_64")]
     Q8Avx2,
@@ -203,6 +217,7 @@ enum DotKernel {
 enum WeightFormat {
     Q4_0,
     Q5_0,
+    Q5_1,
     Q8_0,
     Q4K,
     Q5K,
@@ -213,6 +228,8 @@ enum WeightFormat {
 enum ActivationFormat {
     Q8_0,
     Q8K,
+    /// No activation quantization: the row kernel reads the caller's F32 activations directly.
+    F32,
 }
 
 impl WeightFormat {
@@ -224,6 +241,7 @@ impl WeightFormat {
             3 => Some(Self::Q6K),
             4 => Some(Self::Q5K),
             5 => Some(Self::Q5_0),
+            6 => Some(Self::Q5_1),
             _ => None,
         }
     }
@@ -232,6 +250,7 @@ impl WeightFormat {
         match self {
             Self::Q4_0 => Q4_0_BLOCK_BYTES,
             Self::Q5_0 => Q5_0_BLOCK_BYTES,
+            Self::Q5_1 => Q5_1_BLOCK_BYTES,
             Self::Q8_0 => Q8_0_BLOCK_BYTES,
             Self::Q4K => Q4_K_BLOCK_BYTES,
             Self::Q5K => Q5_K_BLOCK_BYTES,
@@ -241,7 +260,7 @@ impl WeightFormat {
 
     fn block_elements(self) -> usize {
         match self {
-            Self::Q4_0 | Self::Q5_0 | Self::Q8_0 => QK_0,
+            Self::Q4_0 | Self::Q5_0 | Self::Q5_1 | Self::Q8_0 => QK_0,
             Self::Q4K | Self::Q5K | Self::Q6K => QK_K,
         }
     }
@@ -249,6 +268,7 @@ impl WeightFormat {
     fn activation_format(self) -> ActivationFormat {
         match self {
             Self::Q4_0 | Self::Q5_0 | Self::Q8_0 => ActivationFormat::Q8_0,
+            Self::Q5_1 => ActivationFormat::F32,
             Self::Q4K | Self::Q5K | Self::Q6K => ActivationFormat::Q8K,
         }
     }
@@ -257,6 +277,7 @@ impl WeightFormat {
         match self {
             Self::Q4_0 => selected_q4_kernel(),
             Self::Q5_0 => selected_q5_kernel(),
+            Self::Q5_1 => selected_q5_1_kernel(),
             Self::Q8_0 => selected_q8_kernel(),
             Self::Q4K => selected_q4_k_kernel(),
             Self::Q5K => selected_q5_k_kernel(),
@@ -345,6 +366,10 @@ struct MatrixJob {
     scale_elements: usize,
     activation_sums: usize,
     sum_elements: usize,
+    /// The caller's F32 activations, for formats whose activation format is
+    /// [`ActivationFormat::F32`]. Zero-length for every other format, and read by no other kernel.
+    activations: usize,
+    activation_elements: usize,
     batch_size: usize,
     cols: usize,
 }
@@ -796,6 +821,16 @@ unsafe fn execute_matrix_job_partition(
         let activation_sums = unsafe {
             slice::from_raw_parts(matrix.activation_sums as *const i16, matrix.sum_elements)
         };
+        // Empty for every format but the F32-activation ones, whose row kernel reads it instead
+        // of the quantized activations. A null pointer with a zero length is not a valid slice,
+        // so the empty case is built without dereferencing the pointer at all.
+        let activations: &[f32] = if matrix.activation_elements == 0 {
+            &[]
+        } else {
+            unsafe {
+                slice::from_raw_parts(matrix.activations as *const f32, matrix.activation_elements)
+            }
+        };
         let start_row = matrix.rows * worker_index / total_threads;
         let end_row = matrix.rows * (worker_index + 1) / total_threads;
         if start_row == end_row {
@@ -810,6 +845,7 @@ unsafe fn execute_matrix_job_partition(
                 quantized,
                 activation_scales,
                 activation_sums,
+                activations,
                 matrix.output as *mut f32,
                 matrix.batch_size,
                 matrix.rows,
@@ -1697,6 +1733,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_Q5_K_F32_BATCHED_MATMUL
         | CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL
         | CAPABILITY_Q5_0_F32_BATCHED_MATMUL
+        | CAPABILITY_Q5_1_F32_BATCHED_MATMUL
         | CAPABILITY_Q5_0_F32_GROUPED_BATCHED_MATMUL
         | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
         | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
@@ -2683,7 +2720,12 @@ fn quantized_f32_batched_matmul(
     let input = unsafe { slice::from_raw_parts(input, required_input_elements) };
     let output = unsafe { slice::from_raw_parts_mut(output, required_output_elements) };
 
-    let scale_elements = batch_size * blocks_per_row;
+    // An F32 activation format prepares no per-block scales, so it must not reserve any: the
+    // scratch length is what the row kernel's bounds checks are written against.
+    let scale_elements = match format.activation_format() {
+        ActivationFormat::F32 => 0,
+        _ => batch_size * blocks_per_row,
+    };
     let sum_elements = activation_sum_elements(format.activation_format(), batch_size, cols);
     let succeeded = if let Some(context) = context {
         let mut scratch = lock(&context.scratch);
@@ -2741,12 +2783,17 @@ fn compute_with_scratch(
         &mut scratch.scales,
         &mut scratch.sums,
     );
+    let activations: &[f32] = match format.activation_format() {
+        ActivationFormat::F32 => input,
+        _ => &[],
+    };
     compute_outputs(
         context,
         weights,
         &scratch.quantized,
         &scratch.scales,
         &scratch.sums,
+        activations,
         batch_size,
         rows,
         cols,
@@ -2961,6 +3008,15 @@ fn quantized_f32_independent_batched_matmul(
         if weight_pointers[matrix].is_null() || matrix_rows == 0 || batch_size == 0 {
             return STATUS_INVALID_SHAPE;
         }
+        // A grouped job shares one quantized activation across its matrices, which is the whole
+        // point of grouping; a format that dots against F32 activations has nothing to share and
+        // is refused here rather than silently handed an empty activation slice.
+        if matches!(
+            formats[matrix].activation_format(),
+            ActivationFormat::F32
+        ) {
+            return STATUS_INVALID_SHAPE;
+        }
         let Some(matrix_input_elements) = batch_size.checked_mul(cols) else {
             return STATUS_INVALID_SHAPE;
         };
@@ -3082,6 +3138,11 @@ fn compute_independent_with_scratch(
             activation_scales: unsafe { scratch.scales.as_ptr().add(scale_offset) } as usize,
             scale_elements,
             activation_sums: unsafe { scratch.sums.as_ptr().add(sum_offset) } as usize,
+            // Grouping refuses an F32-activation format outright, above, so no grouped job ever
+            // needs this channel. Passing an empty one would make a wrong answer -- zeros -- out
+            // of a format that reached here by mistake, so the refusal is the guard, not this.
+            activations: 0,
+            activation_elements: 0,
             sum_elements,
             batch_size,
             cols,
@@ -3144,6 +3205,8 @@ fn compute_grouped_with_scratch(
                 scale_elements: scratch.scales.len(),
                 activation_sums: scratch.sums.as_ptr() as usize,
                 sum_elements: scratch.sums.len(),
+                activations: 0,
+                activation_elements: 0,
                 batch_size,
                 cols,
             });
@@ -3173,6 +3236,7 @@ fn compute_grouped_with_scratch(
             &scratch.quantized,
             &scratch.scales,
             &scratch.sums,
+            &[],
             batch_size,
             matrix_rows,
             cols,
@@ -3193,6 +3257,7 @@ fn compute_outputs(
     quantized: &[i8],
     activation_scales: &[f32],
     activation_sums: &[i16],
+    activations: &[f32],
     batch_size: usize,
     rows: usize,
     cols: usize,
@@ -3213,6 +3278,8 @@ fn compute_outputs(
             scale_elements: activation_scales.len(),
             activation_sums: activation_sums.as_ptr() as usize,
             sum_elements: activation_sums.len(),
+            activations: activations.as_ptr() as usize,
+            activation_elements: activations.len(),
             batch_size,
             cols,
         });
@@ -3232,6 +3299,7 @@ fn compute_outputs(
             quantized,
             activation_scales,
             activation_sums,
+            activations,
             rows,
             cols,
             0,
@@ -3251,6 +3319,7 @@ fn compute_outputs(
                     quantized,
                     activation_scales,
                     activation_sums,
+                    activations,
                     rows,
                     cols,
                     start_index,
@@ -3270,6 +3339,7 @@ unsafe fn compute_batched_row_range(
     quantized: &[i8],
     activation_scales: &[f32],
     activation_sums: &[i16],
+    activations: &[f32],
     output: *mut f32,
     batch_size: usize,
     rows: usize,
@@ -3279,6 +3349,37 @@ unsafe fn compute_batched_row_range(
     kernel: DotKernel,
 ) {
     match kernel {
+        DotKernel::Q5_1 => {
+            // SAFETY: the caller assigns this worker an exclusive matrix-row range.
+            unsafe {
+                compute_q5_1_batched_row_range_scalar(
+                    weights,
+                    activations,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
+        #[cfg(target_arch = "x86_64")]
+        DotKernel::Q5_1Avx2 => {
+            // SAFETY: runtime dispatch selected this variant only with AVX2, FMA and F16C.
+            unsafe {
+                compute_q5_1_batched_row_range_avx2(
+                    weights,
+                    activations,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
         DotKernel::Q4 => {
             // SAFETY: the caller assigns this worker an exclusive matrix-row range.
             unsafe {
@@ -4622,6 +4723,7 @@ fn compute_output_range(
     quantized: &[i8],
     activation_scales: &[f32],
     activation_sums: &[i16],
+    activations: &[f32],
     rows: usize,
     cols: usize,
     start_index: usize,
@@ -4652,6 +4754,13 @@ fn compute_output_range(
                 unsafe {
                     dot_q5_0_q8_0_row_avx2(weights, quantized, activation_scales, batch, row, cols)
                 }
+            }
+            DotKernel::Q5_1 => dot_q5_1_f32_row_scalar(weights, activations, batch, row, cols),
+            #[cfg(target_arch = "x86_64")]
+            DotKernel::Q5_1Avx2 => {
+                // SAFETY: this variant is selected only after runtime AVX2, FMA and F16C
+                // detection.
+                unsafe { dot_q5_1_f32_row_avx2(weights, activations, batch, row, cols) }
             }
             DotKernel::Q8 => {
                 dot_q8_0_q8_0_row_scalar(weights, quantized, activation_scales, batch, row, cols)
@@ -4806,6 +4915,17 @@ fn selected_q8_kernel() -> DotKernel {
         return DotKernel::Q8Neon;
     }
     DotKernel::Q8
+}
+
+fn selected_q5_1_kernel() -> DotKernel {
+    #[cfg(target_arch = "x86_64")]
+    if std::arch::is_x86_feature_detected!("avx2")
+        && std::arch::is_x86_feature_detected!("fma")
+        && std::arch::is_x86_feature_detected!("f16c")
+    {
+        return DotKernel::Q5_1Avx2;
+    }
+    DotKernel::Q5_1
 }
 
 fn selected_q5_kernel() -> DotKernel {
@@ -5099,6 +5219,226 @@ unsafe fn unpack_q5_0_avx2(high_bits: *const u8, packed_weights: *const u8) -> _
     let signed_high_nibble =
         _mm256_andnot_si256(clear_high_nibble, _mm256_set1_epi8(0xf0_u8 as i8));
     _mm256_or_si256(nibbles, signed_high_nibble)
+}
+
+/// Q5_1 against F32 activations, folded exactly as Java's `PinnedReduction.dot` folds.
+///
+/// Parity, not speed, dictates the shape. `PinnedReduction` keeps four eight-lane accumulators and
+/// steps thirty-two elements per iteration -- which is exactly one Q5_1 block -- so one block maps
+/// to one iteration and the fold order falls out without buffering the row. The multiply by the
+/// block scale and the add of the block minimum are kept separate because Java writes
+/// `q * d + m`, which is a multiply then an add and not a fused one; fusing it here would change
+/// the last bits. The lane fold is `((l4+l0) + (l6+l2)) + ((l5+l1) + (l7+l3))`, transcribed from
+/// `reduceLanesPinned`, and the species is pinned to 256 bits on the Java side, which is what
+/// makes an AVX2 register the right width rather than a coincidence.
+fn dot_q5_1_f32_row_scalar(
+    weights: &[u8],
+    activations: &[f32],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
+    let blocks_per_row = cols / QK_0;
+    let mut accumulators = [0_f32; QK_0];
+    for block in 0..blocks_per_row {
+        let weight_offset = (row * blocks_per_row + block) * Q5_1_BLOCK_BYTES;
+        let scale = f16_to_f32(u16::from_le_bytes([
+            weights[weight_offset],
+            weights[weight_offset + 1],
+        ]));
+        let minimum = f16_to_f32(u16::from_le_bytes([
+            weights[weight_offset + 2],
+            weights[weight_offset + 3],
+        ]));
+        let bit_plane = u32::from_le_bytes([
+            weights[weight_offset + 4],
+            weights[weight_offset + 5],
+            weights[weight_offset + 6],
+            weights[weight_offset + 7],
+        ]);
+        let nibble_offset = weight_offset + 8;
+        let mut dequantized = [0_f32; QK_0];
+        for index in 0..QK_0 / 2 {
+            let packed = weights[nibble_offset + index];
+            let low = u32::from(packed & 0x0F) | (((bit_plane >> index) << 4) & 0x10);
+            let high = u32::from(packed >> 4) | ((bit_plane >> (index + 12)) & 0x10);
+            dequantized[index] = low as f32 * scale + minimum;
+            dequantized[index + QK_0 / 2] = high as f32 * scale + minimum;
+        }
+        let input_offset = batch * cols + block * QK_0;
+        for index in 0..QK_0 {
+            accumulators[index] =
+                activations[input_offset + index].mul_add(dequantized[index], accumulators[index]);
+        }
+    }
+    let mut folded = [0_f32; 8];
+    for lane in 0..8 {
+        folded[lane] = (accumulators[lane] + accumulators[8 + lane])
+            + (accumulators[16 + lane] + accumulators[24 + lane]);
+    }
+    let even = (folded[4] + folded[0]) + (folded[6] + folded[2]);
+    let odd = (folded[5] + folded[1]) + (folded[7] + folded[3]);
+    even + odd
+}
+
+/// Expands one Q5_1 block's thirty-two five-bit quants to unsigned bytes in 0..31.
+///
+/// The nibble split and bit-plane shuffle are [`unpack_q5_0_avx2`]'s, because the fifth-bit plane
+/// is laid out identically: lane `k` tests bit `k`, which is exactly Q5_1's rule that element `j`
+/// takes bit `j` and element `j + 16` takes bit `j + 16`. Only the last step differs. Q5_0 ORs in
+/// `0xf0` to sign-extend a centred quant; Q5_1 carries its offset in the block minimum instead, so
+/// the fifth bit is bit four of an unsigned value and nothing else changes.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn unpack_q5_1_avx2(high_bits: *const u8, packed_weights: *const u8) -> __m256i {
+    // SAFETY: callers provide the 16 packed bytes and four-byte bit plane from one Q5_1 block.
+    let packed = unsafe { _mm_loadu_si128(packed_weights.cast()) };
+    let nibbles = _mm256_and_si256(
+        _mm256_inserti128_si256(_mm256_castsi128_si256(packed), _mm_srli_epi16(packed, 4), 1),
+        _mm256_set1_epi8(0x0f),
+    );
+    let bit_plane = u32::from_le(unsafe { high_bits.cast::<u32>().read_unaligned() });
+    let shuffled_bits = _mm256_shuffle_epi8(
+        _mm256_set1_epi32(bit_plane as i32),
+        _mm256_set_epi64x(
+            0x0303_0303_0303_0303,
+            0x0202_0202_0202_0202,
+            0x0101_0101_0101_0101,
+            0,
+        ),
+    );
+    let fifth_bit_set = _mm256_cmpeq_epi8(
+        _mm256_set1_epi64x(-1),
+        _mm256_or_si256(
+            _mm256_set1_epi64x(0x7fbf_dfef_f7fb_fdfe_u64 as i64),
+            shuffled_bits,
+        ),
+    );
+    _mm256_or_si256(
+        nibbles,
+        _mm256_and_si256(fifth_bit_set, _mm256_set1_epi8(0x10)),
+    )
+}
+
+/// The AVX2 form of [`dot_q5_1_f32_row_scalar`], and bit-identical to it by construction.
+///
+/// Every operation has the same kind and the same order as the scalar version: a widening
+/// unsigned byte-to-float conversion, a multiply by the scale and a separate add of the minimum,
+/// four fused multiply-adds into four accumulators per block, the pairwise accumulator fold and
+/// then the pinned lane fold. A test asserts the two agree exactly on random blocks rather than
+/// trusting that reading.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn dot_q5_1_f32_row_avx2(
+    weights: &[u8],
+    activations: &[f32],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
+    let blocks_per_row = cols / QK_0;
+    let mut accumulators = [_mm256_setzero_ps(); 4];
+    for block in 0..blocks_per_row {
+        let weight_offset = (row * blocks_per_row + block) * Q5_1_BLOCK_BYTES;
+        let scale = _mm256_set1_ps(f16_to_f32(u16::from_le_bytes([
+            weights[weight_offset],
+            weights[weight_offset + 1],
+        ])));
+        let minimum = _mm256_set1_ps(f16_to_f32(u16::from_le_bytes([
+            weights[weight_offset + 2],
+            weights[weight_offset + 3],
+        ])));
+        // SAFETY: the block's bit plane and sixteen nibble bytes are inside the validated row.
+        let quants = unsafe {
+            unpack_q5_1_avx2(
+                weights.as_ptr().add(weight_offset + 4),
+                weights.as_ptr().add(weight_offset + 8),
+            )
+        };
+        let low = _mm256_extracti128_si256(quants, 0);
+        let high = _mm256_extracti128_si256(quants, 1);
+        let groups = [
+            _mm256_cvtepu8_epi32(low),
+            _mm256_cvtepu8_epi32(_mm_srli_si128(low, 8)),
+            _mm256_cvtepu8_epi32(high),
+            _mm256_cvtepu8_epi32(_mm_srli_si128(high, 8)),
+        ];
+        let input_offset = batch * cols + block * QK_0;
+        for group in 0..4 {
+            // Multiply then add, never fused: Java computes q * d + m as two operations.
+            let weight = _mm256_add_ps(
+                _mm256_mul_ps(_mm256_cvtepi32_ps(groups[group]), scale),
+                minimum,
+            );
+            // SAFETY: input_offset + 32 is within the activation row checked by the caller.
+            let activation =
+                unsafe { _mm256_loadu_ps(activations.as_ptr().add(input_offset + group * 8)) };
+            accumulators[group] = _mm256_fmadd_ps(activation, weight, accumulators[group]);
+        }
+    }
+    let folded = _mm256_add_ps(
+        _mm256_add_ps(accumulators[0], accumulators[1]),
+        _mm256_add_ps(accumulators[2], accumulators[3]),
+    );
+    let mut lanes = [0_f32; 8];
+    // SAFETY: the destination is eight floats, which is the register's width.
+    unsafe { _mm256_storeu_ps(lanes.as_mut_ptr(), folded) };
+    let even = (lanes[4] + lanes[0]) + (lanes[6] + lanes[2]);
+    let odd = (lanes[5] + lanes[1]) + (lanes[7] + lanes[3]);
+    even + odd
+}
+
+/// One worker's band of Q5_1 output rows, scalar.
+///
+/// Rows are the partition, as everywhere else here, so no two workers contribute to one reduction
+/// and the pinned fold order is untouched by how many threads run. This is also the only Q5_1
+/// kernel on a non-x86-64 host: the scalar routine is the normative one, so aarch64 is bit-exact
+/// with Java without a NEON variant, and claiming parity for one would require its own test.
+#[allow(clippy::too_many_arguments)]
+unsafe fn compute_q5_1_batched_row_range_scalar(
+    weights: &[u8],
+    activations: &[f32],
+    output: *mut f32,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
+    for row in start_row..end_row {
+        for batch in 0..batch_size {
+            let value = dot_q5_1_f32_row_scalar(weights, activations, batch, row, cols);
+            // SAFETY: the caller assigns this worker an exclusive row range of the output.
+            unsafe { *output.add(batch * rows + row) = value };
+        }
+    }
+}
+
+/// One worker's band of Q5_1 output rows, AVX2.
+///
+/// Split from the scalar form rather than selected by a flag inside it, which is both the house
+/// shape for every other format here and the reason this compiles on aarch64 at all: a runtime
+/// bool still names the x86 symbol on every target.
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments)]
+unsafe fn compute_q5_1_batched_row_range_avx2(
+    weights: &[u8],
+    activations: &[f32],
+    output: *mut f32,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
+    for row in start_row..end_row {
+        for batch in 0..batch_size {
+            // SAFETY: the caller selected this only after AVX2, FMA and F16C detection.
+            let value = unsafe { dot_q5_1_f32_row_avx2(weights, activations, batch, row, cols) };
+            // SAFETY: the caller assigns this worker an exclusive row range of the output.
+            unsafe { *output.add(batch * rows + row) = value };
+        }
+    }
 }
 
 fn dot_q8_0_q8_0_row_scalar(
@@ -5657,7 +5997,7 @@ fn qk_min(scales: &[u8], group: usize) -> i32 {
 
 fn activation_sum_elements(format: ActivationFormat, batch_size: usize, cols: usize) -> usize {
     match format {
-        ActivationFormat::Q8_0 => 0,
+        ActivationFormat::Q8_0 | ActivationFormat::F32 => 0,
         ActivationFormat::Q8K => batch_size * cols / Q8_K_SUM_BLOCK,
     }
 }
@@ -5678,6 +6018,8 @@ fn quantize_activation_batch(
         ActivationFormat::Q8K => {
             quantize_q8_k_batch(input, batch_size, cols, quantized, scales, sums);
         }
+        // Nothing to prepare: the row kernel reads `input` itself.
+        ActivationFormat::F32 => {}
     }
 }
 
@@ -5940,6 +6282,8 @@ mod tests {
             scale_elements: 0,
             activation_sums: 0,
             sum_elements: 0,
+            activations: 0,
+            activation_elements: 0,
             batch_size: 1,
             cols: 1,
         }
@@ -6043,6 +6387,7 @@ mod tests {
                 | CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_Q5_0_F32_BATCHED_MATMUL
                 | CAPABILITY_Q5_0_F32_GROUPED_BATCHED_MATMUL
+                | CAPABILITY_Q5_1_F32_BATCHED_MATMUL
                 | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
                 | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
                 | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL
@@ -6380,6 +6725,8 @@ mod tests {
                 scale_elements: scales.len(),
                 activation_sums: sums.as_ptr() as usize,
                 sum_elements: sums.len(),
+                activations: 0,
+                activation_elements: 0,
                 batch_size: 1,
                 cols,
             });
@@ -7784,6 +8131,162 @@ mod tests {
         assert_eq!(
             unsafe { jmodels_kernels_context_destroy(context) },
             STATUS_OK
+        );
+    }
+
+    /// A pseudo-random Q5_1 weight block set, varied on every axis the kernel reads.
+    ///
+    /// Varied deliberately: a fixture with one scale, a zero minimum or an empty bit plane cannot
+    /// fail on the scale, the minimum or the fifth bits, which are three of the four things that
+    /// distinguish Q5_1 from Q5_0.
+    fn q5_1_rows(rows: usize, blocks_per_row: usize, seed: u32) -> Vec<u8> {
+        let mut state = seed | 1;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        let mut bytes = vec![0_u8; rows * blocks_per_row * Q5_1_BLOCK_BYTES];
+        for block in 0..rows * blocks_per_row {
+            let base = block * Q5_1_BLOCK_BYTES;
+            // Exponents kept near 1.0 so the comparison is about the arithmetic and not about
+            // flushing a subnormal; both halves of the f16 sign range are used.
+            let scale = 0x3000 | (next() & 0x03FF) as u16;
+            let minimum = ((next() & 1) << 15) as u16 | 0x3000 | (next() & 0x03FF) as u16;
+            bytes[base..base + 2].copy_from_slice(&scale.to_le_bytes());
+            bytes[base + 2..base + 4].copy_from_slice(&minimum.to_le_bytes());
+            bytes[base + 4..base + 8].copy_from_slice(&next().to_le_bytes());
+            for index in 0..16 {
+                bytes[base + 8 + index] = next() as u8;
+            }
+        }
+        bytes
+    }
+
+    fn q5_1_activations(elements: usize, seed: u32) -> Vec<f32> {
+        let mut state = seed | 1;
+        (0..elements)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 17;
+                state ^= state << 5;
+                (state % 2_003) as f32 / 1_000.0 - 1.0
+            })
+            .collect()
+    }
+
+    #[test]
+    fn q5_1_unpack_matches_the_block_layout() {
+        // Element j takes bit j of the plane and element j + 16 takes bit j + 16, and the quant is
+        // unsigned 0..31 rather than centred. Checked against a scalar expansion of the same
+        // bytes, since that is the rule llama.cpp's block_q5_1 states.
+        let bytes = q5_1_rows(1, 1, 0x9E37_79B9);
+        let bit_plane = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+        let mut expected = [0_u8; QK_0];
+        for index in 0..16 {
+            let packed = bytes[8 + index];
+            expected[index] = ((packed & 0x0F) as u32 | (((bit_plane >> index) << 4) & 0x10)) as u8;
+            expected[index + 16] =
+                ((packed >> 4) as u32 | ((bit_plane >> (index + 12)) & 0x10)) as u8;
+        }
+        for value in expected {
+            assert!(value < 32, "Q5_1 quants are five bits: {value}");
+        }
+        assert!(
+            expected.iter().any(|value| *value >= 16),
+            "the fixture must set some fifth bits or it proves nothing about them"
+        );
+
+        #[cfg(target_arch = "x86_64")]
+        if std::arch::is_x86_feature_detected!("avx2") {
+            let mut actual = [0_u8; QK_0];
+            // SAFETY: AVX2 was just detected and the block carries its plane and sixteen nibbles.
+            unsafe {
+                let unpacked = unpack_q5_1_avx2(bytes.as_ptr().add(4), bytes.as_ptr().add(8));
+                _mm256_storeu_si256(actual.as_mut_ptr().cast(), unpacked);
+            }
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn q5_1_scalar_and_avx2_rows_agree_exactly() {
+        // Exactly, not closely. The shim and the Java kernel are only interchangeable if every
+        // dot of the same weights and activations returns the same bits, so a tolerance here
+        // would hide the one failure this test exists to catch.
+        let rows = 3;
+        let blocks_per_row = 5;
+        let cols = blocks_per_row * QK_0;
+        let batch_size = 2;
+        let weights = q5_1_rows(rows, blocks_per_row, 0x1234_5678);
+        let activations = q5_1_activations(batch_size * cols, 0x8765_4321);
+
+        // The scalar kernel is the normative one and is the only Q5_1 kernel on a non-x86-64
+        // host, so it is exercised on every target rather than only where there is something to
+        // compare it against: every output finite, not all equal, and the same on a second call.
+        let mut scalars = Vec::new();
+        for batch in 0..batch_size {
+            for row in 0..rows {
+                let value = dot_q5_1_f32_row_scalar(&weights, &activations, batch, row, cols);
+                assert!(value.is_finite(), "batch {batch} row {row} is not finite");
+                assert_eq!(
+                    value.to_bits(),
+                    dot_q5_1_f32_row_scalar(&weights, &activations, batch, row, cols).to_bits(),
+                    "batch {batch} row {row} is not deterministic"
+                );
+                scalars.push(value);
+            }
+        }
+        assert!(
+            scalars.windows(2).any(|pair| pair[0] != pair[1]),
+            "a fixture whose rows all produce the same dot proves nothing"
+        );
+
+        #[cfg(target_arch = "x86_64")]
+        if std::arch::is_x86_feature_detected!("avx2")
+            && std::arch::is_x86_feature_detected!("fma")
+            && std::arch::is_x86_feature_detected!("f16c")
+        {
+            let mut index = 0;
+            for batch in 0..batch_size {
+                for row in 0..rows {
+                    // SAFETY: the features above were just detected.
+                    let vector =
+                        unsafe { dot_q5_1_f32_row_avx2(&weights, &activations, batch, row, cols) };
+                    assert_eq!(
+                        scalars[index].to_bits(),
+                        vector.to_bits(),
+                        "batch {batch} row {row}: {} != {vector}",
+                        scalars[index]
+                    );
+                    index += 1;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn q5_1_grouping_is_refused_rather_than_given_empty_activations() {
+        assert!(matches!(
+            WeightFormat::from_code(6),
+            Some(WeightFormat::Q5_1)
+        ));
+        assert!(matches!(
+            WeightFormat::Q5_1.activation_format(),
+            ActivationFormat::F32
+        ));
+        assert_eq!(WeightFormat::Q5_1.block_bytes(), 24);
+        assert_eq!(WeightFormat::Q5_1.block_elements(), QK_0);
+        assert_eq!(
+            activation_sum_elements(ActivationFormat::F32, 4, 256),
+            0,
+            "an F32 activation format prepares no sums"
+        );
+        assert_ne!(
+            jmodels_kernels_capabilities() & CAPABILITY_Q5_1_F32_BATCHED_MATMUL,
+            0,
+            "the capability must be advertised or Java will never route to it"
         );
     }
 }

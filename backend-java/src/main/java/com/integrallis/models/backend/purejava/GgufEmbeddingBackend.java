@@ -103,7 +103,12 @@ public final class GgufEmbeddingBackend implements EmbeddingBackend {
     if (modelOwnsPooling) {
       pooled = backend.embedSequence(tokens);
     } else {
-      pooled = pooling == Pooling.MEAN ? meanPooled(tokens) : lastTokenPooled(tokens);
+      pooled =
+          switch (pooling) {
+            case MEAN -> meanPooled(tokens);
+            case CLS -> clsPooled(tokens);
+            case LAST_TOKEN -> lastTokenPooled(tokens);
+          };
     }
     // Truncate before normalizing: a Matryoshka prefix is only a unit vector once rescaled to its
     // own length, and cosine over an unrescaled prefix is not the similarity the model was
@@ -148,6 +153,19 @@ public final class GgufEmbeddingBackend implements EmbeddingBackend {
   /** Takes the final position's state: the only one that has attended to the whole input. */
   private float[] lastTokenPooled(int[] tokens) {
     return backend.prefillHiddenState(tokens, 0).clone();
+  }
+
+  /**
+   * The first position's state, which is all CLS pooling reads.
+   *
+   * <p>One token is evaluated, not the sequence. In a causal decoder position zero attends to
+   * nothing but itself, so running the remaining tokens would change the answer only by advancing
+   * the KV cache underneath it — which is exactly the bug an earlier draft of this method had, by
+   * prefilling the whole sequence and then re-reading position zero on top of a cache that already
+   * held it. {@link #meanPooled} reads each position the same way.
+   */
+  private float[] clsPooled(int[] tokens) {
+    return backend.hiddenState(tokens[0], 0).clone();
   }
 
   /** Averages every position's state, which costs one hidden state per token. */
