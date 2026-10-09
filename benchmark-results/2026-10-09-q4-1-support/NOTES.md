@@ -60,3 +60,37 @@ that held the lfm2 and Q5_1 artifacts back until 0.3.55 shipped. The re-run of s
 `eurollm-1.7b-instruct Q4_K_S` ran both arms and returned **FAILED_MODEL_CONTRIBUTION_GATE** -- a
 real verdict, not an error. It is a published null: the pipeline answered, the model did not
 contribute enough of it. Translation coverage stays thin until a model passes.
+
+## Addendum: what the exact Q4_1 path costs, and what it does not explain
+
+Q4_1 is routed through `ggufExactBatchedMatmul` -- dequantize the row, then dot in F32 along
+`PinnedReduction`'s pinned order -- because that is what makes the single-token and batched
+dispatches agree bit for bit. There is no Q4_1 integer kernel and no Q4_1 shim kernel. Measured
+against the Q4_0 integer kernel at the same shapes on this box (i7-9750H, AVX2), min of 7 trials x
+20 calls, `raw/q4-1-vs-q4-0-cost.txt`:
+
+| shape | batch | Q4_0 integer | Q4_1 exact | ratio |
+| --- | --- | --- | --- | --- |
+| 1536x1536 | 1 | 0.7467 ms | 2.4993 ms | **3.35x slower** |
+| 8960x1536 | 1 | 4.4643 ms | 14.9218 ms | **3.34x slower** |
+| 1536x1536 | 8 | 5.1806 ms | 3.6623 ms | 0.71x -- faster |
+| 8960x1536 | 8 | 32.0246 ms | 22.3729 ms | 0.70x -- faster |
+
+So the exact path is **3.3x slower at decode and faster at prefill**. The crossover is not a
+surprise once stated: the exact path unpacks each weight row once and reuses it for every element
+of the batch, while the integer path redoes per-element work, so batching amortises the dequant and
+then wins on it.
+
+**What this does not explain.** `bartowski_yi_coder_1_5b_chat_gguf_q4_0` failed
+`FAILED_RELATIVE_GATE` at 0.364x of ollama's decode and is the only model in that shard carrying
+Q4_1. It carries **three Q4_1 tensors, 2.5% of its matmul weights**, so 3.34x on 2.5% adds about
+**6%** to matmul time. That is real and worth fixing, and it is nowhere near the observed gap --
+`deepseek_coder_1_3b_instruct_q4_0` has no Q4_1 at all and still ran at 0.659x. Attributing
+yi-coder's shortfall to Q4_1 would have been wrong, which is why the ratio was measured rather than
+assumed.
+
+**Follow-up, with its motivation now quantified**: a Q4_1 integer kernel paired with Q8_1
+activations would recover roughly 3.3x on the decode path for the artifacts that carry the type.
+Q4_1's per-block minimum needs the activation block sums a Q8_0 activation does not carry, which is
+the same obstacle Q5_1 has, so one Q8_1 activation path would serve both. Until it is measured, the
+exact path is the correct default: it is right, and the parity test proves it.
