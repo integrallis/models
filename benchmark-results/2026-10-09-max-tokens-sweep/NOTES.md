@@ -53,22 +53,54 @@ had 256 hard-coded in both arms, so before `7ac41536f5c2` this sweep could not b
 
 ## Result
 
-Truncation was real and large, and raising the cap eliminated it completely:
+Five paired cells. Four of them are a clean null; the fifth is the interesting one.
 
-| model | workload | `truncatedAnswerRate` 256 → 768 | `modelAnswerRate` 256 → 768 | verdict |
-| --- | --- | --- | --- | --- |
-| huatuogpt-o1-7b Q4_K_S | healthcare | 0.333 → 0.000 | 0.000 → 0.000 | unchanged |
-| qwen2.5-math-1.5b Q4_0 | math | 0.778 → 0.000 | 0.000 → 0.000 | unchanged |
-| qwen2.5-math-1.5b Q4_K_S | math | 0.556 → 0.000 | 0.000 → 0.000 | unchanged |
+### Four models: the cap was real, and it was not what failed them
 
-`extractiveFallbackRate` is **0.889 in all six cells** — identical before and after. The models
-were given three times the room, used it (`totalOutputTokens` rose 4938 → 6135, 6225 → 8046,
-6294 → 7866), stopped being truncated, and still produced nothing the grounding policy accepts
-as a model answer.
+| model | workload | `truncatedAnswerRate` | `modelAnswerRate` | `totalOutputTokens` | verdict |
+| --- | --- | --- | --- | --- | --- |
+| huatuogpt-o1-7b Q4_K_S | healthcare | 0.333 → 0.000 | 0.000 → 0.000 | 4938 → 6135 | unchanged |
+| qwen2.5-math-1.5b Q4_0 | math | 0.778 → 0.000 | 0.000 → 0.000 | 6225 → 8046 | unchanged |
+| qwen2.5-math-1.5b Q4_K_S | math | 0.556 → 0.000 | 0.000 → 0.000 | 6294 → 7866 | unchanged |
+| qwen2.5-math-7b Q4_K_M | math | 0.444 → 0.000 | 0.000 → 0.000 | 6264 → 6987 | unchanged |
 
-**This is a null, and the null is the result.** By the rule registered above: the cap was a
-genuine defect in the harness and is now fixed, but it was not what failed these models. They
-genuinely do not contribute on these corpora.
+Truncation went to **exactly zero** in all four. `extractiveFallbackRate` is 0.889 before and
+after, in all eight cells. They were given three times the room, used it, stopped being
+truncated, and still produced nothing the grounding policy accepts as a model answer.
+
+**That is the null, and the null is the result.** The cap was a genuine harness defect and is
+fixed; it was not what failed these four. They do not contribute on these corpora.
+
+### Fin-R1: still truncating at 768, and its finished answers are correct
+
+| | mt=256 | mt=768 |
+| --- | --- | --- |
+| `truncatedAnswerRate` | 0.778 | **0.556** |
+| `modelAnswerRate` | 0.111 | 0.111 |
+| `modelAnswerCorrectRate` | 0.000 | **1.000** |
+| `totalOutputTokens` | 5589 | **12036** |
+| verdict | FAILED_ABSOLUTE_GATE | FAILED_MODEL_CONTRIBUTION_GATE |
+
+This model is **not** in the same category and must not be reported as if it were. Its
+truncation fell only 0.778 → 0.556 — over half its answers are still cut off at three times the
+cap — while `totalOutputTokens` went 5589 → 12036, twice any other model here, and
+`modelAnswerRate` did not move at all: 0.111 → 0.111. The verdict changed, but to a different
+failure, not to QUALIFIED.
+
+The signal that matters is `modelAnswerCorrectRate` 0.000 → 1.000: **every answer it managed to
+finish was correct.** It fails `modelAnswerRate` at 0.111 against a 0.333 floor — it is not
+answering often enough, because it is still being cut off. On this evidence Fin-R1 is a model
+the cap is masking, not a model that underperforms, and judging it on these two cells would be
+judging it on a constraint we imposed.
+
+**Conclusion for Fin-R1: inconclusive, needs a third cap.** That run belongs against a released
+build, not a dev build, so it is queued with the post-release confirmation rather than spent now.
+
+`derive.py` makes this distinction itself, and the ordering of its checks is the reason. An
+earlier version asked "did the verdict change?" first and labelled Fin-R1 "CAP WAS THE CAUSE"
+while it was still truncating 56% of its answers. Truncation is the question this sweep asks, so
+it is now asked first: any pair still truncating at the higher cap is reported CAP STILL BINDING
+and inconclusive regardless of what the verdict did.
 
 ## What this does and does not say
 
@@ -79,10 +111,9 @@ genuinely do not contribute on these corpora.
   case, where a `general` failure became a `multilingual` QUALIFIED with workload the only
   variable changed. Workload match cuts both ways and neither direction is predictable from
   the model's name.
-- Seven further cells are measured at `mt=256` only and `derive.py` lists them as UNPAIRED with
-  no conclusion drawn. Two more (`fin_r1_7b_q4_k_m` finance, `bartowski_qwen2_5_math_7b` math)
-  were still running when this was written; re-run `derive.py` after syncing their shards and
-  the table extends itself.
+- Five further cells are measured at `mt=256` only — `fin_r1_7b_q4_0`, `huatuogpt_o1_7b_q4_0`,
+  `bartowski_mathstral_7b_v0_1_gguf_q4_k_s`, `phi_4_mini_instruct_q4_0`,
+  `phi_4_mini_instruct_q4_k_m`. `derive.py` lists them as UNPAIRED and draws no conclusion.
 
 ## Consequence for the harness
 

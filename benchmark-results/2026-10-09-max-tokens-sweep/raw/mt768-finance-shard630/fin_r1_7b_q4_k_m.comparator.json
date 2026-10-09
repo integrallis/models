@@ -1,0 +1,1564 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-09T23:17:47.887133154Z",
+  "framework" : "plain-java",
+  "backend" : "ollama",
+  "backendVersion" : "ollama@ollama version is 0.40.2",
+  "modelId" : "fin_r1_7b_q4_k_m",
+  "model" : "qual-fin_r1_7b_q4_k_m",
+  "artifactSha256" : "d50f16c5149b4dc103c68e249a136ab7c82f7569a7df707a2d6150bff5994c33",
+  "artifactSizeBytes" : 4683073600,
+  "settings" : {
+    "corpusSha256" : "923a8686ef45df6c09c08c0bd80e08ab40a96ad0b4d37fb356729dbd6738befc",
+    "workload" : "finance",
+    "caseIds" : [ "aurora-reserve-review", "birch-duration-coupon", "cobalt-invoice-overdue", "delta-issuer-limit", "ember-loan-terms", "fjord-hedge-policy", "grove-runway-refresh", "harbor-variance-escalation", "unsupported-crypto-allocation" ],
+    "promptTemplate" : "chatml-no-think",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 768,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "seed" : "42",
+      "rawPrompt" : "true",
+      "topK" : "1",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-11-237",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971658752,
+    "maxHeapBytes" : 16500391936,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "ollama",
+    "planVersion" : "unavailable",
+    "environment" : { },
+    "optimizations" : [ ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 6604.489392,
+    "retrievalMillis" : {
+      "p50" : 1.323191,
+      "p95" : 3.082591699999999
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 0.28937700000824407,
+      "p95" : 0.43373170000268146
+    },
+    "ttftMillis" : {
+      "p50" : 1050.623703,
+      "p95" : 1193.1691327
+    },
+    "tpotMillis" : {
+      "p50" : 116.86548241329858,
+      "p95" : 117.55150305736636
+    },
+    "endToEndMillis" : {
+      "p50" : 90708.919943,
+      "p95" : 91320.5592414
+    },
+    "p50PrefillTokensPerSecond" : 159.446892331514,
+    "p50DecodeTokensPerSecond" : 8.55684654998015,
+    "peakRssBytes" : 0,
+    "totalCpuMillis" : 0.0,
+    "totalInputTokens" : 4428,
+    "totalCacheReadInputTokens" : 0,
+    "totalCacheWriteInputTokens" : 0,
+    "totalOutputTokens" : 14241,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 0.9375,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 0.8888888888888888,
+    "rawCorrectAnswerRate" : 0.5555555555555556,
+    "modelAnswerRate" : 0.1111111111111111,
+    "modelAnswerCorrectRate" : 0.0,
+    "extractiveFallbackRate" : 0.7777777777777778,
+    "truncatedAnswerRate" : 0.6666666666666666
+  },
+  "performanceTier" : "FAILED_QUALITY",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "aurora-reserve-review",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-aurora-reserve",
+        "title" : "Aurora reserve policy",
+        "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month."
+      },
+      "score" : 5.188199,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3aaa0b11174bb78dc6c53e81fd79ad7cd4d3f71d2c323d885bae82230ea610ce",
+    "retrievalMillis" : 6.127621,
+    "frameworkOverheadMillis" : 0.3584179999998014,
+    "endToEndMillis" : 4929.006135,
+    "generation" : {
+      "text" : "**Answer:** Aurora Fund keeps 18% of its assets in its liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 42,
+      "ttftMillis" : 158.67821,
+      "totalMillis" : 4922.520096,
+      "prefillTokensPerSecond" : 1476.5215898360375,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Aurora Fund keeps 18% of its assets in its liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "text" : "**Answer:** Aurora Fund keeps 18% of its assets in its liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "birch-duration-coupon",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-birch-duration",
+        "title" : "Birch bond profile",
+        "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year."
+      },
+      "score" : 7.3422394,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ed46fd944739b7146edcd4e726fa66df63861d779e2a70082d61c55850e80059",
+    "retrievalMillis" : 2.432956,
+    "frameworkOverheadMillis" : 0.31466699999873526,
+    "endToEndMillis" : 91321.655475,
+    "generation" : {
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1151.69962,
+      "totalMillis" : 91318.907852,
+      "prefillTokensPerSecond" : 147.45793060348913,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Birch Municipal Bond's modified duration is 4.2 years, and its coupon is paid twice per year.  \n\n**Citations:** [finance-birch-duration]\n</code>\n</pre>\n</div>\n</details>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div",
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "cobalt-invoice-overdue",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-cobalt-invoices",
+        "title" : "Cobalt receivables",
+        "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31."
+      },
+      "score" : 8.500158,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8934496effd06711165e2b6fa1dd6c0f8e8ec40b844265c66083dc7667ce4cf7",
+    "retrievalMillis" : 2.10711,
+    "frameworkOverheadMillis" : 0.3342769999999291,
+    "endToEndMillis" : 6878.953117,
+    "generation" : {
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 59,
+      "ttftMillis" : 141.510762,
+      "totalMillis" : 6876.51173,
+      "prefillTokensPerSecond" : 1380.267820387605,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Cobalt Services uses net-30 payment terms, meaning an invoice is due 30 days after issuance. An invoice becomes overdue on day 31, as stated in the context. \n\n**Citations:** [finance-cobalt-invoices]\n</answer>\n",
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "delta-issuer-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-delta-concentration",
+        "title" : "Delta concentration limit",
+        "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit."
+      },
+      "score" : 6.1008873,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a8c184f68d6d9551e4a3b0f48c40b5385ac00544fad788aa8fbf8fa295e972a5",
+    "retrievalMillis" : 2.452297,
+    "frameworkOverheadMillis" : 0.32425900000089314,
+    "endToEndMillis" : 4413.714353,
+    "generation" : {
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 38,
+      "ttftMillis" : 134.106671,
+      "totalMillis" : 4410.937797,
+      "prefillTokensPerSecond" : 1455.7049771246361,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Delta Portfolio's single-issuer limit is 12% of net assets, and cash is excluded from this limit. [finance-delta-concentration]\n</answer>",
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "ember-loan-terms",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-ember-loan",
+        "title" : "Ember equipment loan",
+        "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031."
+      },
+      "score" : 6.752196,
+      "rank" : 1
+    } ],
+    "promptSha256" : "80b8f08c8351d5ce6ed2dc9bba20949c1b360d9a9cf3a71ff93fd7708ad1a1d2",
+    "retrievalMillis" : 1.71516,
+    "frameworkOverheadMillis" : 0.31869699999515433,
+    "endToEndMillis" : 91318.001363,
+    "generation" : {
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1166.110564,
+      "totalMillis" : 91315.967506,
+      "prefillTokensPerSecond" : 147.59763149212523,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Ember Manufacturing's loan rate is 6.25%, and the loan matures in June 2031. [finance-ember-loan]\n</pre>\n</div>\n</details>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div",
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "fjord-hedge-policy",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-fjord-hedge",
+        "title" : "Fjord currency hedge",
+        "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months."
+      },
+      "score" : 4.780636,
+      "rank" : 1
+    } ],
+    "promptSha256" : "14ca8b7c47414578397a510da7a9a1e466c83b1e6534853b909bc1c30fe5bbeb",
+    "retrievalMillis" : 1.778693,
+    "frameworkOverheadMillis" : 0.30196799999976065,
+    "endToEndMillis" : 90872.004162,
+    "generation" : {
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1195.775253,
+      "totalMillis" : 90869.923501,
+      "prefillTokensPerSecond" : 144.2883336553804,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Fjord Export hedges 70 percent of its forecast euro receipts, with a horizon of six months. [finance-fjord-hedge]\n</pre>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div",
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "grove-runway-refresh",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-grove-runway",
+        "title" : "Grove cash runway",
+        "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly."
+      },
+      "score" : 5.838581,
+      "rank" : 1
+    } ],
+    "promptSha256" : "23caf0f23369ded907c979b075fba4ee2217f3dd0497f82e06de5f34d8a4d2ea",
+    "retrievalMillis" : 1.754911,
+    "frameworkOverheadMillis" : 0.3092870000109542,
+    "endToEndMillis" : 90776.244896,
+    "generation" : {
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1047.563767,
+      "totalMillis" : 90774.180698,
+      "prefillTokensPerSecond" : 159.9226205729854,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Grove Analytics reports **14 months** of cash runway at the approved operating plan. This estimate is refreshed **quarterly**.\n\n**Citations:** [finance-grove-runway]\n</code>\n</pre>\n</div>\n</details>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div",
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "harbor-variance-escalation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-harbor-variance",
+        "title" : "Harbor budget escalation",
+        "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review."
+      },
+      "score" : 5.6997347,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cef82fe3a1cb5c5e93a72888f8eeee9b47ead1ff733a6ff8ca71e97255ea6bb2",
+    "retrievalMillis" : 1.475075,
+    "frameworkOverheadMillis" : 0.3286179999995511,
+    "endToEndMillis" : 90763.103471,
+    "generation" : {
+      "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1088.15466,
+      "totalMillis" : 90761.299778,
+      "prefillTokensPerSecond" : 152.6984594113613,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Harbor Division escalates a monthly budget variance when it exceeds 5 percent, and the finance director owns the review. [finance-harbor-variance]\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code",
+      "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "unsupported-crypto-allocation",
+    "retrieved" : [ ],
+    "promptSha256" : "61a32a85eacb920e02a5613d036cef33dc801b2ec03ea5b8327ba856f0689311",
+    "retrievalMillis" : 0.564523,
+    "frameworkOverheadMillis" : 0.29536600000574253,
+    "endToEndMillis" : 90016.552666,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 125,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 484.880555,
+      "totalMillis" : 90015.692777,
+      "prefillTokensPerSecond" : 262.883941997287,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Meridian Treasury approved a 50% allocation to Bitcoin and a 50% allocation to Ethereum. [C00001] [C00002]\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "aurora-reserve-review",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-aurora-reserve",
+        "title" : "Aurora reserve policy",
+        "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month."
+      },
+      "score" : 5.188199,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3aaa0b11174bb78dc6c53e81fd79ad7cd4d3f71d2c323d885bae82230ea610ce",
+    "retrievalMillis" : 1.442244,
+    "frameworkOverheadMillis" : 1.811772000000019,
+    "endToEndMillis" : 4858.458533,
+    "generation" : {
+      "text" : "**Answer:** Aurora Fund keeps 18% of its assets in its liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 42,
+      "ttftMillis" : 127.925609,
+      "totalMillis" : 4855.204517,
+      "prefillTokensPerSecond" : 1486.5133483713173,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Aurora Fund keeps 18% of its assets in its liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "text" : "**Answer:** Aurora Fund keeps 18% of its assets in its liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "birch-duration-coupon",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-birch-duration",
+        "title" : "Birch bond profile",
+        "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year."
+      },
+      "score" : 7.3422394,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ed46fd944739b7146edcd4e726fa66df63861d779e2a70082d61c55850e80059",
+    "retrievalMillis" : 1.491975,
+    "frameworkOverheadMillis" : 0.43102899999939837,
+    "endToEndMillis" : 91256.636574,
+    "generation" : {
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1150.248869,
+      "totalMillis" : 91254.71357,
+      "prefillTokensPerSecond" : 147.64739692366103,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Birch Municipal Bond's modified duration is 4.2 years, and its coupon is paid twice per year.  \n\n**Citations:** [finance-birch-duration]\n</code>\n</pre>\n</div>\n</details>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div",
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "cobalt-invoice-overdue",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-cobalt-invoices",
+        "title" : "Cobalt receivables",
+        "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31."
+      },
+      "score" : 8.500158,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8934496effd06711165e2b6fa1dd6c0f8e8ec40b844265c66083dc7667ce4cf7",
+    "retrievalMillis" : 1.527826,
+    "frameworkOverheadMillis" : 0.2810859999999593,
+    "endToEndMillis" : 6881.976242,
+    "generation" : {
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 59,
+      "ttftMillis" : 138.357686,
+      "totalMillis" : 6880.16733,
+      "prefillTokensPerSecond" : 1364.9207388132374,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Cobalt Services uses net-30 payment terms, meaning an invoice is due 30 days after issuance. An invoice becomes overdue on day 31, as stated in the context. \n\n**Citations:** [finance-cobalt-invoices]\n</answer>\n",
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "delta-issuer-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-delta-concentration",
+        "title" : "Delta concentration limit",
+        "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit."
+      },
+      "score" : 6.1008873,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a8c184f68d6d9551e4a3b0f48c40b5385ac00544fad788aa8fbf8fa295e972a5",
+    "retrievalMillis" : 1.24992,
+    "frameworkOverheadMillis" : 0.26932599999963713,
+    "endToEndMillis" : 4423.835811,
+    "generation" : {
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 38,
+      "ttftMillis" : 134.512707,
+      "totalMillis" : 4422.316565,
+      "prefillTokensPerSecond" : 1447.1032094681896,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Delta Portfolio's single-issuer limit is 12% of net assets, and cash is excluded from this limit. [finance-delta-concentration]\n</answer>",
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "ember-loan-terms",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-ember-loan",
+        "title" : "Ember equipment loan",
+        "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031."
+      },
+      "score" : 6.752196,
+      "rank" : 1
+    } ],
+    "promptSha256" : "80b8f08c8351d5ce6ed2dc9bba20949c1b360d9a9cf3a71ff93fd7708ad1a1d2",
+    "retrievalMillis" : 1.231309,
+    "frameworkOverheadMillis" : 0.28455599999870174,
+    "endToEndMillis" : 90814.622385,
+    "generation" : {
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1161.297869,
+      "totalMillis" : 90813.10652,
+      "prefillTokensPerSecond" : 147.9750914399021,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Ember Manufacturing's loan rate is 6.25%, and the loan matures in June 2031. [finance-ember-loan]\n</pre>\n</div>\n</details>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div",
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "fjord-hedge-policy",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-fjord-hedge",
+        "title" : "Fjord currency hedge",
+        "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months."
+      },
+      "score" : 4.780636,
+      "rank" : 1
+    } ],
+    "promptSha256" : "14ca8b7c47414578397a510da7a9a1e466c83b1e6534853b909bc1c30fe5bbeb",
+    "retrievalMillis" : 1.230749,
+    "frameworkOverheadMillis" : 0.2645570000022417,
+    "endToEndMillis" : 90831.87716,
+    "generation" : {
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1194.556843,
+      "totalMillis" : 90830.381854,
+      "prefillTokensPerSecond" : 144.38299489171274,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Fjord Export hedges 70 percent of its forecast euro receipts, with a horizon of six months. [finance-fjord-hedge]\n</pre>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div",
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "grove-runway-refresh",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-grove-runway",
+        "title" : "Grove cash runway",
+        "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly."
+      },
+      "score" : 5.838581,
+      "rank" : 1
+    } ],
+    "promptSha256" : "23caf0f23369ded907c979b075fba4ee2217f3dd0497f82e06de5f34d8a4d2ea",
+    "retrievalMillis" : 1.258769,
+    "frameworkOverheadMillis" : 0.2612470000021858,
+    "endToEndMillis" : 90708.919943,
+    "generation" : {
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1050.623703,
+      "totalMillis" : 90707.399927,
+      "prefillTokensPerSecond" : 159.40907248887498,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Grove Analytics reports **14 months** of cash runway at the approved operating plan. This estimate is refreshed **quarterly**.\n\n**Citations:** [finance-grove-runway]\n</code>\n</pre>\n</div>\n</details>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div",
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "harbor-variance-escalation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-harbor-variance",
+        "title" : "Harbor budget escalation",
+        "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review."
+      },
+      "score" : 5.6997347,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cef82fe3a1cb5c5e93a72888f8eeee9b47ead1ff733a6ff8ca71e97255ea6bb2",
+    "retrievalMillis" : 2.084609,
+    "frameworkOverheadMillis" : 0.2830459999968298,
+    "endToEndMillis" : 90744.969239,
+    "generation" : {
+      "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1095.548076,
+      "totalMillis" : 90742.601584,
+      "prefillTokensPerSecond" : 151.8059386483199,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Harbor Division escalates a monthly budget variance when it exceeds 5 percent, and the finance director owns the review. [finance-harbor-variance]\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code",
+      "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "unsupported-crypto-allocation",
+    "retrieved" : [ ],
+    "promptSha256" : "61a32a85eacb920e02a5613d036cef33dc801b2ec03ea5b8327ba856f0689311",
+    "retrievalMillis" : 0.487591,
+    "frameworkOverheadMillis" : 0.2634059999982128,
+    "endToEndMillis" : 89997.954801,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 125,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 491.357173,
+      "totalMillis" : 89997.203804,
+      "prefillTokensPerSecond" : 260.4997009463433,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Meridian Treasury approved a 50% allocation to Bitcoin and a 50% allocation to Ethereum. [C00001] [C00002]\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "aurora-reserve-review",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-aurora-reserve",
+        "title" : "Aurora reserve policy",
+        "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month."
+      },
+      "score" : 5.188199,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3aaa0b11174bb78dc6c53e81fd79ad7cd4d3f71d2c323d885bae82230ea610ce",
+    "retrievalMillis" : 1.323191,
+    "frameworkOverheadMillis" : 0.29969699999946897,
+    "endToEndMillis" : 4911.846793,
+    "generation" : {
+      "text" : "**Answer:** Aurora Fund keeps 18% of its assets in its liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 42,
+      "ttftMillis" : 123.888528,
+      "totalMillis" : 4910.223905,
+      "prefillTokensPerSecond" : 1473.0189180162204,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Aurora Fund keeps 18% of its assets in its liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "text" : "**Answer:** Aurora Fund keeps 18% of its assets in its liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "birch-duration-coupon",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-birch-duration",
+        "title" : "Birch bond profile",
+        "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year."
+      },
+      "score" : 7.3422394,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ed46fd944739b7146edcd4e726fa66df63861d779e2a70082d61c55850e80059",
+    "retrievalMillis" : 1.3003,
+    "frameworkOverheadMillis" : 0.28937700000824407,
+    "endToEndMillis" : 91067.677785,
+    "generation" : {
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1151.080724,
+      "totalMillis" : 91066.088108,
+      "prefillTokensPerSecond" : 147.77090232607233,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Birch Municipal Bond's modified duration is 4.2 years, and its coupon is paid twice per year.  \n\n**Citations:** [finance-birch-duration]\n</code>\n</pre>\n</div>\n</details>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div",
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "cobalt-invoice-overdue",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-cobalt-invoices",
+        "title" : "Cobalt receivables",
+        "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31."
+      },
+      "score" : 8.500158,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8934496effd06711165e2b6fa1dd6c0f8e8ec40b844265c66083dc7667ce4cf7",
+    "retrievalMillis" : 3.352718,
+    "frameworkOverheadMillis" : 0.2674459999998362,
+    "endToEndMillis" : 6849.909395,
+    "generation" : {
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 59,
+      "ttftMillis" : 129.61238,
+      "totalMillis" : 6846.289231,
+      "prefillTokensPerSecond" : 1461.2886686036575,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Cobalt Services uses net-30 payment terms, meaning an invoice is due 30 days after issuance. An invoice becomes overdue on day 31, as stated in the context. \n\n**Citations:** [finance-cobalt-invoices]\n</answer>\n",
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "delta-issuer-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-delta-concentration",
+        "title" : "Delta concentration limit",
+        "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit."
+      },
+      "score" : 6.1008873,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a8c184f68d6d9551e4a3b0f48c40b5385ac00544fad788aa8fbf8fa295e972a5",
+    "retrievalMillis" : 1.174027,
+    "frameworkOverheadMillis" : 0.2596059999996214,
+    "endToEndMillis" : 4406.320804,
+    "generation" : {
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 38,
+      "ttftMillis" : 133.818668,
+      "totalMillis" : 4404.887171,
+      "prefillTokensPerSecond" : 1437.2609911967763,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Delta Portfolio's single-issuer limit is 12% of net assets, and cash is excluded from this limit. [finance-delta-concentration]\n</answer>",
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "ember-loan-terms",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-ember-loan",
+        "title" : "Ember equipment loan",
+        "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031."
+      },
+      "score" : 6.752196,
+      "rank" : 1
+    } ],
+    "promptSha256" : "80b8f08c8351d5ce6ed2dc9bba20949c1b360d9a9cf3a71ff93fd7708ad1a1d2",
+    "retrievalMillis" : 1.127076,
+    "frameworkOverheadMillis" : 0.2585759999928996,
+    "endToEndMillis" : 90964.021973,
+    "generation" : {
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1158.457595,
+      "totalMillis" : 90962.636321,
+      "prefillTokensPerSecond" : 147.76120051629502,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Ember Manufacturing's loan rate is 6.25%, and the loan matures in June 2031. [finance-ember-loan]\n</pre>\n</div>\n</details>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div",
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "fjord-hedge-policy",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-fjord-hedge",
+        "title" : "Fjord currency hedge",
+        "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months."
+      },
+      "score" : 4.780636,
+      "rank" : 1
+    } ],
+    "promptSha256" : "14ca8b7c47414578397a510da7a9a1e466c83b1e6534853b909bc1c30fe5bbeb",
+    "retrievalMillis" : 1.077515,
+    "frameworkOverheadMillis" : 0.4348900000040885,
+    "endToEndMillis" : 93585.552304,
+    "generation" : {
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1189.931142,
+      "totalMillis" : 93584.039899,
+      "prefillTokensPerSecond" : 145.45256587682803,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Fjord Export hedges 70 percent of its forecast euro receipts, with a horizon of six months. [finance-fjord-hedge]\n</pre>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div",
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "grove-runway-refresh",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-grove-runway",
+        "title" : "Grove cash runway",
+        "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly."
+      },
+      "score" : 5.838581,
+      "rank" : 1
+    } ],
+    "promptSha256" : "23caf0f23369ded907c979b075fba4ee2217f3dd0497f82e06de5f34d8a4d2ea",
+    "retrievalMillis" : 1.155507,
+    "frameworkOverheadMillis" : 0.23738599999342114,
+    "endToEndMillis" : 90853.190695,
+    "generation" : {
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1051.381671,
+      "totalMillis" : 90851.797802,
+      "prefillTokensPerSecond" : 159.446892331514,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Grove Analytics reports **14 months** of cash runway at the approved operating plan. This estimate is refreshed **quarterly**.\n\n**Citations:** [finance-grove-runway]\n</code>\n</pre>\n</div>\n</details>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div",
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "harbor-variance-escalation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-harbor-variance",
+        "title" : "Harbor budget escalation",
+        "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review."
+      },
+      "score" : 5.6997347,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cef82fe3a1cb5c5e93a72888f8eeee9b47ead1ff733a6ff8ca71e97255ea6bb2",
+    "retrievalMillis" : 1.149337,
+    "frameworkOverheadMillis" : 0.2440550000028452,
+    "endToEndMillis" : 90674.909422,
+    "generation" : {
+      "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 1089.814121,
+      "totalMillis" : 90673.51603,
+      "prefillTokensPerSecond" : 152.1938045130536,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Harbor Division escalates a monthly budget variance when it exceeds 5 percent, and the finance director owns the review. [finance-harbor-variance]\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code>\n</pre>\n</div>\n</body>\n</html>\n</code",
+      "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-fin_r1_7b_q4_k_m",
+    "caseId" : "unsupported-crypto-allocation",
+    "retrieved" : [ ],
+    "promptSha256" : "61a32a85eacb920e02a5613d036cef33dc801b2ec03ea5b8327ba856f0689311",
+    "retrievalMillis" : 0.45455,
+    "frameworkOverheadMillis" : 0.23301599999831524,
+    "endToEndMillis" : 89892.527391,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 125,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 768,
+      "ttftMillis" : 486.583439,
+      "totalMillis" : 89891.839825,
+      "prefillTokensPerSecond" : 260.5083873280384,
+      "loadMillis" : 6604.489392,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Meridian Treasury approved a 50% allocation to Bitcoin and a 50% allocation to Ethereum. [C00001] [C00002]\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

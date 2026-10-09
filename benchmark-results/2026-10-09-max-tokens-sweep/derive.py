@@ -181,17 +181,34 @@ def main():
                   f"{fmt(r['truncatedAnswerRate']):>7} {fmt(r['modelAnswerRate']):>7} "
                   f"{fmt(r['modelAnswerCorrectRate']):>7} {fmt(r['extractiveFallbackRate']):>7} "
                   f"{fmt(r['totalOutputTokens']):>7}  {r['verdict']}")
+        # Order matters. A verdict can change while truncation is still happening, and then the
+        # cap has NOT been ruled out -- it has only moved. Checking "verdict changed" first
+        # labelled fin-r1 "CAP WAS THE CAUSE" when it was still truncating 56% of answers at the
+        # higher cap. Truncation is the question this sweep asks, so it is asked first.
         verdict_changed = a["verdict"] != b["verdict"]
-        trunc_cleared = (a["truncatedAnswerRate"] or 0) > 0 and (b["truncatedAnswerRate"] or 0) == 0
-        if verdict_changed:
-            call = "CAP WAS THE CAUSE (verdict changed)"
-        elif trunc_cleared:
+        trunc_lo = a["truncatedAnswerRate"] or 0
+        trunc_hi = b["truncatedAnswerRate"] or 0
+        notes = []
+        if trunc_hi > 0:
+            call = f"CAP STILL BINDING ({trunc_hi:.3f} of answers truncated at mt={b['mt']})"
+            notes.append(f"inconclusive: raise the cap again before judging this model")
+        elif trunc_lo > 0 and verdict_changed:
+            call = "CAP WAS THE CAUSE (truncation cleared and the verdict changed)"
+        elif trunc_lo > 0:
             call = "GENUINE UNDERPERFORMANCE (truncation cleared, verdict unchanged)"
-        elif (a["truncatedAnswerRate"] or 0) == 0:
-            call = "CAP NOT BINDING (no truncation at either cap)"
         else:
-            call = "CAP STILL BINDING (truncation did not clear)"
+            call = "CAP NOT BINDING (no truncation at either cap)"
+        if verdict_changed:
+            notes.append(f"verdict moved {a['verdict']} -> {b['verdict']}")
+        # A model whose finished answers are correct is being masked by the cap, not failing on
+        # quality. That is the one signal that justifies spending another run on it.
+        if (b["modelAnswerCorrectRate"] or 0) > (a["modelAnswerCorrectRate"] or 0):
+            notes.append(f"modelAnswerCorrectRate rose {a['modelAnswerCorrectRate']:.3f} -> "
+                         f"{b['modelAnswerCorrectRate']:.3f}: its finished answers are right, "
+                         f"it is not finishing enough of them")
         print(f"{'':<44} {'':<12} {'=>':>9}  {call}")
+        for n in notes:
+            print(f"{'':<44} {'':<12} {'':>9}  - {n}")
         print()
 
     if unpaired:
