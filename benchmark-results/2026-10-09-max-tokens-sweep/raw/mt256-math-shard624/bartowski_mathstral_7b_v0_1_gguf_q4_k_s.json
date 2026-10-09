@@ -1,0 +1,1888 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-09T21:17:46.114568141Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.3.56-dev+q41-48caca0dafed",
+  "modelId" : "bartowski_mathstral_7b_v0_1_gguf_q4_k_s",
+  "model" : "/work/models/bartowski_mathstral_7b_v0_1_gguf_q4_k_s.gguf",
+  "artifactSha256" : "8f32f4bbb08aceb4128de915aeccc0dccfb978d57f236b35a23544496b51871f",
+  "artifactSizeBytes" : 4144746304,
+  "settings" : {
+    "corpusSha256" : "4da610e627e7481d54d1595ef1191dff454455d9bb04fc814b5ea12fd6180315",
+    "workload" : "math",
+    "caseIds" : [ "amber-determinant-trace", "birch-function-derivative", "cobalt-red-probability", "delta-sixth-term", "ember-modulo", "fjord-integral", "grove-hypotenuse", "harbor-mean-median", "unsupported-maple-limit" ],
+    "promptTemplate" : "chatml",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 256,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "promptCache" : "longest-common-prefix",
+      "topP" : "1.0",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0",
+      "topK" : "1",
+      "seed" : "42"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-11-211",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971654656,
+    "maxHeapBytes" : 16500391936,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v13",
+    "environment" : {
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "projection-layers" : "32",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "native-kernel-threads" : "16",
+      "performance-cliffs" : "fused-grouped-attention-disabled",
+      "tokenizer.pre.implemented" : "true",
+      "kernel-runtime" : "rust-ffm",
+      "preferred-vector-bits" : "256",
+      "java-version" : "25.0.4.1",
+      "end-of-generation.2" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+      "processors" : "16",
+      "fast-scalar-fma" : "true",
+      "end-of-generation-token-ids" : "2",
+      "native-kernel-decode-threads" : "8",
+      "gguf-chunks-per-thread" : "2",
+      "vm-vendor" : "Eclipse Adoptium",
+      "native-grouped-attention" : "true",
+      "vector-api" : "true",
+      "architecture" : "amd64",
+      "gguf-executor" : "persistent",
+      "fast-vector-fma" : "true",
+      "vm-version" : "25.0.4.1+1-LTS",
+      "gguf-parallel" : "true",
+      "gguf-threads" : "16",
+      "kernel-implementation" : "rust-ffm-quantized-v13",
+      "tokenizer.pre" : "default",
+      "os" : "Linux",
+      "native-kernel-abi" : "6",
+      "native-kernel-poll-millis" : "5",
+      "end-of-generation.chat-template" : "absent",
+      "native-quantized-decode" : "true",
+      "compiler" : "hotspot-c2",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "sve" : "false",
+      "model-architecture" : "llama",
+      "java-feature" : "25",
+      "transformer-runtime" : "java",
+      "q4-unsigned-pairwise-supported" : "true",
+      "java-executor-poll-millis" : "0",
+      "active-vector-bits" : "256",
+      "q4-short-pairwise-supported" : "true",
+      "native-q5-0-grouped" : "false",
+      "performance-cliff.fused-grouped-attention-disabled" : "architecture=llama, group-size=4",
+      "native-gated-delta-net" : "false"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "implementation" : "rust-ffm-quantized-v13",
+        "qkv" : "grouped",
+        "gate-up" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "eligible-layers" : "0",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "requested" : "widened",
+        "compiler" : "hotspot-c2",
+        "architecture" : "amd64",
+        "os" : "Linux",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded projection topology has no Q6_K consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "batch-size" : "32",
+        "architecture" : "amd64",
+        "kernel" : "one-query-block",
+        "requested-kernel" : "one-query-block"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "ENABLED",
+      "reason" : "the validated final FFN runs only for requested prompt output rows",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q4_K",
+        "output-rows" : "requested"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "ENABLED",
+      "reason" : "unused final-layer prompt rows compute only the persistent K/V state",
+      "settings" : {
+        "unused-rows" : "kv-only",
+        "formats" : "Q4_K,Q4_K,Q4_K,Q4_K"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "parallel" : "true",
+        "eligible-layers" : "0",
+        "executor" : "persistent",
+        "stages" : "2"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "parallel" : "true",
+        "eligible-layers" : "0",
+        "executor" : "persistent",
+        "stages" : "7"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "eligible-layers" : "0",
+        "partitions" : "16",
+        "partition" : "batch-rows",
+        "staged-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "16",
+        "executor" : "persistent",
+        "chunks-per-thread" : "2"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "the Qwen 3.5 recurrence stays in Java: the shim's chunked recurrence agrees only to 2.0e-4 relative, every certified Qwen 3.5 record was produced with the Java one, and whether the shim is faster here is unmeasured. Adopting it is an epoch change, not a setting",
+      "settings" : {
+        "state" : "caller-owned-java-array",
+        "abi" : "6",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "unrouted for the same reason as rust-gated-delta-net: adopting it would change the bytes published Qwen 3.5 records claim",
+      "settings" : {
+        "state" : "branch-major-caller-owned-java-array",
+        "abi" : "6",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 projections run independently: grouping them decoded slower on the controlled Qwen2.5-0.5B x86-64 profile, 37.33 against 38.94 tokens/s. Not a setting -- the slower route is simply not taken",
+      "settings" : {
+        "raw-artifact" : "none-committed",
+        "evidence" : "backend-native/README.md"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "single-token projections execute in the Models Rust kernel for every tensor type it supports; the per-type decisions above report any type it does not",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 397.3055,
+    "retrievalMillis" : {
+      "p50" : 1.322976,
+      "p95" : 1.9606387
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 1.49484399999983,
+      "p95" : 2.224885400000494
+    },
+    "ttftMillis" : {
+      "p50" : 2727.228093,
+      "p95" : 3037.8764013
+    },
+    "tpotMillis" : {
+      "p50" : 125.89250188,
+      "p95" : 128.4644922210526
+    },
+    "endToEndMillis" : {
+      "p50" : 5907.048133,
+      "p95" : 8607.9173666
+    },
+    "p50PrefillTokensPerSecond" : 30.3067187327429,
+    "p50DecodeTokensPerSecond" : 7.94328482686915,
+    "peakRssBytes" : 4621393920,
+    "totalCpuMillis" : 1921550.0,
+    "totalInputTokens" : 5982,
+    "totalCacheReadInputTokens" : 3699,
+    "totalCacheWriteInputTokens" : 2283,
+    "totalOutputTokens" : 774,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.3333333333333333,
+    "modelAnswerRate" : 0.5555555555555556,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.3333333333333333,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "amber-determinant-trace",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-amber-matrix",
+        "title" : "Amber matrix",
+        "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7."
+      },
+      "score" : 4.5716124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cfa37b20c25b43df3136e4b537925678c5d311551a94eeffc8127827cab085b9",
+    "retrievalMillis" : 1.78693,
+    "frameworkOverheadMillis" : 2.167548999999781,
+    "endToEndMillis" : 5891.627235,
+    "generation" : {
+      "text" : "The determinant of the Amber matrix is 10 and the trace is 7. [math-amber-matrix]",
+      "inputTokens" : 219,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 82,
+      "outputTokens" : 26,
+      "ttftMillis" : 2740.360209,
+      "totalMillis" : 5887.672756,
+      "prefillTokensPerSecond" : 29.938088544029046,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616175616,
+      "cpuMillis" : 67170.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The determinant of the Amber matrix is 10 and the trace is 7. [math-amber-matrix]",
+      "text" : "The determinant of the Amber matrix is 10 and the trace is 7. [math-amber-matrix]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "birch-function-derivative",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 4.115302,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a295044585bcd5f931e90fd4186ee2ae035728851e2d51083b1d90137505ec27",
+    "retrievalMillis" : 1.485524,
+    "frameworkOverheadMillis" : 2.186531000001196,
+    "endToEndMillis" : 8633.636871,
+    "generation" : {
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "inputTokens" : 227,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 90,
+      "outputTokens" : 46,
+      "ttftMillis" : 3027.998072,
+      "totalMillis" : 8629.964816,
+      "prefillTokensPerSecond" : 29.735697081383346,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616261632,
+      "cpuMillis" : 90930.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "cobalt-red-probability",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-cobalt-probability",
+        "title" : "Cobalt urn",
+        "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5."
+      },
+      "score" : 8.382398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5db1fe258ad18f5e3bdadbc51bbddffcf287648b99c3f12bb5448665bc0b3e77",
+    "retrievalMillis" : 1.939988,
+    "frameworkOverheadMillis" : 2.2484429999994973,
+    "endToEndMillis" : 5965.91606,
+    "generation" : {
+      "text" : "The Cobalt urn contains three red and two blue balls. The red probability is 3/5. [math-cobalt-probability]",
+      "inputTokens" : 228,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 91,
+      "outputTokens" : 23,
+      "ttftMillis" : 3160.49773,
+      "totalMillis" : 5961.727629,
+      "prefillTokensPerSecond" : 28.806418171265854,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616429568,
+      "cpuMillis" : 70250.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Cobalt urn contains three red and two blue balls. The red probability is 3/5.",
+      "text" : "The Cobalt urn contains three red and two blue balls. The red probability is 3/5. [math-cobalt-probability]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "delta-sixth-term",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-delta-sequence",
+        "title" : "Delta sequence",
+        "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27."
+      },
+      "score" : 6.3672924,
+      "rank" : 1
+    } ],
+    "promptSha256" : "587c842e2fcc84da27f8478640521271030c5dcd31aa7d83ed00e6157e821d37",
+    "retrievalMillis" : 1.969489,
+    "frameworkOverheadMillis" : 2.241323000000193,
+    "endToEndMillis" : 6366.273575,
+    "generation" : {
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "inputTokens" : 216,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 79,
+      "outputTokens" : 31,
+      "ttftMillis" : 2605.762478,
+      "totalMillis" : 6362.062763,
+      "prefillTokensPerSecond" : 30.330924631748886,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616536064,
+      "cpuMillis" : 70150.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The start of Delta is 7, its common difference is 4, and its sixth term is 27. [math-delta-sequence]",
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "ember-modulo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-ember-modulus",
+        "title" : "Ember congruence",
+        "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3."
+      },
+      "score" : 4.442518,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c906d4ee39ce249b7b045460d06a2f7e8d9632b78f58c6a35fc461d2e191734a",
+    "retrievalMillis" : 1.417461,
+    "frameworkOverheadMillis" : 1.9522879999994984,
+    "endToEndMillis" : 6027.01419,
+    "generation" : {
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "inputTokens" : 213,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 76,
+      "outputTokens" : 29,
+      "ttftMillis" : 2515.406143,
+      "totalMillis" : 6023.644441,
+      "prefillTokensPerSecond" : 30.226484995877698,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616617984,
+      "cpuMillis" : 67000.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Ember value reduced modulo 7 is 38, and the remainder is 3. [math-ember-modulus]",
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "fjord-integral",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-fjord-integral",
+        "title" : "Fjord integral",
+        "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2."
+      },
+      "score" : 5.5134096,
+      "rank" : 1
+    } ],
+    "promptSha256" : "883ca02950ffa962edb17e3c4854b83d88003f6bce052eb3e5afec2682333a1f",
+    "retrievalMillis" : 1.526707,
+    "frameworkOverheadMillis" : 1.851252999999815,
+    "endToEndMillis" : 6989.628588,
+    "generation" : {
+      "text" : "The Fjord definite integral of 2x from 0 to 3 is 9, and the antiderivative used is x^2. [math-fjord-integral]",
+      "inputTokens" : 227,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 90,
+      "outputTokens" : 33,
+      "ttftMillis" : 2968.623671,
+      "totalMillis" : 6986.250628,
+      "prefillTokensPerSecond" : 30.325573343822917,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616691712,
+      "cpuMillis" : 78050.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Fjord definite integral of 2x from 0 to 3 is 9, and the antiderivative used is x^2.",
+      "text" : "The Fjord definite integral of 2x from 0 to 3 is 9, and the antiderivative used is x^2. [math-fjord-integral]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "grove-hypotenuse",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-grove-geometry",
+        "title" : "Grove triangle",
+        "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13."
+      },
+      "score" : 5.9253526,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1efce585de3d869ce099a14feeefb91d3f9a615da3145ec5a0f448024fc60d28",
+    "retrievalMillis" : 1.927987,
+    "frameworkOverheadMillis" : 1.5579390000002604,
+    "endToEndMillis" : 5635.70838,
+    "generation" : {
+      "text" : "The Grove triangle has legs of 5 and 12, and its hypotenuse is 13. [math-grove-geometry]",
+      "inputTokens" : 217,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 80,
+      "outputTokens" : 25,
+      "ttftMillis" : 2612.805417,
+      "totalMillis" : 5632.222454,
+      "prefillTokensPerSecond" : 30.626215483669423,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616740864,
+      "cpuMillis" : 64720.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Grove triangle has legs of 5 and 12, and its hypotenuse is 13.",
+      "text" : "The Grove triangle has legs of 5 and 12, and its hypotenuse is 13. [math-grove-geometry]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "harbor-mean-median",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-harbor-statistics",
+        "title" : "Harbor sample",
+        "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4."
+      },
+      "score" : 4.7371473,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fa5ad040883fbfad0bca40703362d01ef569fceacddd90737296e59e2e5d4bbf",
+    "retrievalMillis" : 1.454373,
+    "frameworkOverheadMillis" : 1.441372000001138,
+    "endToEndMillis" : 5750.351671,
+    "generation" : {
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "inputTokens" : 219,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 82,
+      "outputTokens" : 25,
+      "ttftMillis" : 2705.119918,
+      "totalMillis" : 5747.455926,
+      "prefillTokensPerSecond" : 30.320917492977856,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616814592,
+      "cpuMillis" : 66410.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The mean of the Harbor sample is 5 and its median is 4. [math-harbor-statistics]",
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "unsupported-maple-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 1.2100124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a54105389b35b29d4d177e55042c9e902d7b8fdfd5e157224b42854dd4035cae",
+    "retrievalMillis" : 1.343037,
+    "frameworkOverheadMillis" : 1.503005999999914,
+    "endToEndMillis" : 5422.004757,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 228,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 91,
+      "outputTokens" : 20,
+      "ttftMillis" : 2975.023537,
+      "totalMillis" : 5419.158714,
+      "prefillTokensPerSecond" : 30.59522415860117,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616835072,
+      "cpuMillis" : 65770.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The limit of the Maple rational function at infinity is INSUFFICIENT_CONTEXT.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "amber-determinant-trace",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-amber-matrix",
+        "title" : "Amber matrix",
+        "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7."
+      },
+      "score" : 4.5716124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cfa37b20c25b43df3136e4b537925678c5d311551a94eeffc8127827cab085b9",
+    "retrievalMillis" : 1.39658,
+    "frameworkOverheadMillis" : 1.4721340000005512,
+    "endToEndMillis" : 5839.634164,
+    "generation" : {
+      "text" : "The determinant of the Amber matrix is 10 and the trace is 7. [math-amber-matrix]",
+      "inputTokens" : 219,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 82,
+      "outputTokens" : 26,
+      "ttftMillis" : 2687.768849,
+      "totalMillis" : 5836.76545,
+      "prefillTokensPerSecond" : 30.51619818313962,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616851456,
+      "cpuMillis" : 66960.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The determinant of the Amber matrix is 10 and the trace is 7. [math-amber-matrix]",
+      "text" : "The determinant of the Amber matrix is 10 and the trace is 7. [math-amber-matrix]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "birch-function-derivative",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 4.115302,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a295044585bcd5f931e90fd4186ee2ae035728851e2d51083b1d90137505ec27",
+    "retrievalMillis" : 1.218121,
+    "frameworkOverheadMillis" : 1.4015800000015588,
+    "endToEndMillis" : 8607.783955,
+    "generation" : {
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "inputTokens" : 227,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 90,
+      "outputTokens" : 46,
+      "ttftMillis" : 2970.310035,
+      "totalMillis" : 8605.164254,
+      "prefillTokensPerSecond" : 30.3067187327429,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616892416,
+      "cpuMillis" : 91030.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "cobalt-red-probability",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-cobalt-probability",
+        "title" : "Cobalt urn",
+        "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5."
+      },
+      "score" : 8.382398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5db1fe258ad18f5e3bdadbc51bbddffcf287648b99c3f12bb5448665bc0b3e77",
+    "retrievalMillis" : 1.378869,
+    "frameworkOverheadMillis" : 1.4717540000001463,
+    "endToEndMillis" : 5783.650014,
+    "generation" : {
+      "text" : "The Cobalt urn contains three red and two blue balls. The red probability is 3/5. [math-cobalt-probability]",
+      "inputTokens" : 228,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 91,
+      "outputTokens" : 23,
+      "ttftMillis" : 2978.952639,
+      "totalMillis" : 5780.799391,
+      "prefillTokensPerSecond" : 30.55572483483077,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616925184,
+      "cpuMillis" : 68560.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Cobalt urn contains three red and two blue balls. The red probability is 3/5.",
+      "text" : "The Cobalt urn contains three red and two blue balls. The red probability is 3/5. [math-cobalt-probability]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "delta-sixth-term",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-delta-sequence",
+        "title" : "Delta sequence",
+        "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27."
+      },
+      "score" : 6.3672924,
+      "rank" : 1
+    } ],
+    "promptSha256" : "587c842e2fcc84da27f8478640521271030c5dcd31aa7d83ed00e6157e821d37",
+    "retrievalMillis" : 2.113986,
+    "frameworkOverheadMillis" : 1.8879449999994904,
+    "endToEndMillis" : 6392.545355,
+    "generation" : {
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "inputTokens" : 216,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 79,
+      "outputTokens" : 31,
+      "ttftMillis" : 2628.230009,
+      "totalMillis" : 6388.543424,
+      "prefillTokensPerSecond" : 30.06803417590769,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4616974336,
+      "cpuMillis" : 70590.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The start of Delta is 7, its common difference is 4, and its sixth term is 27. [math-delta-sequence]",
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "ember-modulo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-ember-modulus",
+        "title" : "Ember congruence",
+        "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3."
+      },
+      "score" : 4.442518,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c906d4ee39ce249b7b045460d06a2f7e8d9632b78f58c6a35fc461d2e191734a",
+    "retrievalMillis" : 1.146068,
+    "frameworkOverheadMillis" : 1.3990600000006452,
+    "endToEndMillis" : 6064.386569,
+    "generation" : {
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "inputTokens" : 213,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 76,
+      "outputTokens" : 29,
+      "ttftMillis" : 2539.846359,
+      "totalMillis" : 6061.841441,
+      "prefillTokensPerSecond" : 29.930484229220646,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4617007104,
+      "cpuMillis" : 67170.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Ember value reduced modulo 7 is 38, and the remainder is 3. [math-ember-modulus]",
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "fjord-integral",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-fjord-integral",
+        "title" : "Fjord integral",
+        "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2."
+      },
+      "score" : 5.5134096,
+      "rank" : 1
+    } ],
+    "promptSha256" : "883ca02950ffa962edb17e3c4854b83d88003f6bce052eb3e5afec2682333a1f",
+    "retrievalMillis" : 1.237422,
+    "frameworkOverheadMillis" : 1.3871799999997165,
+    "endToEndMillis" : 7042.964481,
+    "generation" : {
+      "text" : "The Fjord definite integral of 2x from 0 to 3 is 9, and the antiderivative used is x^2. [math-fjord-integral]",
+      "inputTokens" : 227,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 90,
+      "outputTokens" : 33,
+      "ttftMillis" : 3022.960047,
+      "totalMillis" : 7040.339879,
+      "prefillTokensPerSecond" : 29.77818531511052,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4617027584,
+      "cpuMillis" : 78610.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Fjord definite integral of 2x from 0 to 3 is 9, and the antiderivative used is x^2.",
+      "text" : "The Fjord definite integral of 2x from 0 to 3 is 9, and the antiderivative used is x^2. [math-fjord-integral]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "grove-hypotenuse",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-grove-geometry",
+        "title" : "Grove triangle",
+        "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13."
+      },
+      "score" : 5.9253526,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1efce585de3d869ce099a14feeefb91d3f9a615da3145ec5a0f448024fc60d28",
+    "retrievalMillis" : 1.570939,
+    "frameworkOverheadMillis" : 1.7007449999991877,
+    "endToEndMillis" : 5663.246018,
+    "generation" : {
+      "text" : "The Grove triangle has legs of 5 and 12, and its hypotenuse is 13. [math-grove-geometry]",
+      "inputTokens" : 217,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 80,
+      "outputTokens" : 25,
+      "ttftMillis" : 2632.689794,
+      "totalMillis" : 5659.974334,
+      "prefillTokensPerSecond" : 30.39778910070766,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4617072640,
+      "cpuMillis" : 64950.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Grove triangle has legs of 5 and 12, and its hypotenuse is 13.",
+      "text" : "The Grove triangle has legs of 5 and 12, and its hypotenuse is 13. [math-grove-geometry]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "harbor-mean-median",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-harbor-statistics",
+        "title" : "Harbor sample",
+        "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4."
+      },
+      "score" : 4.7371473,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fa5ad040883fbfad0bca40703362d01ef569fceacddd90737296e59e2e5d4bbf",
+    "retrievalMillis" : 1.230212,
+    "frameworkOverheadMillis" : 1.3835699999990538,
+    "endToEndMillis" : 5765.664494,
+    "generation" : {
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "inputTokens" : 219,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 82,
+      "outputTokens" : 25,
+      "ttftMillis" : 2715.26428,
+      "totalMillis" : 5763.050712,
+      "prefillTokensPerSecond" : 30.206336426659874,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4617125888,
+      "cpuMillis" : 66250.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The mean of the Harbor sample is 5 and its median is 4. [math-harbor-statistics]",
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "unsupported-maple-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 1.2100124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a54105389b35b29d4d177e55042c9e902d7b8fdfd5e157224b42854dd4035cae",
+    "retrievalMillis" : 1.172108,
+    "frameworkOverheadMillis" : 1.5428890000002866,
+    "endToEndMillis" : 5438.571448,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 228,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 91,
+      "outputTokens" : 20,
+      "ttftMillis" : 2996.883667,
+      "totalMillis" : 5435.856451,
+      "prefillTokensPerSecond" : 30.371121720771875,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4617134080,
+      "cpuMillis" : 65810.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The limit of the Maple rational function at infinity is INSUFFICIENT_CONTEXT.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "amber-determinant-trace",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-amber-matrix",
+        "title" : "Amber matrix",
+        "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7."
+      },
+      "score" : 4.5716124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cfa37b20c25b43df3136e4b537925678c5d311551a94eeffc8127827cab085b9",
+    "retrievalMillis" : 1.134277,
+    "frameworkOverheadMillis" : 1.3783000000003085,
+    "endToEndMillis" : 5907.048133,
+    "generation" : {
+      "text" : "The determinant of the Amber matrix is 10 and the trace is 7. [math-amber-matrix]",
+      "inputTokens" : 219,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 82,
+      "outputTokens" : 26,
+      "ttftMillis" : 2727.228093,
+      "totalMillis" : 5904.535556,
+      "prefillTokensPerSecond" : 30.07387712832136,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4617138176,
+      "cpuMillis" : 67690.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The determinant of the Amber matrix is 10 and the trace is 7. [math-amber-matrix]",
+      "text" : "The determinant of the Amber matrix is 10 and the trace is 7. [math-amber-matrix]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "birch-function-derivative",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 4.115302,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a295044585bcd5f931e90fd4186ee2ae035728851e2d51083b1d90137505ec27",
+    "retrievalMillis" : 1.060933,
+    "frameworkOverheadMillis" : 1.3999899999998888,
+    "endToEndMillis" : 8607.974543,
+    "generation" : {
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "inputTokens" : 227,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 90,
+      "outputTokens" : 46,
+      "ttftMillis" : 2976.676494,
+      "totalMillis" : 8605.51362,
+      "prefillTokensPerSecond" : 30.240878424940135,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4617150464,
+      "cpuMillis" : 91110.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "cobalt-red-probability",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-cobalt-probability",
+        "title" : "Cobalt urn",
+        "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5."
+      },
+      "score" : 8.382398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5db1fe258ad18f5e3bdadbc51bbddffcf287648b99c3f12bb5448665bc0b3e77",
+    "retrievalMillis" : 1.210801,
+    "frameworkOverheadMillis" : 1.4587639999999737,
+    "endToEndMillis" : 5845.138245,
+    "generation" : {
+      "text" : "The Cobalt urn contains three red and two blue balls. The red probability is 3/5. [math-cobalt-probability]",
+      "inputTokens" : 228,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 91,
+      "outputTokens" : 23,
+      "ttftMillis" : 3042.109971,
+      "totalMillis" : 5842.46868,
+      "prefillTokensPerSecond" : 29.919700652540122,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4617175040,
+      "cpuMillis" : 69340.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Cobalt urn contains three red and two blue balls. The red probability is 3/5.",
+      "text" : "The Cobalt urn contains three red and two blue balls. The red probability is 3/5. [math-cobalt-probability]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "delta-sixth-term",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-delta-sequence",
+        "title" : "Delta sequence",
+        "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27."
+      },
+      "score" : 6.3672924,
+      "rank" : 1
+    } ],
+    "promptSha256" : "587c842e2fcc84da27f8478640521271030c5dcd31aa7d83ed00e6157e821d37",
+    "retrievalMillis" : 1.319295,
+    "frameworkOverheadMillis" : 1.3312869999999748,
+    "endToEndMillis" : 6375.731184,
+    "generation" : {
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "inputTokens" : 216,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 79,
+      "outputTokens" : 31,
+      "ttftMillis" : 2611.188728,
+      "totalMillis" : 6373.080602,
+      "prefillTokensPerSecond" : 30.26192000126227,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4617211904,
+      "cpuMillis" : 70420.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The start of Delta is 7, its common difference is 4, and its sixth term is 27. [math-delta-sequence]",
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "ember-modulo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-ember-modulus",
+        "title" : "Ember congruence",
+        "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3."
+      },
+      "score" : 4.442518,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c906d4ee39ce249b7b045460d06a2f7e8d9632b78f58c6a35fc461d2e191734a",
+    "retrievalMillis" : 1.00387,
+    "frameworkOverheadMillis" : 1.4166009999999005,
+    "endToEndMillis" : 6015.638435,
+    "generation" : {
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "inputTokens" : 213,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 76,
+      "outputTokens" : 29,
+      "ttftMillis" : 2503.204951,
+      "totalMillis" : 6013.217964,
+      "prefillTokensPerSecond" : 30.368909804292727,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4617383936,
+      "cpuMillis" : 66930.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Ember value reduced modulo 7 is 38, and the remainder is 3. [math-ember-modulus]",
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "fjord-integral",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-fjord-integral",
+        "title" : "Fjord integral",
+        "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2."
+      },
+      "score" : 5.5134096,
+      "rank" : 1
+    } ],
+    "promptSha256" : "883ca02950ffa962edb17e3c4854b83d88003f6bce052eb3e5afec2682333a1f",
+    "retrievalMillis" : 1.19262,
+    "frameworkOverheadMillis" : 1.5146660000009433,
+    "endToEndMillis" : 7023.819126,
+    "generation" : {
+      "text" : "The Fjord definite integral of 2x from 0 to 3 is 9, and the antiderivative used is x^2. [math-fjord-integral]",
+      "inputTokens" : 227,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 90,
+      "outputTokens" : 33,
+      "ttftMillis" : 2994.211375,
+      "totalMillis" : 7021.11184,
+      "prefillTokensPerSecond" : 30.065467877000494,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4618637312,
+      "cpuMillis" : 78580.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Fjord definite integral of 2x from 0 to 3 is 9, and the antiderivative used is x^2.",
+      "text" : "The Fjord definite integral of 2x from 0 to 3 is 9, and the antiderivative used is x^2. [math-fjord-integral]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "grove-hypotenuse",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-grove-geometry",
+        "title" : "Grove triangle",
+        "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13."
+      },
+      "score" : 5.9253526,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1efce585de3d869ce099a14feeefb91d3f9a615da3145ec5a0f448024fc60d28",
+    "retrievalMillis" : 1.322976,
+    "frameworkOverheadMillis" : 1.49484399999983,
+    "endToEndMillis" : 5680.81353,
+    "generation" : {
+      "text" : "The Grove triangle has legs of 5 and 12, and its hypotenuse is 13. [math-grove-geometry]",
+      "inputTokens" : 217,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 80,
+      "outputTokens" : 25,
+      "ttftMillis" : 2626.001602,
+      "totalMillis" : 5677.99571,
+      "prefillTokensPerSecond" : 30.47309574467463,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4620103680,
+      "cpuMillis" : 65000.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Grove triangle has legs of 5 and 12, and its hypotenuse is 13.",
+      "text" : "The Grove triangle has legs of 5 and 12, and its hypotenuse is 13. [math-grove-geometry]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "harbor-mean-median",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-harbor-statistics",
+        "title" : "Harbor sample",
+        "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4."
+      },
+      "score" : 4.7371473,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fa5ad040883fbfad0bca40703362d01ef569fceacddd90737296e59e2e5d4bbf",
+    "retrievalMillis" : 1.159177,
+    "frameworkOverheadMillis" : 1.4533929999988686,
+    "endToEndMillis" : 5734.905999,
+    "generation" : {
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "inputTokens" : 219,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 82,
+      "outputTokens" : 25,
+      "ttftMillis" : 2696.604474,
+      "totalMillis" : 5732.293429,
+      "prefillTokensPerSecond" : 30.415286268281182,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4621119488,
+      "cpuMillis" : 66150.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The mean of the Harbor sample is 5 and its median is 4. [math-harbor-statistics]",
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "unsupported-maple-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 1.2100124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a54105389b35b29d4d177e55042c9e902d7b8fdfd5e157224b42854dd4035cae",
+    "retrievalMillis" : 1.277554,
+    "frameworkOverheadMillis" : 1.6389909999998054,
+    "endToEndMillis" : 5441.337495,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 228,
+      "cacheReadInputTokens" : 137,
+      "cacheWriteInputTokens" : 91,
+      "outputTokens" : 20,
+      "ttftMillis" : 2996.80164,
+      "totalMillis" : 5438.42095,
+      "prefillTokensPerSecond" : 30.374400160212343,
+      "loadMillis" : 397.3055,
+      "peakRssBytes" : 4621393920,
+      "cpuMillis" : 65950.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The limit of the Maple rational function at infinity is INSUFFICIENT_CONTEXT.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

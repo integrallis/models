@@ -1,0 +1,1588 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-09T21:08:56.426633849Z",
+  "framework" : "plain-java",
+  "backend" : "ollama",
+  "backendVersion" : "ollama@ollama version is 0.40.2",
+  "modelId" : "huatuogpt_o1_7b_q4_0",
+  "model" : "qual-huatuogpt_o1_7b_q4_0",
+  "artifactSha256" : "5aadde67af405c3722dcd58b3fc0c4eaf489a68360860d8c1176a5661c7f9d92",
+  "artifactSizeBytes" : 4444122272,
+  "settings" : {
+    "corpusSha256" : "50b20fdae13db749bdf1bc029c681d53fff8895fb11aa3a177264ab3e6fd62f0",
+    "workload" : "healthcare",
+    "caseIds" : [ "atlas-consent-form", "beacon-protocol-visits", "cedar-storage-retention", "delta-arrival-desk", "elm-portal-routing", "fir-reconciliation-owner", "grove-image-transfer", "harbor-records-timing", "unsupported-raven-treatment" ],
+    "promptTemplate" : "chatml-no-think",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 256,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topK" : "1",
+      "rawPrompt" : "true",
+      "seed" : "42",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-3-189",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971658752,
+    "maxHeapBytes" : 16500391936,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "ollama",
+    "planVersion" : "unavailable",
+    "environment" : { },
+    "optimizations" : [ ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 5856.849734,
+    "retrievalMillis" : {
+      "p50" : 1.668232,
+      "p95" : 10.628898599999994
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 0.3012239999989106,
+      "p95" : 2.3182625999991613
+    },
+    "ttftMillis" : {
+      "p50" : 1135.014602,
+      "p95" : 1280.7931824
+    },
+    "tpotMillis" : {
+      "p50" : 108.49232816862747,
+      "p95" : 109.31464416174148
+    },
+    "endToEndMillis" : {
+      "p50" : 16759.781971,
+      "p95" : 28968.5882796
+    },
+    "p50PrefillTokensPerSecond" : 142.36319341997321,
+    "p50DecodeTokensPerSecond" : 9.21724159560591,
+    "peakRssBytes" : 0,
+    "totalCpuMillis" : 0.0,
+    "totalInputTokens" : 4407,
+    "totalCacheReadInputTokens" : 0,
+    "totalCacheWriteInputTokens" : 0,
+    "totalOutputTokens" : 3534,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.7777777777777778,
+    "modelAnswerRate" : 0.1111111111111111,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.7777777777777778,
+    "truncatedAnswerRate" : 0.2222222222222222
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "atlas-consent-form",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-atlas-consent",
+        "title" : "Atlas consent workflow",
+        "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent."
+      },
+      "score" : 8.389286,
+      "rank" : 1
+    } ],
+    "promptSha256" : "38b644cb4cd04e5c8175d65866a144de2f3ea3801542807e1063cb573b751a4d",
+    "retrievalMillis" : 2.25393,
+    "frameworkOverheadMillis" : 0.302335000000312,
+    "endToEndMillis" : 17050.617081,
+    "generation" : {
+      "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent. [health-atlas-consent]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 156,
+      "ttftMillis" : 133.725536,
+      "totalMillis" : 17048.060816,
+      "prefillTokensPerSecond" : 1499.4971198683368,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[health-atlas-consent] Okay, let's think about this. The question is asking about the form that records consent at Atlas Clinic and when an interpreter is needed. From what I understand, Atlas Clinic uses a form called AC-17 for recording consent. That's the form they use. Now, about the interpreter, it says that a certified interpreter is required when the patient wants the consent translated. So, if the patient asks for it in another language, they need an interpreter. That makes sense. So, to answer the question, the form AC-17 records the consent, and an interpreter is needed when the patient requests a translated version. That's it!\n\n[health-atlas-consent] <CITATION health-atlas-consent>",
+      "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent. [health-atlas-consent]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "beacon-protocol-visits",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-beacon-visits",
+        "title" : "Beacon research visits",
+        "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks."
+      },
+      "score" : 6.8266687,
+      "rank" : 1
+    } ],
+    "promptSha256" : "bcfdcb00f4779038afaa0c4208224dc06b1966bd90601915397def00c3daf88b",
+    "retrievalMillis" : 20.245425,
+    "frameworkOverheadMillis" : 0.2969039999998131,
+    "endToEndMillis" : 3686.216901,
+    "generation" : {
+      "text" : "The Beacon study protocol code is BT-204. Follow-up visits occur every six weeks. \n\n[health-beacon-visits]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 29,
+      "ttftMillis" : 648.231698,
+      "totalMillis" : 3665.674572,
+      "prefillTokensPerSecond" : 261.65939923640127,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Beacon study protocol code is BT-204. Follow-up visits occur every six weeks. \n\n[health-beacon-visits]",
+      "text" : "The Beacon study protocol code is BT-204. Follow-up visits occur every six weeks. \n\n[health-beacon-visits]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "cedar-storage-retention",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-cedar-specimens",
+        "title" : "Cedar specimen storage",
+        "text" : "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. Retention lasts seven years after study closure."
+      },
+      "score" : 2.7801502,
+      "rank" : 1
+    } ],
+    "promptSha256" : "37743600fad2f6bed59097a298e72d9c7ed77aa32582798712c8e9c82261537f",
+    "retrievalMillis" : 2.553054,
+    "frameworkOverheadMillis" : 0.5148750000007567,
+    "endToEndMillis" : 8832.340866,
+    "generation" : {
+      "text" : "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. Retention lasts seven years after study closure. [health-cedar-specimens]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 71,
+      "ttftMillis" : 1242.500847,
+      "totalMillis" : 8829.272937,
+      "prefillTokensPerSecond" : 133.878801549424,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Cedar Laboratory stores their study specimens at minus 80 degrees Celsius. That's quite cold! And they keep them for seven years after the study is closed. So, the temperature is minus 80 degrees Celsius, and the retention period is seven years. That's the information we have from the context.\n\n[health-cedar-specimens]",
+      "text" : "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. Retention lasts seven years after study closure. [health-cedar-specimens]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "delta-arrival-desk",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-delta-arrival",
+        "title" : "Delta imaging arrival",
+        "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4."
+      },
+      "score" : 4.609287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8f10108cf54f8c445845c4538d0179dca28052492556667ba9ee81156e8562db",
+    "retrievalMillis" : 1.503303,
+    "frameworkOverheadMillis" : 0.2588319999995292,
+    "endToEndMillis" : 5420.541936,
+    "generation" : {
+      "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4. [health-delta-arrival]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 40,
+      "ttftMillis" : 1180.03897,
+      "totalMillis" : 5418.779801,
+      "prefillTokensPerSecond" : 138.74418636323398,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Delta Imaging patients should arrive 20 minutes before their scheduled scan. They need to register at desk D4. That's the information given in the context.\n\n[health-delta-arrival]",
+      "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4. [health-delta-arrival]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "elm-portal-routing",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-elm-portal",
+        "title" : "Elm portal messages",
+        "text" : "Elm Health routes nonurgent portal messages to the care team within 72 hours. Emergency messages are not accepted through the portal."
+      },
+      "score" : 6.6502957,
+      "rank" : 1
+    } ],
+    "promptSha256" : "73834b3dca5dd7963111a3b21f8f9ed0440b0a75ab20793309e2c3c30e23657b",
+    "retrievalMillis" : 1.415979,
+    "frameworkOverheadMillis" : 0.27155299999867566,
+    "endToEndMillis" : 16946.725419,
+    "generation" : {
+      "text" : "Elm Health routes nonurgent portal messages to the care team within 72 hours. Emergency messages are not accepted through the portal. [health-elm-portal]",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 144,
+      "ttftMillis" : 1301.405589,
+      "totalMillis" : 16945.037887,
+      "prefillTokensPerSecond" : 131.96923719452033,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Elm Health processes nonurgent messages through their portal and routes them to the care team within 72 hours. That's the timeframe for nonurgent messages. Now, let's think about what they don't accept. Hmm, the context mentions that emergency messages are not accepted through the portal. So, those are the ones that are rejected. It's clear now: nonurgent messages are handled within 72 hours, and emergency messages are not processed via the portal.\n\nSo, to sum it up, Elm Health routes nonurgent messages to the care team within 72 hours, and emergency messages are not accepted through the portal. That's the deal with their system.\n\n[health-elm-portal]",
+      "text" : "Elm Health routes nonurgent portal messages to the care team within 72 hours. Emergency messages are not accepted through the portal. [health-elm-portal]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "fir-reconciliation-owner",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-fir-reconciliation",
+        "title" : "Fir medication reconciliation",
+        "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The assigned nurse records completion."
+      },
+      "score" : 6.4065657,
+      "rank" : 1
+    } ],
+    "promptSha256" : "04ebbb83edcaea6708640cb7bc7bef5285452e5dffc81e3eb4533345714c51e0",
+    "retrievalMillis" : 1.378357,
+    "frameworkOverheadMillis" : 0.2573530000008759,
+    "endToEndMillis" : 17893.967829,
+    "generation" : {
+      "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The assigned nurse records completion. [health-fir-reconciliation]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 163,
+      "ttftMillis" : 125.315027,
+      "totalMillis" : 17892.332119,
+      "prefillTokensPerSecond" : 1435.6254572055595,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[health-fir-reconciliation] Fir performs medication reconciliation at every admission and discharge. The assigned nurse records the completion of this process.\n\nSo, Fir does medication reconciliation at both admission and discharge. And it's the assigned nurse who records when it's done. That's clear from the context.\n\nLet's make sure we're not missing anything. The context mentions that Fir does this at every admission and discharge, and the nurse records it. That seems straightforward.\n\nOkay, let's put it all together. Fir performs medication reconciliation at every admission and discharge, and the assigned nurse records the completion. That matches what we found in the context.\n\nSo, the answer is that Fir performs medication reconciliation at every admission and discharge, and the assigned nurse records completion. That's it!\n\n[health-fir-reconciliation]",
+      "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The assigned nurse records completion. [health-fir-reconciliation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "grove-image-transfer",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-grove-images",
+        "title" : "Grove image exchange",
+        "text" : "Grove Hospital exchanges diagnostic images in DICOM format. Temporary transfer links expire after 30 days."
+      },
+      "score" : 7.4368615,
+      "rank" : 1
+    } ],
+    "promptSha256" : "262707c26ebe2e048dff108c6708af3119d246a95620164f7c16f12469b06937",
+    "retrievalMillis" : 1.668232,
+    "frameworkOverheadMillis" : 0.2951840000005177,
+    "endToEndMillis" : 6806.985727,
+    "generation" : {
+      "text" : "Grove Hospital exchanges diagnostic images in DICOM format. Temporary transfer links expire after 30 days. [health-grove-images]",
+      "inputTokens" : 161,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 63,
+      "ttftMillis" : 129.166223,
+      "totalMillis" : 6805.022311,
+      "prefillTokensPerSecond" : 1472.3634634378316,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Grove Hospital exchanges diagnostic images in DICOM format. That's the format they use. And the transfer links they provide expire after 30 days. So, the answer is that they exchange images in DICOM format, and the links expire in 30 days. \n\n[health-grove-images]",
+      "text" : "Grove Hospital exchanges diagnostic images in DICOM format. Temporary transfer links expire after 30 days. [health-grove-images]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "harbor-records-timing",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-harbor-records",
+        "title" : "Harbor records request",
+        "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR."
+      },
+      "score" : 4.368799,
+      "rank" : 1
+    } ],
+    "promptSha256" : "6169eb8018613409fca16f4554ba8afa8e21c193404978926a1ad5d703a09001",
+    "retrievalMillis" : 1.623989,
+    "frameworkOverheadMillis" : 0.26679199999853154,
+    "endToEndMillis" : 28993.115937,
+    "generation" : {
+      "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR. [health-harbor-records]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 256,
+      "ttftMillis" : 1244.322867,
+      "totalMillis" : 28991.225156,
+      "prefillTokensPerSecond" : 134.730062196296,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[health-harbor-records] Okay, let's see. Harbor Medical says they process complete records requests within 15 business days. That's pretty clear. And they use a tracking prefix, which is HRR. So, it looks like they're on top of things with both the timing and tracking.\n\nSo, to answer the question: Harbor processes complete requests within 15 business days, and they use the tracking prefix HRR. That seems to match what they said in their records request process.\n\n[health-harbor-records] Yep, that's it. The answer fits perfectly with what they mentioned. No need to change anything.\n\nSo, the answer is: Harbor processes complete requests within 15 business days, and they use the tracking prefix HRR. That's it!\n\n[health-harbor-records] Alright, looks like we've got it right. The answer matches the context perfectly. No issues here.\n\n[health-harbor-records] Done and done. The answer is clear and correct based on the context provided.\n\n[health-harbor-records] There we go. The answer is solid: Harbor processes complete requests within 15 business days, and they use the tracking prefix HRR. That's the",
+      "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR. [health-harbor-records]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "unsupported-raven-treatment",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-beacon-visits",
+        "title" : "Beacon research visits",
+        "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks."
+      },
+      "score" : 0.98855627,
+      "rank" : 1
+    } ],
+    "promptSha256" : "72f2d9e8f3ce3a832d526e0323cd25b6d020d1549309ada8aaf9f241426d22dc",
+    "retrievalMillis" : 2.158335,
+    "frameworkOverheadMillis" : 0.3309949999966193,
+    "endToEndMillis" : 28848.530772,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 256,
+      "ttftMillis" : 1135.014602,
+      "totalMillis" : 28846.041442,
+      "prefillTokensPerSecond" : 142.36319341997321,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[health-beacon-visits] The context mentions a Beacon study with protocol BT-204, but it doesn't mention Raven Clinic or any specific protocol for condition Zeta. So, I can't really say which protocol Raven Clinic uses based on this information.\n\n[health-beacon-visits] Hmm, let me think. The context talks about research visits every six weeks for the Beacon study, but it doesn't connect this to Raven Clinic or condition Zeta. I need more details about Raven Clinic's protocols.\n\n[health-beacon-visits] Oh, wait. The question asks about Raven Clinic and condition Zeta, but the context doesn't provide any information about them. It's like trying to find a needle in a haystack.\n\n[health-beacon-visits] Since there's no information about Raven Clinic or condition Zeta in the context, I can't determine which protocol they use. The context just doesn't give me enough to go on.\n\n[health-beacon-visits] So, I guess the answer is that there's not enough context to figure out which protocol Raven Clinic uses for condition Zeta. That's why I have to say there's insufficient context.\n\n[health-beacon-visits] Yeah, that makes sense. Without any details about",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "atlas-consent-form",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-atlas-consent",
+        "title" : "Atlas consent workflow",
+        "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent."
+      },
+      "score" : 8.389286,
+      "rank" : 1
+    } ],
+    "promptSha256" : "38b644cb4cd04e5c8175d65866a144de2f3ea3801542807e1063cb573b751a4d",
+    "retrievalMillis" : 12.838764,
+    "frameworkOverheadMillis" : 0.34040599999934784,
+    "endToEndMillis" : 16968.260997,
+    "generation" : {
+      "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent. [health-atlas-consent]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 156,
+      "ttftMillis" : 131.697827,
+      "totalMillis" : 16955.081827,
+      "prefillTokensPerSecond" : 1502.0103125829999,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[health-atlas-consent] Okay, let's think about this. The question is asking about the form that records consent at Atlas Clinic and when an interpreter is needed. From what I understand, Atlas Clinic uses a form called AC-17 for recording consent. That's the form they use. Now, about the interpreter, it says that a certified interpreter is required when the patient wants the consent translated. So, if the patient asks for it in another language, they need an interpreter. That makes sense. So, to answer the question, the form AC-17 records the consent, and an interpreter is needed when the patient requests a translated version. That's it!\n\n[health-atlas-consent] <CITATION health-atlas-consent>",
+      "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent. [health-atlas-consent]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "beacon-protocol-visits",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-beacon-visits",
+        "title" : "Beacon research visits",
+        "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks."
+      },
+      "score" : 6.8266687,
+      "rank" : 1
+    } ],
+    "promptSha256" : "bcfdcb00f4779038afaa0c4208224dc06b1966bd90601915397def00c3daf88b",
+    "retrievalMillis" : 4.357192,
+    "frameworkOverheadMillis" : 0.3016450000000077,
+    "endToEndMillis" : 3664.847096,
+    "generation" : {
+      "text" : "The Beacon study protocol code is BT-204. Follow-up visits occur every six weeks. \n\n[health-beacon-visits]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 29,
+      "ttftMillis" : 649.133995,
+      "totalMillis" : 3660.188259,
+      "prefillTokensPerSecond" : 262.1328342153677,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Beacon study protocol code is BT-204. Follow-up visits occur every six weeks. \n\n[health-beacon-visits]",
+      "text" : "The Beacon study protocol code is BT-204. Follow-up visits occur every six weeks. \n\n[health-beacon-visits]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "cedar-storage-retention",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-cedar-specimens",
+        "title" : "Cedar specimen storage",
+        "text" : "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. Retention lasts seven years after study closure."
+      },
+      "score" : 2.7801502,
+      "rank" : 1
+    } ],
+    "promptSha256" : "37743600fad2f6bed59097a298e72d9c7ed77aa32582798712c8e9c82261537f",
+    "retrievalMillis" : 4.123,
+    "frameworkOverheadMillis" : 0.29912400000102934,
+    "endToEndMillis" : 8874.393099,
+    "generation" : {
+      "text" : "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. Retention lasts seven years after study closure. [health-cedar-specimens]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 71,
+      "ttftMillis" : 1239.122214,
+      "totalMillis" : 8869.970975,
+      "prefillTokensPerSecond" : 134.48035568016496,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Cedar Laboratory stores their study specimens at minus 80 degrees Celsius. That's quite cold! And they keep them for seven years after the study is closed. So, the temperature is minus 80 degrees Celsius, and the retention period is seven years. That's the information we have from the context.\n\n[health-cedar-specimens]",
+      "text" : "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. Retention lasts seven years after study closure. [health-cedar-specimens]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "delta-arrival-desk",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-delta-arrival",
+        "title" : "Delta imaging arrival",
+        "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4."
+      },
+      "score" : 4.609287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8f10108cf54f8c445845c4538d0179dca28052492556667ba9ee81156e8562db",
+    "retrievalMillis" : 1.668861,
+    "frameworkOverheadMillis" : 0.276253999999426,
+    "endToEndMillis" : 5422.207127,
+    "generation" : {
+      "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4. [health-delta-arrival]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 40,
+      "ttftMillis" : 1183.364331,
+      "totalMillis" : 5420.262012,
+      "prefillTokensPerSecond" : 138.92120440422832,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Delta Imaging patients should arrive 20 minutes before their scheduled scan. They need to register at desk D4. That's the information given in the context.\n\n[health-delta-arrival]",
+      "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4. [health-delta-arrival]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "elm-portal-routing",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-elm-portal",
+        "title" : "Elm portal messages",
+        "text" : "Elm Health routes nonurgent portal messages to the care team within 72 hours. Emergency messages are not accepted through the portal."
+      },
+      "score" : 6.6502957,
+      "rank" : 1
+    } ],
+    "promptSha256" : "73834b3dca5dd7963111a3b21f8f9ed0440b0a75ab20793309e2c3c30e23657b",
+    "retrievalMillis" : 1.721634,
+    "frameworkOverheadMillis" : 0.6251389999997627,
+    "endToEndMillis" : 16742.207446,
+    "generation" : {
+      "text" : "Elm Health routes nonurgent portal messages to the care team within 72 hours. Emergency messages are not accepted through the portal. [health-elm-portal]",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 144,
+      "ttftMillis" : 1281.096873,
+      "totalMillis" : 16739.860673,
+      "prefillTokensPerSecond" : 133.74179651421676,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Elm Health processes nonurgent messages through their portal and routes them to the care team within 72 hours. That's the timeframe for nonurgent messages. Now, let's think about what they don't accept. Hmm, the context mentions that emergency messages are not accepted through the portal. So, those are the ones that are rejected. It's clear now: nonurgent messages are handled within 72 hours, and emergency messages are not processed via the portal.\n\nSo, to sum it up, Elm Health routes nonurgent messages to the care team within 72 hours, and emergency messages are not accepted through the portal. That's the deal with their system.\n\n[health-elm-portal]",
+      "text" : "Elm Health routes nonurgent portal messages to the care team within 72 hours. Emergency messages are not accepted through the portal. [health-elm-portal]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "fir-reconciliation-owner",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-fir-reconciliation",
+        "title" : "Fir medication reconciliation",
+        "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The assigned nurse records completion."
+      },
+      "score" : 6.4065657,
+      "rank" : 1
+    } ],
+    "promptSha256" : "04ebbb83edcaea6708640cb7bc7bef5285452e5dffc81e3eb4533345714c51e0",
+    "retrievalMillis" : 4.857317,
+    "frameworkOverheadMillis" : 0.4099889999961306,
+    "endToEndMillis" : 17689.77771,
+    "generation" : {
+      "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The assigned nurse records completion. [health-fir-reconciliation]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 163,
+      "ttftMillis" : 119.950769,
+      "totalMillis" : 17684.510404,
+      "prefillTokensPerSecond" : 1440.2744777858302,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[health-fir-reconciliation] Fir performs medication reconciliation at every admission and discharge. The assigned nurse records the completion of this process.\n\nSo, Fir does medication reconciliation at both admission and discharge. And it's the assigned nurse who records when it's done. That's clear from the context.\n\nLet's make sure we're not missing anything. The context mentions that Fir does this at every admission and discharge, and the nurse records it. That seems straightforward.\n\nOkay, let's put it all together. Fir performs medication reconciliation at every admission and discharge, and the assigned nurse records the completion. That matches what we found in the context.\n\nSo, the answer is that Fir performs medication reconciliation at every admission and discharge, and the assigned nurse records completion. That's it!\n\n[health-fir-reconciliation]",
+      "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The assigned nurse records completion. [health-fir-reconciliation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "grove-image-transfer",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-grove-images",
+        "title" : "Grove image exchange",
+        "text" : "Grove Hospital exchanges diagnostic images in DICOM format. Temporary transfer links expire after 30 days."
+      },
+      "score" : 7.4368615,
+      "rank" : 1
+    } ],
+    "promptSha256" : "262707c26ebe2e048dff108c6708af3119d246a95620164f7c16f12469b06937",
+    "retrievalMillis" : 3.646637,
+    "frameworkOverheadMillis" : 2.279211000000032,
+    "endToEndMillis" : 6881.468737,
+    "generation" : {
+      "text" : "Grove Hospital exchanges diagnostic images in DICOM format. Temporary transfer links expire after 30 days. [health-grove-images]",
+      "inputTokens" : 161,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 63,
+      "ttftMillis" : 121.698353,
+      "totalMillis" : 6875.542889,
+      "prefillTokensPerSecond" : 1477.6742691937038,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Grove Hospital exchanges diagnostic images in DICOM format. That's the format they use. And the transfer links they provide expire after 30 days. So, the answer is that they exchange images in DICOM format, and the links expire in 30 days. \n\n[health-grove-images]",
+      "text" : "Grove Hospital exchanges diagnostic images in DICOM format. Temporary transfer links expire after 30 days. [health-grove-images]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "harbor-records-timing",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-harbor-records",
+        "title" : "Harbor records request",
+        "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR."
+      },
+      "score" : 4.368799,
+      "rank" : 1
+    } ],
+    "promptSha256" : "6169eb8018613409fca16f4554ba8afa8e21c193404978926a1ad5d703a09001",
+    "retrievalMillis" : 3.08634,
+    "frameworkOverheadMillis" : 0.36301799999637296,
+    "endToEndMillis" : 28991.570559,
+    "generation" : {
+      "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR. [health-harbor-records]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 256,
+      "ttftMillis" : 1235.896304,
+      "totalMillis" : 28988.121201,
+      "prefillTokensPerSecond" : 134.7868529720501,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[health-harbor-records] Okay, let's see. Harbor Medical says they process complete records requests within 15 business days. That's pretty clear. And they use a tracking prefix, which is HRR. So, it looks like they're on top of things with both the timing and tracking.\n\nSo, to answer the question: Harbor processes complete requests within 15 business days, and they use the tracking prefix HRR. That seems to match what they said in their records request process.\n\n[health-harbor-records] Yep, that's it. The answer fits perfectly with what they mentioned. No need to change anything.\n\nSo, the answer is: Harbor processes complete requests within 15 business days, and they use the tracking prefix HRR. That's it!\n\n[health-harbor-records] Alright, looks like we've got it right. The answer matches the context perfectly. No issues here.\n\n[health-harbor-records] Done and done. The answer is clear and correct based on the context provided.\n\n[health-harbor-records] There we go. The answer is solid: Harbor processes complete requests within 15 business days, and they use the tracking prefix HRR. That's the",
+      "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR. [health-harbor-records]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "unsupported-raven-treatment",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-beacon-visits",
+        "title" : "Beacon research visits",
+        "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks."
+      },
+      "score" : 0.98855627,
+      "rank" : 1
+    } ],
+    "promptSha256" : "72f2d9e8f3ce3a832d526e0323cd25b6d020d1549309ada8aaf9f241426d22dc",
+    "retrievalMillis" : 1.01967,
+    "frameworkOverheadMillis" : 0.3012239999989106,
+    "endToEndMillis" : 28758.501652,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 256,
+      "ttftMillis" : 1136.477522,
+      "totalMillis" : 28757.180758,
+      "prefillTokensPerSecond" : 141.92235605303284,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[health-beacon-visits] The context mentions a Beacon study with protocol BT-204, but it doesn't mention Raven Clinic or any specific protocol for condition Zeta. So, I can't really say which protocol Raven Clinic uses based on this information.\n\n[health-beacon-visits] Hmm, let me think. The context talks about research visits every six weeks for the Beacon study, but it doesn't connect this to Raven Clinic or condition Zeta. I need more details about Raven Clinic's protocols.\n\n[health-beacon-visits] Oh, wait. The question asks about Raven Clinic and condition Zeta, but the context doesn't provide any information about them. It's like trying to find a needle in a haystack.\n\n[health-beacon-visits] Since there's no information about Raven Clinic or condition Zeta in the context, I can't determine which protocol they use. The context just doesn't give me enough to go on.\n\n[health-beacon-visits] So, I guess the answer is that there's not enough context to figure out which protocol Raven Clinic uses for condition Zeta. That's why I have to say there's insufficient context.\n\n[health-beacon-visits] Yeah, that makes sense. Without any details about",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "atlas-consent-form",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-atlas-consent",
+        "title" : "Atlas consent workflow",
+        "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent."
+      },
+      "score" : 8.389286,
+      "rank" : 1
+    } ],
+    "promptSha256" : "38b644cb4cd04e5c8175d65866a144de2f3ea3801542807e1063cb573b751a4d",
+    "retrievalMillis" : 1.605572,
+    "frameworkOverheadMillis" : 2.3349989999987883,
+    "endToEndMillis" : 16951.349834,
+    "generation" : {
+      "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent. [health-atlas-consent]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 156,
+      "ttftMillis" : 122.695387,
+      "totalMillis" : 16947.409263,
+      "prefillTokensPerSecond" : 1507.3529411764705,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[health-atlas-consent] Okay, let's think about this. The question is asking about the form that records consent at Atlas Clinic and when an interpreter is needed. From what I understand, Atlas Clinic uses a form called AC-17 for recording consent. That's the form they use. Now, about the interpreter, it says that a certified interpreter is required when the patient wants the consent translated. So, if the patient asks for it in another language, they need an interpreter. That makes sense. So, to answer the question, the form AC-17 records the consent, and an interpreter is needed when the patient requests a translated version. That's it!\n\n[health-atlas-consent] <CITATION health-atlas-consent>",
+      "text" : "Atlas Clinic records consent in form AC-17. A certified interpreter is required when the patient requests translated consent. [health-atlas-consent]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "beacon-protocol-visits",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-beacon-visits",
+        "title" : "Beacon research visits",
+        "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks."
+      },
+      "score" : 6.8266687,
+      "rank" : 1
+    } ],
+    "promptSha256" : "bcfdcb00f4779038afaa0c4208224dc06b1966bd90601915397def00c3daf88b",
+    "retrievalMillis" : 5.472546,
+    "frameworkOverheadMillis" : 0.31311600000026374,
+    "endToEndMillis" : 3671.458051,
+    "generation" : {
+      "text" : "The Beacon study protocol code is BT-204. Follow-up visits occur every six weeks. \n\n[health-beacon-visits]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 29,
+      "ttftMillis" : 641.721267,
+      "totalMillis" : 3665.672389,
+      "prefillTokensPerSecond" : 261.86412126224894,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Beacon study protocol code is BT-204. Follow-up visits occur every six weeks. \n\n[health-beacon-visits]",
+      "text" : "The Beacon study protocol code is BT-204. Follow-up visits occur every six weeks. \n\n[health-beacon-visits]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "cedar-storage-retention",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-cedar-specimens",
+        "title" : "Cedar specimen storage",
+        "text" : "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. Retention lasts seven years after study closure."
+      },
+      "score" : 2.7801502,
+      "rank" : 1
+    } ],
+    "promptSha256" : "37743600fad2f6bed59097a298e72d9c7ed77aa32582798712c8e9c82261537f",
+    "retrievalMillis" : 1.309204,
+    "frameworkOverheadMillis" : 4.920538000000306,
+    "endToEndMillis" : 8790.143134,
+    "generation" : {
+      "text" : "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. Retention lasts seven years after study closure. [health-cedar-specimens]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 71,
+      "ttftMillis" : 1233.688802,
+      "totalMillis" : 8783.913392,
+      "prefillTokensPerSecond" : 134.47630038582474,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Cedar Laboratory stores their study specimens at minus 80 degrees Celsius. That's quite cold! And they keep them for seven years after the study is closed. So, the temperature is minus 80 degrees Celsius, and the retention period is seven years. That's the information we have from the context.\n\n[health-cedar-specimens]",
+      "text" : "Cedar Laboratory stores study specimens at minus 80 degrees Celsius. Retention lasts seven years after study closure. [health-cedar-specimens]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "delta-arrival-desk",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-delta-arrival",
+        "title" : "Delta imaging arrival",
+        "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4."
+      },
+      "score" : 4.609287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8f10108cf54f8c445845c4538d0179dca28052492556667ba9ee81156e8562db",
+    "retrievalMillis" : 1.387578,
+    "frameworkOverheadMillis" : 0.24782299999969837,
+    "endToEndMillis" : 5409.750811,
+    "generation" : {
+      "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4. [health-delta-arrival]",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 40,
+      "ttftMillis" : 1177.087214,
+      "totalMillis" : 5408.11541,
+      "prefillTokensPerSecond" : 139.22603988185432,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Delta Imaging patients should arrive 20 minutes before their scheduled scan. They need to register at desk D4. That's the information given in the context.\n\n[health-delta-arrival]",
+      "text" : "Delta Imaging asks patients to arrive 20 minutes before a scheduled scan. Registration occurs at desk D4. [health-delta-arrival]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "elm-portal-routing",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-elm-portal",
+        "title" : "Elm portal messages",
+        "text" : "Elm Health routes nonurgent portal messages to the care team within 72 hours. Emergency messages are not accepted through the portal."
+      },
+      "score" : 6.6502957,
+      "rank" : 1
+    } ],
+    "promptSha256" : "73834b3dca5dd7963111a3b21f8f9ed0440b0a75ab20793309e2c3c30e23657b",
+    "retrievalMillis" : 1.23471,
+    "frameworkOverheadMillis" : 0.30613399999856483,
+    "endToEndMillis" : 16759.781971,
+    "generation" : {
+      "text" : "Elm Health routes nonurgent portal messages to the care team within 72 hours. Emergency messages are not accepted through the portal. [health-elm-portal]",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 144,
+      "ttftMillis" : 1280.084571,
+      "totalMillis" : 16758.241127,
+      "prefillTokensPerSecond" : 133.59990443677424,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Elm Health processes nonurgent messages through their portal and routes them to the care team within 72 hours. That's the timeframe for nonurgent messages. Now, let's think about what they don't accept. Hmm, the context mentions that emergency messages are not accepted through the portal. So, those are the ones that are rejected. It's clear now: nonurgent messages are handled within 72 hours, and emergency messages are not processed via the portal.\n\nSo, to sum it up, Elm Health routes nonurgent messages to the care team within 72 hours, and emergency messages are not accepted through the portal. That's the deal with their system.\n\n[health-elm-portal]",
+      "text" : "Elm Health routes nonurgent portal messages to the care team within 72 hours. Emergency messages are not accepted through the portal. [health-elm-portal]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "fir-reconciliation-owner",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-fir-reconciliation",
+        "title" : "Fir medication reconciliation",
+        "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The assigned nurse records completion."
+      },
+      "score" : 6.4065657,
+      "rank" : 1
+    } ],
+    "promptSha256" : "04ebbb83edcaea6708640cb7bc7bef5285452e5dffc81e3eb4533345714c51e0",
+    "retrievalMillis" : 1.205789,
+    "frameworkOverheadMillis" : 0.2531230000022333,
+    "endToEndMillis" : 17702.792751,
+    "generation" : {
+      "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The assigned nurse records completion. [health-fir-reconciliation]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 163,
+      "ttftMillis" : 125.947583,
+      "totalMillis" : 17701.333839,
+      "prefillTokensPerSecond" : 1348.4844580724402,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[health-fir-reconciliation] Fir performs medication reconciliation at every admission and discharge. The assigned nurse records the completion of this process.\n\nSo, Fir does medication reconciliation at both admission and discharge. And it's the assigned nurse who records when it's done. That's clear from the context.\n\nLet's make sure we're not missing anything. The context mentions that Fir does this at every admission and discharge, and the nurse records it. That seems straightforward.\n\nOkay, let's put it all together. Fir performs medication reconciliation at every admission and discharge, and the assigned nurse records the completion. That matches what we found in the context.\n\nSo, the answer is that Fir performs medication reconciliation at every admission and discharge, and the assigned nurse records completion. That's it!\n\n[health-fir-reconciliation]",
+      "text" : "Fir Practice performs medication reconciliation at every admission and discharge. The assigned nurse records completion. [health-fir-reconciliation]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "grove-image-transfer",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-grove-images",
+        "title" : "Grove image exchange",
+        "text" : "Grove Hospital exchanges diagnostic images in DICOM format. Temporary transfer links expire after 30 days."
+      },
+      "score" : 7.4368615,
+      "rank" : 1
+    } ],
+    "promptSha256" : "262707c26ebe2e048dff108c6708af3119d246a95620164f7c16f12469b06937",
+    "retrievalMillis" : 1.326355,
+    "frameworkOverheadMillis" : 0.24944300000061048,
+    "endToEndMillis" : 6863.163188,
+    "generation" : {
+      "text" : "Grove Hospital exchanges diagnostic images in DICOM format. Temporary transfer links expire after 30 days. [health-grove-images]",
+      "inputTokens" : 161,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 63,
+      "ttftMillis" : 129.254492,
+      "totalMillis" : 6861.58739,
+      "prefillTokensPerSecond" : 1376.38600360767,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "Grove Hospital exchanges diagnostic images in DICOM format. That's the format they use. And the transfer links they provide expire after 30 days. So, the answer is that they exchange images in DICOM format, and the links expire in 30 days. \n\n[health-grove-images]",
+      "text" : "Grove Hospital exchanges diagnostic images in DICOM format. Temporary transfer links expire after 30 days. [health-grove-images]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "harbor-records-timing",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-harbor-records",
+        "title" : "Harbor records request",
+        "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR."
+      },
+      "score" : 4.368799,
+      "rank" : 1
+    } ],
+    "promptSha256" : "6169eb8018613409fca16f4554ba8afa8e21c193404978926a1ad5d703a09001",
+    "retrievalMillis" : 1.272433,
+    "frameworkOverheadMillis" : 0.2812640000011015,
+    "endToEndMillis" : 28914.962961,
+    "generation" : {
+      "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR. [health-harbor-records]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 256,
+      "ttftMillis" : 1247.865581,
+      "totalMillis" : 28913.409264,
+      "prefillTokensPerSecond" : 133.29175707617665,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[health-harbor-records] Okay, let's see. Harbor Medical says they process complete records requests within 15 business days. That's pretty clear. And they use a tracking prefix, which is HRR. So, it looks like they're on top of things with both the timing and tracking.\n\nSo, to answer the question: Harbor processes complete requests within 15 business days, and they use the tracking prefix HRR. That seems to match what they said in their records request process.\n\n[health-harbor-records] Yep, that's it. The answer fits perfectly with what they mentioned. No need to change anything.\n\nSo, the answer is: Harbor processes complete requests within 15 business days, and they use the tracking prefix HRR. That's it!\n\n[health-harbor-records] Alright, looks like we've got it right. The answer matches the context perfectly. No issues here.\n\n[health-harbor-records] Done and done. The answer is clear and correct based on the context provided.\n\n[health-harbor-records] There we go. The answer is solid: Harbor processes complete requests within 15 business days, and they use the tracking prefix HRR. That's the",
+      "text" : "Harbor Medical processes complete records requests within 15 business days. Requests are tracked with prefix HRR. [health-harbor-records]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-huatuogpt_o1_7b_q4_0",
+    "caseId" : "unsupported-raven-treatment",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-beacon-visits",
+        "title" : "Beacon research visits",
+        "text" : "The synthetic Beacon study uses protocol BT-204. Follow-up research visits occur every six weeks."
+      },
+      "score" : 0.98855627,
+      "rank" : 1
+    } ],
+    "promptSha256" : "72f2d9e8f3ce3a832d526e0323cd25b6d020d1549309ada8aaf9f241426d22dc",
+    "retrievalMillis" : 1.309584,
+    "frameworkOverheadMillis" : 0.2643430000025546,
+    "endToEndMillis" : 28764.284655,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 256,
+      "ttftMillis" : 1133.864377,
+      "totalMillis" : 28762.710728,
+      "prefillTokensPerSecond" : 142.6055459296812,
+      "loadMillis" : 5856.849734,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "[health-beacon-visits] The context mentions a Beacon study with protocol BT-204, but it doesn't mention Raven Clinic or any specific protocol for condition Zeta. So, I can't really say which protocol Raven Clinic uses based on this information.\n\n[health-beacon-visits] Hmm, let me think. The context talks about research visits every six weeks for the Beacon study, but it doesn't connect this to Raven Clinic or condition Zeta. I need more details about Raven Clinic's protocols.\n\n[health-beacon-visits] Oh, wait. The question asks about Raven Clinic and condition Zeta, but the context doesn't provide any information about them. It's like trying to find a needle in a haystack.\n\n[health-beacon-visits] Since there's no information about Raven Clinic or condition Zeta in the context, I can't determine which protocol they use. The context just doesn't give me enough to go on.\n\n[health-beacon-visits] So, I guess the answer is that there's not enough context to figure out which protocol Raven Clinic uses for condition Zeta. That's why I have to say there's insufficient context.\n\n[health-beacon-visits] Yeah, that makes sense. Without any details about",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

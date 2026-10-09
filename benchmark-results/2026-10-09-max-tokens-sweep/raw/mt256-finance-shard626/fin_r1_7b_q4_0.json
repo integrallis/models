@@ -1,0 +1,1865 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-09T20:55:22.920016723Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.3.56-dev+q41-48caca0dafed",
+  "modelId" : "fin_r1_7b_q4_0",
+  "model" : "/work/models/fin_r1_7b_q4_0.gguf",
+  "artifactSha256" : "c4f0538a7a9335765df02b518dbc2800110705227a5a5303148fdda5cf45e384",
+  "artifactSizeBytes" : 4444121152,
+  "settings" : {
+    "corpusSha256" : "923a8686ef45df6c09c08c0bd80e08ab40a96ad0b4d37fb356729dbd6738befc",
+    "workload" : "finance",
+    "caseIds" : [ "aurora-reserve-review", "birch-duration-coupon", "cobalt-invoice-overdue", "delta-issuer-limit", "ember-loan-terms", "fjord-hedge-policy", "grove-runway-refresh", "harbor-variance-escalation", "unsupported-crypto-allocation" ],
+    "promptTemplate" : "chatml-no-think",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 256,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "topP" : "1.0",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0",
+      "topK" : "1",
+      "seed" : "42",
+      "promptCache" : "longest-common-prefix"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-12-50",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971658752,
+    "maxHeapBytes" : 16500391936,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v13",
+    "environment" : {
+      "tokenizer.pre.implemented" : "true",
+      "transformer-runtime" : "java",
+      "projection-layers" : "28",
+      "java-executor-poll-millis" : "0",
+      "performance-cliffs" : "fused-grouped-attention-disabled",
+      "vector-api" : "true",
+      "fast-scalar-fma" : "true",
+      "preferred-vector-bits" : "256",
+      "kernel-runtime" : "rust-ffm",
+      "native-quantized-decode" : "true",
+      "end-of-generation.chat-template" : "resolved:151645",
+      "active-vector-bits" : "256",
+      "gguf-parallel" : "true",
+      "gguf-threads" : "16",
+      "native-kernel-poll-millis" : "5",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "java-version" : "25.0.4.1",
+      "gguf-executor" : "persistent",
+      "q4-unsigned-pairwise-supported" : "true",
+      "native-kernel-abi" : "6",
+      "architecture" : "amd64",
+      "tokenizer.pre" : "qwen2",
+      "performance-cliff.fused-grouped-attention-disabled" : "architecture=qwen2, group-size=7",
+      "vm-version" : "25.0.4.1+1-LTS",
+      "fast-vector-fma" : "true",
+      "model-architecture" : "qwen2",
+      "native-kernel-decode-threads" : "8",
+      "kernel-implementation" : "rust-ffm-quantized-v13",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "os" : "Linux",
+      "vm-vendor" : "Eclipse Adoptium",
+      "compiler" : "hotspot-c2",
+      "native-grouped-attention" : "true",
+      "gguf-chunks-per-thread" : "2",
+      "native-q5-0-grouped" : "false",
+      "java-feature" : "25",
+      "sve" : "false",
+      "processors" : "16",
+      "end-of-generation-token-ids" : "151643,151645",
+      "q4-short-pairwise-supported" : "true",
+      "end-of-generation.151643" : "vocabulary-text",
+      "end-of-generation.151645" : "tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn",
+      "native-gated-delta-net" : "false",
+      "native-kernel-threads" : "16"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "implementation" : "rust-ffm-quantized-v13",
+        "qkv" : "grouped",
+        "gate-up" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "eligible-layers" : "0",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "DISABLED",
+      "reason" : "the stable widened Q4 kernel was selected",
+      "settings" : {
+        "compiler" : "hotspot-c2",
+        "architecture" : "amd64",
+        "os" : "Linux",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded projection topology has no Q6_K consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "batch-size" : "32",
+        "architecture" : "amd64",
+        "kernel" : "one-query-block",
+        "requested-kernel" : "one-query-block"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "ENABLED",
+      "reason" : "the validated final FFN runs only for requested prompt output rows",
+      "settings" : {
+        "formats" : "Q4_0,Q4_0,Q4_0",
+        "output-rows" : "requested"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "ENABLED",
+      "reason" : "unused final-layer prompt rows compute only the persistent K/V state",
+      "settings" : {
+        "unused-rows" : "kv-only",
+        "formats" : "Q4_0,Q4_0,Q4_0,Q4_0"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.stagedQuantizedFfn",
+      "settings" : {
+        "eligible-layers" : "25",
+        "executor" : "persistent",
+        "stages" : "2",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.stagedQuantizedLayer",
+      "settings" : {
+        "eligible-layers" : "25",
+        "executor" : "persistent",
+        "stages" : "7",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "eligible-layers" : "0",
+        "partitions" : "16",
+        "partition" : "batch-rows",
+        "staged-layers" : "25"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "16"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "6",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "6",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "6",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "6",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "6",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "abi" : "6",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "abi" : "6",
+        "boundary" : "panama-ffm",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "the Qwen 3.5 recurrence stays in Java: the shim's chunked recurrence agrees only to 2.0e-4 relative, every certified Qwen 3.5 record was produced with the Java one, and whether the shim is faster here is unmeasured. Adopting it is an epoch change, not a setting",
+      "settings" : {
+        "abi" : "6",
+        "boundary" : "panama-ffm-critical",
+        "state" : "caller-owned-java-array"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "unrouted for the same reason as rust-gated-delta-net: adopting it would change the bytes published Qwen 3.5 records claim",
+      "settings" : {
+        "abi" : "6",
+        "boundary" : "panama-ffm-critical",
+        "state" : "branch-major-caller-owned-java-array"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 projections run independently: grouping them decoded slower on the controlled Qwen2.5-0.5B x86-64 profile, 37.33 against 38.94 tokens/s. Not a setting -- the slower route is simply not taken",
+      "settings" : {
+        "raw-artifact" : "none-committed",
+        "evidence" : "backend-native/README.md"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "single-token projections execute in the Models Rust kernel for every tensor type it supports; the per-type decisions above report any type it does not",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 560.54945,
+    "retrievalMillis" : {
+      "p50" : 1.175016,
+      "p95" : 1.9959981
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 1.4529220000003988,
+      "p95" : 1.6300152999978308
+    },
+    "ttftMillis" : {
+      "p50" : 5152.24328,
+      "p95" : 5459.4152026
+    },
+    "tpotMillis" : {
+      "p50" : 328.0034989090909,
+      "p95" : 329.7849946055556
+    },
+    "endToEndMillis" : {
+      "p50" : 18468.171164,
+      "p95" : 88582.9269237
+    },
+    "p50PrefillTokensPerSecond" : 13.165200402955188,
+    "p50DecodeTokensPerSecond" : 3.048747965573254,
+    "peakRssBytes" : 4806127616,
+    "totalCpuMillis" : 4343520.0,
+    "totalInputTokens" : 4428,
+    "totalCacheReadInputTokens" : 2742,
+    "totalCacheWriteInputTokens" : 1686,
+    "totalOutputTokens" : 2064,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 0.9375,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 0.8888888888888888,
+    "rawCorrectAnswerRate" : 0.6666666666666666,
+    "modelAnswerRate" : 0.2222222222222222,
+    "modelAnswerCorrectRate" : 0.5,
+    "extractiveFallbackRate" : 0.6666666666666666,
+    "truncatedAnswerRate" : 0.1111111111111111
+  },
+  "performanceTier" : "FAILED_QUALITY",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "aurora-reserve-review",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-aurora-reserve",
+        "title" : "Aurora reserve policy",
+        "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month."
+      },
+      "score" : 5.188199,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3aaa0b11174bb78dc6c53e81fd79ad7cd4d3f71d2c323d885bae82230ea610ce",
+    "retrievalMillis" : 2.258891,
+    "frameworkOverheadMillis" : 1.8099399999991874,
+    "endToEndMillis" : 18591.754306,
+    "generation" : {
+      "text" : "**Answer:** Aurora Fund keeps 18% of its assets in the liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 72,
+      "outputTokens" : 41,
+      "ttftMillis" : 5445.975435,
+      "totalMillis" : 18587.685475,
+      "prefillTokensPerSecond" : 13.22269340612716,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4796641280,
+      "cpuMillis" : 118150.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Aurora Fund keeps 18% of its assets in the liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "text" : "**Answer:** Aurora Fund keeps 18% of its assets in the liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "birch-duration-coupon",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-birch-duration",
+        "title" : "Birch bond profile",
+        "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year."
+      },
+      "score" : 7.3422394,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ed46fd944739b7146edcd4e726fa66df63861d779e2a70082d61c55850e80059",
+    "retrievalMillis" : 2.034345,
+    "frameworkOverheadMillis" : 1.6307859999978973,
+    "endToEndMillis" : 17868.123903,
+    "generation" : {
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 40,
+      "ttftMillis" : 5075.913207,
+      "totalMillis" : 17864.458772,
+      "prefillTokensPerSecond" : 13.004373311042608,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4796747776,
+      "cpuMillis" : 112370.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Birch Municipal Bond's modified duration is 4.2 years, and its coupon is paid twice per year.  \n\n**Citations:** [finance-birch-duration]\n</assistant>",
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "cobalt-invoice-overdue",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-cobalt-invoices",
+        "title" : "Cobalt receivables",
+        "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31."
+      },
+      "score" : 8.500158,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8934496effd06711165e2b6fa1dd6c0f8e8ec40b844265c66083dc7667ce4cf7",
+    "retrievalMillis" : 1.906522,
+    "frameworkOverheadMillis" : 1.5412459999934072,
+    "endToEndMillis" : 88555.817673,
+    "generation" : {
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 256,
+      "ttftMillis" : 5282.919317,
+      "totalMillis" : 88552.369905,
+      "prefillTokensPerSecond" : 13.062604427500254,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4797587456,
+      "cpuMillis" : 424730.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Cobalt Services uses net-30 payment terms, meaning invoices are due 30 days after issuance. An invoice becomes overdue on day 31, as stated in the context. \n\n**Citations:** [finance-cobalt-invoices]\n</answer>\n``` To determine Cobalt Services' payment terms and the day an invoice becomes overdue, we analyze the provided context:\n\n1. **Payment Terms**: The context explicitly states, \"Cobalt Services issues invoices on net-30 terms.\" Net-30 terms indicate that the full amount is due 30 days after the invoice is generated. This is a standard commercial term where \"net\" refers to the due date, and \"30\" specifies the number of days.\n\n2. **Overdue Date**: The context further clarifies, \"An invoice becomes overdue on day 31.\" This means that if payment is not received by the 31st day following the issuance date, the invoice is considered past due. This aligns with the net-30 terms, as day 31 marks the first day of non-compliance.\n\n**Conclusion**: Cobalt Services adheres to net-30 payment terms, and an invoice is overdue starting on day 3",
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "delta-issuer-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-delta-concentration",
+        "title" : "Delta concentration limit",
+        "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit."
+      },
+      "score" : 6.1008873,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a8c184f68d6d9551e4a3b0f48c40b5385ac00544fad788aa8fbf8fa295e972a5",
+    "retrievalMillis" : 1.572305,
+    "frameworkOverheadMillis" : 1.6282169999976759,
+    "endToEndMillis" : 17007.702555,
+    "generation" : {
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 37,
+      "ttftMillis" : 5182.704207,
+      "totalMillis" : 17004.502033,
+      "prefillTokensPerSecond" : 12.736514810126234,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4797652992,
+      "cpuMillis" : 109360.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Delta Portfolio's single-issuer limit is 12% of net assets, and cash is excluded from this limit. [finance-delta-concentration]\n</answer>\n",
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "ember-loan-terms",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-ember-loan",
+        "title" : "Ember equipment loan",
+        "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031."
+      },
+      "score" : 6.752196,
+      "rank" : 1
+    } ],
+    "promptSha256" : "80b8f08c8351d5ce6ed2dc9bba20949c1b360d9a9cf3a71ff93fd7708ad1a1d2",
+    "retrievalMillis" : 1.408541,
+    "frameworkOverheadMillis" : 1.4654320000045118,
+    "endToEndMillis" : 51073.347788,
+    "generation" : {
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 68,
+      "outputTokens" : 142,
+      "ttftMillis" : 5212.504341,
+      "totalMillis" : 51070.473815,
+      "prefillTokensPerSecond" : 13.047351771009941,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4797710336,
+      "cpuMillis" : 258040.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Ember Manufacturing's loan rate is 6.25% annually, and the loan matures in June 2031.  \n**Citations:** [finance-ember-loan]\n</answer>\n``` To determine Ember Manufacturing's loan rate and maturity date, we refer to the provided context. The context explicitly states that the equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. There is no ambiguity in the data presented, as both the rate and maturity date are directly mentioned without requiring further calculation or interpretation. The answer is derived solely from the information given in the context, ensuring accuracy and alignment with the source material.\n```",
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "fjord-hedge-policy",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-fjord-hedge",
+        "title" : "Fjord currency hedge",
+        "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months."
+      },
+      "score" : 4.780636,
+      "rank" : 1
+    } ],
+    "promptSha256" : "14ca8b7c47414578397a510da7a9a1e466c83b1e6534853b909bc1c30fe5bbeb",
+    "retrievalMillis" : 1.461013,
+    "frameworkOverheadMillis" : 1.5127639999991516,
+    "endToEndMillis" : 19768.78626,
+    "generation" : {
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 45,
+      "ttftMillis" : 5341.119455,
+      "totalMillis" : 19765.812483,
+      "prefillTokensPerSecond" : 12.920197930668856,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4797767680,
+      "cpuMillis" : 123020.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Fjord Export hedges **70 percent** of its forecast euro receipts, with a horizon of **six months**.  \n\n**Citations:** [finance-fjord-hedge]\n</answer>",
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "grove-runway-refresh",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-grove-runway",
+        "title" : "Grove cash runway",
+        "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly."
+      },
+      "score" : 5.838581,
+      "rank" : 1
+    } ],
+    "promptSha256" : "23caf0f23369ded907c979b075fba4ee2217f3dd0497f82e06de5f34d8a4d2ea",
+    "retrievalMillis" : 1.416042,
+    "frameworkOverheadMillis" : 1.5070740000010119,
+    "endToEndMillis" : 18515.755389,
+    "generation" : {
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 43,
+      "ttftMillis" : 4732.939627,
+      "totalMillis" : 18512.832273,
+      "prefillTokensPerSecond" : 13.52412977548436,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4797792256,
+      "cpuMillis" : 113760.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Grove Analytics reports **14 months** of cash runway at the approved operating plan, and it is refreshed **quarterly**.\n\n**Citations:** [finance-grove-runway]\n</answer>",
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "harbor-variance-escalation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-harbor-variance",
+        "title" : "Harbor budget escalation",
+        "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review."
+      },
+      "score" : 5.6997347,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cef82fe3a1cb5c5e93a72888f8eeee9b47ead1ff733a6ff8ca71e97255ea6bb2",
+    "retrievalMillis" : 1.409851,
+    "frameworkOverheadMillis" : 1.4801829999996698,
+    "endToEndMillis" : 16155.331713,
+    "generation" : {
+      "text" : "**Answer:** Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]\n</answer>",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 36,
+      "ttftMillis" : 4642.610355,
+      "totalMillis" : 16152.441679,
+      "prefillTokensPerSecond" : 13.572051240674533,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4797874176,
+      "cpuMillis" : 103210.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]\n</answer>\n",
+      "text" : "**Answer:** Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]\n</answer>",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "unsupported-crypto-allocation",
+    "retrieved" : [ ],
+    "promptSha256" : "61a32a85eacb920e02a5613d036cef33dc801b2ec03ea5b8327ba856f0689311",
+    "retrievalMillis" : 0.555743,
+    "frameworkOverheadMillis" : 1.5223639999967418,
+    "endToEndMillis" : 17236.201078,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 125,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 25,
+      "outputTokens" : 48,
+      "ttftMillis" : 1986.131723,
+      "totalMillis" : 17234.122971,
+      "prefillTokensPerSecond" : 12.590777865312392,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4797939712,
+      "cpuMillis" : 87450.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Meridian Treasury approved a 50% allocation to Bitcoin and a 50% allocation to Ethereum.  \n\n**Citations:** [MERIDIAN_TREASURY] [CRYPTO_ALLOCATION]\n</answer>\n",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "aurora-reserve-review",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-aurora-reserve",
+        "title" : "Aurora reserve policy",
+        "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month."
+      },
+      "score" : 5.188199,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3aaa0b11174bb78dc6c53e81fd79ad7cd4d3f71d2c323d885bae82230ea610ce",
+    "retrievalMillis" : 1.446163,
+    "frameworkOverheadMillis" : 1.4983219999994617,
+    "endToEndMillis" : 18588.629693,
+    "generation" : {
+      "text" : "**Answer:** Aurora Fund keeps 18% of its assets in the liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 72,
+      "outputTokens" : 41,
+      "ttftMillis" : 5469.572518,
+      "totalMillis" : 18585.685208,
+      "prefillTokensPerSecond" : 13.165200402955188,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4797968384,
+      "cpuMillis" : 118480.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Aurora Fund keeps 18% of its assets in the liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "text" : "**Answer:** Aurora Fund keeps 18% of its assets in the liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "birch-duration-coupon",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-birch-duration",
+        "title" : "Birch bond profile",
+        "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year."
+      },
+      "score" : 7.3422394,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ed46fd944739b7146edcd4e726fa66df63861d779e2a70082d61c55850e80059",
+    "retrievalMillis" : 1.37318,
+    "frameworkOverheadMillis" : 1.4641440000013972,
+    "endToEndMillis" : 17976.656692,
+    "generation" : {
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 40,
+      "ttftMillis" : 5152.24328,
+      "totalMillis" : 17973.819368,
+      "prefillTokensPerSecond" : 12.811591005728598,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4803104768,
+      "cpuMillis" : 113340.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Birch Municipal Bond's modified duration is 4.2 years, and its coupon is paid twice per year.  \n\n**Citations:** [finance-birch-duration]\n</assistant>",
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "cobalt-invoice-overdue",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-cobalt-invoices",
+        "title" : "Cobalt receivables",
+        "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31."
+      },
+      "score" : 8.500158,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8934496effd06711165e2b6fa1dd6c0f8e8ec40b844265c66083dc7667ce4cf7",
+    "retrievalMillis" : 1.34611,
+    "frameworkOverheadMillis" : 1.428180999995675,
+    "endToEndMillis" : 88594.545174,
+    "generation" : {
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 256,
+      "ttftMillis" : 5320.23149,
+      "totalMillis" : 88591.770883,
+      "prefillTokensPerSecond" : 12.970872890189256,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4805607424,
+      "cpuMillis" : 424900.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Cobalt Services uses net-30 payment terms, meaning invoices are due 30 days after issuance. An invoice becomes overdue on day 31, as stated in the context. \n\n**Citations:** [finance-cobalt-invoices]\n</answer>\n``` To determine Cobalt Services' payment terms and the day an invoice becomes overdue, we analyze the provided context:\n\n1. **Payment Terms**: The context explicitly states, \"Cobalt Services issues invoices on net-30 terms.\" Net-30 terms indicate that the full amount is due 30 days after the invoice is generated. This is a standard commercial term where \"net\" refers to the due date, and \"30\" specifies the number of days.\n\n2. **Overdue Date**: The context further clarifies, \"An invoice becomes overdue on day 31.\" This means that if payment is not received by the 31st day following the issuance date, the invoice is considered past due. This aligns with the net-30 terms, as day 31 marks the first day of non-compliance.\n\n**Conclusion**: Cobalt Services adheres to net-30 payment terms, and an invoice is overdue starting on day 3",
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "delta-issuer-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-delta-concentration",
+        "title" : "Delta concentration limit",
+        "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit."
+      },
+      "score" : 6.1008873,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a8c184f68d6d9551e4a3b0f48c40b5385ac00544fad788aa8fbf8fa295e972a5",
+    "retrievalMillis" : 1.155726,
+    "frameworkOverheadMillis" : 1.3674099999989267,
+    "endToEndMillis" : 16958.65451,
+    "generation" : {
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 37,
+      "ttftMillis" : 5091.104503,
+      "totalMillis" : 16956.131374,
+      "prefillTokensPerSecond" : 12.965049927114693,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4805644288,
+      "cpuMillis" : 108640.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Delta Portfolio's single-issuer limit is 12% of net assets, and cash is excluded from this limit. [finance-delta-concentration]\n</answer>\n",
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "ember-loan-terms",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-ember-loan",
+        "title" : "Ember equipment loan",
+        "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031."
+      },
+      "score" : 6.752196,
+      "rank" : 1
+    } ],
+    "promptSha256" : "80b8f08c8351d5ce6ed2dc9bba20949c1b360d9a9cf3a71ff93fd7708ad1a1d2",
+    "retrievalMillis" : 1.175016,
+    "frameworkOverheadMillis" : 1.4169220000039786,
+    "endToEndMillis" : 51197.449867,
+    "generation" : {
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 68,
+      "outputTokens" : 142,
+      "ttftMillis" : 5224.211605,
+      "totalMillis" : 51194.857929,
+      "prefillTokensPerSecond" : 13.017721376545554,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4805705728,
+      "cpuMillis" : 258870.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Ember Manufacturing's loan rate is 6.25% annually, and the loan matures in June 2031.  \n**Citations:** [finance-ember-loan]\n</answer>\n``` To determine Ember Manufacturing's loan rate and maturity date, we refer to the provided context. The context explicitly states that the equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. There is no ambiguity in the data presented, as both the rate and maturity date are directly mentioned without requiring further calculation or interpretation. The answer is derived solely from the information given in the context, ensuring accuracy and alignment with the source material.\n```",
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "fjord-hedge-policy",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-fjord-hedge",
+        "title" : "Fjord currency hedge",
+        "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months."
+      },
+      "score" : 4.780636,
+      "rank" : 1
+    } ],
+    "promptSha256" : "14ca8b7c47414578397a510da7a9a1e466c83b1e6534853b909bc1c30fe5bbeb",
+    "retrievalMillis" : 1.161925,
+    "frameworkOverheadMillis" : 1.420352000001003,
+    "endToEndMillis" : 19681.713871,
+    "generation" : {
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 45,
+      "ttftMillis" : 5241.983557,
+      "totalMillis" : 19679.131594,
+      "prefillTokensPerSecond" : 13.164427162077624,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4805722112,
+      "cpuMillis" : 121750.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Fjord Export hedges **70 percent** of its forecast euro receipts, with a horizon of **six months**.  \n\n**Citations:** [finance-fjord-hedge]\n</answer>",
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "grove-runway-refresh",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-grove-runway",
+        "title" : "Grove cash runway",
+        "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly."
+      },
+      "score" : 5.838581,
+      "rank" : 1
+    } ],
+    "promptSha256" : "23caf0f23369ded907c979b075fba4ee2217f3dd0497f82e06de5f34d8a4d2ea",
+    "retrievalMillis" : 1.185886,
+    "frameworkOverheadMillis" : 1.4439129999991565,
+    "endToEndMillis" : 18429.297407,
+    "generation" : {
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 43,
+      "ttftMillis" : 4694.82738,
+      "totalMillis" : 18426.667608,
+      "prefillTokensPerSecond" : 13.63375172616904,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4805750784,
+      "cpuMillis" : 113130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Grove Analytics reports **14 months** of cash runway at the approved operating plan, and it is refreshed **quarterly**.\n\n**Citations:** [finance-grove-runway]\n</answer>",
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "harbor-variance-escalation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-harbor-variance",
+        "title" : "Harbor budget escalation",
+        "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review."
+      },
+      "score" : 5.6997347,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cef82fe3a1cb5c5e93a72888f8eeee9b47ead1ff733a6ff8ca71e97255ea6bb2",
+    "retrievalMillis" : 1.158416,
+    "frameworkOverheadMillis" : 1.4529220000003988,
+    "endToEndMillis" : 16128.880158,
+    "generation" : {
+      "text" : "**Answer:** Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]\n</answer>",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 36,
+      "ttftMillis" : 4619.112654,
+      "totalMillis" : 16126.26882,
+      "prefillTokensPerSecond" : 13.640837978848815,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4805791744,
+      "cpuMillis" : 102500.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]\n</answer>\n",
+      "text" : "**Answer:** Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]\n</answer>",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "unsupported-crypto-allocation",
+    "retrieved" : [ ],
+    "promptSha256" : "61a32a85eacb920e02a5613d036cef33dc801b2ec03ea5b8327ba856f0689311",
+    "retrievalMillis" : 0.43843,
+    "frameworkOverheadMillis" : 1.2915180000018154,
+    "endToEndMillis" : 17144.865873,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 125,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 25,
+      "outputTokens" : 48,
+      "ttftMillis" : 1881.133885,
+      "totalMillis" : 17143.135925,
+      "prefillTokensPerSecond" : 13.293406512430172,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4805816320,
+      "cpuMillis" : 86720.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Meridian Treasury approved a 50% allocation to Bitcoin and a 50% allocation to Ethereum.  \n\n**Citations:** [MERIDIAN_TREASURY] [CRYPTO_ALLOCATION]\n</answer>\n",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "aurora-reserve-review",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-aurora-reserve",
+        "title" : "Aurora reserve policy",
+        "text" : "Aurora Fund keeps 18 percent of assets in its liquidity reserve. The reserve is reviewed on the first business day of each month."
+      },
+      "score" : 5.188199,
+      "rank" : 1
+    } ],
+    "promptSha256" : "3aaa0b11174bb78dc6c53e81fd79ad7cd4d3f71d2c323d885bae82230ea610ce",
+    "retrievalMillis" : 1.140305,
+    "frameworkOverheadMillis" : 1.3643410000004224,
+    "endToEndMillis" : 18640.938418,
+    "generation" : {
+      "text" : "**Answer:** Aurora Fund keeps 18% of its assets in the liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 72,
+      "outputTokens" : 41,
+      "ttftMillis" : 5465.175103,
+      "totalMillis" : 18638.433772,
+      "prefillTokensPerSecond" : 13.175762848258676,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4805816320,
+      "cpuMillis" : 118790.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Aurora Fund keeps 18% of its assets in the liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "text" : "**Answer:** Aurora Fund keeps 18% of its assets in the liquidity reserve, which is reviewed on the first business day of each month. [finance-aurora-reserve]\n</answer>",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "birch-duration-coupon",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-birch-duration",
+        "title" : "Birch bond profile",
+        "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year."
+      },
+      "score" : 7.3422394,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ed46fd944739b7146edcd4e726fa66df63861d779e2a70082d61c55850e80059",
+    "retrievalMillis" : 1.066474,
+    "frameworkOverheadMillis" : 1.3860600000007253,
+    "endToEndMillis" : 17923.403854,
+    "generation" : {
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 40,
+      "ttftMillis" : 5084.526161,
+      "totalMillis" : 17920.95132,
+      "prefillTokensPerSecond" : 12.982079114892043,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4805836800,
+      "cpuMillis" : 112500.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Birch Municipal Bond's modified duration is 4.2 years, and its coupon is paid twice per year.  \n\n**Citations:** [finance-birch-duration]\n</assistant>",
+      "text" : "Birch Municipal Bond has a modified duration of 4.2 years. Its coupon is paid twice per year. [finance-birch-duration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "cobalt-invoice-overdue",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-cobalt-invoices",
+        "title" : "Cobalt receivables",
+        "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31."
+      },
+      "score" : 8.500158,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8934496effd06711165e2b6fa1dd6c0f8e8ec40b844265c66083dc7667ce4cf7",
+    "retrievalMillis" : 1.227598,
+    "frameworkOverheadMillis" : 1.4236019999952987,
+    "endToEndMillis" : 88611.54074,
+    "generation" : {
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 256,
+      "ttftMillis" : 5226.596019,
+      "totalMillis" : 88608.88954,
+      "prefillTokensPerSecond" : 13.20319237209954,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4805881856,
+      "cpuMillis" : 425000.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Cobalt Services uses net-30 payment terms, meaning invoices are due 30 days after issuance. An invoice becomes overdue on day 31, as stated in the context. \n\n**Citations:** [finance-cobalt-invoices]\n</answer>\n``` To determine Cobalt Services' payment terms and the day an invoice becomes overdue, we analyze the provided context:\n\n1. **Payment Terms**: The context explicitly states, \"Cobalt Services issues invoices on net-30 terms.\" Net-30 terms indicate that the full amount is due 30 days after the invoice is generated. This is a standard commercial term where \"net\" refers to the due date, and \"30\" specifies the number of days.\n\n2. **Overdue Date**: The context further clarifies, \"An invoice becomes overdue on day 31.\" This means that if payment is not received by the 31st day following the issuance date, the invoice is considered past due. This aligns with the net-30 terms, as day 31 marks the first day of non-compliance.\n\n**Conclusion**: Cobalt Services adheres to net-30 payment terms, and an invoice is overdue starting on day 3",
+      "text" : "Cobalt Services issues invoices on net-30 terms. An invoice becomes overdue on day 31. [finance-cobalt-invoices]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "delta-issuer-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-delta-concentration",
+        "title" : "Delta concentration limit",
+        "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit."
+      },
+      "score" : 6.1008873,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a8c184f68d6d9551e4a3b0f48c40b5385ac00544fad788aa8fbf8fa295e972a5",
+    "retrievalMillis" : 1.093044,
+    "frameworkOverheadMillis" : 1.3921209999971325,
+    "endToEndMillis" : 16915.018673,
+    "generation" : {
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 37,
+      "ttftMillis" : 5037.173873,
+      "totalMillis" : 16912.533508,
+      "prefillTokensPerSecond" : 13.104228641304267,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4805914624,
+      "cpuMillis" : 108140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Delta Portfolio's single-issuer limit is 12% of net assets, and cash is excluded from this limit. [finance-delta-concentration]\n</answer>\n",
+      "text" : "Delta Portfolio limits exposure to any single issuer to 12 percent of net assets. Cash is excluded from that issuer limit. [finance-delta-concentration]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "ember-loan-terms",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-ember-loan",
+        "title" : "Ember equipment loan",
+        "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031."
+      },
+      "score" : 6.752196,
+      "rank" : 1
+    } ],
+    "promptSha256" : "80b8f08c8351d5ce6ed2dc9bba20949c1b360d9a9cf3a71ff93fd7708ad1a1d2",
+    "retrievalMillis" : 1.061254,
+    "frameworkOverheadMillis" : 1.3926789999968605,
+    "endToEndMillis" : 51023.72799,
+    "generation" : {
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 68,
+      "outputTokens" : 142,
+      "ttftMillis" : 5162.757465,
+      "totalMillis" : 51021.274057,
+      "prefillTokensPerSecond" : 13.172808782954448,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4806029312,
+      "cpuMillis" : 257380.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Ember Manufacturing's loan rate is 6.25% annually, and the loan matures in June 2031.  \n**Citations:** [finance-ember-loan]\n</answer>\n``` To determine Ember Manufacturing's loan rate and maturity date, we refer to the provided context. The context explicitly states that the equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. There is no ambiguity in the data presented, as both the rate and maturity date are directly mentioned without requiring further calculation or interpretation. The answer is derived solely from the information given in the context, ensuring accuracy and alignment with the source material.\n```",
+      "text" : "Ember Manufacturing's equipment loan has a fixed annual rate of 6.25 percent and matures in June 2031. [finance-ember-loan]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "fjord-hedge-policy",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-fjord-hedge",
+        "title" : "Fjord currency hedge",
+        "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months."
+      },
+      "score" : 4.780636,
+      "rank" : 1
+    } ],
+    "promptSha256" : "14ca8b7c47414578397a510da7a9a1e466c83b1e6534853b909bc1c30fe5bbeb",
+    "retrievalMillis" : 1.019369,
+    "frameworkOverheadMillis" : 1.3673479999961273,
+    "endToEndMillis" : 19675.590448,
+    "generation" : {
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 45,
+      "ttftMillis" : 5241.049779,
+      "totalMillis" : 19673.203731,
+      "prefillTokensPerSecond" : 13.166470646191673,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4806045696,
+      "cpuMillis" : 121330.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Fjord Export hedges **70 percent** of its forecast euro receipts, with a horizon of **six months**.  \n\n**Citations:** [finance-fjord-hedge]\n</answer>",
+      "text" : "Fjord Export hedges 70 percent of forecast euro receipts. The hedge horizon is six months. [finance-fjord-hedge]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "grove-runway-refresh",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-grove-runway",
+        "title" : "Grove cash runway",
+        "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly."
+      },
+      "score" : 5.838581,
+      "rank" : 1
+    } ],
+    "promptSha256" : "23caf0f23369ded907c979b075fba4ee2217f3dd0497f82e06de5f34d8a4d2ea",
+    "retrievalMillis" : 1.049563,
+    "frameworkOverheadMillis" : 1.5188539999981003,
+    "endToEndMillis" : 18468.171164,
+    "generation" : {
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 43,
+      "ttftMillis" : 4678.481893,
+      "totalMillis" : 18465.602747,
+      "prefillTokensPerSecond" : 13.68131536646564,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4806103040,
+      "cpuMillis" : 113140.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Grove Analytics reports **14 months** of cash runway at the approved operating plan, and it is refreshed **quarterly**.\n\n**Citations:** [finance-grove-runway]\n</answer>",
+      "text" : "Grove Analytics reports 14 months of cash runway at the approved operating plan. The estimate is refreshed quarterly. [finance-grove-runway]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "harbor-variance-escalation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "finance-harbor-variance",
+        "title" : "Harbor budget escalation",
+        "text" : "Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review."
+      },
+      "score" : 5.6997347,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cef82fe3a1cb5c5e93a72888f8eeee9b47ead1ff733a6ff8ca71e97255ea6bb2",
+    "retrievalMillis" : 1.027313,
+    "frameworkOverheadMillis" : 1.4660629999998491,
+    "endToEndMillis" : 16122.995357,
+    "generation" : {
+      "text" : "**Answer:** Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]\n</answer>",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 36,
+      "ttftMillis" : 4573.110836,
+      "totalMillis" : 16120.501981,
+      "prefillTokensPerSecond" : 13.778020134561336,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4806107136,
+      "cpuMillis" : 102450.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]\n</answer>\n",
+      "text" : "**Answer:** Harbor Division escalates a monthly budget variance when it exceeds 5 percent. The finance director owns the review. [finance-harbor-variance]\n</answer>",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Fin R1",
+    "caseId" : "unsupported-crypto-allocation",
+    "retrieved" : [ ],
+    "promptSha256" : "61a32a85eacb920e02a5613d036cef33dc801b2ec03ea5b8327ba856f0689311",
+    "retrievalMillis" : 0.42632,
+    "frameworkOverheadMillis" : 1.211897000001045,
+    "endToEndMillis" : 17121.563508,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 125,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 25,
+      "outputTokens" : 48,
+      "ttftMillis" : 1868.992596,
+      "totalMillis" : 17119.925291,
+      "prefillTokensPerSecond" : 13.37966011032887,
+      "loadMillis" : 560.54945,
+      "peakRssBytes" : 4806127616,
+      "cpuMillis" : 86370.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "**Answer:** Meridian Treasury approved a 50% allocation to Bitcoin and a 50% allocation to Ethereum.  \n\n**Citations:** [MERIDIAN_TREASURY] [CRYPTO_ALLOCATION]\n</answer>\n",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}
