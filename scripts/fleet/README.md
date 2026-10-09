@@ -60,3 +60,57 @@ mid-sentence, so the metric measured the cap rather than the model. It was hard-
 and is now one per-job variable handed to **both** arms, because `sameWorkload()` compares max
 tokens and a mismatch excludes the comparator.
 
+## Building shard files: `build-shards.py`
+
+`fleet-shard-NNN.json` used to be written by hand, and both fields that were learned the hard way
+above were learned by getting them wrong by hand on the same day. `build-shards.py` builds them
+from recorded evidence instead:
+
+```
+python3 scripts/fleet/build-shards.py \
+    --ids ids.txt --reports ./prior-reports --catalog ../model-jars/catalog/models.json \
+    --out-dir /tmp --start-shard 640 [--mt-override id=2048] [--wl-override id=finance]
+```
+
+**It copies, it does not derive.** For each requested model it reads `wl`, `tpl`, `dt` and `mt`
+out of a prior candidate report for *that same model* and reuses them exactly, printing the path
+it read each one from. Where no prior report exists it prints the precedent it found and **fails**,
+writing nothing.
+
+That restraint is deliberate, and it is not caution for its own sake. The obvious design —
+derive `wl` from the model's capabilities and `tpl` from its architecture — does not survive the
+data. Measured against the catalog on 2026-10-09:
+
+- `medical-reasoning` maps to workload `general`, not `healthcare`
+- `math` splits between `general` and `math`; `reasoning` is mostly `general`
+- `chat` and `text-generation` appear against all eight workloads
+- architecture `llama` has qualified under **eight** different prompt templates, `qwen2` under three
+
+So a model's declared capabilities do not determine its workload and its architecture does not
+determine its template. A script that picked anyway would be guessing with a script's authority,
+which is worse than a person guessing, because nobody would look again.
+
+### `dt` is not `--threads`
+
+Two different knobs, and conflating them was this tool's first bug — found by running it against
+real reports rather than by reading them:
+
+| job field | becomes | recorded in the report as | fleet value |
+| --- | --- | --- | --- |
+| `dt` | `-Dmodels.native.kernels.decodeThreads` | `backendDiagnostics.environment.native-kernel-decode-threads` | 8 |
+| *(not a job field)* | `--threads`, to **both** arms | `settings.threads` | 16 |
+
+The first version read `settings.threads` and emitted `dt: 16`, silently undoing the decode-thread
+setting the measured runs had actually used. `dt` is omitted entirely when the prior run used the
+whole pool, so the job inherits the worker's default rather than pinning a number nobody pinned.
+
+### Why a confirmation run reuses the settings
+
+Re-measuring a model against a released build is only a comparison if everything except the build
+is held fixed. Copying the recorded settings is what makes that true; an override is per field and
+is marked `OVERRIDDEN` in the output so it cannot pass for a copied value.
+
+Shard numbers are immutable — a number that has been launched names a payload and an S3 result
+prefix — so the tool refuses to overwrite an existing shard file rather than reusing a number.
+
+Tests: `python3 -m unittest discover -s scripts/fleet -p 'build_shards_test.py'` (stdlib only).
