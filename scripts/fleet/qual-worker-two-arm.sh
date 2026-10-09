@@ -205,6 +205,12 @@ while IFS= read -r job; do
   arch=$(python3 -c "import json,sys;print(json.loads(sys.argv[1]).get('arch',''))" "$job")
   dt=$(python3 -c "import json,sys;print(json.loads(sys.argv[1]).get('dt') or '')" "$job")
   wl=$(python3 -c "import json,sys;print(json.loads(sys.argv[1]).get('wl') or 'general')" "$job")
+  # Output budget per job, 256 unless the manifest says otherwise. A reasoning model that needs
+  # 400 tokens to finish an answer is not failing the quality bar at 256, it is being cut off
+  # mid-sentence: fin-r1-7b returned truncatedAnswerRate 0.778 and modelAnswerCorrectRate 0.0 on
+  # the finance corpus, which measured the cap and not the model. Both arms receive the same value
+  # from this one variable, so sameWorkload() still admits the comparator.
+  mt=$(python3 -c "import json,sys;print(json.loads(sys.argv[1]).get('mt') or 256)" "$job")
   [ -z "$dt" ] && dt="$DECODE_THREAD_DEFAULT"
   DECODE_THREAD_OPT=""
   if [ -n "$dt" ]; then
@@ -268,7 +274,7 @@ while IFS= read -r job; do
         com.integrallis.models.rag.RagBenchmarkCli \
         --framework plain-java --backend rust-ffm --backend-version "$BACKEND_VERSION" \
         --model "$artifact" --model-id "$id" --workload "$wl" --prompt-template "$tpl" \
-        --context 2048 --threads 8 --max-tokens 256 --warmups 1 --iterations 3 \
+        --context 2048 --threads 8 --max-tokens "$mt" --warmups 1 --iterations 3 \
         --output "/work/out/$id.json" > "/work/out/$id.log" 2>&1
       rc=$?
       printf '%s\trc%s\t%s\n' "$id" "$rc" "$(( $(date +%s)-T0 ))" >> /work/out/progress.tsv
@@ -289,9 +295,10 @@ while IFS= read -r job; do
     # excluded: workload, corpus, cases, template, topK, max tokens, context, THREADS, grounding policy,
     # minimum retrieval score, and the matched generation controls. Threads are passed explicitly to
     # both for that reason -- a shard that passed --threads 8 to the candidate and let the comparator
-    # default to the host's core count was rejected with "benchmark workload differs".
+    # default to the host's core count was rejected with "benchmark workload differs". The same
+    # applies to max tokens, which is why $mt is read once per job and handed to both arms.
     ARMS="--workload $wl --prompt-template $tpl --context 2048 --threads $THREADS"
-    ARMS="$ARMS --max-tokens 256 --warmups 1 --iterations 3"
+    ARMS="$ARMS --max-tokens $mt --warmups 1 --iterations 3"
 
     java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED \
       $DECODE_THREAD_OPT \

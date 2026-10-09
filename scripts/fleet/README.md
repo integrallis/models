@@ -33,3 +33,30 @@ rejected for exactly that, so both arms are given `--threads $THREADS` from one 
   answers the model did contribute. The pipeline answered; the model did not.
 - `FAILED_RELATIVE_GATE` — slower than the comparator beyond the policy's floor and ceiling.
 - `NO_COMPARABLE_BASELINE` — the comparator was excluded; `exclusions` in the verdict names why.
+
+## The manifest is the knob, not the script
+
+`fleet-shard-NNN.json` is a list of jobs, each `{id, uri, tpl, gb, arch, wl, dt, mt}`:
+
+| field | meaning |
+| --- | --- |
+| `tpl` | prompt template, from what the architecture already qualified with |
+| `wl` | **the workload corpus**, derived from the model's declared capabilities |
+| `dt` | decode threads, or omit for the pool default |
+| `mt` | max output tokens, 256 when omitted |
+
+Two of these were learned by getting them wrong, both on 2026-10-09.
+
+**`wl` must match the capability.** A shard built with `wl: "general"` for every model returned
+`FAILED_MODEL_CONTRIBUTION_GATE` for a math specialist and a translation model, while the same base
+models were already qualified in the catalog on `math` and `multilingual`. Re-running
+`eurollm-1.7b-instruct Q4_K_S` on `multilingual` with nothing else changed returned **QUALIFIED**.
+Retrieval was perfect in the failing runs -- recall, MRR, factCoverage and both citation metrics all
+1.0 -- so the corpus was the only variable. Put one workload per shard so a box loads one corpus.
+
+**`mt` must fit the model.** `fin-r1-7b` returned `truncatedAnswerRate 0.778` and
+`modelAnswerCorrectRate 0.0` at the old hard-coded 256: seven of nine answers were cut off
+mid-sentence, so the metric measured the cap rather than the model. It was hard-coded in two places
+and is now one per-job variable handed to **both** arms, because `sameWorkload()` compares max
+tokens and a mismatch excludes the comparator.
+
