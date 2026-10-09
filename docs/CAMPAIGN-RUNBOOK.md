@@ -278,6 +278,16 @@ publish the site. So the order is:
 Dispatching pages before Central has synchronized fails the deploy on a 404 that looks like a
 missing model but is only a missing publish step. Verify the artifacts, not the workflow status.
 
+**And pages is not dispatch-only, which the list above reads as though it were.** `pages.yml`
+triggers on any push to `main` touching `catalog/**`, so landing a catalog change *starts a deploy
+by itself*, and that run stalls on step 7, "Verify public markers are available from Maven
+Central", until the new markers are actually on Central. Observed on 2026-10-09: landing seventeen
+embedding qualifications published all seventeen markers to GitHub Packages, skipped the Central
+staging job exactly as designed, and left the automatic pages run waiting at step 7 on coordinates
+that return 404 from `repo1.maven.org`. Nothing is wrong when that happens and nothing needs
+reverting -- the deploy is ahead of the publish, not broken. Expect the automatic run to fail or
+hang, do steps 2 and 3, then dispatch pages again.
+
 **Run the gates locally before merging.** All four are runnable on a laptop in under a minute
 each: `./gradlew verifyReleaseMetadata` in models, and in modeljars `npm test`,
 `npm run catalog:verify-components`, `npm run catalog:verify-compositions`,
