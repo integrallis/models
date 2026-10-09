@@ -21,6 +21,23 @@ campaigns stale; derive it instead of reading it:
         ...q("speech-qualifications.json"), ...q("component-qualifications.json")]);
       console.log(all.size)'
 
+## The catalog is nearly single-modality, and that is tracked
+
+100 published models and **one** modality that is not text (Soprano TTS, two quantizations of one
+model). No speech-to-text, no vision, no OCR. Size range 0.013-15.64 GB, parameters 22.6M-25.23B.
+
+**The plan for changing that lives in `model-jars/docs/MODALITY-ROADMAP.md`, with a gate on every
+step.** Read it before adding another text model. It exists because a candidate list was given
+verbally, acted on partially and lost, and the phases are ordered so that each one unblocks the
+next: ASR first (self-contained frontend, 38M target, Apache-2.0, cross-attention is the only new
+concept), then vision (two files, two architectures, mRoPE), then OCR, which rides the vision work
+and is mostly a metric.
+
+Two rules from it that apply here directly: **triage the real artifact before writing code**
+(`npm run catalog:triage -- <id-or-url>` — the header has contradicted the model card more than
+once), and **a new modality needs a new gate**, because `correctAnswerRate` describes neither
+transcription nor page accuracy.
+
 ## What the catalog is for
 
 modeljars.org states it on its own front page: **"Discover the power of small and medium-sized models
