@@ -116,9 +116,18 @@ public final class WhisperMelFrontend {
     return fftSize / 2 + 1;
   }
 
-  /** The mel filterbank, {@code melBins} rows of {@link #frequencyBins()}. */
+  /**
+   * The mel filterbank, {@code melBins} rows of {@link #frequencyBins()}.
+   *
+   * <p>A copy. The bank is built once and reused for every frame of every clip, so handing out the
+   * live arrays would let a caller silently change what every later spectrogram is computed from.
+   */
   public float[][] filterbank() {
-    return filterbank;
+    float[][] copy = new float[filterbank.length][];
+    for (int row = 0; row < filterbank.length; row++) {
+      copy[row] = filterbank[row].clone();
+    }
+    return copy;
   }
 
   /** The analysis window, periodic Hann of {@code winLength}. */
