@@ -69,3 +69,29 @@ and tool workloads. The runbook has been corrected and now derives the number.
 
 Landing these 17 takes it to **93**. The 8 held artifacts take it to **101**, so 100 is reachable
 from measurements already taken, on the next library release. Nothing here needs new fleet spend.
+
+## Addendum, 2026-10-09: the eight held artifacts, re-verified on 0.3.55
+
+The eight that could not be claimed under 0.3.54 were re-run against the 0.3.55 source after it
+merged to `main` — the same discipline applied to the seventeen, for the same reason: the
+`backendVersion` a catalog entry carries is a claim a user can check.
+
+**8 of 8 REPRODUCED, and all eight cosines identical to the original run**
+(`raw/verdicts-released-0.3.55-held-eight.tsv`, columns 3 and 4):
+
+| artifact | worst-probe cosine |
+| --- | --- |
+| LFM2.5-Embedding F16 | 0.9999994 |
+| LFM2.5-Embedding BF16 | 0.9999915 |
+| granite-embedding-107m Q4_K_S | 0.9998215 |
+| granite-embedding-107m Q5_K_S | 0.9997886 |
+| granite-embedding-107m Q5_K_M | 0.9997759 |
+| LFM2.5-Embedding Q8_0 | 0.9997380 |
+| LFM2.5-Embedding Q4_0 | 0.9997358 |
+| all-MiniLM-L6-v2 Q4_K_S | 0.9992974 |
+
+These are **not landed yet**, and deliberately so. 0.3.55 is merged and its release bundle passed a
+dry run, but it is not published: `repo1.maven.org` returns 404 for the coordinates. Writing
+`backendVersion: models-0.3.55` into the catalog before that version exists for a user to resolve
+would be the same false claim as writing `models-0.3.54` would have been, only pointed at a
+different version. They land when the release is published, which takes the catalog to **101**.
