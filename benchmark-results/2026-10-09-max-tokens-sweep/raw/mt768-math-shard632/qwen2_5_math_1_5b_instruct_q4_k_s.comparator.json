@@ -1,0 +1,1588 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-09T22:31:39.855532950Z",
+  "framework" : "plain-java",
+  "backend" : "ollama",
+  "backendVersion" : "ollama@ollama version is 0.40.2",
+  "modelId" : "qwen2_5_math_1_5b_instruct_q4_k_s",
+  "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+  "artifactSha256" : "c15d259c0634521c04e56e0717f3fecccd3445eac891fff1d119ac94fa154427",
+  "artifactSizeBytes" : 940312896,
+  "settings" : {
+    "corpusSha256" : "4da610e627e7481d54d1595ef1191dff454455d9bb04fc814b5ea12fd6180315",
+    "workload" : "math",
+    "caseIds" : [ "amber-determinant-trace", "birch-function-derivative", "cobalt-red-probability", "delta-sixth-term", "ember-modulo", "fjord-integral", "grove-hypotenuse", "harbor-mean-median", "unsupported-maple-limit" ],
+    "promptTemplate" : "chatml",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 768,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topK" : "1",
+      "rawPrompt" : "true",
+      "seed" : "42",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-7-17",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971654656,
+    "maxHeapBytes" : 16500391936,
+    "javaVersion" : "25.0.4.1",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "ollama",
+    "planVersion" : "unavailable",
+    "environment" : { },
+    "optimizations" : [ ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 1586.724468,
+    "retrievalMillis" : {
+      "p50" : 1.424858,
+      "p95" : 5.437129399999998
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 0.2826969999996436,
+      "p95" : 4.414313700000002
+    },
+    "ttftMillis" : {
+      "p50" : 47.098357,
+      "p95" : 88.9837226
+    },
+    "tpotMillis" : {
+      "p50" : 27.16667848666667,
+      "p95" : 27.77788511157163
+    },
+    "endToEndMillis" : {
+      "p50" : 8200.728768,
+      "p95" : 11169.622635
+    },
+    "p50PrefillTokensPerSecond" : 5609.121237672764,
+    "p50DecodeTokensPerSecond" : 36.809799935269865,
+    "peakRssBytes" : 0,
+    "totalCpuMillis" : 0.0,
+    "totalInputTokens" : 4380,
+    "totalCacheReadInputTokens" : 0,
+    "totalCacheWriteInputTokens" : 0,
+    "totalOutputTokens" : 7581,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.0,
+    "modelAnswerRate" : 0.0,
+    "modelAnswerCorrectRate" : 0.0,
+    "extractiveFallbackRate" : 0.8888888888888888,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "amber-determinant-trace",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-amber-matrix",
+        "title" : "Amber matrix",
+        "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7."
+      },
+      "score" : 4.5716124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cfa37b20c25b43df3136e4b537925678c5d311551a94eeffc8127827cab085b9",
+    "retrievalMillis" : 1.672366,
+    "frameworkOverheadMillis" : 0.32367899999917427,
+    "endToEndMillis" : 9981.225377,
+    "generation" : {
+      "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7. [math-amber-matrix]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 362,
+      "ttftMillis" : 43.627314,
+      "totalMillis" : 9979.229332,
+      "prefillTokensPerSecond" : 5823.0520071332385,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To find the determinant and trace of the Amber matrix [[3, 1], [2, 4]], we will follow these steps:\n\n1. **Determinant Calculation:**\n   The determinant of a 2x2 matrix \\(\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}\\) is given by the formula:\n   \\[\n   \\text{det} = ad - bc\n   \\]\n   For the given matrix \\(\\begin{bmatrix} 3 & 1 \\\\ 2 & 4 \\end{bmatrix}\\), we have:\n   \\[\n   a = 3, \\quad b = 1, \\quad c = 2, \\quad d = 4\n   \\]\n   Substituting these values into the formula, we get:\n   \\[\n   \\text{det} = (3 \\cdot 4) - (1 \\cdot 2) = 12 - 2 = 10\n   \\]\n   So, the determinant of the matrix is \\(10\\).\n\n2. **Trace Calculation:**\n   The trace of a matrix is the sum of the elements on its main diagonal. For the matrix \\(\\begin{bmatrix} 3 & 1 \\\\ 2 & 4 \\end{bmatrix}\\), the elements on the main diagonal are 3 and 4. Therefore, the trace is:\n   \\[\n   \\text{trace} = 3 + 4 = 7\n   \\]\n   So, the trace of the matrix is \\(7\\).\n\nPutting it all together, the determinant and trace of the Amber matrix are:\n\\[\n\\boxed{10 \\text{ and } 7}\n\\]",
+      "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7. [math-amber-matrix]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "birch-function-derivative",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 4.115302,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a295044585bcd5f931e90fd4186ee2ae035728851e2d51083b1d90137505ec27",
+    "retrievalMillis" : 1.646484,
+    "frameworkOverheadMillis" : 0.2834869999996954,
+    "endToEndMillis" : 4821.616803,
+    "generation" : {
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 176,
+      "ttftMillis" : 91.951464,
+      "totalMillis" : 4819.686832,
+      "prefillTokensPerSecond" : 2375.533428165007,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Birch function is a polynomial function given by \\( f(x) = x^3 - 2x \\). To find its derivative, we apply the power rule of differentiation, which states that if \\( f(x) = x^n \\), then \\( f'(x) = nx^{n-1} \\).\n\nLet's differentiate each term of the function \\( f(x) = x^3 - 2x \\) separately:\n\n1. The derivative of \\( x^3 \\) is \\( 3x^2 \\).\n2. The derivative of \\( -2x \\) is \\( -2 \\).\n\nCombining these, the derivative of the entire function is:\n\\[ f'(x) = 3x^2 - 2 \\]\n\nSo, the derivative of the Birch function is \\(\\boxed{3x^2 - 2}\\).",
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "cobalt-red-probability",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-cobalt-probability",
+        "title" : "Cobalt urn",
+        "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5."
+      },
+      "score" : 8.382398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5db1fe258ad18f5e3bdadbc51bbddffcf287648b99c3f12bb5448665bc0b3e77",
+    "retrievalMillis" : 2.59598,
+    "frameworkOverheadMillis" : 0.3734599999997954,
+    "endToEndMillis" : 6721.850482,
+    "generation" : {
+      "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5. [math-cobalt-probability]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 247,
+      "ttftMillis" : 43.89277,
+      "totalMillis" : 6718.881042,
+      "prefillTokensPerSecond" : 6105.140016085399,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To determine the number of red and blue balls in the Jacobian urn and the probability of drawing a red ball, we can follow these steps:\n\n1. **Identify the total number of balls in the urn:**\n   The Jacobian urn contains 3 red balls and 2 blue balls. Therefore, the total number of balls is:\n   \\[\n   3 + 2 = 5\n   \\]\n\n2. **Calculate the probability of drawing a red ball:**\n   The probability of drawing a red ball is the number of red balls divided by the total number of balls. So, the probability \\( P \\) is:\n   \\[\n   P(\\text{red}) = \\frac{\\text{number of red balls}}{\\text{total number of balls}} = \\frac{3}{5}\n   \\]\n\nThus, the Jacobian urn contains 3 red balls and 2 blue balls, and the probability of drawing a red ball is \\(\\frac{3}{5}\\).\n\nThe final answer is:\n\\[\n\\boxed{3 \\text{ red balls, 2 blue balls, and the probability of drawing a red ball is } \\frac{3}{5}}\n\\]",
+      "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5. [math-cobalt-probability]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "delta-sixth-term",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-delta-sequence",
+        "title" : "Delta sequence",
+        "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27."
+      },
+      "score" : 6.3672924,
+      "rank" : 1
+    } ],
+    "promptSha256" : "587c842e2fcc84da27f8478640521271030c5dcd31aa7d83ed00e6157e821d37",
+    "retrievalMillis" : 3.514296,
+    "frameworkOverheadMillis" : 0.314038000000437,
+    "endToEndMillis" : 8256.878039,
+    "generation" : {
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 301,
+      "ttftMillis" : 47.098357,
+      "totalMillis" : 8253.049705,
+      "prefillTokensPerSecond" : 5812.263876780005,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To determine the start and common difference of the Delta arithmetic sequence, and to find its sixth term, we can follow these steps:\n\n1. Identify the start and common difference from the given information.\n2. Use the formula for the \\(n\\)-th term of an arithmetic sequence to find the sixth term.\n\nThe general formula for the \\(n\\)-th term of an arithmetic sequence is:\n\\[ a_n = a_1 + (n-1)d \\]\nwhere \\(a_n\\) is the \\(n\\)-th term, \\(a_1\\) is the first term, \\(d\\) is the common difference, and \\(n\\) is the term number.\n\nFrom the problem, we know:\n- The first term \\(a_1 = 7\\)\n- The common difference \\(d = 4\\)\n\nWe need to find the sixth term (\\(a_6\\)). Using the formula for the \\(n\\)-th term:\n\\[ a_6 = a_1 + (6-1)d \\]\n\\[ a_6 = 7 + 5 \\cdot 4 \\]\n\\[ a_6 = 7 + 20 \\]\n\\[ a_6 = 27 \\]\n\nSo, the start of the Delta sequence is 7, the common difference is 4, and the sixth term is 27.\n\nThe final answer is:\n\\[\n\\boxed{7 \\text{ and } 4, 27}\n\\]",
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "ember-modulo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-ember-modulus",
+        "title" : "Ember congruence",
+        "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3."
+      },
+      "score" : 4.442518,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c906d4ee39ce249b7b045460d06a2f7e8d9632b78f58c6a35fc461d2e191734a",
+    "retrievalMillis" : 3.814143,
+    "frameworkOverheadMillis" : 0.3035490000002028,
+    "endToEndMillis" : 4576.306789,
+    "generation" : {
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "inputTokens" : 153,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 168,
+      "ttftMillis" : 46.5206,
+      "totalMillis" : 4572.189097,
+      "prefillTokensPerSecond" : 5609.121237672764,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To solve the problem of reducing the value 38 modulo 7, we need to find the remainder when 38 is divided by 7. Here are the steps to do that:\n\n1. Perform the division of 38 by 7.\n2. Determine the quotient and the remainder.\n\nLet's do the division:\n\n\\[ 38 \\div 7 = 5 \\text{ remainder } 3 \\]\n\nThis means that 38 can be expressed as:\n\n\\[ 38 = 7 \\times 5 + 3 \\]\n\nHere, 5 is the quotient and 3 is the remainder. Therefore, when 38 is divided by 7, the remainder is 3.\n\nSo, the remainder when 38 is reduced modulo 7 is \\(\\boxed{3}\\).",
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "fjord-integral",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-fjord-integral",
+        "title" : "Fjord integral",
+        "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2."
+      },
+      "score" : 5.5134096,
+      "rank" : 1
+    } ],
+    "promptSha256" : "883ca02950ffa962edb17e3c4854b83d88003f6bce052eb3e5afec2682333a1f",
+    "retrievalMillis" : 1.775798,
+    "frameworkOverheadMillis" : 0.29969899999923655,
+    "endToEndMillis" : 8701.473738,
+    "generation" : {
+      "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2. [math-fjord-integral]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 319,
+      "ttftMillis" : 48.080701,
+      "totalMillis" : 8699.398241,
+      "prefillTokensPerSecond" : 5420.142157021843,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To solve the problem, we need to evaluate the definite integral of \\(2x\\) from 0 to 3. The antiderivative of \\(2x\\) is \\(x^2\\). We can use the Fundamental Theorem of Calculus to find the value of the definite integral.\n\nThe Fundamental Theorem of Calculus states that if \\(F\\) is an antiderivative of \\(f\\), then:\n\n\\[\n\\int_a^b f(x) \\, dx = F(b) - F(a)\n\\]\n\nIn this case, \\(f(x) = 2x\\) and the antiderivative \\(F(x) = x^2\\). So, we need to evaluate \\(F(3) - F(0)\\):\n\n\\[\n\\int_0^3 2x \\, dx = \\left[ x^2 \\right]_0^3 = 3^2 - 0^2 = 9\n\\]\n\nLet's confirm this with Python code.\n```python\n# Define the antiderivative function\ndef antiderivative(x):\n    return x**2\n\n# Evaluate the definite integral from 0 to 3\ndefinite_integral = antiderivative(3) - antiderivative(0)\nprint(definite_integral)\n```\n```output\n9\n```\nThe definite integral of \\(2x\\) from 0 to 3 is indeed \\(9\\). The antiderivative used is \\(x^2\\).\n\nSo, the final answer is:\n\n\\[\n\\boxed{9}\n\\]",
+      "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2. [math-fjord-integral]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "grove-hypotenuse",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-grove-geometry",
+        "title" : "Grove triangle",
+        "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13."
+      },
+      "score" : 5.9253526,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1efce585de3d869ce099a14feeefb91d3f9a615da3145ec5a0f448024fc60d28",
+    "retrievalMillis" : 6.132695,
+    "frameworkOverheadMillis" : 0.3135099999999511,
+    "endToEndMillis" : 11289.802693,
+    "generation" : {
+      "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13. [math-grove-geometry]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 410,
+      "ttftMillis" : 46.401775,
+      "totalMillis" : 11283.356488,
+      "prefillTokensPerSecond" : 5713.453910258743,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To solve the problem, we need to identify the legs and the hypotenuse of the right triangle. The problem states that the right triangle has legs of lengths 5 and 12, and we need to confirm that the hypotenuse is 13. We can use the Pythagorean theorem to verify this.\n\nThe Pythagorean theorem states that for a right triangle with legs \\(a\\) and \\(b\\) and hypotenuse \\(c\\), the following equation holds:\n\\[ a^2 + b^2 = c^2 \\]\n\nGiven:\n\\[ a = 5 \\]\n\\[ b = 12 \\]\n\\[ c = 13 \\]\n\nWe can check if these values satisfy the Pythagorean theorem:\n\\[ 5^2 + 12^2 = 13^2 \\]\n\\[ 25 + 144 = 169 \\]\n\\[ 169 = 169 \\]\n\nSince the equation holds true, the values are correct. Therefore, the legs of the right triangle are 5 and 12, and the hypotenuse is 13.\n\nLet's confirm this using Python code.\n```python\n# Define the legs and hypotenuse of the right triangle\na = 5\nb = 12\nc = 13\n\n# Check if the Pythagorean theorem holds\nis_right_triangle = (a**2 + b**2 == c**2)\n\n# Output the result\nprint(((is_right_triangle, a, b, c)))\n```\n```output\n(True, 5, 12, 13)\n```\nThe output confirms that the Pythagorean theorem holds true for the given values. Therefore, the legs of the right triangle are \\(5\\) and \\(12\\), and the hypotenuse is \\(13\\).\n\nSo, the final answer is:\n\\[\n\\boxed{5, 12, 13}\n\\]",
+      "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13. [math-grove-geometry]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "harbor-mean-median",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-harbor-statistics",
+        "title" : "Harbor sample",
+        "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4."
+      },
+      "score" : 4.7371473,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fa5ad040883fbfad0bca40703362d01ef569fceacddd90737296e59e2e5d4bbf",
+    "retrievalMillis" : 1.594443,
+    "frameworkOverheadMillis" : 4.622675999999956,
+    "endToEndMillis" : 6606.68771,
+    "generation" : {
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 242,
+      "ttftMillis" : 51.849493,
+      "totalMillis" : 6600.470591,
+      "prefillTokensPerSecond" : 5911.977227939567,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To find the mean and median of the symmetric harmonic sample [2, 4, 4, 10], we will follow these steps:\n\n1. **Calculate the Mean:**\n   - The mean is the sum of all the numbers divided by the count of numbers.\n   - Sum of the numbers: \\(2 + 4 + 4 + 10 = 20\\)\n   - Count of numbers: 4\n   - Mean: \\(\\frac{20}{4} = 5\\)\n\n2. **Calculate the Median:**\n   - The median is the middle number when the numbers are arranged in ascending order.\n   - The numbers are already in ascending order: [2, 4, 4, 10]\n   - Since there are 4 numbers (an even count), the median is the average of the two middle numbers.\n   - The two middle numbers are 4 and 4.\n   - Median: \\(\\frac{4 + 4}{2} = 4\\)\n\nTherefore, the mean and median of the harmonic sample are \\(\\boxed{5}\\) and \\(\\boxed{4}\\), respectively.",
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "unsupported-maple-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 1.2100124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a54105389b35b29d4d177e55042c9e902d7b8fdfd5e157224b42854dd4035cae",
+    "retrievalMillis" : 1.424858,
+    "frameworkOverheadMillis" : 0.27362800000082643,
+    "endToEndMillis" : 8278.752764,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 302,
+      "ttftMillis" : 88.365621,
+      "totalMillis" : 8277.054278,
+      "prefillTokensPerSecond" : 2387.078330474557,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To find the limit of the Maple rational function \\( f(x) = \\frac{x^3 - 2x}{x^3 + x^2} \\) as \\( x \\) approaches infinity, we can follow these steps:\n\n1. **Identify the degrees of the numerator and the denominator:**\n   - The degree of the numerator \\( x^3 - 2x \\) is 3.\n   - The degree of the denominator \\( x^3 + x^2 \\) is also 3.\n\n2. **Compare the degrees of the numerator and the denominator:**\n   - Since the degrees of both the numerator and the denominator are the same, the limit as \\( x \\) approaches infinity is the ratio of the leading coefficients.\n\n3. **Identify the leading coefficients:**\n   - The leading coefficient of the numerator \\( x^3 - 2x \\) is 1.\n   - The leading coefficient of the denominator \\( x^3 + x^2 \\) is also 1.\n\n4. **Calculate the limit:**\n   - The limit of the rational function as \\( x \\) approaches infinity is the ratio of the leading coefficients, which is \\( \\frac{1}{1} = 1 \\).\n\nTherefore, the limit of the function \\( f(x) = \\frac{x^3 - 2x}{x^3 + x^2} \\) as \\( x \\) approaches infinity is \\(\\boxed{1}\\).",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "amber-determinant-trace",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-amber-matrix",
+        "title" : "Amber matrix",
+        "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7."
+      },
+      "score" : 4.5716124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cfa37b20c25b43df3136e4b537925678c5d311551a94eeffc8127827cab085b9",
+    "retrievalMillis" : 1.434229,
+    "frameworkOverheadMillis" : 0.28357799999866984,
+    "endToEndMillis" : 10000.294374,
+    "generation" : {
+      "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7. [math-amber-matrix]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 362,
+      "ttftMillis" : 51.202495,
+      "totalMillis" : 9998.576567,
+      "prefillTokensPerSecond" : 5758.5027892747885,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To find the determinant and trace of the Amber matrix [[3, 1], [2, 4]], we will follow these steps:\n\n1. **Determinant Calculation:**\n   The determinant of a 2x2 matrix \\(\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}\\) is given by the formula:\n   \\[\n   \\text{det} = ad - bc\n   \\]\n   For the given matrix \\(\\begin{bmatrix} 3 & 1 \\\\ 2 & 4 \\end{bmatrix}\\), we have:\n   \\[\n   a = 3, \\quad b = 1, \\quad c = 2, \\quad d = 4\n   \\]\n   Substituting these values into the formula, we get:\n   \\[\n   \\text{det} = (3 \\cdot 4) - (1 \\cdot 2) = 12 - 2 = 10\n   \\]\n   So, the determinant of the matrix is \\(10\\).\n\n2. **Trace Calculation:**\n   The trace of a matrix is the sum of the elements on its main diagonal. For the matrix \\(\\begin{bmatrix} 3 & 1 \\\\ 2 & 4 \\end{bmatrix}\\), the elements on the main diagonal are 3 and 4. Therefore, the trace is:\n   \\[\n   \\text{trace} = 3 + 4 = 7\n   \\]\n   So, the trace of the matrix is \\(7\\).\n\nPutting it all together, the determinant and trace of the Amber matrix are:\n\\[\n\\boxed{10 \\text{ and } 7}\n\\]",
+      "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7. [math-amber-matrix]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "birch-function-derivative",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 4.115302,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a295044585bcd5f931e90fd4186ee2ae035728851e2d51083b1d90137505ec27",
+    "retrievalMillis" : 1.44235,
+    "frameworkOverheadMillis" : 3.928135000000111,
+    "endToEndMillis" : 4989.300731,
+    "generation" : {
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 176,
+      "ttftMillis" : 88.880607,
+      "totalMillis" : 4983.930246,
+      "prefillTokensPerSecond" : 2369.432896809069,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Birch function is a polynomial function given by \\( f(x) = x^3 - 2x \\). To find its derivative, we apply the power rule of differentiation, which states that if \\( f(x) = x^n \\), then \\( f'(x) = nx^{n-1} \\).\n\nLet's differentiate each term of the function \\( f(x) = x^3 - 2x \\) separately:\n\n1. The derivative of \\( x^3 \\) is \\( 3x^2 \\).\n2. The derivative of \\( -2x \\) is \\( -2 \\).\n\nCombining these, the derivative of the entire function is:\n\\[ f'(x) = 3x^2 - 2 \\]\n\nSo, the derivative of the Birch function is \\(\\boxed{3x^2 - 2}\\).",
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "cobalt-red-probability",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-cobalt-probability",
+        "title" : "Cobalt urn",
+        "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5."
+      },
+      "score" : 8.382398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5db1fe258ad18f5e3bdadbc51bbddffcf287648b99c3f12bb5448665bc0b3e77",
+    "retrievalMillis" : 1.726606,
+    "frameworkOverheadMillis" : 4.79265199999918,
+    "endToEndMillis" : 6715.702372,
+    "generation" : {
+      "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5. [math-cobalt-probability]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 247,
+      "ttftMillis" : 37.000402,
+      "totalMillis" : 6709.183114,
+      "prefillTokensPerSecond" : 6032.365265135096,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To determine the number of red and blue balls in the Jacobian urn and the probability of drawing a red ball, we can follow these steps:\n\n1. **Identify the total number of balls in the urn:**\n   The Jacobian urn contains 3 red balls and 2 blue balls. Therefore, the total number of balls is:\n   \\[\n   3 + 2 = 5\n   \\]\n\n2. **Calculate the probability of drawing a red ball:**\n   The probability of drawing a red ball is the number of red balls divided by the total number of balls. So, the probability \\( P \\) is:\n   \\[\n   P(\\text{red}) = \\frac{\\text{number of red balls}}{\\text{total number of balls}} = \\frac{3}{5}\n   \\]\n\nThus, the Jacobian urn contains 3 red balls and 2 blue balls, and the probability of drawing a red ball is \\(\\frac{3}{5}\\).\n\nThe final answer is:\n\\[\n\\boxed{3 \\text{ red balls, 2 blue balls, and the probability of drawing a red ball is } \\frac{3}{5}}\n\\]",
+      "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5. [math-cobalt-probability]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "delta-sixth-term",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-delta-sequence",
+        "title" : "Delta sequence",
+        "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27."
+      },
+      "score" : 6.3672924,
+      "rank" : 1
+    } ],
+    "promptSha256" : "587c842e2fcc84da27f8478640521271030c5dcd31aa7d83ed00e6157e821d37",
+    "retrievalMillis" : 2.160028,
+    "frameworkOverheadMillis" : 0.33877899999970396,
+    "endToEndMillis" : 8206.253861,
+    "generation" : {
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 301,
+      "ttftMillis" : 47.617591,
+      "totalMillis" : 8203.755054,
+      "prefillTokensPerSecond" : 5881.704223798845,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To determine the start and common difference of the Delta arithmetic sequence, and to find its sixth term, we can follow these steps:\n\n1. Identify the start and common difference from the given information.\n2. Use the formula for the \\(n\\)-th term of an arithmetic sequence to find the sixth term.\n\nThe general formula for the \\(n\\)-th term of an arithmetic sequence is:\n\\[ a_n = a_1 + (n-1)d \\]\nwhere \\(a_n\\) is the \\(n\\)-th term, \\(a_1\\) is the first term, \\(d\\) is the common difference, and \\(n\\) is the term number.\n\nFrom the problem, we know:\n- The first term \\(a_1 = 7\\)\n- The common difference \\(d = 4\\)\n\nWe need to find the sixth term (\\(a_6\\)). Using the formula for the \\(n\\)-th term:\n\\[ a_6 = a_1 + (6-1)d \\]\n\\[ a_6 = 7 + 5 \\cdot 4 \\]\n\\[ a_6 = 7 + 20 \\]\n\\[ a_6 = 27 \\]\n\nSo, the start of the Delta sequence is 7, the common difference is 4, and the sixth term is 27.\n\nThe final answer is:\n\\[\n\\boxed{7 \\text{ and } 4, 27}\n\\]",
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "ember-modulo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-ember-modulus",
+        "title" : "Ember congruence",
+        "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3."
+      },
+      "score" : 4.442518,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c906d4ee39ce249b7b045460d06a2f7e8d9632b78f58c6a35fc461d2e191734a",
+    "retrievalMillis" : 7.545323,
+    "frameworkOverheadMillis" : 0.2826969999996436,
+    "endToEndMillis" : 4586.673005,
+    "generation" : {
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "inputTokens" : 153,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 168,
+      "ttftMillis" : 46.621144,
+      "totalMillis" : 4578.844985,
+      "prefillTokensPerSecond" : 4878.826530612245,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To solve the problem of reducing the value 38 modulo 7, we need to find the remainder when 38 is divided by 7. Here are the steps to do that:\n\n1. Perform the division of 38 by 7.\n2. Determine the quotient and the remainder.\n\nLet's do the division:\n\n\\[ 38 \\div 7 = 5 \\text{ remainder } 3 \\]\n\nThis means that 38 can be expressed as:\n\n\\[ 38 = 7 \\times 5 + 3 \\]\n\nHere, 5 is the quotient and 3 is the remainder. Therefore, when 38 is divided by 7, the remainder is 3.\n\nSo, the remainder when 38 is reduced modulo 7 is \\(\\boxed{3}\\).",
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "fjord-integral",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-fjord-integral",
+        "title" : "Fjord integral",
+        "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2."
+      },
+      "score" : 5.5134096,
+      "rank" : 1
+    } ],
+    "promptSha256" : "883ca02950ffa962edb17e3c4854b83d88003f6bce052eb3e5afec2682333a1f",
+    "retrievalMillis" : 1.14547,
+    "frameworkOverheadMillis" : 0.26314800000000105,
+    "endToEndMillis" : 8914.032115,
+    "generation" : {
+      "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2. [math-fjord-integral]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 319,
+      "ttftMillis" : 48.887175,
+      "totalMillis" : 8912.623497,
+      "prefillTokensPerSecond" : 6012.817743213077,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To solve the problem, we need to evaluate the definite integral of \\(2x\\) from 0 to 3. The antiderivative of \\(2x\\) is \\(x^2\\). We can use the Fundamental Theorem of Calculus to find the value of the definite integral.\n\nThe Fundamental Theorem of Calculus states that if \\(F\\) is an antiderivative of \\(f\\), then:\n\n\\[\n\\int_a^b f(x) \\, dx = F(b) - F(a)\n\\]\n\nIn this case, \\(f(x) = 2x\\) and the antiderivative \\(F(x) = x^2\\). So, we need to evaluate \\(F(3) - F(0)\\):\n\n\\[\n\\int_0^3 2x \\, dx = \\left[ x^2 \\right]_0^3 = 3^2 - 0^2 = 9\n\\]\n\nLet's confirm this with Python code.\n```python\n# Define the antiderivative function\ndef antiderivative(x):\n    return x**2\n\n# Evaluate the definite integral from 0 to 3\ndefinite_integral = antiderivative(3) - antiderivative(0)\nprint(definite_integral)\n```\n```output\n9\n```\nThe definite integral of \\(2x\\) from 0 to 3 is indeed \\(9\\). The antiderivative used is \\(x^2\\).\n\nSo, the final answer is:\n\n\\[\n\\boxed{9}\n\\]",
+      "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2. [math-fjord-integral]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "grove-hypotenuse",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-grove-geometry",
+        "title" : "Grove triangle",
+        "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13."
+      },
+      "score" : 5.9253526,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1efce585de3d869ce099a14feeefb91d3f9a615da3145ec5a0f448024fc60d28",
+    "retrievalMillis" : 1.350896,
+    "frameworkOverheadMillis" : 0.27382699999907345,
+    "endToEndMillis" : 11184.07584,
+    "generation" : {
+      "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13. [math-grove-geometry]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 410,
+      "ttftMillis" : 39.647812,
+      "totalMillis" : 11182.451117,
+      "prefillTokensPerSecond" : 5627.845288023802,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To solve the problem, we need to identify the legs and the hypotenuse of the right triangle. The problem states that the right triangle has legs of lengths 5 and 12, and we need to confirm that the hypotenuse is 13. We can use the Pythagorean theorem to verify this.\n\nThe Pythagorean theorem states that for a right triangle with legs \\(a\\) and \\(b\\) and hypotenuse \\(c\\), the following equation holds:\n\\[ a^2 + b^2 = c^2 \\]\n\nGiven:\n\\[ a = 5 \\]\n\\[ b = 12 \\]\n\\[ c = 13 \\]\n\nWe can check if these values satisfy the Pythagorean theorem:\n\\[ 5^2 + 12^2 = 13^2 \\]\n\\[ 25 + 144 = 169 \\]\n\\[ 169 = 169 \\]\n\nSince the equation holds true, the values are correct. Therefore, the legs of the right triangle are 5 and 12, and the hypotenuse is 13.\n\nLet's confirm this using Python code.\n```python\n# Define the legs and hypotenuse of the right triangle\na = 5\nb = 12\nc = 13\n\n# Check if the Pythagorean theorem holds\nis_right_triangle = (a**2 + b**2 == c**2)\n\n# Output the result\nprint(((is_right_triangle, a, b, c)))\n```\n```output\n(True, 5, 12, 13)\n```\nThe output confirms that the Pythagorean theorem holds true for the given values. Therefore, the legs of the right triangle are \\(5\\) and \\(12\\), and the hypotenuse is \\(13\\).\n\nSo, the final answer is:\n\\[\n\\boxed{5, 12, 13}\n\\]",
+      "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13. [math-grove-geometry]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "harbor-mean-median",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-harbor-statistics",
+        "title" : "Harbor sample",
+        "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4."
+      },
+      "score" : 4.7371473,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fa5ad040883fbfad0bca40703362d01ef569fceacddd90737296e59e2e5d4bbf",
+    "retrievalMillis" : 1.316605,
+    "frameworkOverheadMillis" : 0.25247699999999895,
+    "endToEndMillis" : 6546.279418,
+    "generation" : {
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 242,
+      "ttftMillis" : 41.863301,
+      "totalMillis" : 6544.710336,
+      "prefillTokensPerSecond" : 5593.922651933702,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To find the mean and median of the symmetric harmonic sample [2, 4, 4, 10], we will follow these steps:\n\n1. **Calculate the Mean:**\n   - The mean is the sum of all the numbers divided by the count of numbers.\n   - Sum of the numbers: \\(2 + 4 + 4 + 10 = 20\\)\n   - Count of numbers: 4\n   - Mean: \\(\\frac{20}{4} = 5\\)\n\n2. **Calculate the Median:**\n   - The median is the middle number when the numbers are arranged in ascending order.\n   - The numbers are already in ascending order: [2, 4, 4, 10]\n   - Since there are 4 numbers (an even count), the median is the average of the two middle numbers.\n   - The two middle numbers are 4 and 4.\n   - Median: \\(\\frac{4 + 4}{2} = 4\\)\n\nTherefore, the mean and median of the harmonic sample are \\(\\boxed{5}\\) and \\(\\boxed{4}\\), respectively.",
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "unsupported-maple-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 1.2100124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a54105389b35b29d4d177e55042c9e902d7b8fdfd5e157224b42854dd4035cae",
+    "retrievalMillis" : 1.273605,
+    "frameworkOverheadMillis" : 0.2754769999992277,
+    "endToEndMillis" : 8283.22447,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 302,
+      "ttftMillis" : 79.030835,
+      "totalMillis" : 8281.675388,
+      "prefillTokensPerSecond" : 2385.8506200354304,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To find the limit of the Maple rational function \\( f(x) = \\frac{x^3 - 2x}{x^3 + x^2} \\) as \\( x \\) approaches infinity, we can follow these steps:\n\n1. **Identify the degrees of the numerator and the denominator:**\n   - The degree of the numerator \\( x^3 - 2x \\) is 3.\n   - The degree of the denominator \\( x^3 + x^2 \\) is also 3.\n\n2. **Compare the degrees of the numerator and the denominator:**\n   - Since the degrees of both the numerator and the denominator are the same, the limit as \\( x \\) approaches infinity is the ratio of the leading coefficients.\n\n3. **Identify the leading coefficients:**\n   - The leading coefficient of the numerator \\( x^3 - 2x \\) is 1.\n   - The leading coefficient of the denominator \\( x^3 + x^2 \\) is also 1.\n\n4. **Calculate the limit:**\n   - The limit of the rational function as \\( x \\) approaches infinity is the ratio of the leading coefficients, which is \\( \\frac{1}{1} = 1 \\).\n\nTherefore, the limit of the function \\( f(x) = \\frac{x^3 - 2x}{x^3 + x^2} \\) as \\( x \\) approaches infinity is \\(\\boxed{1}\\).",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "amber-determinant-trace",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-amber-matrix",
+        "title" : "Amber matrix",
+        "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7."
+      },
+      "score" : 4.5716124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cfa37b20c25b43df3136e4b537925678c5d311551a94eeffc8127827cab085b9",
+    "retrievalMillis" : 1.12207,
+    "frameworkOverheadMillis" : 0.2698770000006334,
+    "endToEndMillis" : 9859.055256,
+    "generation" : {
+      "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7. [math-amber-matrix]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 362,
+      "ttftMillis" : 38.751152,
+      "totalMillis" : 9857.663309,
+      "prefillTokensPerSecond" : 5779.92919586735,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To find the determinant and trace of the Amber matrix [[3, 1], [2, 4]], we will follow these steps:\n\n1. **Determinant Calculation:**\n   The determinant of a 2x2 matrix \\(\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}\\) is given by the formula:\n   \\[\n   \\text{det} = ad - bc\n   \\]\n   For the given matrix \\(\\begin{bmatrix} 3 & 1 \\\\ 2 & 4 \\end{bmatrix}\\), we have:\n   \\[\n   a = 3, \\quad b = 1, \\quad c = 2, \\quad d = 4\n   \\]\n   Substituting these values into the formula, we get:\n   \\[\n   \\text{det} = (3 \\cdot 4) - (1 \\cdot 2) = 12 - 2 = 10\n   \\]\n   So, the determinant of the matrix is \\(10\\).\n\n2. **Trace Calculation:**\n   The trace of a matrix is the sum of the elements on its main diagonal. For the matrix \\(\\begin{bmatrix} 3 & 1 \\\\ 2 & 4 \\end{bmatrix}\\), the elements on the main diagonal are 3 and 4. Therefore, the trace is:\n   \\[\n   \\text{trace} = 3 + 4 = 7\n   \\]\n   So, the trace of the matrix is \\(7\\).\n\nPutting it all together, the determinant and trace of the Amber matrix are:\n\\[\n\\boxed{10 \\text{ and } 7}\n\\]",
+      "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7. [math-amber-matrix]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "birch-function-derivative",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 4.115302,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a295044585bcd5f931e90fd4186ee2ae035728851e2d51083b1d90137505ec27",
+    "retrievalMillis" : 1.11577,
+    "frameworkOverheadMillis" : 0.3010789999998451,
+    "endToEndMillis" : 4817.359005,
+    "generation" : {
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 176,
+      "ttftMillis" : 89.027915,
+      "totalMillis" : 4815.942156,
+      "prefillTokensPerSecond" : 2210.983424244029,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Birch function is a polynomial function given by \\( f(x) = x^3 - 2x \\). To find its derivative, we apply the power rule of differentiation, which states that if \\( f(x) = x^n \\), then \\( f'(x) = nx^{n-1} \\).\n\nLet's differentiate each term of the function \\( f(x) = x^3 - 2x \\) separately:\n\n1. The derivative of \\( x^3 \\) is \\( 3x^2 \\).\n2. The derivative of \\( -2x \\) is \\( -2 \\).\n\nCombining these, the derivative of the entire function is:\n\\[ f'(x) = 3x^2 - 2 \\]\n\nSo, the derivative of the Birch function is \\(\\boxed{3x^2 - 2}\\).",
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "cobalt-red-probability",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-cobalt-probability",
+        "title" : "Cobalt urn",
+        "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5."
+      },
+      "score" : 8.382398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5db1fe258ad18f5e3bdadbc51bbddffcf287648b99c3f12bb5448665bc0b3e77",
+    "retrievalMillis" : 1.390498,
+    "frameworkOverheadMillis" : 0.2760570000009466,
+    "endToEndMillis" : 6716.722649,
+    "generation" : {
+      "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5. [math-cobalt-probability]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 247,
+      "ttftMillis" : 39.098281,
+      "totalMillis" : 6715.056094,
+      "prefillTokensPerSecond" : 5979.661987969063,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To determine the number of red and blue balls in the Jacobian urn and the probability of drawing a red ball, we can follow these steps:\n\n1. **Identify the total number of balls in the urn:**\n   The Jacobian urn contains 3 red balls and 2 blue balls. Therefore, the total number of balls is:\n   \\[\n   3 + 2 = 5\n   \\]\n\n2. **Calculate the probability of drawing a red ball:**\n   The probability of drawing a red ball is the number of red balls divided by the total number of balls. So, the probability \\( P \\) is:\n   \\[\n   P(\\text{red}) = \\frac{\\text{number of red balls}}{\\text{total number of balls}} = \\frac{3}{5}\n   \\]\n\nThus, the Jacobian urn contains 3 red balls and 2 blue balls, and the probability of drawing a red ball is \\(\\frac{3}{5}\\).\n\nThe final answer is:\n\\[\n\\boxed{3 \\text{ red balls, 2 blue balls, and the probability of drawing a red ball is } \\frac{3}{5}}\n\\]",
+      "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5. [math-cobalt-probability]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "delta-sixth-term",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-delta-sequence",
+        "title" : "Delta sequence",
+        "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27."
+      },
+      "score" : 6.3672924,
+      "rank" : 1
+    } ],
+    "promptSha256" : "587c842e2fcc84da27f8478640521271030c5dcd31aa7d83ed00e6157e821d37",
+    "retrievalMillis" : 1.408758,
+    "frameworkOverheadMillis" : 0.2735069999998814,
+    "endToEndMillis" : 8198.157002,
+    "generation" : {
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "inputTokens" : 160,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 301,
+      "ttftMillis" : 46.471191,
+      "totalMillis" : 8196.474737,
+      "prefillTokensPerSecond" : 4708.375022070508,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To determine the start and common difference of the Delta arithmetic sequence, and to find its sixth term, we can follow these steps:\n\n1. Identify the start and common difference from the given information.\n2. Use the formula for the \\(n\\)-th term of an arithmetic sequence to find the sixth term.\n\nThe general formula for the \\(n\\)-th term of an arithmetic sequence is:\n\\[ a_n = a_1 + (n-1)d \\]\nwhere \\(a_n\\) is the \\(n\\)-th term, \\(a_1\\) is the first term, \\(d\\) is the common difference, and \\(n\\) is the term number.\n\nFrom the problem, we know:\n- The first term \\(a_1 = 7\\)\n- The common difference \\(d = 4\\)\n\nWe need to find the sixth term (\\(a_6\\)). Using the formula for the \\(n\\)-th term:\n\\[ a_6 = a_1 + (6-1)d \\]\n\\[ a_6 = 7 + 5 \\cdot 4 \\]\n\\[ a_6 = 7 + 20 \\]\n\\[ a_6 = 27 \\]\n\nSo, the start of the Delta sequence is 7, the common difference is 4, and the sixth term is 27.\n\nThe final answer is:\n\\[\n\\boxed{7 \\text{ and } 4, 27}\n\\]",
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "ember-modulo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-ember-modulus",
+        "title" : "Ember congruence",
+        "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3."
+      },
+      "score" : 4.442518,
+      "rank" : 1
+    } ],
+    "promptSha256" : "c906d4ee39ce249b7b045460d06a2f7e8d9632b78f58c6a35fc461d2e191734a",
+    "retrievalMillis" : 1.038638,
+    "frameworkOverheadMillis" : 0.25983699999960663,
+    "endToEndMillis" : 4535.667684,
+    "generation" : {
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "inputTokens" : 153,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 168,
+      "ttftMillis" : 48.429914,
+      "totalMillis" : 4534.369209,
+      "prefillTokensPerSecond" : 5193.306405077899,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To solve the problem of reducing the value 38 modulo 7, we need to find the remainder when 38 is divided by 7. Here are the steps to do that:\n\n1. Perform the division of 38 by 7.\n2. Determine the quotient and the remainder.\n\nLet's do the division:\n\n\\[ 38 \\div 7 = 5 \\text{ remainder } 3 \\]\n\nThis means that 38 can be expressed as:\n\n\\[ 38 = 7 \\times 5 + 3 \\]\n\nHere, 5 is the quotient and 3 is the remainder. Therefore, when 38 is divided by 7, the remainder is 3.\n\nSo, the remainder when 38 is reduced modulo 7 is \\(\\boxed{3}\\).",
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "fjord-integral",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-fjord-integral",
+        "title" : "Fjord integral",
+        "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2."
+      },
+      "score" : 5.5134096,
+      "rank" : 1
+    } ],
+    "promptSha256" : "883ca02950ffa962edb17e3c4854b83d88003f6bce052eb3e5afec2682333a1f",
+    "retrievalMillis" : 1.233423,
+    "frameworkOverheadMillis" : 0.24219599999923958,
+    "endToEndMillis" : 8659.709657,
+    "generation" : {
+      "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2. [math-fjord-integral]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 319,
+      "ttftMillis" : 51.346454,
+      "totalMillis" : 8658.234038,
+      "prefillTokensPerSecond" : 4171.245878709162,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To solve the problem, we need to evaluate the definite integral of \\(2x\\) from 0 to 3. The antiderivative of \\(2x\\) is \\(x^2\\). We can use the Fundamental Theorem of Calculus to find the value of the definite integral.\n\nThe Fundamental Theorem of Calculus states that if \\(F\\) is an antiderivative of \\(f\\), then:\n\n\\[\n\\int_a^b f(x) \\, dx = F(b) - F(a)\n\\]\n\nIn this case, \\(f(x) = 2x\\) and the antiderivative \\(F(x) = x^2\\). So, we need to evaluate \\(F(3) - F(0)\\):\n\n\\[\n\\int_0^3 2x \\, dx = \\left[ x^2 \\right]_0^3 = 3^2 - 0^2 = 9\n\\]\n\nLet's confirm this with Python code.\n```python\n# Define the antiderivative function\ndef antiderivative(x):\n    return x**2\n\n# Evaluate the definite integral from 0 to 3\ndefinite_integral = antiderivative(3) - antiderivative(0)\nprint(definite_integral)\n```\n```output\n9\n```\nThe definite integral of \\(2x\\) from 0 to 3 is indeed \\(9\\). The antiderivative used is \\(x^2\\).\n\nSo, the final answer is:\n\n\\[\n\\boxed{9}\n\\]",
+      "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2. [math-fjord-integral]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "grove-hypotenuse",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-grove-geometry",
+        "title" : "Grove triangle",
+        "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13."
+      },
+      "score" : 5.9253526,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1efce585de3d869ce099a14feeefb91d3f9a615da3145ec5a0f448024fc60d28",
+    "retrievalMillis" : 1.178352,
+    "frameworkOverheadMillis" : 0.23639599999842176,
+    "endToEndMillis" : 11135.89849,
+    "generation" : {
+      "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13. [math-grove-geometry]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 410,
+      "ttftMillis" : 43.803469,
+      "totalMillis" : 11134.483742,
+      "prefillTokensPerSecond" : 5734.531375557017,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To solve the problem, we need to identify the legs and the hypotenuse of the right triangle. The problem states that the right triangle has legs of lengths 5 and 12, and we need to confirm that the hypotenuse is 13. We can use the Pythagorean theorem to verify this.\n\nThe Pythagorean theorem states that for a right triangle with legs \\(a\\) and \\(b\\) and hypotenuse \\(c\\), the following equation holds:\n\\[ a^2 + b^2 = c^2 \\]\n\nGiven:\n\\[ a = 5 \\]\n\\[ b = 12 \\]\n\\[ c = 13 \\]\n\nWe can check if these values satisfy the Pythagorean theorem:\n\\[ 5^2 + 12^2 = 13^2 \\]\n\\[ 25 + 144 = 169 \\]\n\\[ 169 = 169 \\]\n\nSince the equation holds true, the values are correct. Therefore, the legs of the right triangle are 5 and 12, and the hypotenuse is 13.\n\nLet's confirm this using Python code.\n```python\n# Define the legs and hypotenuse of the right triangle\na = 5\nb = 12\nc = 13\n\n# Check if the Pythagorean theorem holds\nis_right_triangle = (a**2 + b**2 == c**2)\n\n# Output the result\nprint(((is_right_triangle, a, b, c)))\n```\n```output\n(True, 5, 12, 13)\n```\nThe output confirms that the Pythagorean theorem holds true for the given values. Therefore, the legs of the right triangle are \\(5\\) and \\(12\\), and the hypotenuse is \\(13\\).\n\nSo, the final answer is:\n\\[\n\\boxed{5, 12, 13}\n\\]",
+      "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13. [math-grove-geometry]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "harbor-mean-median",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-harbor-statistics",
+        "title" : "Harbor sample",
+        "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4."
+      },
+      "score" : 4.7371473,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fa5ad040883fbfad0bca40703362d01ef569fceacddd90737296e59e2e5d4bbf",
+    "retrievalMillis" : 1.12469,
+    "frameworkOverheadMillis" : 0.26873799999975745,
+    "endToEndMillis" : 6536.942808,
+    "generation" : {
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 242,
+      "ttftMillis" : 41.540488,
+      "totalMillis" : 6535.54938,
+      "prefillTokensPerSecond" : 5507.58142381179,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To find the mean and median of the symmetric harmonic sample [2, 4, 4, 10], we will follow these steps:\n\n1. **Calculate the Mean:**\n   - The mean is the sum of all the numbers divided by the count of numbers.\n   - Sum of the numbers: \\(2 + 4 + 4 + 10 = 20\\)\n   - Count of numbers: 4\n   - Mean: \\(\\frac{20}{4} = 5\\)\n\n2. **Calculate the Median:**\n   - The median is the middle number when the numbers are arranged in ascending order.\n   - The numbers are already in ascending order: [2, 4, 4, 10]\n   - Since there are 4 numbers (an even count), the median is the average of the two middle numbers.\n   - The two middle numbers are 4 and 4.\n   - Median: \\(\\frac{4 + 4}{2} = 4\\)\n\nTherefore, the mean and median of the harmonic sample are \\(\\boxed{5}\\) and \\(\\boxed{4}\\), respectively.",
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-qwen2_5_math_1_5b_instruct_q4_k_s",
+    "caseId" : "unsupported-maple-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 1.2100124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a54105389b35b29d4d177e55042c9e902d7b8fdfd5e157224b42854dd4035cae",
+    "retrievalMillis" : 1.08862,
+    "frameworkOverheadMillis" : 0.2637360000007902,
+    "endToEndMillis" : 8200.728768,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 302,
+      "ttftMillis" : 79.401145,
+      "totalMillis" : 8199.376412,
+      "prefillTokensPerSecond" : 2359.923691090228,
+      "loadMillis" : 1586.724468,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "To find the limit of the Maple rational function \\( f(x) = \\frac{x^3 - 2x}{x^3 + x^2} \\) as \\( x \\) approaches infinity, we can follow these steps:\n\n1. **Identify the degrees of the numerator and the denominator:**\n   - The degree of the numerator \\( x^3 - 2x \\) is 3.\n   - The degree of the denominator \\( x^3 + x^2 \\) is also 3.\n\n2. **Compare the degrees of the numerator and the denominator:**\n   - Since the degrees of both the numerator and the denominator are the same, the limit as \\( x \\) approaches infinity is the ratio of the leading coefficients.\n\n3. **Identify the leading coefficients:**\n   - The leading coefficient of the numerator \\( x^3 - 2x \\) is 1.\n   - The leading coefficient of the denominator \\( x^3 + x^2 \\) is also 1.\n\n4. **Calculate the limit:**\n   - The limit of the rational function as \\( x \\) approaches infinity is the ratio of the leading coefficients, which is \\( \\frac{1}{1} = 1 \\).\n\nTherefore, the limit of the function \\( f(x) = \\frac{x^3 - 2x}{x^3 + x^2} \\) as \\( x \\) approaches infinity is \\(\\boxed{1}\\).",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}
