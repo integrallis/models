@@ -5273,8 +5273,8 @@ fn dot_q5_1_f32_row_scalar(
     }
     let mut folded = [0_f32; 8];
     for lane in 0..8 {
-        folded[lane] =
-            (accumulators[lane] + accumulators[8 + lane]) + (accumulators[16 + lane] + accumulators[24 + lane]);
+        folded[lane] = (accumulators[lane] + accumulators[8 + lane])
+            + (accumulators[16 + lane] + accumulators[24 + lane]);
     }
     let even = (folded[4] + folded[0]) + (folded[6] + folded[2]);
     let odd = (folded[5] + folded[1]) + (folded[7] + folded[3]);
@@ -8186,8 +8186,7 @@ mod tests {
         let mut expected = [0_u8; QK_0];
         for index in 0..16 {
             let packed = bytes[8 + index];
-            expected[index] =
-                ((packed & 0x0F) as u32 | (((bit_plane >> index) << 4) & 0x10)) as u8;
+            expected[index] = ((packed & 0x0F) as u32 | (((bit_plane >> index) << 4) & 0x10)) as u8;
             expected[index + 16] =
                 ((packed >> 4) as u32 | ((bit_plane >> (index + 12)) & 0x10)) as u8;
         }
@@ -8204,8 +8203,7 @@ mod tests {
             let mut actual = [0_u8; QK_0];
             // SAFETY: AVX2 was just detected and the block carries its plane and sixteen nibbles.
             unsafe {
-                let unpacked =
-                    unpack_q5_1_avx2(bytes.as_ptr().add(4), bytes.as_ptr().add(8));
+                let unpacked = unpack_q5_1_avx2(bytes.as_ptr().add(4), bytes.as_ptr().add(8));
                 _mm256_storeu_si256(actual.as_mut_ptr().cast(), unpacked);
             }
             assert_eq!(actual, expected);
@@ -8224,24 +8222,45 @@ mod tests {
         let weights = q5_1_rows(rows, blocks_per_row, 0x1234_5678);
         let activations = q5_1_activations(batch_size * cols, 0x8765_4321);
 
+        // The scalar kernel is the normative one and is the only Q5_1 kernel on a non-x86-64
+        // host, so it is exercised on every target rather than only where there is something to
+        // compare it against: every output finite, not all equal, and the same on a second call.
+        let mut scalars = Vec::new();
+        for batch in 0..batch_size {
+            for row in 0..rows {
+                let value = dot_q5_1_f32_row_scalar(&weights, &activations, batch, row, cols);
+                assert!(value.is_finite(), "batch {batch} row {row} is not finite");
+                assert_eq!(
+                    value.to_bits(),
+                    dot_q5_1_f32_row_scalar(&weights, &activations, batch, row, cols).to_bits(),
+                    "batch {batch} row {row} is not deterministic"
+                );
+                scalars.push(value);
+            }
+        }
+        assert!(
+            scalars.windows(2).any(|pair| pair[0] != pair[1]),
+            "a fixture whose rows all produce the same dot proves nothing"
+        );
+
         #[cfg(target_arch = "x86_64")]
         if std::arch::is_x86_feature_detected!("avx2")
             && std::arch::is_x86_feature_detected!("fma")
             && std::arch::is_x86_feature_detected!("f16c")
         {
+            let mut index = 0;
             for batch in 0..batch_size {
                 for row in 0..rows {
-                    let scalar =
-                        dot_q5_1_f32_row_scalar(&weights, &activations, batch, row, cols);
                     // SAFETY: the features above were just detected.
-                    let vector = unsafe {
-                        dot_q5_1_f32_row_avx2(&weights, &activations, batch, row, cols)
-                    };
+                    let vector =
+                        unsafe { dot_q5_1_f32_row_avx2(&weights, &activations, batch, row, cols) };
                     assert_eq!(
-                        scalar.to_bits(),
+                        scalars[index].to_bits(),
                         vector.to_bits(),
-                        "batch {batch} row {row}: {scalar} != {vector}"
+                        "batch {batch} row {row}: {} != {vector}",
+                        scalars[index]
                     );
+                    index += 1;
                 }
             }
         }
