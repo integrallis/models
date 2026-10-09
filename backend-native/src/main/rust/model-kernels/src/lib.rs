@@ -3352,7 +3352,7 @@ unsafe fn compute_batched_row_range(
         DotKernel::Q5_1 => {
             // SAFETY: the caller assigns this worker an exclusive matrix-row range.
             unsafe {
-                compute_q5_1_batched_row_range(
+                compute_q5_1_batched_row_range_scalar(
                     weights,
                     activations,
                     output,
@@ -3361,7 +3361,6 @@ unsafe fn compute_batched_row_range(
                     cols,
                     start_row,
                     end_row,
-                    false,
                 );
             }
         }
@@ -3369,7 +3368,7 @@ unsafe fn compute_batched_row_range(
         DotKernel::Q5_1Avx2 => {
             // SAFETY: runtime dispatch selected this variant only with AVX2, FMA and F16C.
             unsafe {
-                compute_q5_1_batched_row_range(
+                compute_q5_1_batched_row_range_avx2(
                     weights,
                     activations,
                     output,
@@ -3378,7 +3377,6 @@ unsafe fn compute_batched_row_range(
                     cols,
                     start_row,
                     end_row,
-                    true,
                 );
             }
         }
@@ -5390,12 +5388,14 @@ unsafe fn dot_q5_1_f32_row_avx2(
     even + odd
 }
 
-/// One worker's band of Q5_1 output rows.
+/// One worker's band of Q5_1 output rows, scalar.
 ///
 /// Rows are the partition, as everywhere else here, so no two workers contribute to one reduction
-/// and the pinned fold order is untouched by how many threads run.
+/// and the pinned fold order is untouched by how many threads run. This is also the only Q5_1
+/// kernel on a non-x86-64 host: the scalar routine is the normative one, so aarch64 is bit-exact
+/// with Java without a NEON variant, and claiming parity for one would require its own test.
 #[allow(clippy::too_many_arguments)]
-unsafe fn compute_q5_1_batched_row_range(
+unsafe fn compute_q5_1_batched_row_range_scalar(
     weights: &[u8],
     activations: &[f32],
     output: *mut f32,
@@ -5404,16 +5404,37 @@ unsafe fn compute_q5_1_batched_row_range(
     cols: usize,
     start_row: usize,
     end_row: usize,
-    avx2: bool,
 ) {
     for row in start_row..end_row {
         for batch in 0..batch_size {
-            let value = if avx2 {
-                // SAFETY: the caller selected this only after AVX2, FMA and F16C detection.
-                unsafe { dot_q5_1_f32_row_avx2(weights, activations, batch, row, cols) }
-            } else {
-                dot_q5_1_f32_row_scalar(weights, activations, batch, row, cols)
-            };
+            let value = dot_q5_1_f32_row_scalar(weights, activations, batch, row, cols);
+            // SAFETY: the caller assigns this worker an exclusive row range of the output.
+            unsafe { *output.add(batch * rows + row) = value };
+        }
+    }
+}
+
+/// One worker's band of Q5_1 output rows, AVX2.
+///
+/// Split from the scalar form rather than selected by a flag inside it, which is both the house
+/// shape for every other format here and the reason this compiles on aarch64 at all: a runtime
+/// bool still names the x86 symbol on every target.
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments)]
+unsafe fn compute_q5_1_batched_row_range_avx2(
+    weights: &[u8],
+    activations: &[f32],
+    output: *mut f32,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
+    for row in start_row..end_row {
+        for batch in 0..batch_size {
+            // SAFETY: the caller selected this only after AVX2, FMA and F16C detection.
+            let value = unsafe { dot_q5_1_f32_row_avx2(weights, activations, batch, row, cols) };
             // SAFETY: the caller assigns this worker an exclusive row range of the output.
             unsafe { *output.add(batch * rows + row) = value };
         }
