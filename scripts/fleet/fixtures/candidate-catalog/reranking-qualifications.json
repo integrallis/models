@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-06T19:42:51Z",
+  "policyVersion": "reranking-exact-artifact-and-latency-v3",
+  "modelsRevision": "73e2b81b30f2adbc84a44757c3b3ef48c47ce5dc",
+  "qualifiedModels": 2,
+  "rejectedModels": 0,
+  "entries": [
+    {
+      "modelId": "cstr_ms_marco_minilm_l6_v2_gguf_q4_k_imatrix_g7c_f7",
+      "model": "MS MARCO MiniLM L6 v2 reranker corrected Q4_K imatrix",
+      "backend": "pure-java",
+      "backendVersion": "models-0.3.23",
+      "workload": "reranking-oracle-and-latency-v1",
+      "artifactSha256": "0752a92bc33289f3fe230d1a33cce471f1a7fe1c8d5a491ca7fff6b068b0fc83",
+      "artifactSizeBytes": 19986112,
+      "report": "benchmark-results/reranking/ms-marco-minilm-l6-v2-q4-k-imatrix/performance-intel-mac.json",
+      "reportSha256": "114f393304830f279b89dfc7f04e3e6ea7055692b517f58956a39bc8f13c0a4f",
+      "qualified": true,
+      "pairs": 6,
+      "oracleBackends": {
+        "primary": "ONNX Runtime",
+        "sameArtifact": "CrispEmbed e4cfd3dd5353c4a4e9d48c3e6657491d38e797d3"
+      },
+      "primaryReferenceKind": "source-artifact",
+      "maximumReferenceLogitDelta": 0.101034,
+      "maximumSameArtifactReferenceLogitDelta": 0.036392,
+      "topKOrderExact": true,
+      "topKOriginalIndexes": [0, 2],
+      "medianColdLoadMillis": 221.346,
+      "maximumPairP95Millis": 174.357,
+      "maximumBatchP95Millis": 930.176,
+      "medianBatchDocumentsPerSecond": 7.875,
+      "environment": {
+        "hostname": "Brians-MacBook-Pro.local",
+        "osName": "Mac OS X",
+        "osVersion": "26.6.2",
+        "architecture": "x86_64",
+        "cpuModel": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+        "processors": 12,
+        "physicalMemoryBytes": 34359738368,
+        "javaVersion": "25.0.3",
+        "javaVendor": "Eclipse Adoptium",
+        "vmName": "OpenJDK 64-Bit Server VM",
+        "vectorBits": 256
+      }
+    },
+    {
+      "modelId": "mixedbread_ai_mxbai_rerank_xsmall_v1_f16",
+      "model": "mixedbread-ai/mxbai-rerank-xsmall-v1 F16",
+      "backend": "pure-java",
+      "backendVersion": "models-0.3.31",
+      "workload": "berlin-population-six-documents-v1",
+      "artifactSha256": "a29bc212faf59c136ad0fd5712ecd2346e7b32c44a25b690625bc9ecebb14b8f",
+      "artifactSizeBytes": 141685186,
+      "artifactBundleSizeBytes": 150335293,
+      "artifactBundleSha256": "f57afc0f62b3571e6b284931b84b2929df284c481644cfcc75a88e3c0a7262c9",
+      "artifactFiles": [
+        {
+          "path": "config.json",
+          "role": "model-configuration",
+          "sha256": "470a53befc79da411cc04e466770d9f219f3c14adb276bfa0a58df28774ceade",
+          "sizeBytes": 968
+        },
+        {
+          "path": "model.safetensors",
+          "role": "model-weights",
+          "sha256": "a29bc212faf59c136ad0fd5712ecd2346e7b32c44a25b690625bc9ecebb14b8f",
+          "sizeBytes": 141685186
+        },
+        {
+          "path": "tokenizer.json",
+          "role": "tokenizer",
+          "sha256": "305674b4d785287feecfb5f73f24aa75e9b57c87c579cfe24fbd207987d4b4c4",
+          "sizeBytes": 8649139
+        }
+      ],
+      "report": "benchmark-results/reranking/mxbai-rerank-xsmall-v1/performance-intel-mac.json",
+      "reportSha256": "2733f98c3b349b32036c9e52465daf700d5933fb4b3f59f809c7edf2c17e1468",
+      "qualified": true,
+      "pairs": 6,
+      "oracleBackends": {
+        "primary": "Hugging Face Transformers 4.38.1 with PyTorch"
+      },
+      "primaryReferenceKind": "exact-artifact",
+      "maximumReferenceLogitDelta": 0.0000030994415283203125,
+      "topKOrderExact": true,
+      "topKOriginalIndexes": [0, 2, 5, 1, 4, 3],
+      "medianColdLoadMillis": 2556.399,
+      "maximumPairP95Millis": 156.300,
+      "maximumBatchP95Millis": 560.781,
+      "medianBatchDocumentsPerSecond": 17.114,
+      "environment": {
+        "hostname": "Brians-MacBook-Pro.local",
+        "osName": "Mac OS X",
+        "osVersion": "26.6.2",
+        "architecture": "x86_64",
+        "cpuModel": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+        "processors": 12,
+        "physicalMemoryBytes": 34359738368,
+        "javaVersion": "25.0.3",
+        "javaVendor": "Eclipse Adoptium",
+        "vmName": "OpenJDK 64-Bit Server VM",
+        "vectorBits": 256
+      }
+    }
+  ]
+}

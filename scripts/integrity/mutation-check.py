@@ -86,6 +86,19 @@ MUTATIONS = [
         "the one of five without rust-src",
     ),
     (
+        "candidate-inventory/count-drifts-from-catalog",
+        # The committed snapshot is copied with the test tree. No sibling repository is required.
+        ["python3", "scripts/fleet/candidate-inventory.py",
+         "--catalog", "scripts/fleet/fixtures/candidate-catalog",
+         # Only the document is mutated. Read committed evidence from the original Git checkout;
+         # the throwaway document copy intentionally has no .git directory.
+         "--repo-root", str(ROOT),
+         "--check-doc", "docs/CANDIDATE-INVENTORY.md"],
+        sub("docs/CANDIDATE-INVENTORY.md", "| **NOT_EVALUATED** |", "| **NOT_EVALUATED** | 999 |#"),
+        "the inventory's bucket counts drifting from the catalog, which is how 356 undocumented "
+        "candidates stayed undocumented",
+    ),
+    (
         "sweep-derive/number-drifts-from-data",
         ["python3", "benchmark-results/2026-10-09-max-tokens-sweep/derive.py"],
         sub("benchmark-results/2026-10-09-max-tokens-sweep/NOTES.md",
