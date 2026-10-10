@@ -143,8 +143,16 @@ def main(argv=None):
     idx = {m["id"]: m for m in models}
     entries = json.loads((catalog / "qualifications.json").read_bytes())["entries"]
 
+    # `entries` holds BOTH outcomes: the manifest header counts qualifiedModels and
+    # rejectedModels separately and `entries` is their sum. Counting every row as coverage
+    # inflated general from 51 to 52 and the catalog's qualified total from 101 to 102, because
+    # h2o-danube3-500m sits there with verdict FAILED_MODEL_CONTRIBUTION_GATE. A rejection is
+    # evidence, but it is not coverage, so it is counted and reported separately.
+    qualified = [e for e in entries if e.get("qualified") is True]
+    rejected = [e for e in entries if e.get("qualified") is not True]
+
     by_wl = collections.defaultdict(list)
-    for e in entries:
+    for e in qualified:
         by_wl[e["workload"]].append(e)
 
     unknown = sorted(set(by_wl) - set(workloads))
@@ -187,6 +195,12 @@ def main(argv=None):
         print(f"{wl}:")
         for e, gb in sorted(zip(got, sizes), key=lambda x: x[1]):
             print(f"    {gb:>5} GB  {e['modelId']:<46} tpl={e.get('promptTemplate')}")
+
+    if rejected:
+        print()
+        print(f"rejected, and therefore NOT counted as coverage ({len(rejected)}):")
+        for e in rejected:
+            print(f"    {e['modelId']:<46} [{e['workload']}]  {e.get('verdict', 'no verdict')}")
 
     if unknown:
         print()

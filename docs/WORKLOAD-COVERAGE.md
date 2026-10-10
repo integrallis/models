@@ -16,7 +16,7 @@ workload        qualified   docs  cases  state
 ------------------------------------------------------
 coding                  7     12      9  
 finance                 1     12      9  thin: one model
-general                52     12      9  
+general                51     12      9  
 healthcare              1     12      9  thin: one model
 legal                   2     12      9  
 math                    1     12      9  thin: one model
@@ -25,6 +25,13 @@ sql                     0     12      9  NO QUALIFIED MODEL (corpus is usable; t
 summarization           0     12      9  NO QUALIFIED MODEL (corpus is usable; this is a closable gap)
 transportation          1     12      9  thin: one model
 ```
+
+One row in `qualifications.json` is a **rejection**, not a qualification: the manifest header
+counts `qualifiedModels` and `rejectedModels` separately and `entries` is their sum.
+`h2o-danube3-500m` sits there on `general` with verdict `FAILED_MODEL_CONTRIBUTION_GATE`. It is
+reported below the table and **not** counted as coverage — counting it inflated `general` from 51
+to 52 and the catalog's qualified total from 101 to 102. A rejection is evidence; it is not
+coverage.
 
 Two states that both show as a zero are kept apart deliberately. **No corpus** means no model
 *could* qualify there, which is "no data". **No qualified model** means the corpus has cases and
