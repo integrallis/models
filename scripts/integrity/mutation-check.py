@@ -49,7 +49,7 @@ def append(path, text):
 # name, guard command, the defect to inject, what the guard is supposed to notice
 MUTATIONS = [
     (
-        "evidence-references/fabricated-path",
+        "evidence-references/unresolvable-path",
         ["python3", "scripts/integrity/check-evidence-references.py"],
         sub("CHANGELOG.md",
             "benchmark-results/2026-10-09-q4-1-support/NOTES.md",
