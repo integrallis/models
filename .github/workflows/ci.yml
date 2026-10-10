@@ -27,15 +27,6 @@ jobs:
           # that ran a September kernel for a whole campaign.
           fetch-depth: 0
 
-      - name: Checkout the catalog used by the candidate inventory
-        uses: actions/checkout@v5
-        with:
-          repository: ModelJars/modeljars
-          ref: eb68debc29d30db24e9b7f99ecbdb5a3544f802f
-          path: model-jars
-          sparse-checkout: catalog
-          persist-credentials: false
-
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -80,7 +71,8 @@ jobs:
 
       # The fleet tooling decides what every qualification measures, so its tests belong in CI
       # rather than with whoever remembers to run them. Stdlib unittest and plain bash, no
-      # dependencies. The pinned sibling checkout also exercises the catalog-dependent cases.
+      # dependencies. A committed catalog fixture exercises catalog cases without a reverse build
+      # dependency on the downstream ModelJars repository.
       - name: Test fleet tooling
         run: |
           python3 -m unittest discover -s scripts/fleet -p '*_test.py' -v
@@ -98,7 +90,8 @@ jobs:
 
       - name: Check the candidate inventory matches the catalog
         run: >-
-          python3 scripts/fleet/candidate-inventory.py --catalog ../model-jars/catalog
+          python3 scripts/fleet/candidate-inventory.py
+          --catalog scripts/fleet/fixtures/candidate-catalog
           --check-doc docs/CANDIDATE-INVENTORY.md
 
       - name: Prove every integrity guard can fail

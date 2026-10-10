@@ -1,5 +1,6 @@
 """Regression tests for committed, exact candidate evidence matching."""
 import importlib.util
+import hashlib
 import json
 import pathlib
 import subprocess
@@ -10,6 +11,18 @@ SPEC = importlib.util.spec_from_file_location(
     "candidate_inventory", pathlib.Path(__file__).with_name("candidate-inventory.py"))
 inventory = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(inventory)
+
+
+class CatalogFixtureTest(unittest.TestCase):
+    def test_snapshot_bytes_match_recorded_source_hashes(self):
+        fixture = pathlib.Path(__file__).parent / "fixtures" / "candidate-catalog"
+        source = json.loads((fixture / "source.json").read_text())
+        self.assertRegex(source["revision"], r"^[0-9a-f]{40}$")
+        self.assertEqual({"models.json", *(name + ".json" for name in inventory.MANIFESTS)},
+                         set(source["sha256"]))
+        for name, expected in source["sha256"].items():
+            with self.subTest(file=name):
+                self.assertEqual(expected, hashlib.sha256((fixture / name).read_bytes()).hexdigest())
 
 
 class CandidateInventoryTest(unittest.TestCase):

@@ -87,12 +87,9 @@ MUTATIONS = [
     ),
     (
         "candidate-inventory/count-drifts-from-catalog",
-        # Absolute catalog path on purpose. The mutation runs in a throwaway copy of this repo,
-        # and a relative ../model-jars/catalog would not exist there -- the guard would then fail
-        # because the catalog is missing rather than because the count drifted, which is a guard
-        # failing for the wrong reason and would have passed this harness for a bogus reason.
+        # The committed snapshot is copied with the test tree. No sibling repository is required.
         ["python3", "scripts/fleet/candidate-inventory.py",
-         "--catalog", str(ROOT.parent / "model-jars" / "catalog"),
+         "--catalog", "scripts/fleet/fixtures/candidate-catalog",
          # Only the document is mutated. Read committed evidence from the original Git checkout;
          # the throwaway document copy intentionally has no .git directory.
          "--repo-root", str(ROOT),

@@ -3,15 +3,16 @@
 Regenerate with:
 
 ```
-python3 scripts/fleet/candidate-inventory.py --catalog ../model-jars/catalog --format md
-python3 scripts/fleet/candidate-inventory.py --catalog ../model-jars/catalog \
+python3 scripts/fleet/candidate-inventory.py --catalog scripts/fleet/fixtures/candidate-catalog --format md
+python3 scripts/fleet/candidate-inventory.py --catalog scripts/fleet/fixtures/candidate-catalog \
     --check-doc docs/CANDIDATE-INVENTORY.md
 ```
 
-CI checks out ModelJars at `eb68debc29d30db24e9b7f99ecbdb5a3544f802f` beside Models.
-Use that catalog revision to reproduce this inventory; update the pin and regenerate the counts
-together when adopting catalog changes. The checkout is required, and a missing catalog fails the
-check rather than skipping it. Evidence is read from committed Git objects at Models `HEAD`, so
+CI uses the committed catalog fixture from ModelJars
+`eb68debc29d30db24e9b7f99ecbdb5a3544f802f`. Its `source.json` records the source revision and file
+hashes. Update the fixture and regenerate the counts together when adopting catalog changes.
+Models never checks out or builds its downstream project. The fixture is required, and a missing
+catalog fails the check rather than skipping it. Evidence is read from Git objects at Models `HEAD`, so
 local downloads, staged reports and edits cannot change the result.
 
 The matcher parses valid JSON and matches complete `modelId` fields (including nested verdict
