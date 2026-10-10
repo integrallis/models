@@ -12,7 +12,7 @@ the earlier candidate Qwen evidence; none of that historical evidence was overwr
 - Runtime libraries came from Maven Central through a fresh Gradle consumer/cache, without
   source substitution, local Maven fallback or added consumer dependency-policy rules.
   The complete combined graph was checked against the shared policy and embedded manifests.
-- `qwen-bf16/run-inputs.json` records 58 classpath JARs: 57 Central artifacts and the unpublished
+- `qwen-bf16/default-correctness/run-inputs.json` records 58 classpath JARs: 57 Central artifacts and the unpublished
   `models-rag-bench` harness built from the clean tagged source. Embedding checks add the
   unpublished `models-bench` harness from the same source. Every JAR has a SHA-256 receipt.
 - The native check used the Central `backend-native` bundle, including its embedded macOS Intel
