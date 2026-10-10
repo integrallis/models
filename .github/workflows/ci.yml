@@ -20,6 +20,12 @@ jobs:
         uses: actions/checkout@v5
         with:
           path: models
+          # Full history. The evidence scripts resolve commit ranges -- derive.py checks that a
+          # paired measurement's two arms came from builds whose delta misses the measured path
+          # -- and on a shallow clone they cannot, so they fail closed and the build goes red.
+          # The alternative was to let them trust a record they cannot verify, which is the hole
+          # that ran a September kernel for a whole campaign.
+          fetch-depth: 0
 
       - uses: actions/setup-java@v5
         with:
