@@ -57,6 +57,47 @@ not. Small models are dominated by fixed per-token cost -- on the order of 200 J
 per token, each partitioned across the whole thread pool however little work it carries -- and not by
 bandwidth. A poor number on a small model is the headline, not an outlier to explain away.
 
+## Match the workload to the capability, or the verdict is honest and useless
+
+`RagWorkload` ships ten corpora — `general`, `coding`, `finance`, `healthcare`, `legal`, `math`,
+`multilingual`, `sql`, `summarization`, `transportation` — and a specialist measured on `general`
+fails in a way that tells you nothing you can act on.
+
+Observed on 2026-10-09, at a cost of six boxes: a shard was built with `wl: "general"` for every
+model in it, including a math specialist and a translation model. Both returned
+`FAILED_MODEL_CONTRIBUTION_GATE`. **The same base models were already qualified in the catalog on
+their matched workload** — `qwen2_5_math_1_5b_instruct_q4_k_m` on `math`,
+`eurollm_1_7b_instruct_q4_k_m` on `multilingual` — so the failure was the manifest, not the model
+and not the runtime.
+
+The per-case data says so plainly, which is the part worth copying into any future diagnosis.
+Retrieval was **perfect** for both: `retrievalRecall 1.0`, `meanReciprocalRank 1.0`,
+`factCoverage 1.0`, `citationRecall 1.0`, `citationPrecision 1.0`. Nothing failed at retrieval or
+citation. What differed was the shape of the answer:
+
+- the math model produced **~151 output tokens per attempt with 11% truncated** at the 256-token
+  cap and `modelAnswerRate 0.0` — asked about auto-glass deadlines, it reasons at length and the
+  citation screen rejects the result;
+- the translation model produced **~22 tokens per attempt** with
+  `modelAnswerCorrectRate 1.0` — correct every single time it answered, but it answered only 2 of
+  9 where the gate needs 3. Under-answering, not wrong.
+
+**So read `modelAnswerCorrectRate` before concluding a model is bad.** A high correct rate with a
+low answer rate is a model being appropriately cautious on a corpus it was not built for; a zero
+answer rate with long outputs is a specialist talking past the question. Neither is fixed by
+changing the prompt template.
+
+The rule: derive the workload from the model's declared capabilities, and put **one workload per
+shard** so a box loads one corpus and `sameWorkload()` cannot exclude the comparator over a corpus
+mismatch. The mapping used here, most specific first — `text-to-sql`/`sql-generation` to `sql`,
+`math` to `math`, `financial-reasoning` to `finance`, `medical-reasoning` to `healthcare`,
+`translation`/`multilingual`/`bilingual` to `multilingual`, `code-completion`/`code-generation`/
+`fim` to `coding`, everything else to `general`.
+
+Note that `general` is not always wrong for a specialist: `mathstral-7b`, `huatuogpt-o1-7b` and
+`granite-4.1-8b` all qualified on `general`. It is wrong for a **narrow** one, and the way to find
+out is to run the matched workload rather than to argue about it.
+
 ## The one rule that invalidates everything else
 
 **A verdict requires two arms measured on the same host in the same session.** A candidate arm alone
