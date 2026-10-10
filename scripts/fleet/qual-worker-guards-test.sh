@@ -76,5 +76,30 @@ else
 fi
 
 echo
+echo "no script in scripts/fleet may fetch a measurement input by a fixed name."
+echo "this exists because the kernels JAR was fixed-name in TWO workers, and fixing one of them"
+echo "is what let a September kernel be measured against a 0.3.56 library:"
+FLEET_DIR="$(cd "$(dirname "$0")" && pwd)"
+offenders=0
+for f in "$FLEET_DIR"/*.sh; do
+  case "$(basename "$f")" in *guards-test*) continue ;; esac
+  # A literal versionless artifact name in an s3 cp or on a classpath is the defect. Comments are
+  # excluded: the workers document the incident by name on purpose.
+  # The artifact names contain hyphens and dots. An earlier version of this check used
+  # [a-z0-9_]+ and therefore never matched models-kernels-linux-x86_64.jar at all: it passed
+  # while the defect was present, which is worse than no check. Verified to fail on
+  # reintroduction before being committed.
+  hits=$(grep -nE "(s3://[^\"]*payload/|CP=|-cp )" "$f" \
+         | grep -vE "^[0-9]+:[[:space:]]*#" \
+         | grep -oE "models-kernels-[A-Za-z0-9_.-]+\.jar|models-rag-bench-[A-Za-z0-9_.-]*\.tar" \
+         || true)
+  if [ -n "$hits" ]; then
+    fail "$(basename "$f") fetches a measurement input by a literal name: $(printf '%s' "$hits" | tr '\n' ' ')"
+    offenders=$((offenders+1))
+  fi
+done
+[ "$offenders" -eq 0 ] && pass "every fleet script names its payload and kernel through a variable"
+
+echo
 if [ "$fails" -eq 0 ]; then echo "all guard checks passed"; exit 0; fi
 echo "$fails guard check(s) failed"; exit 1
