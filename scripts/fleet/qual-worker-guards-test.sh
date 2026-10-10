@@ -56,6 +56,25 @@ echo "a label that names no version at all cannot be checked, so it is refused r
 expect_unparseable "models-rag-bench-0.3.56-v24.tar" "local"
 expect_unparseable "models-rag-bench-0.3.56-v24.tar" "models@"
 
+echo "the kernels jar is checked by the same rule, because backend-native's published JAR carries"
+echo "no .so at all and a September kernel loaded cleanly against a 0.3.56 library for want of"
+echo "this check -- both declare abi=6:"
+expect_accept "models-kernels-linux-x86_64-0.3.56.jar" "models@0.3.56+v25-666bb48c61e0"
+expect_reject "models-kernels-linux-x86_64.jar"        "models@0.3.56+v25-666bb48c61e0"
+expect_reject "models-kernels-linux-x86_64-0.3.54.jar" "models@0.3.56+v25-666bb48c61e0"
+
+echo
+echo "the worker must require all three inputs and refuse to guess any of them:"
+for required in QUAL_PAYLOAD QUAL_KERNELS QUAL_BACKEND_VERSION; do
+  if grep -q "z \"\${$required:-}\"" "$WORKER"; then pass "refuses without $required"
+  else fail "does not require $required"; fi
+done
+if grep -q 'CP="\$DIST/lib/\*:/work/\$KERNELS"' "$WORKER"; then
+  pass "classpath uses the named kernels jar, not a fixed name"
+else
+  fail "classpath does not use \$KERNELS -- a fixed name can go stale unnoticed"
+fi
+
 echo
 if [ "$fails" -eq 0 ]; then echo "all guard checks passed"; exit 0; fi
 echo "$fails guard check(s) failed"; exit 1
