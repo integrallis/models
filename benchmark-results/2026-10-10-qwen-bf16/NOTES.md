@@ -41,9 +41,10 @@ qualification or a speed comparison with earlier reports. `peakRssBytes=0` means
 Models **0.3.57 candidate**, with the verified staged Vectors **0.1.29** artifacts. These were not
 downloaded from Central as released versions. `run-inputs.json` records the exact Java command,
 JDK version, runtime JAR hashes and sizes, source base commit, working-tree patch digest and timestamps.
-The source base is `be4493e1`; apply `candidate.patch` and copy `candidate-build-inputs/` into that
+The source base is `be4493e1`; decompress and apply `candidate.patch.gz`, then copy `candidate-build-inputs/` into that
 checkout to reconstruct the candidate source/build inputs. The patch includes the pending audit
 repairs and dependency updates; it is retained as evidence, not an additional implementation branch.
+The recorded patch digest applies to the decompressed bytes.
 
 The real tests used:
 
