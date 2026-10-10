@@ -95,13 +95,52 @@ export JAVA_HOME=/opt/jdk; export PATH=$JAVA_HOME/bin:$PATH
 say "jdk $(/opt/jdk/bin/java -version 2>&1 | head -1)"
 
 cd /work
-aws s3 cp "s3://$BUCKET/payload/models-rag-bench-0.3.50-v23.tar" . --only-show-errors
+# The payload and the version string that will be stamped on every report are REQUIRED inputs with
+# no defaults, and they are checked against each other below. Both used to be hard-coded here, and
+# both went stale: this file said models-rag-bench-0.3.50-v23.tar and
+# BACKEND_VERSION="models@0.3.50+v23-08d9b5e1cef8" while the 2026-10-09 campaign was in fact
+# running a 0.3.56-dev payload and stamping 0.3.56-dev on its reports. The deployed worker was an
+# edited copy, so the committed one -- the whole reason this script is in the repository -- named
+# a build nobody had run. A wrong BACKEND_VERSION is not a cosmetic defect; it is a false
+# provenance claim on evidence that goes into the catalog.
+if [ -z "${QUAL_PAYLOAD:-}" ] || [ -z "${QUAL_BACKEND_VERSION:-}" ]; then
+  say "FATAL QUAL_PAYLOAD and QUAL_BACKEND_VERSION are required; refusing to guess a build"
+  STATUS=NO_PAYLOAD_INPUTS; exit 1
+fi
+PAYLOAD="$QUAL_PAYLOAD"
+BACKEND_VERSION="$QUAL_BACKEND_VERSION"
+# The version in the label must be the version in the payload, or the reports describe a build that
+# was not measured. models@0.3.56+v24-abc -> 0.3.56, which must appear in the payload object name.
+#
+# Kept as a named function between these markers so qual-worker-guards-test.sh can extract and
+# exercise THIS code rather than a copy of it. The worker is fetched from S3 as a single file and
+# cannot source a helper, so extraction-by-marker is how it stays both self-contained and tested.
+# >>> BEGIN payload_label_version
+payload_label_version() {
+  printf '%s' "$1" | sed -n 's/^models@\([0-9][0-9.]*[^+]*\).*/\1/p'
+}
+payload_matches_label() {
+  local payload=$1 label=$2 version
+  version=$(payload_label_version "$label")
+  [ -n "$version" ] || return 2
+  case "$payload" in
+    *"$version"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+# <<< END payload_label_version
+if ! payload_matches_label "$PAYLOAD" "$BACKEND_VERSION"; then
+  say "FATAL BACKEND_VERSION $BACKEND_VERSION does not name the payload $PAYLOAD"
+  STATUS=VERSION_PAYLOAD_MISMATCH; exit 1
+fi
+say "payload $PAYLOAD labelled $BACKEND_VERSION"
+aws s3 cp "s3://$BUCKET/payload/$PAYLOAD" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/models-kernels-linux-x86_64.jar" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/fleet-shard-$SHARD.json" /work/shard.json --only-show-errors
-[ -s models-rag-bench-0.3.50-v23.tar ] || { STATUS=NO_DIST; exit 1; }
+[ -s "$PAYLOAD" ] || { STATUS=NO_DIST; exit 1; }
 [ -s /work/models-kernels-linux-x86_64.jar ] || { STATUS=NO_KERNEL_JAR; exit 1; }
 [ -s /work/shard.json ] || { STATUS=NO_SHARD; exit 1; }
-tar xf models-rag-bench-0.3.50-v23.tar || { STATUS=NO_DIST_UNPACK; exit 1; }
+tar xf "$PAYLOAD" || { STATUS=NO_DIST_UNPACK; exit 1; }
 DIST=$(ls -d /work/models-rag-bench-*/ | head -1)
 CP="$DIST/lib/*:/work/models-kernels-linux-x86_64.jar"
 JOBS=$(python3 -c "import json;print(len(json.load(open('/work/shard.json'))))")
@@ -119,9 +158,9 @@ THREADS=${QUAL_THREADS:-$(nproc 2>/dev/null || echo 8)}
 # slower at 8 and collapsed at 4 -- a different kernel with a different optimum. So the thread count is
 # per job, read from the manifest, rather than one value imposed on the whole shard.
 DECODE_THREAD_DEFAULT="${QUAL_DECODE_THREADS:-}"
-# Baked in, not derived: the worker has no git repository, so `git rev-parse` there would record
-# "local" and the result would name no build at all.
-BACKEND_VERSION="models@0.3.50+v23-08d9b5e1cef8"
+# BACKEND_VERSION is set and cross-checked against the payload above. It cannot be derived here --
+# the worker has no git repository, so `git rev-parse` would record "local" and name no build at
+# all -- which is exactly why it is a required input rather than a hard-coded string that rots.
 STATUS=RUNNING
 
 # The comparator arm. A qualification is comparative: RagProductionQualificationPolicy needs a baseline
