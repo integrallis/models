@@ -59,7 +59,7 @@ jobs:
           sed -i "s/models-version: '.*'/models-version: '$VERSION'/" docs/content/antora.yml
 
       - name: Install the PTX toolchain
-        uses: ./.github/actions/ptx-toolchain
+        uses: ./models/.github/actions/ptx-toolchain
 
       - name: Build documentation
         run: ./gradlew :docs:build --console=plain

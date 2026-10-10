@@ -77,7 +77,7 @@ MUTATIONS = [
         "workflow-duplication/step-copied-back-inline",
         ["python3", "scripts/integrity/check-workflow-duplication.py"],
         sub(".github/workflows/docs.yml",
-            "      - name: Install the PTX toolchain\n        uses: ./.github/actions/ptx-toolchain",
+            "      - name: Install the PTX toolchain\n        uses: ./models/.github/actions/ptx-toolchain",
             "      - name: Install pinned Rust nightly for the PTX kernels\n"
             "        run: |\n"
             "          rustup toolchain install nightly-2026-09-17 --profile minimal\n"

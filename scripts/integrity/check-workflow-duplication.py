@@ -17,6 +17,9 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
+# Workflows reference it as ./models/.github/actions/... because `uses: ./` resolves from the
+# workspace root and every workflow here checks the repo out into models/. The check matches the
+# repo-relative tail so it is independent of that prefix.
 ACTION = ".github/actions/ptx-toolchain"
 
 # Markers that mean a workflow is doing the action's job by hand.
@@ -40,7 +43,7 @@ def main():
             users.append(wf.name)
         for pattern, why in INLINE:
             if pattern.search(text):
-                problems.append(f"{wf.name}: {why}; use `uses: ./{ACTION}` instead")
+                problems.append(f"{wf.name}: {why}; use the shared action at {ACTION} instead")
 
     print(f"workflows using the shared PTX toolchain action: {len(users)}")
     for u in users:
