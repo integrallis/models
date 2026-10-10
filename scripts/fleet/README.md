@@ -114,3 +114,24 @@ Shard numbers are immutable — a number that has been launched names a payload 
 prefix — so the tool refuses to overwrite an existing shard file rather than reusing a number.
 
 Tests: `python3 -m unittest discover -s scripts/fleet -p 'build_shards_test.py'` (stdlib only).
+
+### Declaring a candidate that has never run here
+
+A model with no prior report cannot have its settings copied, and `build-shards.py` refuses it by
+default. To run a new candidate, declare **both** fields that decide whether the measurement means
+anything:
+
+```
+python3 scripts/fleet/build-shards.py --ids slate.txt --reports <prior> \
+    --catalog ../model-jars/catalog/models.json --out-dir /tmp --start-shard 650 \
+    --wl-override new_model_id=summarization --tpl-override new_model_id=chatml
+```
+
+`--wl-override` and `--tpl-override` are required **together** for such a model. Declaring one and
+letting the other fall back to a default would be the same guess the tool exists not to make, so
+one without the other is still a refusal and the message says which is missing.
+
+Declared jobs are printed as `DECLARED on the command line`, counted separately in the summary, and
+noted as comparable only to a later run that holds the same declaration. `--mt-override` and
+`--dt-override` are optional on top; without them the cap falls back to the worker default of 256
+and no decode-thread pin is written.

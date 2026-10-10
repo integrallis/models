@@ -199,6 +199,63 @@ class RefusesRatherThanGuesses(unittest.TestCase):
         self.assertIn("no workload", missing[0][1])
 
 
+class DeclaringACandidateWithNoPriorReport(unittest.TestCase):
+    """A never-run candidate can be built, but only if a person declares wl AND tpl.
+
+    This is the case the sql/summarization slate hit: four candidates with no prior report, which
+    the tool refused outright because overrides covered wl but not tpl.
+    """
+
+    def test_declaring_both_wl_and_tpl_builds_the_job(self):
+        missing = []
+        jobs = bs.build_jobs(["a"], CATALOG, {}, {}, {"a": "summarization"}, missing,
+                             {"a": "chatml"})
+        self.assertEqual(missing, [])
+        self.assertEqual(jobs[0]["wl"], "summarization")
+        self.assertEqual(jobs[0]["tpl"], "chatml")
+        self.assertEqual(jobs[0]["mt"], 256, "the cap falls back to the worker default")
+        self.assertTrue(jobs[0]["_declared"], "a declared job must be flagged, not pass as copied")
+
+    def test_declaring_only_the_workload_still_refuses(self):
+        # Declaring one and letting the other default would be exactly the guess this tool exists
+        # not to make.
+        missing = []
+        jobs = bs.build_jobs(["a"], CATALOG, {}, {}, {"a": "sql"}, missing, {})
+        self.assertEqual(jobs, [])
+        self.assertIn("wl was declared but tpl was not", missing[0][1])
+
+    def test_declaring_only_the_template_still_refuses(self):
+        missing = []
+        jobs = bs.build_jobs(["a"], CATALOG, {}, {}, {}, missing, {"a": "chatml"})
+        self.assertEqual(jobs, [])
+        self.assertIn("tpl was declared but wl was not", missing[0][1])
+
+    def test_a_declared_job_can_carry_an_explicit_cap_and_decode_threads(self):
+        missing = []
+        jobs = bs.build_jobs(["a"], CATALOG, {}, {"a": 2048}, {"a": "sql"}, missing,
+                             {"a": "chatml"}, {"a": 8})
+        self.assertEqual(jobs[0]["mt"], 2048)
+        self.assertEqual(jobs[0]["dt"], 8)
+
+    def test_a_declared_job_omits_dt_when_none_is_given(self):
+        missing = []
+        jobs = bs.build_jobs(["a"], CATALOG, {}, {}, {"a": "sql"}, missing, {"a": "chatml"})
+        self.assertNotIn("dt", jobs[0], "no decode-thread pin unless one is asked for")
+
+    def test_a_copied_job_is_not_flagged_as_declared(self):
+        missing = []
+        jobs = bs.build_jobs(["a"], CATALOG, {"a": rec("math", "chatml")}, {}, {}, missing)
+        self.assertFalse(jobs[0]["_declared"])
+
+    def test_declaration_does_not_rescue_a_non_gguf_or_unknown_entry(self):
+        missing = []
+        bs.build_jobs(["st", "ghost"], CATALOG, {}, {}, {"st": "sql", "ghost": "sql"}, missing,
+                      {"st": "chatml", "ghost": "chatml"})
+        reasons = dict(missing)
+        self.assertIn("format is safetensors", reasons["st"])
+        self.assertEqual(reasons["ghost"], "not in the catalog")
+
+
 class Sharding(unittest.TestCase):
     def test_one_workload_per_shard(self):
         jobs = [{"id": "a", "wl": "math", "gb": 1.0}, {"id": "b", "wl": "coding", "gb": 4.0},

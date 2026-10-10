@@ -134,7 +134,18 @@ def decode_threads(rec):
     return dt
 
 
-def build_jobs(ids, catalog_by_id, prior, mt_override, wl_override, missing):
+def build_jobs(ids, catalog_by_id, prior, mt_override, wl_override, missing,
+               tpl_override=None, dt_override=None):
+    """Jobs for the requested ids, or reasons in ``missing``.
+
+    A model with a prior report has its settings copied. A model WITHOUT one -- a candidate that
+    has never run here -- can only be built if the caller declares both of the fields that decide
+    whether the measurement means anything, ``wl`` and ``tpl``. Declaring one and leaving the other
+    to a default would be the same guess this tool exists not to make, so both are required
+    together and the job is reported as declared rather than copied.
+    """
+    tpl_override = tpl_override or {}
+    dt_override = dt_override or {}
     jobs = []
     for model_id in ids:
         cat = catalog_by_id.get(model_id)
@@ -146,8 +157,25 @@ def build_jobs(ids, catalog_by_id, prior, mt_override, wl_override, missing):
             continue
         rec = prior.get(model_id)
         if not rec:
-            missing.append((model_id, "no prior report records its settings"))
-            continue
+            if model_id in wl_override and model_id in tpl_override:
+                rec = {
+                    "generatedAt": "", "source": "(declared on the command line)",
+                    "backendVersion": None, "diagnostics": {},
+                    "settings": {"workload": wl_override[model_id],
+                                 "promptTemplate": tpl_override[model_id],
+                                 "maxOutputTokens": mt_override.get(model_id, 256)},
+                    "declared": True,
+                }
+            else:
+                have = [f for f, d in (("wl", wl_override), ("tpl", tpl_override))
+                        if model_id in d]
+                need = [f for f in ("wl", "tpl") if f not in have]
+                detail = "no prior report records its settings"
+                if have:
+                    detail += (f"; {' and '.join(have)} was declared but "
+                               f"{' and '.join(need)} was not -- both are required together")
+                missing.append((model_id, detail))
+                continue
         s = rec["settings"]
         for field in ("workload", "promptTemplate"):
             if not s.get(field):
@@ -167,9 +195,10 @@ def build_jobs(ids, catalog_by_id, prior, mt_override, wl_override, missing):
                 "wl": wl_override.get(model_id, s["workload"]),
                 "mt": mt_override.get(model_id, s.get("maxOutputTokens", 256)),
             }
-            dt = decode_threads(rec)
+            dt = dt_override.get(model_id, decode_threads(rec))
             if dt is not None:
                 job["dt"] = dt
+            job["_declared"] = bool(rec.get("declared"))
             job["_from"] = rec["source"]
             job["_priorBackend"] = rec["backendVersion"]
             jobs.append(job)
@@ -213,6 +242,11 @@ def main(argv=None):
     ap.add_argument("--start-shard", type=int, required=True)
     ap.add_argument("--mt-override", nargs="*", default=[], metavar="id=N")
     ap.add_argument("--wl-override", nargs="*", default=[], metavar="id=workload")
+    ap.add_argument("--tpl-override", nargs="*", default=[], metavar="id=template",
+                    help="prompt template; for a model with no prior report this is REQUIRED "
+                         "alongside --wl-override, and neither is guessed")
+    ap.add_argument("--dt-override", nargs="*", default=[], metavar="id=N",
+                    help="decode threads (-Dmodels.native.kernels.decodeThreads), not --threads")
     args = ap.parse_args(argv)
 
     ids = [ln.split("#")[0].strip() for ln in pathlib.Path(args.ids).read_text().splitlines()]
@@ -223,13 +257,16 @@ def main(argv=None):
     prior = index_prior_reports(args.reports)
     mt_override = {k: int(v) for k, v in parse_overrides(args.mt_override).items()}
     wl_override = parse_overrides(args.wl_override)
+    tpl_override = parse_overrides(args.tpl_override)
+    dt_override = {k: int(v) for k, v in parse_overrides(args.dt_override).items()}
 
-    for k in list(mt_override) + list(wl_override):
+    for k in list(mt_override) + list(wl_override) + list(tpl_override) + list(dt_override):
         if k not in ids:
             sys.exit(f"override names {k!r}, which is not in --ids")
 
     missing = []
-    jobs = build_jobs(ids, catalog_by_id, prior, mt_override, wl_override, missing)
+    jobs = build_jobs(ids, catalog_by_id, prior, mt_override, wl_override, missing,
+                      tpl_override, dt_override)
 
     if missing:
         print(f"REFUSING: {len(missing)} of {len(ids)} models cannot be built from recorded "
@@ -264,17 +301,28 @@ def main(argv=None):
         print(f"shard {n}  [{wl}]  {len(group)} models  {total} GB  -> {path}")
         for j in group:
             tag = ""
-            if j["id"] in mt_override:
-                tag += f"  mt OVERRIDDEN to {j['mt']}"
-            if j["id"] in wl_override:
-                tag += f"  wl OVERRIDDEN to {j['wl']}"
+            for field, over in (("mt", mt_override), ("wl", wl_override),
+                                ("tpl", tpl_override), ("dt", dt_override)):
+                if j["id"] in over:
+                    tag += f"  {field} OVERRIDDEN to {j.get(field, '-')}"
             print(f"    {j['id']:<52} tpl={j['tpl']:<18} mt={j['mt']:<5} "
                   f"dt={j.get('dt', 'pool')}{tag}")
-            print(f"        settings from {j['_from']}")
-            print(f"        prior backend {j['_priorBackend']}")
+            if j["_declared"]:
+                print(f"        DECLARED on the command line -- no prior report exists for this "
+                      f"model, so wl and tpl were chosen by a person, not copied")
+            else:
+                print(f"        settings from {j['_from']}")
+                print(f"        prior backend {j['_priorBackend']}")
     print()
+    declared = [j["id"] for group in shards.values() for j in group if j["_declared"]]
     print(f"{len(jobs)} jobs across {len(shards)} shards. Every tpl/wl/dt/mt above was copied from "
-          f"a prior report for that same model, except where marked OVERRIDDEN.")
+          f"a prior report for that same model, except where marked OVERRIDDEN or DECLARED.")
+    if declared:
+        print(f"{len(declared)} job(s) were DECLARED rather than copied, because no prior report "
+              f"exists for them:")
+        for d in declared:
+            print(f"    {d}")
+        print("Their verdicts are only comparable to a later run that holds the same declaration.")
     return 0
 
 
