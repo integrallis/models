@@ -20,6 +20,15 @@ _spec.loader.exec_module(wc)
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
+# The ModelJars catalog is a separate repository, normally checked out beside this one. Tests that
+# need it SKIP when it is absent rather than erroring: a missing sibling checkout is an environment
+# fact, not a defect in the code under test, and an error there trains everyone to ignore a red
+# suite. Everything that does not need the catalog still runs.
+CATALOG = REPO.parent / "model-jars" / "catalog"
+HAVE_CATALOG = (CATALOG / "models.json").exists() and (CATALOG / "qualifications.json").exists()
+needs_catalog = unittest.skipUnless(
+    HAVE_CATALOG, f"ModelJars catalog not checked out at {CATALOG}")
+
 
 class ParsesTheRealEnum(unittest.TestCase):
     def test_reads_every_workload_the_enum_declares(self):
@@ -152,10 +161,11 @@ class Reporting(unittest.TestCase):
 
 
 class DocCheck(unittest.TestCase):
+    @needs_catalog
     def test_passes_on_the_committed_doc(self):
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = wc.main(["--catalog", str(REPO.parent / "model-jars" / "catalog"),
+            rc = wc.main(["--catalog", str(CATALOG),
                           "--check-doc", str(REPO / "docs" / "WORKLOAD-COVERAGE.md")])
         self.assertEqual(rc, 0, buf.getvalue()[-600:])
         self.assertIn("match this run", buf.getvalue())
@@ -189,10 +199,11 @@ class DocCheck(unittest.TestCase):
 class AgainstTheLiveCatalog(unittest.TestCase):
     """Only assertions that hold whatever the live coverage happens to be."""
 
+    @needs_catalog
     def test_the_report_runs_and_covers_every_declared_workload(self):
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = wc.main(["--catalog", str(REPO.parent / "model-jars" / "catalog")])
+            rc = wc.main(["--catalog", str(CATALOG)])
         out = buf.getvalue()
         self.assertEqual(rc, 0)
         for wl in wc.parse_workloads(REPO)[0]:
