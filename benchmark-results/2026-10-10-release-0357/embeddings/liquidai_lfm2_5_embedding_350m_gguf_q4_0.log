@@ -1,0 +1,18 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 10, 2026 2:52:46 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 10, 2026 2:52:46 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=12 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+LFM2.5-Embedding-350M GGUF Q4_0 vs llama.cpp a5822222909b785f23ddc74ce3c8f85bd0e38562 | 8 probes | cls pooling, dim 1024
+  0.9998539  The cat sat on the mat.
+  0.9998393  How do I reset my password?
+  0.9998633  Quantum chromodynamics describes the strong interaction.
+  0.9997358  a
+  0.9998543  The quick brown fox jumps over the lazy dog near the ...
+  0.9998552  Database backups are retained for 30 days.
+  0.9998148  def add(a, b): return a + b
+  0.9998935  ¿Dónde está la biblioteca?
+min 0.9997358  mean 0.9998388  max component delta 0.002651  floor 0.9990
+unit length: held (max deviation 4.28e-09, floor 1e-03)
+REPRODUCED in 6.6s
+report: /Users/briansam-bodden/Code/java-ai/audit-2026-10-10/models-released-embedding-smokes/liquidai_lfm2_5_embedding_350m_gguf_q4_0.json

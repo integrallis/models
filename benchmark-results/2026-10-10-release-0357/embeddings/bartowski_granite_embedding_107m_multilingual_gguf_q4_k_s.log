@@ -1,0 +1,18 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 10, 2026 2:52:24 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 10, 2026 2:52:24 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=12 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+granite-embedding-107m-multilingual GGUF Q4_K_S vs llama.cpp a5822222909b785f23ddc74ce3c8f85bd0e38562 | 8 probes | cls pooling, dim 384
+  0.9999223  The cat sat on the mat.
+  0.9998952  How do I reset my password?
+  0.9999118  Quantum chromodynamics describes the strong interaction.
+  0.9998215  a
+  0.9999119  The quick brown fox jumps over the lazy dog near the ...
+  0.9999181  Database backups are retained for 30 days.
+  0.9998954  def add(a, b): return a + b
+  0.9999014  ¿Dónde está la biblioteca?
+min 0.9998215  mean 0.9998972  max component delta 0.003122  floor 0.9990
+unit length: held (max deviation 4.17e-09, floor 1e-03)
+REPRODUCED in 3.7s
+report: /Users/briansam-bodden/Code/java-ai/audit-2026-10-10/models-released-embedding-smokes/bartowski_granite_embedding_107m_multilingual_gguf_q4_k_s.json
