@@ -87,6 +87,17 @@ jobs:
       - name: Check no workflow duplicates a shared setup step
         run: python3 scripts/integrity/check-workflow-duplication.py
 
+      # Needs the ModelJars catalog beside this repo; skipped rather than failed when it is absent,
+      # because a missing sibling checkout is an environment fact and not a defect here.
+      - name: Check the candidate inventory matches the catalog
+        run: |
+          if [ -d ../model-jars/catalog ]; then
+            python3 scripts/fleet/candidate-inventory.py --catalog ../model-jars/catalog \
+              --check-doc docs/CANDIDATE-INVENTORY.md
+          else
+            echo "ModelJars catalog not checked out beside this repo; skipping."
+          fi
+
       - name: Prove every integrity guard can fail
         run: python3 scripts/integrity/mutation-check.py
 

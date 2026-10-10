@@ -86,6 +86,19 @@ MUTATIONS = [
         "the one of five without rust-src",
     ),
     (
+        "candidate-inventory/count-drifts-from-catalog",
+        # Absolute catalog path on purpose. The mutation runs in a throwaway copy of this repo,
+        # and a relative ../model-jars/catalog would not exist there -- the guard would then fail
+        # because the catalog is missing rather than because the count drifted, which is a guard
+        # failing for the wrong reason and would have passed this harness for a bogus reason.
+        ["python3", "scripts/fleet/candidate-inventory.py",
+         "--catalog", str(ROOT.parent / "model-jars" / "catalog"),
+         "--check-doc", "docs/CANDIDATE-INVENTORY.md"],
+        sub("docs/CANDIDATE-INVENTORY.md", "| **NOT_EVALUATED** |", "| **NOT_EVALUATED** | 999 |#"),
+        "the inventory's bucket counts drifting from the catalog, which is how 356 undocumented "
+        "candidates stayed undocumented",
+    ),
+    (
         "sweep-derive/number-drifts-from-data",
         ["python3", "benchmark-results/2026-10-09-max-tokens-sweep/derive.py"],
         sub("benchmark-results/2026-10-09-max-tokens-sweep/NOTES.md",
