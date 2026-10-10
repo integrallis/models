@@ -20,6 +20,15 @@ _spec.loader.exec_module(wc)
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
+# The ModelJars catalog is a separate repository, normally checked out beside this one. Tests that
+# need it SKIP when it is absent rather than erroring: a missing sibling checkout is an environment
+# fact, not a defect in the code under test, and an error there trains everyone to ignore a red
+# suite. Everything that does not need the catalog still runs.
+CATALOG = REPO.parent / "model-jars" / "catalog"
+HAVE_CATALOG = (CATALOG / "models.json").exists() and (CATALOG / "qualifications.json").exists()
+needs_catalog = unittest.skipUnless(
+    HAVE_CATALOG, f"ModelJars catalog not checked out at {CATALOG}")
+
 
 class ParsesTheRealEnum(unittest.TestCase):
     def test_reads_every_workload_the_enum_declares(self):
@@ -93,16 +102,20 @@ class Reporting(unittest.TestCase):
     coverage is.
     """
 
-    def _fake_catalog(self, root, qualified_workloads):
+    def _fake_catalog(self, root, qualified_workloads, rejected_workloads=()):
         cat = pathlib.Path(root) / "catalog"
         cat.mkdir(parents=True, exist_ok=True)
         (cat / "models.json").write_text(json.dumps([
             {"id": "m1", "sizeBytes": 1_000_000_000},
             {"id": "m2", "sizeBytes": 2_000_000_000},
+            {"id": "rej", "sizeBytes": 500_000_000},
         ]))
         entries = [{"modelId": f"m{i+1}" if i < 2 else "m1", "workload": wl,
-                    "promptTemplate": "chatml"}
+                    "promptTemplate": "chatml", "qualified": True}
                    for i, wl in enumerate(qualified_workloads)]
+        entries += [{"modelId": "rej", "workload": wl, "promptTemplate": "chatml",
+                     "qualified": False, "verdict": "FAILED_MODEL_CONTRIBUTION_GATE"}
+                    for wl in rejected_workloads]
         (cat / "qualifications.json").write_text(json.dumps({"entries": entries}))
         return str(cat)
 
@@ -137,6 +150,26 @@ class Reporting(unittest.TestCase):
         self.assertEqual(rc_closed, 0, "with every workload covered it must pass")
         self.assertIn("every declared workload with a corpus has at least one qualified", out)
 
+    def test_a_rejected_row_is_not_counted_as_coverage(self):
+        """qualifications.json holds BOTH outcomes; only one of them is coverage.
+
+        Counting every row inflated general from 51 to 52 and the catalog's qualified total from
+        101 to 102, because h2o-danube3-500m sits in `entries` with
+        verdict FAILED_MODEL_CONTRIBUTION_GATE. A rejection is evidence; it is not coverage.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            every = [w for w in wc.parse_workloads(REPO)[0] if w != "sql"]
+            # sql has ONLY a rejected row: it must still read as a gap, not as covered.
+            cat = self._fake_catalog(tmp, every, rejected_workloads=["sql"])
+            rc, out = self._run(cat, ["--fail-on-zero"])
+        self.assertEqual(rc, 1, "a workload whose only row is a rejection is still uncovered")
+        gap = [l for l in out.splitlines() if l.startswith("no qualified model but a usable")]
+        self.assertTrue(gap and "sql" in gap[0])
+        self.assertIn("rejected, and therefore NOT counted as coverage", out)
+        self.assertIn("FAILED_MODEL_CONTRIBUTION_GATE", out)
+        sql_row = [l for l in out.splitlines() if l.startswith("sql ")][0]
+        self.assertRegex(sql_row, r"^sql\s+0\s", "sql must show zero qualified, not one")
+
     def test_a_workload_with_exactly_one_model_is_called_thin(self):
         with tempfile.TemporaryDirectory() as tmp:
             allw = list(wc.parse_workloads(REPO)[0])
@@ -152,10 +185,11 @@ class Reporting(unittest.TestCase):
 
 
 class DocCheck(unittest.TestCase):
+    @needs_catalog
     def test_passes_on_the_committed_doc(self):
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = wc.main(["--catalog", str(REPO.parent / "model-jars" / "catalog"),
+            rc = wc.main(["--catalog", str(CATALOG),
                           "--check-doc", str(REPO / "docs" / "WORKLOAD-COVERAGE.md")])
         self.assertEqual(rc, 0, buf.getvalue()[-600:])
         self.assertIn("match this run", buf.getvalue())
@@ -189,10 +223,11 @@ class DocCheck(unittest.TestCase):
 class AgainstTheLiveCatalog(unittest.TestCase):
     """Only assertions that hold whatever the live coverage happens to be."""
 
+    @needs_catalog
     def test_the_report_runs_and_covers_every_declared_workload(self):
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = wc.main(["--catalog", str(REPO.parent / "model-jars" / "catalog")])
+            rc = wc.main(["--catalog", str(CATALOG)])
         out = buf.getvalue()
         self.assertEqual(rc, 0)
         for wl in wc.parse_workloads(REPO)[0]:
