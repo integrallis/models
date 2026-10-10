@@ -48,5 +48,5 @@ or a version property alone does not establish compatibility or absence of vulne
 
 Individual module constraints are ordinary published constraints. Where Maven's transitive mediation
 would retain an older dependency, the optional integration also declares that dependency directly.
-The clean consumers verify the result. The core facade does not gain optional Arrow or HTTP runtime
+The clean consumers verify the result. The core library does not gain optional Arrow or HTTP runtime
 dependencies merely because the policy constrains their versions when present.
