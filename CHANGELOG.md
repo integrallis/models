@@ -4,6 +4,63 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.56] - 2026-10-09
+
+### Added
+
+- **Q4_1 projections load.** Four catalogued models were unloadable because of three tensors each.
+  Q4_1 is a 20-byte, 32-weight block carrying an f16 scale and an f16 minimum with unsigned 0..15
+  nibbles (`q * d + m`), not the centred `-8` bias of Q4_0, and it appears in otherwise
+  K-quant files for a handful of tensors — 2.5% of weights in yi-coder — which was enough to
+  refuse the whole file. `Q4_1Dequantizer` and the batched projection path are added, and the
+  single-token path now routes through the same batched routine as Q5_1 so a decoder and an
+  embedder on the same weights agree exactly rather than closely.
+
+  Verified against llama.cpp **token for token**, not by cosine: on the same prompt and greedy
+  settings both runtimes produced the identical continuation. The exact path is also measured,
+  and the measurement is not flattering — **3.3x slower at decode** and 0.70x (faster) at prefill
+  than the K-quant routes around it. At 2.5% of weights that is roughly 6% end to end, which is
+  not the explanation for yi-coder's throughput and was wrongly offered as one before it was
+  measured. A shared Q8_1 activation path would recover the decode cost and is not in this
+  release. See `benchmark-results/2026-10-09-q4-1-support/NOTES.md`.
+
+- **Whisper's log-mel frontend, in `models-audio`.** `WhisperMelFrontend` implements the signal
+  frontend that whisper-family artifacts specify in their own GGUF headers: periodic Hann, Slaney
+  mel scaling, magnitude rather than power spectra, the dropped final STFT frame, and the global
+  `max - 8` log floor. `Dft` supports it with radix-2 for power-of-two sizes and a direct
+  transform otherwise, because whisper's `n_fft = 400` is not a power of two.
+
+  It is validated against the tensors the artifact itself ships, not against a reimplementation:
+  `whisper-tiny-Q5_K_M.gguf` carries `frontend.window` and `frontend.mel_filterbank` as real
+  tensors, and both the computed window and the computed filterbank agree with them to better
+  than **1e-6**. That oracle also settles the choice that most easily goes wrong — a symmetric
+  Hann window instead of a periodic one is asserted to be measurably off, by more than 1e-4,
+  which is orders of magnitude worse than the agreement above.
+
+  **This is the frontend only and is not speech-to-text.** There is no whisper encoder, no
+  cross-attention and no decoder in this release; nothing in the catalog is served by it yet. It
+  is published because it is complete, verified and independently useful, not because the feature
+  it belongs to is done.
+
+### Unchanged — `backend-cuda` device gates
+
+`RELEASING.md` requires a release to state `backend-cuda`'s numeric state rather than let its
+presence imply one. `backend-cuda` has **zero file changes** in 0.3.56, and its gates were **not
+re-run for this release**. Where they last ran:
+
+| gate | result | when and where | evidence |
+| --- | --- | --- | --- |
+| G1 token parity (no tolerance) | **passed** — 1280/1280 token ids identical across 20 prompts | 2026-10-07, RTX 4090 at compute capability 8.9, Granite 4.1 3B Q4_K_M | `benchmark-results/2026-10-07-g1-parity` |
+| G4 decode speed | **passed** — 6.184x against a 3.00x gate, 31.26 vs 5.06 tok/s | same host and model | `benchmark-results/2026-10-07-g4-dualpath` |
+
+Two limits carried forward verbatim from that evidence rather than softened. **One host and one
+model**: the `sm_80` module serves compute capability 8.0 and above, but G1 has no tolerance and a
+single host does not establish hardware independence — it has not been re-run on an A40 or L40S,
+so G1 is not established across the qualifying profiles. And shipping the jar does not activate
+anything: there is no `META-INF/services` entry, a consumer has to call
+`CudaGgufBatchedMatrixKernel.open()` and inject the kernel, and `-Dmodels.cuda.disabled=true` is a
+kill switch on top of that.
+
 ## [0.3.55] - 2026-10-09
 
 ### Added
