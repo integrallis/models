@@ -13,8 +13,8 @@ Four buckets, in descending order of evidence:
 * EVALUATED_NOT_LANDED -- committed evidence under benchmark-results/ names it, but no manifest row
                           claims it. Either the run failed and was never recorded, or it passed on
                           an unreleased build and is waiting for a release.
-* NOT_EVALUATED        -- nothing in the catalog or the evidence tree mentions it. "No data", not
-                          "no effect".
+* NOT_EVALUATED        -- no manifest row or matching committed JSON artifact found. Aliases,
+                          non-JSON notes and external evidence are outside this inventory.
 
     python3 scripts/fleet/candidate-inventory.py --catalog ../model-jars/catalog \
         [--check-doc docs/CANDIDATE-INVENTORY.md] [--format md]
@@ -24,9 +24,10 @@ a candidate counts as evaluated only when an artifact in this repository names i
 """
 import argparse
 import collections
+import io
 import json
 import pathlib
-import re
+import subprocess
 import sys
 
 MANIFESTS = ("qualifications", "embedding-qualifications", "tool-qualifications",
@@ -68,23 +69,63 @@ def manifest_rows(catalog_dir):
 
 
 def evidence_ids(repo_root, candidate_ids):
-    """Ids that committed evidence under benchmark-results/ actually names."""
-    root = pathlib.Path(repo_root) / "benchmark-results"
-    if not root.exists():
-        return set(), {}
+    """Match complete IDs in valid JSON at HEAD, never uncommitted or filename substrings.
+
+    Payload modelId fields take precedence. Older oracle reports lack that field, so their exact
+    filename stem is accepted. Only underscore/hyphen spelling is normalized; aliases and model
+    display names are deliberately not guessed. A matching artifact is evidence to inspect, not
+    proof of a successful run, a paired qualification, or a released runtime.
+    """
     found, where = set(), collections.defaultdict(set)
-    # Filenames carry the id in both underscore and hyphen spellings.
     by_slug = {}
     for mid in candidate_ids:
-        by_slug[mid.replace("_", "-")] = mid
-        by_slug[mid] = mid
-    for p in root.rglob("*.json"):
-        rel = str(p.relative_to(root))
-        stem = p.name
-        for slug, mid in by_slug.items():
-            if slug and slug in stem:
+        slug = mid.replace("_", "-")
+        if slug in by_slug and by_slug[slug] != mid:
+            raise ValueError(f"ambiguous normalized candidate ID: {mid}")
+        by_slug[slug] = mid
+
+    def payload_ids(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key == "modelId" and isinstance(child, str):
+                    yield child
+                else:
+                    yield from payload_ids(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from payload_ids(child)
+
+    paths = subprocess.check_output(
+        ["git", "ls-tree", "-r", "--name-only", "-z", "HEAD", "--", "benchmark-results"],
+        cwd=repo_root).decode().split("\0")
+    paths = [path for path in paths if path.endswith(".json")]
+    # One Git process for the evidence tree: hundreds of individual git-show processes repeatedly
+    # inflate the same pack and make this otherwise small CI guard unnecessarily slow.
+    batch = subprocess.run(["git", "cat-file", "--batch"], cwd=repo_root,
+                           input="".join(f"HEAD:{path}\n" for path in paths).encode(),
+                           stdout=subprocess.PIPE, check=True)
+    objects = io.BytesIO(batch.stdout)
+    for path in paths:
+        _, kind, size = objects.readline().split()
+        if kind != b"blob":
+            raise ValueError(f"evidence is not a Git blob: {path}")
+        raw = objects.read(int(size))
+        if objects.read(1) != b"\n":
+            raise ValueError(f"incomplete Git evidence object: {path}")
+        try:
+            report = json.loads(raw)
+        except (ValueError, UnicodeDecodeError):
+            continue
+        if not isinstance(report, (dict, list)) or not report:
+            continue
+        ids = list(payload_ids(report))
+        if not ids:
+            ids = [pathlib.PurePosixPath(path).stem]
+        for value in ids:
+            mid = by_slug.get(value.replace("_", "-"))
+            if mid is not None:
                 found.add(mid)
-                where[mid].add(rel.split("/")[0])
+                where[mid].add(str(pathlib.PurePosixPath(path).relative_to("benchmark-results")))
     return found, where
 
 
@@ -103,7 +144,7 @@ def classify(catalog_dir, repo_root):
             by[mid] = {"bucket": bucket, "manifest": manifest, "verdict": verdict, "model": m}
         elif mid in seen:
             by[mid] = {"bucket": "EVALUATED_NOT_LANDED", "manifest": None,
-                       "verdict": f"evidence under {', '.join(sorted(where[mid])[:2])}",
+                       "verdict": f"evidence: {', '.join(sorted(where[mid])[:2])}",
                        "model": m}
         else:
             by[mid] = {"bucket": "NOT_EVALUATED", "manifest": None, "verdict": None, "model": m}
@@ -132,7 +173,7 @@ def main(argv=None):
             "QUALIFIED": "a manifest row with `qualified` true",
             "REJECTED": "a manifest row with `qualified` false; the verdict is the finding",
             "EVALUATED_NOT_LANDED": "committed evidence names it, no manifest row claims it",
-            "NOT_EVALUATED": "nothing in the catalog or the evidence tree mentions it",
+            "NOT_EVALUATED": "no manifest row or matching committed JSON artifact found",
         }
         for b in order:
             print(f"| **{b}** | {counts[b]} | {meaning[b]} |")

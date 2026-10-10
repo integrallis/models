@@ -93,6 +93,9 @@ MUTATIONS = [
         # failing for the wrong reason and would have passed this harness for a bogus reason.
         ["python3", "scripts/fleet/candidate-inventory.py",
          "--catalog", str(ROOT.parent / "model-jars" / "catalog"),
+         # Only the document is mutated. Read committed evidence from the original Git checkout;
+         # the throwaway document copy intentionally has no .git directory.
+         "--repo-root", str(ROOT),
          "--check-doc", "docs/CANDIDATE-INVENTORY.md"],
         sub("docs/CANDIDATE-INVENTORY.md", "| **NOT_EVALUATED** |", "| **NOT_EVALUATED** | 999 |#"),
         "the inventory's bucket counts drifting from the catalog, which is how 356 undocumented "

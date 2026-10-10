@@ -1,4 +1,4 @@
-# Candidate inventory: what is published, what failed, what has never been looked at
+# Candidate inventory: qualifications, failures and evidence still to review
 
 Regenerate with:
 
@@ -7,6 +7,17 @@ python3 scripts/fleet/candidate-inventory.py --catalog ../model-jars/catalog --f
 python3 scripts/fleet/candidate-inventory.py --catalog ../model-jars/catalog \
     --check-doc docs/CANDIDATE-INVENTORY.md
 ```
+
+CI checks out ModelJars at `eb68debc29d30db24e9b7f99ecbdb5a3544f802f` beside Models.
+Use that catalog revision to reproduce this inventory; update the pin and regenerate the counts
+together when adopting catalog changes. The checkout is required, and a missing catalog fails the
+check rather than skipping it. Evidence is read from committed Git objects at Models `HEAD`, so
+local downloads, staged reports and edits cannot change the result.
+
+The matcher parses valid JSON and matches complete `modelId` fields (including nested verdict
+records). Older reports without those fields use their exact filename stem. It normalizes only
+underscore/hyphen spelling, never substrings or guessed display-name aliases. A matching artifact
+is a pointer to evidence to inspect; it does not establish a successful run or qualification.
 
 The catalog carries far more candidates than qualifications, and until this inventory existed the
 difference was undocumented as a set. "Tried and failed" and "never looked at" are different facts
@@ -18,7 +29,7 @@ not published.
 | **QUALIFIED** | 101 | a manifest row with `qualified` true |
 | **REJECTED** | 1 | a manifest row with `qualified` false; the verdict is the finding |
 | **EVALUATED_NOT_LANDED** | 19 | committed evidence names it, no manifest row claims it |
-| **NOT_EVALUATED** | 336 | nothing in the catalog or the evidence tree mentions it |
+| **NOT_EVALUATED** | 336 | no manifest row or matching committed JSON artifact found |
 | | **457** | catalog candidates |
 
 A model that appears in several manifests is counted once, and **qualified anywhere wins**: four
@@ -35,8 +46,8 @@ REJECTED (1):
 
 ## Evaluated, not landed
 
-Committed evidence names these, but no manifest row claims them. Two distinct reasons, and the
-distinction matters:
+Committed evidence names these, but no manifest row claims them. This bucket alone does not say
+whether a run passed. The reports distinguish these findings:
 
 - **Measured and failed.** The max-output-tokens sweep entries are published nulls: raising the cap
   from 256 to 768 cleared truncation entirely and did not change a single verdict, so those models
@@ -45,37 +56,40 @@ distinction matters:
   exception and is recorded as **inconclusive**, not failed: it still truncated 56% of answers at
   the higher cap while every answer it finished was correct, so the cap was still the binding
   constraint and a third cap is owed.
-- **Measured and passed on an unreleased build.** The embedding entries reproduce against the
-  llama.cpp oracle but their reports name a `-dev` version, and a dev build is not publishable
-  evidence. They land when re-measured against a release.
+- **Embedding oracle failures.** All nine embedding reports listed below record `qualified: false`:
+  their minimum oracle cosine falls below the recorded `0.999` floor. They are failed measurements,
+  not successful qualifications waiting only for a release. A new run must satisfy the gate before
+  admission; changing the runtime version label cannot repair those results.
 
 ```
 EVALUATED_NOT_LANDED (19):
-  bartowski_mathstral_7b_v0_1_gguf_q4_k_s                  evidence under 2026-10-09-max-tokens-sweep
-  bartowski_qwen2_5_math_7b_instruct_gguf_q4_k_m           evidence under 2026-10-09-max-tokens-sweep
-  fin_r1_7b_q4_0                                           evidence under 2026-10-09-max-tokens-sweep
-  fin_r1_7b_q4_k_m                                         evidence under 2026-10-09-max-tokens-sweep
-  huatuogpt_o1_7b_q4_0                                     evidence under 2026-10-09-max-tokens-sweep
-  huatuogpt_o1_7b_q4_k_s                                   evidence under 2026-10-09-max-tokens-sweep
-  liquidai_lfm2_5_embedding_350m_gguf_q4_k_m               evidence under embedding
-  liquidai_lfm2_5_embedding_350m_gguf_q5_k_m               evidence under embedding
-  liquidai_lfm2_5_embedding_350m_gguf_q6_k                 evidence under embedding
-  phi_4_mini_instruct_q4_0                                 evidence under 2026-10-09-max-tokens-sweep
-  phi_4_mini_instruct_q4_k_m                               evidence under 2026-10-09-max-tokens-sweep
-  qwen2_5_math_1_5b_instruct_q4_0                          evidence under 2026-10-09-max-tokens-sweep
-  qwen2_5_math_1_5b_instruct_q4_k_s                        evidence under 2026-10-09-max-tokens-sweep
-  qwen_qwen3_embedding_4b_gguf_q4_k_m                      evidence under embedding
-  second_state_all_minilm_l6_v2_embedding_gguf_q5_k_m      evidence under embedding
-  second_state_all_minilm_l6_v2_embedding_gguf_q5_k_s      evidence under embedding
-  second_state_nomic_embed_text_v1_5_embedding_gguf_q4_0   evidence under embedding
-  second_state_nomic_embed_text_v1_5_embedding_gguf_q4_k_m evidence under embedding
-  second_state_nomic_embed_text_v1_5_embedding_gguf_q4_k_s evidence under embedding
+  bartowski_mathstral_7b_v0_1_gguf_q4_k_s                  evidence: 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/bartowski_mathstral_7b_v0_1_gguf_q4_k_s.comparator.json, 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/bartowski_mathstral_7b_v0_1_gguf_q4_k_s.json
+  bartowski_qwen2_5_math_7b_instruct_gguf_q4_k_m           evidence: 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/bartowski_qwen2_5_math_7b_instruct_gguf_q4_k_m.comparator.json, 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/bartowski_qwen2_5_math_7b_instruct_gguf_q4_k_m.json
+  fin_r1_7b_q4_0                                           evidence: 2026-10-09-max-tokens-sweep/raw/mt256-finance-shard626/fin_r1_7b_q4_0.comparator.json, 2026-10-09-max-tokens-sweep/raw/mt256-finance-shard626/fin_r1_7b_q4_0.json
+  fin_r1_7b_q4_k_m                                         evidence: 2026-10-09-max-tokens-sweep/raw/mt256-finance-shard626/fin_r1_7b_q4_k_m.comparator.json, 2026-10-09-max-tokens-sweep/raw/mt256-finance-shard626/fin_r1_7b_q4_k_m.json
+  huatuogpt_o1_7b_q4_0                                     evidence: 2026-10-09-max-tokens-sweep/raw/mt256-healthcare-shard627/huatuogpt_o1_7b_q4_0.comparator.json, 2026-10-09-max-tokens-sweep/raw/mt256-healthcare-shard627/huatuogpt_o1_7b_q4_0.json
+  huatuogpt_o1_7b_q4_k_s                                   evidence: 2026-10-09-max-tokens-sweep/raw/mt256-healthcare-shard627/huatuogpt_o1_7b_q4_k_s.comparator.json, 2026-10-09-max-tokens-sweep/raw/mt256-healthcare-shard627/huatuogpt_o1_7b_q4_k_s.json
+  liquidai_lfm2_5_embedding_350m_gguf_q4_k_m               evidence: embedding/liquidai-lfm2-5-embedding-350m-gguf-q4-k-m.json
+  liquidai_lfm2_5_embedding_350m_gguf_q5_k_m               evidence: embedding/liquidai-lfm2-5-embedding-350m-gguf-q5-k-m.json
+  liquidai_lfm2_5_embedding_350m_gguf_q6_k                 evidence: embedding/liquidai-lfm2-5-embedding-350m-gguf-q6-k.json
+  phi_4_mini_instruct_q4_0                                 evidence: 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/phi_4_mini_instruct_q4_0.comparator.json, 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/phi_4_mini_instruct_q4_0.json
+  phi_4_mini_instruct_q4_k_m                               evidence: 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/phi_4_mini_instruct_q4_k_m.comparator.json, 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/phi_4_mini_instruct_q4_k_m.json
+  qwen2_5_math_1_5b_instruct_q4_0                          evidence: 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/qwen2_5_math_1_5b_instruct_q4_0.comparator.json, 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/qwen2_5_math_1_5b_instruct_q4_0.json
+  qwen2_5_math_1_5b_instruct_q4_k_s                        evidence: 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/qwen2_5_math_1_5b_instruct_q4_k_s.comparator.json, 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/qwen2_5_math_1_5b_instruct_q4_k_s.json
+  qwen_qwen3_embedding_4b_gguf_q4_k_m                      evidence: embedding/qwen-qwen3-embedding-4b-gguf-q4-k-m.json
+  second_state_all_minilm_l6_v2_embedding_gguf_q5_k_m      evidence: embedding/second-state-all-minilm-l6-v2-embedding-gguf-q5-k-m.json
+  second_state_all_minilm_l6_v2_embedding_gguf_q5_k_s      evidence: embedding/second-state-all-minilm-l6-v2-embedding-gguf-q5-k-s.json
+  second_state_nomic_embed_text_v1_5_embedding_gguf_q4_0   evidence: embedding/second-state-nomic-embed-text-v1-5-embedding-gguf-q4-0.json
+  second_state_nomic_embed_text_v1_5_embedding_gguf_q4_k_m evidence: embedding/second-state-nomic-embed-text-v1-5-embedding-gguf-q4-k-m.json
+  second_state_nomic_embed_text_v1_5_embedding_gguf_q4_k_s evidence: embedding/second-state-nomic-embed-text-v1-5-embedding-gguf-q4-k-s.json
 ```
 
 ## Not evaluated
 
-The remainder. This is **"no data", not "no effect"** — nothing in the catalog or the evidence tree
-mentions them, so nothing is known about how they behave on this harness. They are candidates
+The remainder. This is **"no matching evidence found", not "no effect"** — no manifest row or valid
+committed JSON matches their complete ID under the rules above. Reports under other aliases,
+non-JSON notes, uncommitted runs or external evidence are outside this inventory; absence here does
+not prove a model was never tested. They are candidates
 because their headers were read and their licenses checked, which is the bar for entering the
 catalog; it is not a claim about quality.
 

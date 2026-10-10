@@ -27,6 +27,15 @@ jobs:
           # that ran a September kernel for a whole campaign.
           fetch-depth: 0
 
+      - name: Checkout the catalog used by the candidate inventory
+        uses: actions/checkout@v5
+        with:
+          repository: integrallis/model-jars
+          ref: eb68debc29d30db24e9b7f99ecbdb5a3544f802f
+          path: model-jars
+          sparse-checkout: catalog
+          persist-credentials: false
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -71,7 +80,7 @@ jobs:
 
       # The fleet tooling decides what every qualification measures, so its tests belong in CI
       # rather than with whoever remembers to run them. Stdlib unittest and plain bash, no
-      # dependencies. Cases needing the ModelJars catalog skip when it is not checked out here.
+      # dependencies. The pinned sibling checkout also exercises the catalog-dependent cases.
       - name: Test fleet tooling
         run: |
           python3 -m unittest discover -s scripts/fleet -p '*_test.py' -v
@@ -87,16 +96,10 @@ jobs:
       - name: Check no workflow duplicates a shared setup step
         run: python3 scripts/integrity/check-workflow-duplication.py
 
-      # Needs the ModelJars catalog beside this repo; skipped rather than failed when it is absent,
-      # because a missing sibling checkout is an environment fact and not a defect here.
       - name: Check the candidate inventory matches the catalog
-        run: |
-          if [ -d ../model-jars/catalog ]; then
-            python3 scripts/fleet/candidate-inventory.py --catalog ../model-jars/catalog \
-              --check-doc docs/CANDIDATE-INVENTORY.md
-          else
-            echo "ModelJars catalog not checked out beside this repo; skipping."
-          fi
+        run: >-
+          python3 scripts/fleet/candidate-inventory.py --catalog ../model-jars/catalog
+          --check-doc docs/CANDIDATE-INVENTORY.md
 
       - name: Prove every integrity guard can fail
         run: python3 scripts/integrity/mutation-check.py
