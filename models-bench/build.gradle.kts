@@ -82,8 +82,8 @@ dependencies {
     // runtime is not requested; the bridge JAR needs no Cargo build to compile.
     jmhImplementation(project(":backend-native"))
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.21.7")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.21.7")
+    implementation("com.fasterxml.jackson.core:jackson-databind:${rootProject.extra["jacksonVersion"]}")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:${rootProject.extra["jacksonVersion"]}")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testImplementation("org.assertj:assertj-core:3.27.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")

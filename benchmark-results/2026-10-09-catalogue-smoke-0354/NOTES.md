@@ -1,5 +1,11 @@
 # Catalogue-wide default-configuration smoke on Models 0.3.54
 
+> Audit correction, 2026-10-10: the diagnosis below that Qwen BF16 has a bad catalog URI was not
+> supported. ModelJars `v0.1.54` already declares `qwen_qwen2_5_0_5b_instruct_bf16` as Safetensors,
+> with four pinned files. The single-file worker instead saved its weights as `$id.gguf` and omitted
+> the configuration/tokenizer files. Both this entry and MobileMoE require the directory-loading
+> path. The raw outcomes below are unchanged; neither model was measured successfully by that worker.
+
 `CAMPAIGN-RUNBOOK.md` requires a default-configuration smoke across the whole catalogue whenever the
 released library changes the grounding policy, the decoder, or the kernel. 0.3.54 changed kernel
 dispatch defaults, so every published entry needed a current proof that it answers its whole workload

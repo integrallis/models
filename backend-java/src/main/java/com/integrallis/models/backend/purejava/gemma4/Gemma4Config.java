@@ -477,12 +477,6 @@ public record Gemma4Config(
         .orElseThrow(() -> new IllegalArgumentException("Missing " + key));
   }
 
-  private static List<Integer> requiredIntArray(GgufMetadata metadata, String key) {
-    return metadata
-        .getInt32Array(key)
-        .orElseThrow(() -> new IllegalArgumentException("Missing " + key));
-  }
-
   /**
    * A per-layer integer list, accepting a scalar and broadcasting it over every layer.
    *

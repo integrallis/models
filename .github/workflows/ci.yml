@@ -103,6 +103,21 @@ jobs:
       - name: Compliance Check
         run: ./gradlew complianceCheck
 
+      - name: Test dependency policy rejection cases
+        run: |
+          python3 scripts/test-dependency-policy.py
+          python3 scripts/test-published-consumers.py
+
+      - name: Retain dependency and consumer evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-dependency-consumers
+          path: |
+            models/build/reports/release-dependencies/
+            models/build/published-consumers/
+          retention-days: 30
+
       - name: Upload SBOM
         uses: actions/upload-artifact@v7
         with:

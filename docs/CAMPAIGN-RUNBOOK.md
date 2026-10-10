@@ -325,11 +325,11 @@ already-landed evidence is missing.
 models on exactly that field, so the stamp is what creates a model's `coverage` record and a check
 run before the stamp passes while the file is about to go stale.
 
-**And nothing in the push CI path runs that gate.** `validate` runs `spotlessCheck test assemble
-verifyCatalog`, the publication verifiers and `generateSite`; `catalog:profiles:check` is not among
-them. Landing seventeen embedding qualifications on 2026-10-09 therefore merged green with
-`coverage` seventeen records short, and it was only caught when the next landing ran the gate.
-Run it yourself before opening the pull request.
+**The ModelJars audit cleanup adds this gate to push and PR validation.** Previously, `validate`
+ran `spotlessCheck test assemble verifyCatalog`, publication verifiers and `generateSite` without
+`catalog:profiles:check`. Seventeen embedding qualifications landed on 2026-10-09 with `coverage`
+seventeen records short, and the next explicit profile check caught it. Keep the check in CI and
+run it after stamping publication metadata before opening a pull request.
 
 **4. Markers reach Maven Central only by explicit dispatch.** A push to `main` runs
 `model-artifacts` and publishes markers to **GitHub Packages only** — its `maven-central` job is

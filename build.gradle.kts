@@ -14,6 +14,10 @@ plugins {
     jacoco
 }
 
+val releaseDependencyPolicy = JsonSlurper().parse(file("gradle/dependency-policy.json")) as Map<*, *>
+extra["jacksonVersion"] = releaseDependencyPolicy["jacksonBom"] as String
+extra["slf4jVersion"] = releaseDependencyPolicy["slf4j"] as String
+
 val notebookRepositoryUrl =
     providers.gradleProperty("notebookRepository")
         .orElse(providers.environmentVariable("MODELS_NOTEBOOK_REPOSITORY"))
@@ -121,7 +125,7 @@ dependencies {
     listOf(
         "dev.langchain4j:langchain4j-core:$notebookLangchain4jVersion",
         "org.springframework.ai:spring-ai-model:$notebookSpringAiVersion",
-        "org.slf4j:slf4j-nop:2.0.17"
+        "org.slf4j:slf4j-nop:${rootProject.extra["slf4jVersion"]}"
     ).forEach { dependency ->
         notebookSourceClasspath(dependency)
         notebookReleaseClasspath(dependency)
@@ -1222,6 +1226,7 @@ tasks.register("verifyReleaseMetadata") {
         )
 
     inputs.property("releaseVersion", provider { project.version.toString() })
+    inputs.property("vectorsVersion", providers.gradleProperty("vectorsVersion"))
     inputs.files(
         changelogFile,
         releasingFile,
@@ -1269,6 +1274,10 @@ tasks.register("verifyReleaseMetadata") {
         }
         require("models-version: '$releaseVersion'" in antoraComponent) {
             "Antora models-version must match $releaseVersion"
+        }
+        val documentedVectorsVersion = providers.gradleProperty("vectorsVersion").get()
+        require("vectors-version: '$documentedVectorsVersion'" in antoraComponent) {
+            "Antora vectors-version must match the released dependency $documentedVectorsVersion"
         }
 
         val docsPackage = JsonSlurper().parse(docsPackageFile) as Map<*, *>
@@ -1921,3 +1930,20 @@ tasks.register("generateModuleJavadocs") {
     group = "documentation"
     dependsOn(perModuleJavadocCopies)
 }
+
+// Validate released upstream jars and published consumer graphs, not sibling checkouts.
+extra["javaAIFamily"] = "models"
+extra["javaAIReleaseVersions"] = mapOf(
+    "vectors" to providers.gradleProperty("vectorsVersion").get(),
+    "models" to project.version.toString()
+)
+extra["javaAIPublishedProjects"] = publishedProjects
+apply(from = "gradle/dependency-policy.gradle")
+tasks.named("verifyReleaseDependencies") { dependsOn("verifyResolvedDependencyChain", "verifySharedDependencyPolicy") }
+tasks.register<Exec>("verifyPublishedConsumerGraph") {
+    group = "verification"
+    description = "Consume every staged publication through clean Maven and Gradle projects"
+    dependsOn("verifyReleaseTrain", "verifyStagedPublications")
+    commandLine("python3", "scripts/verify-maven-runtime.py", "--repository", "build/staging-deploy")
+}
+tasks.named("complianceCheck") { dependsOn("verifyPublishedConsumerGraph") }

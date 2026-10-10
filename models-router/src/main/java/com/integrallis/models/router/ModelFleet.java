@@ -262,12 +262,6 @@ public final class ModelFleet<T> {
     throw new RoutingExecutionException(attempts, lastFailure);
   }
 
-  private static void checkInterrupted() {
-    if (Thread.currentThread().isInterrupted()) {
-      throw new CancellationException("routed invocation interrupted");
-    }
-  }
-
   private RoutingFeedback feedback(
       RoutingRequest request, String taskType, String modelId, boolean success) {
     RoutingFeedback.Builder feedback =

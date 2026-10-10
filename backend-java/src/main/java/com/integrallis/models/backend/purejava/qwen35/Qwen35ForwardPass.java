@@ -2238,8 +2238,4 @@ public final class Qwen35ForwardPass {
     float exponential = (float) Math.exp(value);
     return exponential / (1.0f + exponential);
   }
-
-  private static float silu(float value) {
-    return value * sigmoid(value);
-  }
 }

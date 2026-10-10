@@ -534,6 +534,112 @@ class InferencePipelineTest {
   }
 
   @Test
+  void batchingCallbacksReadSessionStateAndRejectMutatingReentryWithoutBlockingOtherSessions() {
+    org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
+        java.time.Duration.ofSeconds(10),
+        () -> {
+          ContinuousBatchBackend backend = new ContinuousBatchBackend();
+          var batching = ContinuousBatchingOptions.builder().maximumBatchSize(2).build();
+          try (InferencePipeline pipeline = new InferencePipeline(backend, batching);
+              TextGenerationSession first = pipeline.openGenerationSession();
+              TextGenerationSession second = pipeline.openGenerationSession();
+              var callers = Executors.newVirtualThreadPerTaskExecutor()) {
+            AtomicReference<Throwable> error = new AtomicReference<>();
+            List<String> callbacks = new ArrayList<>();
+            TokenStream stream =
+                new TokenStream() {
+                  private void inspect() {
+                    assertThat(first.lastGenerationMetrics()).isNotNull();
+                    assertThat(first.contextWindow().position()).isPresent();
+                    assertThat(first.allocatedInferenceStateBytes()).isNotNull();
+                    assertThat(first.modelName()).isEqualTo("continuous-batch-fixture");
+                    assertThat(first.diagnostics()).isNotNull();
+                    assertThat(first.tokenizer().vocabSize()).isEqualTo(8);
+                    assertThatThrownBy(first::resetContext)
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("callback");
+                    assertThatThrownBy(first::close)
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("callback");
+                    assertThatThrownBy(pipeline::close)
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("callback");
+                    assertThatThrownBy(() -> second.generate("b", twoTokenOptions()))
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("callback");
+                    assertThatThrownBy(() -> first.prefillPrompt(ModelPrompt.text("a")))
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("callback");
+                  }
+
+                  @Override
+                  public void onToken(String token) {
+                    inspect();
+                    callbacks.add(token);
+                  }
+
+                  @Override
+                  public void onComplete() {
+                    inspect();
+                    callbacks.add("complete");
+                  }
+
+                  @Override
+                  public void onError(Throwable failure) {
+                    error.set(failure);
+                  }
+                };
+            var firstResult = callers.submit(() -> first.generate("a", twoTokenOptions(), stream));
+            var secondResult = callers.submit(() -> second.generate("b", twoTokenOptions()));
+            firstResult.get(5, TimeUnit.SECONDS);
+            assertThat(secondResult.get(5, TimeUnit.SECONDS)).isEqualTo("B");
+            assertThat(error.get()).isNull();
+            assertThat(callbacks).containsExactly("A", "complete");
+            assertThat(first.lastGenerationMetrics().available()).isTrue();
+          }
+        });
+  }
+
+  @Test
+  void batchingErrorCallbackCanReadMetricsAndSchedulerContinues() {
+    org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
+        java.time.Duration.ofSeconds(10),
+        () -> {
+          var batching = ContinuousBatchingOptions.builder().maximumBatchSize(2).build();
+          try (InferencePipeline pipeline =
+                  new InferencePipeline(new ContinuousBatchBackend(), batching);
+              TextGenerationSession session = pipeline.openGenerationSession()) {
+            IllegalArgumentException expected = new IllegalArgumentException("callback failure");
+            AtomicReference<Throwable> error = new AtomicReference<>();
+            AtomicReference<GenerationMetrics> metrics = new AtomicReference<>();
+            session.generate(
+                "a",
+                twoTokenOptions(),
+                new TokenStream() {
+                  @Override
+                  public void onToken(String token) {
+                    throw expected;
+                  }
+
+                  @Override
+                  public void onComplete() {
+                    throw new AssertionError("unexpected completion");
+                  }
+
+                  @Override
+                  public void onError(Throwable failure) {
+                    metrics.set(session.lastGenerationMetrics());
+                    error.set(failure);
+                  }
+                });
+            assertThat(error.get()).isSameAs(expected);
+            assertThat(metrics.get().available()).isTrue();
+            assertThat(session.generate("b", twoTokenOptions())).isEqualTo("B");
+          }
+        });
+  }
+
+  @Test
   void batchesUnequalPromptsOnlyWhenExplicitlyEnabled() throws Exception {
     ContinuousBatchBackend backend = new ContinuousBatchBackend();
     ContinuousBatchingOptions batching =
