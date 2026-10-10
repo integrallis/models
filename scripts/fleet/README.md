@@ -60,6 +60,40 @@ mid-sentence, so the metric measured the cap rather than the model. It was hard-
 and is now one per-job variable handed to **both** arms, because `sameWorkload()` compares max
 tokens and a mismatch excludes the comparator.
 
+
+## The payload and the version label are required inputs
+
+`QUAL_PAYLOAD` and `QUAL_BACKEND_VERSION` must both be set in the bootstrap's environment. The
+worker refuses to start without them, and refuses to start if they disagree.
+
+Both used to be hard-coded in `qual-worker-two-arm.sh`, and both went stale. The committed file
+said `models-rag-bench-0.3.50-v23.tar` and `BACKEND_VERSION="models@0.3.50+v23-08d9b5e1cef8"`
+while the 2026-10-09 campaign was running a `0.3.56-dev` payload and stamping `0.3.56-dev` on
+every report. The worker that ran was an edited copy, so the committed one — the entire reason
+this script lives in the repository rather than a scratch directory — named a build nobody had
+run.
+
+A wrong `BACKEND_VERSION` is not cosmetic. It is a false provenance claim written into evidence
+that goes on to back a catalog entry, and it is unfalsifiable once the box is gone.
+
+So the worker parses the version out of the label and requires it to appear in the payload object
+name:
+
+| `QUAL_BACKEND_VERSION` | `QUAL_PAYLOAD` | |
+| --- | --- | --- |
+| `models@0.3.56+v24-7ac4153` | `models-rag-bench-0.3.56-v24.tar` | starts |
+| `models@0.3.56+v24-7ac4153` | `models-rag-bench-0.3.50-v23.tar` | `VERSION_PAYLOAD_MISMATCH` |
+| `local` | anything | refused: a label naming no version cannot be checked |
+
+The check is a named function bracketed by `# >>> BEGIN payload_label_version` markers.
+`qual-worker-guards-test.sh` extracts that block and exercises **the shipped implementation**
+rather than a copy, because the worker is fetched from S3 as one self-contained file and cannot
+source a helper. If a marker is renamed the test fails loudly rather than silently testing
+nothing.
+
+```
+bash scripts/fleet/qual-worker-guards-test.sh
+```
 ## Building shard files: `build-shards.py`
 
 `fleet-shard-NNN.json` used to be written by hand, and both fields that were learned the hard way
@@ -114,3 +148,28 @@ Shard numbers are immutable — a number that has been launched names a payload 
 prefix — so the tool refuses to overwrite an existing shard file rather than reusing a number.
 
 Tests: `python3 -m unittest discover -s scripts/fleet -p 'build_shards_test.py'` (stdlib only).
+
+## Workload coverage: `workload-coverage.py`
+
+```
+python3 scripts/fleet/workload-coverage.py --catalog ../model-jars/catalog \
+    [--check-doc docs/WORKLOAD-COVERAGE.md] [--fail-on-zero]
+```
+
+Reports which RAG workloads have qualified models. The workload list is **parsed out of
+`RagWorkload.java`**, not written in the script, so a workload the enum gains cannot go missing
+from the report; a constant the parser cannot read is printed as a warning rather than skipped.
+
+It keeps apart two states that both look like a zero:
+
+- **no corpus** — the documents or cases resource is missing or empty, so no model *could* qualify
+  there. That is "no data".
+- **no qualified model** — the corpus has cases and nothing has passed the gate yet. That is a gap
+  a campaign closes.
+
+`--check-doc` verifies that `docs/WORKLOAD-COVERAGE.md` still states what this tool derives: the
+pasted table, the quoted case questions, and the answerable/unanswerable split. Markdown
+blockquote markers are stripped first, because a quoted question wraps across lines. `--fail-on-zero`
+turns the report into a gate.
+
+The candidate slate for the open gaps lives in `docs/WORKLOAD-COVERAGE.md`.
