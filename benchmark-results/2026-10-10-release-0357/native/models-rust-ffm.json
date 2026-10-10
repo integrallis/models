@@ -1,0 +1,899 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-10T21:54:02.405965Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.3.57+7bde1c2ef31c",
+  "modelId" : "qwen2_5_coder_0_5b_instruct_q4_0",
+  "model" : "/Users/briansam-bodden/.jvllm/models/qwen2.5-coder-0.5b-instruct-q4_0.gguf",
+  "artifactSha256" : "9739055e046d62a937e5b7879012209ef40ebea8a1569a96028de491f3f091d5",
+  "artifactSizeBytes" : 428730240,
+  "settings" : {
+    "corpusSha256" : "6841c286837b4c45c06fe8d103b2e044b61a1bfe75a61b64fa04c7ca31b20e45",
+    "workload" : "coding",
+    "caseIds" : [ "list-copy-null-handling", "compute-if-absent-null", "virtual-thread-executor", "record-compact-validation", "gradle-java-25", "http-retry-rules", "migration-lock-expiry", "jackson-module-and-feature", "unsupported-cuda-kernel" ],
+    "promptTemplate" : "chatml",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 64,
+    "warmups" : 0,
+    "iterations" : 1,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topK" : "1",
+      "seed" : "42",
+      "promptCache" : "longest-common-prefix",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "Brians-MacBook-Pro.local",
+    "osName" : "Mac OS X",
+    "osVersion" : "26.6.2",
+    "architecture" : "x86_64",
+    "cpuModel" : "unknown",
+    "availableProcessors" : 12,
+    "totalMemoryBytes" : 34359738368,
+    "maxHeapBytes" : 8589934592,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v13",
+    "environment" : {
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "gguf-executor" : "persistent",
+      "q4-unsigned-pairwise-supported" : "true",
+      "native-kernel-abi" : "6",
+      "architecture" : "x86_64",
+      "tokenizer.pre" : "qwen2",
+      "performance-cliff.fused-grouped-attention-disabled" : "architecture=qwen2, group-size=7",
+      "vm-version" : "25.0.3+9-LTS",
+      "fast-vector-fma" : "true",
+      "model-architecture" : "qwen2",
+      "native-kernel-decode-threads" : "12",
+      "kernel-implementation" : "rust-ffm-quantized-v13",
+      "cpu-model" : "unknown",
+      "os" : "Mac OS X",
+      "vm-vendor" : "Eclipse Adoptium",
+      "compiler" : "hotspot-c2",
+      "native-grouped-attention" : "true",
+      "gguf-chunks-per-thread" : "2",
+      "native-q5-0-grouped" : "false",
+      "java-feature" : "25",
+      "sve" : "false",
+      "processors" : "12",
+      "end-of-generation-token-ids" : "151643,151645",
+      "q4-short-pairwise-supported" : "true",
+      "end-of-generation.151643" : "vocabulary-text",
+      "end-of-generation.151645" : "tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn",
+      "native-gated-delta-net" : "false",
+      "native-kernel-threads" : "12",
+      "tokenizer.pre.implemented" : "true",
+      "transformer-runtime" : "java",
+      "projection-layers" : "24",
+      "java-executor-poll-millis" : "0",
+      "performance-cliffs" : "fused-grouped-attention-disabled",
+      "fast-scalar-fma" : "true",
+      "vector-api" : "true",
+      "preferred-vector-bits" : "256",
+      "kernel-runtime" : "rust-ffm",
+      "native-quantized-decode" : "true",
+      "end-of-generation.chat-template" : "resolved:151645",
+      "gguf-threads" : "12",
+      "active-vector-bits" : "256",
+      "gguf-parallel" : "true",
+      "native-kernel-poll-millis" : "5",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "java-version" : "25.0.3"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "grouped",
+        "gate-up" : "grouped",
+        "implementation" : "rust-ffm-quantized-v13"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "DISABLED",
+      "reason" : "the stable widened Q4 kernel was selected",
+      "settings" : {
+        "os" : "Mac OS X",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2",
+        "architecture" : "x86_64"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded projection topology has no Q6_K consumer",
+      "settings" : {
+        "architecture" : "x86_64",
+        "kernel" : "one-query-block",
+        "requested-kernel" : "one-query-block",
+        "active-vector-bits" : "256",
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "ENABLED",
+      "reason" : "the validated final FFN runs only for requested prompt output rows",
+      "settings" : {
+        "output-rows" : "requested",
+        "formats" : "Q4_0,Q4_0,Q4_0"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "ENABLED",
+      "reason" : "unused final-layer prompt rows compute only the persistent K/V state",
+      "settings" : {
+        "formats" : "Q4_0,Q4_0,Q4_0,Q4_0",
+        "unused-rows" : "kv-only"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.stagedQuantizedFfn",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "2",
+        "parallel" : "true",
+        "eligible-layers" : "24"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.stagedQuantizedLayer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "7",
+        "parallel" : "true",
+        "eligible-layers" : "24"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered",
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "partition" : "batch-rows",
+        "staged-layers" : "24",
+        "eligible-layers" : "0",
+        "partitions" : "12"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "12"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "6",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "the Qwen 3.5 recurrence stays in Java: the shim's chunked recurrence agrees only to 2.0e-4 relative, every certified Qwen 3.5 record was produced with the Java one, and whether the shim is faster here is unmeasured. Adopting it is an epoch change, not a setting",
+      "settings" : {
+        "state" : "caller-owned-java-array",
+        "abi" : "6",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "DISABLED",
+      "reason" : "unrouted for the same reason as rust-gated-delta-net: adopting it would change the bytes published Qwen 3.5 records claim",
+      "settings" : {
+        "state" : "branch-major-caller-owned-java-array",
+        "abi" : "6",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 projections run independently: grouping them decoded slower on the controlled Qwen2.5-0.5B x86-64 profile, 37.33 against 38.94 tokens/s. Not a setting -- the slower route is simply not taken",
+      "settings" : {
+        "evidence" : "backend-native/README.md",
+        "raw-artifact" : "none-committed"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "single-token projections execute in the Models Rust kernel for every tensor type it supports; the per-type decisions above report any type it does not",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 9,
+    "successfulAttempts" : 9,
+    "loadMillis" : 1650.796136,
+    "retrievalMillis" : {
+      "p50" : 2.340335,
+      "p95" : 28.899140799999987
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 1.7761609999979555,
+      "p95" : 14.65143619999871
+    },
+    "ttftMillis" : {
+      "p50" : 1764.367657,
+      "p95" : 3960.745010999999
+    },
+    "tpotMillis" : {
+      "p50" : 448.2882366111111,
+      "p95" : 508.96162072
+    },
+    "endToEndMillis" : {
+      "p50" : 9836.938562,
+      "p95" : 20696.1415364
+    },
+    "p50PrefillTokensPerSecond" : 38.15450734732657,
+    "p50DecodeTokensPerSecond" : 2.230707652646923,
+    "peakRssBytes" : 0,
+    "totalCpuMillis" : 802488.912,
+    "totalInputTokens" : 1493,
+    "totalCacheReadInputTokens" : 809,
+    "totalCacheWriteInputTokens" : 684,
+    "totalOutputTokens" : 198,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.0,
+    "modelAnswerRate" : 0.4444444444444444,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.4444444444444444,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen2.5 Coder 0.5B Instruct AWQ",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "e021ef2518be085dc77d65393253276a88bcd621ff26c7164753213d2dbe2fda",
+    "retrievalMillis" : 41.632858,
+    "frameworkOverheadMillis" : 21.239496999998664,
+    "endToEndMillis" : 20939.216538,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 170,
+      "outputTokens" : 31,
+      "ttftMillis" : 5247.362197,
+      "totalMillis" : 20876.344183,
+      "prefillTokensPerSecond" : 32.4802659228,
+      "loadMillis" : 1650.796136,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 152854.992,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable.",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen2.5 Coder 0.5B Instruct AWQ",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "abb3da9ae32e35ee42cf831e6d51075c3bc37464f1cb940557ac5ae469b14316",
+    "retrievalMillis" : 3.874007,
+    "frameworkOverheadMillis" : 4.769344999998793,
+    "endToEndMillis" : 15381.28558,
+    "generation" : {
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 169,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 67,
+      "outputTokens" : 30,
+      "ttftMillis" : 2030.819232,
+      "totalMillis" : 15372.642228,
+      "prefillTokensPerSecond" : 33.05407690198136,
+      "loadMillis" : 1650.796136,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 115568.396,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key.",
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen2.5 Coder 0.5B Instruct AWQ",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ad57def56c9b9fc9ca81825dcefbb05682ef212caab5523c2fd38abb653682ef",
+    "retrievalMillis" : 9.798565,
+    "frameworkOverheadMillis" : 3.329675999999381,
+    "endToEndMillis" : 10930.971585,
+    "generation" : {
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 23,
+      "ttftMillis" : 1655.460762,
+      "totalMillis" : 10917.843344,
+      "prefillTokensPerSecond" : 38.15450734732657,
+      "loadMillis" : 1650.796136,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 90345.96,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing that executor waits for all submitted tasks to finish.",
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen2.5 Coder 0.5B Instruct AWQ",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "07f191eeab7fcbe55f678227ef09a14d398dbd1f7d67799791f0dfcc02c4a43d",
+    "retrievalMillis" : 2.340335,
+    "frameworkOverheadMillis" : 2.083081000000675,
+    "endToEndMillis" : 7761.401547,
+    "generation" : {
+      "text" : "ServiceConfig validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 154,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 52,
+      "outputTokens" : 16,
+      "ttftMillis" : 1769.342251,
+      "totalMillis" : 7756.978131,
+      "prefillTokensPerSecond" : 29.41086261750112,
+      "loadMillis" : 1650.796136,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 61235.351,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "ServiceConfig validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException.",
+      "text" : "ServiceConfig validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen2.5 Coder 0.5B Instruct AWQ",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "dc45ed44dd66c3dc04b05a3e0c9e52ef4063fdfb2984d1cb4a8271d976c10621",
+    "retrievalMillis" : 2.208701,
+    "frameworkOverheadMillis" : 1.7761609999979555,
+    "endToEndMillis" : 20331.529034,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 173,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 73,
+      "outputTokens" : 43,
+      "ttftMillis" : 1846.453505,
+      "totalMillis" : 20327.544172,
+      "prefillTokensPerSecond" : 39.558105271364305,
+      "loadMillis" : 1650.796136,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 170726.512,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Gradle Java toolchain selects JDK 25 with `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))`. Compilation also sets `java.toolchain.release.set(25)`.",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen2.5 Coder 0.5B Instruct AWQ",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4ea3dc42b106de0bb4c45e222130132afa8397ca251c7a87bdee115d4af3b697",
+    "retrievalMillis" : 2.39869,
+    "frameworkOverheadMillis" : 1.4433109999999942,
+    "endToEndMillis" : 5672.819814,
+    "generation" : {
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 70,
+      "outputTokens" : 9,
+      "ttftMillis" : 1741.338193,
+      "totalMillis" : 5668.977813,
+      "prefillTokensPerSecond" : 40.22065769890488,
+      "loadMillis" : 1650.796136,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 47818.239,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "HTTP retry rules: GET, HEAD, POST",
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen2.5 Coder 0.5B Instruct AWQ",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "69d579ca71de8607f90ccb0d06ee2a8485a4c3872642efd9a419d8169b77ebf4",
+    "retrievalMillis" : 2.021006,
+    "frameworkOverheadMillis" : 1.6050459999996747,
+    "endToEndMillis" : 6351.983783,
+    "generation" : {
+      "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 12,
+      "ttftMillis" : 1361.988455,
+      "totalMillis" : 6348.357731,
+      "prefillTokensPerSecond" : 44.82223830576395,
+      "loadMillis" : 1650.796136,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 54229.488,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration lease is stored in the schema_history_lock table.",
+      "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen2.5 Coder 0.5B Instruct AWQ",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5a2bf8c75d3e79a27a754086274a764781ed25957574af813d510dd49e4fd985",
+    "retrievalMillis" : 1.768703,
+    "frameworkOverheadMillis" : 1.6139430000002903,
+    "endToEndMillis" : 9836.938562,
+    "generation" : {
+      "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 100,
+      "cacheWriteInputTokens" : 66,
+      "outputTokens" : 19,
+      "ttftMillis" : 1764.367657,
+      "totalMillis" : 9833.555916,
+      "prefillTokensPerSecond" : 37.426330266682584,
+      "loadMillis" : 1650.796136,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 84200.061,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The wire mapper registers Java time support, and DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES is disabled.",
+      "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Qwen2.5 Coder 0.5B Instruct AWQ",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "724aa58f8c6071453ccd0fff2c223c92c059059f555df1bbe6de894b8270056e",
+    "retrievalMillis" : 1.821504,
+    "frameworkOverheadMillis" : 1.5135209999998551,
+    "endToEndMillis" : 2737.393376,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 163,
+      "cacheReadInputTokens" : 101,
+      "cacheWriteInputTokens" : 62,
+      "outputTokens" : 15,
+      "ttftMillis" : 1331.826099,
+      "totalMillis" : 2734.058351,
+      "prefillTokensPerSecond" : 46.58168413904692,
+      "loadMillis" : 1650.796136,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 25509.913,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CUDA block size used by the photon shader kernel is 16.",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

@@ -1,0 +1,18 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 10, 2026 2:49:32 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 10, 2026 2:49:32 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=12 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Oct 10, 2026 2:49:34 PM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256
+iteration 1/1 case=auto-glass-deadline correct=true retrieval=66.7ms ttft=6839.9ms decode=6.37 tok/s e2e=11492.1ms
+iteration 1/1 case=travel-limit correct=true retrieval=3.4ms ttft=2211.9ms decode=5.90 tok/s e2e=6289.8ms
+iteration 1/1 case=telemedicine-benefit correct=true retrieval=2.8ms ttft=1855.2ms decode=6.09 tok/s e2e=5147.3ms
+iteration 1/1 case=claim-payment-times correct=true retrieval=3.9ms ttft=1809.0ms decode=6.17 tok/s e2e=4897.7ms
+iteration 1/1 case=chargeback-evidence correct=true retrieval=2.8ms ttft=1885.1ms decode=7.20 tok/s e2e=5222.8ms
+iteration 1/1 case=break-glass correct=true retrieval=3.8ms ttft=1964.0ms decode=7.48 tok/s e2e=6247.2ms
+iteration 1/1 case=idempotency correct=true retrieval=3.0ms ttft=2332.7ms decode=6.99 tok/s e2e=5054.3ms
+iteration 1/1 case=priority-one correct=true retrieval=2.5ms ttft=2511.8ms decode=5.80 tok/s e2e=7692.1ms
+iteration 1/1 case=unsupported-lunar-vehicle correct=true retrieval=2.5ms ttft=2614.7ms decode=3.71 tok/s e2e=3158.5ms
+plain-java/pure-java/qwen_qwen2_5_0_5b_instruct_bf16: tier=PERFORMANCE_REDUCED success=9/9 p95-retrieval=41.6ms p95-ttft=5149.8ms p50-decode=6.17 tok/s p95-e2e=9972.1ms correct=100.0% model-answered=55.6% of-those-correct=100.0% extractive-fallback=33.3% truncated=0.0%
+report: /Users/briansam-bodden/Code/java-ai/audit-2026-10-10/models-released-qwen-smoke/models-pure-java.json

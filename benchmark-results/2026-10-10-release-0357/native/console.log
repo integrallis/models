@@ -1,0 +1,18 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 10, 2026 2:52:21 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 10, 2026 2:52:21 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=12 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Oct 10, 2026 2:52:22 PM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256
+iteration 1/1 case=list-copy-null-handling correct=true retrieval=41.6ms ttft=5247.4ms decode=1.92 tok/s e2e=20939.2ms
+iteration 1/1 case=compute-if-absent-null correct=true retrieval=3.9ms ttft=2030.8ms decode=2.17 tok/s e2e=15381.3ms
+iteration 1/1 case=virtual-thread-executor correct=true retrieval=9.8ms ttft=1655.5ms decode=2.38 tok/s e2e=10931.0ms
+iteration 1/1 case=record-compact-validation correct=true retrieval=2.3ms ttft=1769.3ms decode=2.51 tok/s e2e=7761.4ms
+iteration 1/1 case=gradle-java-25 correct=true retrieval=2.2ms ttft=1846.5ms decode=2.27 tok/s e2e=20331.5ms
+iteration 1/1 case=http-retry-rules correct=true retrieval=2.4ms ttft=1741.3ms decode=2.04 tok/s e2e=5672.8ms
+iteration 1/1 case=migration-lock-expiry correct=true retrieval=2.0ms ttft=1362.0ms decode=2.21 tok/s e2e=6352.0ms
+iteration 1/1 case=jackson-module-and-feature correct=true retrieval=1.8ms ttft=1764.4ms decode=2.23 tok/s e2e=9836.9ms
+iteration 1/1 case=unsupported-cuda-kernel correct=true retrieval=1.8ms ttft=1331.8ms decode=9.98 tok/s e2e=2737.4ms
+plain-java/rust-ffm/qwen2_5_coder_0_5b_instruct_q4_0: tier=PERFORMANCE_REDUCED success=9/9 p95-retrieval=28.9ms p95-ttft=3960.7ms p50-decode=2.23 tok/s p95-e2e=20696.1ms correct=100.0% model-answered=44.4% of-those-correct=100.0% extractive-fallback=44.4% truncated=0.0%
+report: /Users/briansam-bodden/Code/java-ai/audit-2026-10-10/models-released-native-smoke/models-rust-ffm.json
