@@ -40,13 +40,22 @@ tar xzf /tmp/jdk.tgz -C /opt/jdk --strip-components=1 || { STATUS=NO_JDK_UNPACK;
 export JAVA_HOME=/opt/jdk; export PATH=$JAVA_HOME/bin:$PATH
 say "jdk $(/opt/jdk/bin/java -version 2>&1 | head -1)"
 cd /work
+# The kernels JAR is named explicitly, never by a fixed name. backend-native's published JAR
+# carries classes only -- zero META-INF/models/native entries -- so this JAR is the ONLY source of
+# the .so, and a fixed name is how a 2026-09-28 kernel came to be measured against a 0.3.56
+# library with no symptom: both declare abi=6. Same defect, same file family, second instance.
+KERNELS=${PARITY_KERNELS:?PARITY_KERNELS required; refusing to pick a kernel by a fixed name}
 aws s3 cp "s3://$BUCKET/payload/$PARITY_DIST" . --only-show-errors
-aws s3 cp "s3://$BUCKET/payload/models-kernels-linux-x86_64.jar" . --only-show-errors
+aws s3 cp "s3://$BUCKET/payload/$KERNELS" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/parity-shard-$SHARD.json" /work/shard.json --only-show-errors
 [ -s "$PARITY_DIST" ] && [ -s /work/shard.json ] || { STATUS=NO_PAYLOAD; exit 1; }
+[ -s "/work/$KERNELS" ] || { STATUS=NO_KERNEL_JAR; exit 1; }
 tar xf "$PARITY_DIST" || { STATUS=NO_DIST_UNPACK; exit 1; }
 DIST=$(ls -d /work/models-rag-bench-*/ | head -1)
-CP="$DIST/lib/*:/work/models-kernels-linux-x86_64.jar"
+CP="$DIST/lib/*:/work/$KERNELS"
+# Record which kernel ran. The .so digest is the only thing distinguishing two ABI-6 builds.
+say "kernel $KERNELS sha256=$(unzip -p "/work/$KERNELS" \
+  META-INF/models/native/linux-x86_64/native.properties 2>/dev/null | sed -n 's/^sha256=//p')"
 THREADS=$(nproc 2>/dev/null || echo 8)
 : > /work/out/progress.tsv
 python3 -c "
