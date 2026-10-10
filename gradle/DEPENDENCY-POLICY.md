@@ -1,5 +1,11 @@
 # Release dependency policy
 
+Native private CI builds may use the existing immutable
+`<version>-ci.<run>.<attempt>.<12-character commit>` version for their own artifacts. Their upstream
+dependencies still require exact stable releases. `verifyReleaseTrain` rejects CI versions, and
+publication permits them only to the HTTPS GitHub Packages repository; public/staging repositories
+require stable versions. This keeps private platform verification separate from release admission.
+
 `dependency-policy.json` is the reviewed external policy for Vectors → Models → ModelJars.
 Every published Java library embeds this policy and its exact internal versions in
 `META-INF/jvm-ai/release-dependencies.json`. A downstream build validates the actual upstream jars.
