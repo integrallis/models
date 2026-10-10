@@ -1,5 +1,38 @@
 # Qualification fleet worker
 
+## Default correctness smoke and Qwen BF16
+
+`smoke-worker.sh` runs one correctness arm against a released Central payload. It does not issue a
+comparative qualification or performance verdict. The versioned `smoke-worker-0354*.sh` files remain
+historical reproductions; use the unversioned worker for the next release.
+
+The October 9 worker saved Qwen BF16's `model.safetensors` as a `.gguf` and omitted its configuration
+and tokenizer. The catalog already contained the correct four-file snapshot. The new worker requires
+each job to declare its format, backend and complete `files` list, with an HTTPS URI, SHA-256 and
+byte size per file. It verifies every file before invoking Java, passes a directory for Safetensors
+and a file for GGUF, and uploads a per-model `.inputs.json` receipt alongside the report. Downloads
+and Java runs share the shard deadline. Sharded Safetensors are explicitly unsupported by this worker.
+
+`smoke-qwen-bf16.json` is the next release's Qwen job. Its four files come from catalog revision
+`7ae557604adf67be50417f59c2c2f167def9a775`; workload `general`, template `chatml`, context 2048,
+8 threads and 64 output tokens come from the hash-verified report recorded in `settingsSource`.
+The smoke uses zero warmups, one iteration and the current library's default grounding and prompt
+cache. These cold-run results are not a performance comparison with the historical warm run.
+
+Deployment requires `SHARD` (a new numeric shard ID), `SMOKE_PAYLOAD` (an immutable versioned
+`models-rag-bench-VERSION-SUFFIX.tar`), its `SMOKE_PAYLOAD_SHA256`, and `SMOKE_BACKEND_VERSION`
+(`models@VERSION+SOURCE_REVISION`). Upload the job as `payload/smoke-shard-SHARD.json` to the campaign
+bucket. The payload's published native JAR must match the version label and already contain the
+Linux native library; do not append another kernel JAR. `DEADLINE_SECONDS` defaults to five hours;
+set a shorter bound for the single Qwen job. Follow the runbook's quota, ownership and release gates
+before launching. This manifest is prepared input, not evidence that the next release has passed.
+
+CI runs `smoke_worker_test.py`: tiny synthetic snapshots exercise the deployed downloader and shell
+job loop, including the directory passed to Java and refusal to start Java on tokenizer corruption.
+The tests download no weights and run no inference on the developer machine.
+
+## Comparative qualification worker
+
 `qual-worker-two-arm.sh` is the EC2 user-data a qualification worker runs. It lives here because the
 evidence behind every catalog entry comes out of it, and for the whole 2026-09 campaign it existed only
 in a scratch directory: the script that produced the numbers was not reviewable, not diffable, and not
@@ -88,8 +121,11 @@ name:
 
 ### The kernels JAR was the worse case
 
-`backend-native`'s published JAR carries **classes only** — zero `META-INF/models/native` entries
-— so the `.so` comes *exclusively* from a separate platform JAR. The worker used to fetch that
+The source-built `backend-native` JAR in the two-arm worker's payload carries **classes only**
+when built without `modelsNativeArtifactDirectory`, so that payload gets its `.so` from a separate
+platform JAR. This is not the packaging of the released Central JAR: the verified 0.3.56 Central
+artifact contains all six native platforms. Never append a separate platform JAR to a payload that
+already contains that platform; the loader correctly rejects duplicate resources. The worker used to fetch that
 under the fixed name `models-kernels-linux-x86_64.jar`, and the object on S3 under that name dated
 from **2026-09-28** while the Java side was 0.3.56.
 
