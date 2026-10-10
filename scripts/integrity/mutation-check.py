@@ -74,6 +74,18 @@ MUTATIONS = [
         "the same defect in the second worker, which is the copy I missed the first time",
     ),
     (
+        "workflow-duplication/step-copied-back-inline",
+        ["python3", "scripts/integrity/check-workflow-duplication.py"],
+        sub(".github/workflows/docs.yml",
+            "      - name: Install the PTX toolchain\n        uses: ./.github/actions/ptx-toolchain",
+            "      - name: Install pinned Rust nightly for the PTX kernels\n"
+            "        run: |\n"
+            "          rustup toolchain install nightly-2026-09-17 --profile minimal\n"
+            "          rustup component add --toolchain nightly-2026-09-17 rust-src"),
+        "a workflow installing the pinned nightly itself again, which is how docs ended up as "
+        "the one of five without rust-src",
+    ),
+    (
         "sweep-derive/number-drifts-from-data",
         ["python3", "benchmark-results/2026-10-09-max-tokens-sweep/derive.py"],
         sub("benchmark-results/2026-10-09-max-tokens-sweep/NOTES.md",

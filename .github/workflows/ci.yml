@@ -84,6 +84,9 @@ jobs:
       - name: Check cited evidence exists
         run: python3 scripts/integrity/check-evidence-references.py
 
+      - name: Check no workflow duplicates a shared setup step
+        run: python3 scripts/integrity/check-workflow-duplication.py
+
       - name: Prove every integrity guard can fail
         run: python3 scripts/integrity/mutation-check.py
 
