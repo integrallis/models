@@ -103,6 +103,10 @@ public final class InferenceBenchmarkCli {
       RouterSelectionEvaluationCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;
     }
+    if (args.length > 0 && "router-collect".equals(args[0])) {
+      RouterObservationCollectorCli.run(Arrays.copyOfRange(args, 1, args.length));
+      return;
+    }
     if (args.length > 0 && "task-index".equals(args[0])) {
       // Its evaluate subcommand is a gate, so the verdict travels in the exit status.
       System.exit(TaskIndexCli.run(Arrays.copyOfRange(args, 1, args.length)));
