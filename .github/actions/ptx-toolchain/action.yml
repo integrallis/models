@@ -1,0 +1,36 @@
+name: PTX toolchain
+description: >
+  Install the pinned Rust nightly that backend-cuda's PTX crate needs, with every component and
+  target its rust-toolchain.toml declares.
+
+# Why this is a composite action rather than a copied step.
+#
+# :backend-cuda:compilePtx pins its own nightly and builds with -Zbuild-std, so it needs rust-src,
+# and it links through llvm-bitcode-linker. The crate's rust-toolchain.toml declares all of that,
+# but a toolchain rustup auto-installs on first use arrives with the minimal profile and none of
+# it, so every workflow that reaches compilePtx has to install the components explicitly.
+#
+# Three workflows did and one did not. docs.yml had no Rust setup at all, so Deploy Docs failed on
+# main for every run from 2026-10-09 onward with
+#   error: ".../nightly-2026-09-17-.../lib/rustlib/src/rust/library/..." (rust-src missing)
+#   > Task :backend-cuda:compilePtx FAILED
+# while CI, CodeQL and model-determinism stayed green. A step copied into N places gets fixed in
+# N-1 of them; this file is the one definition they now share.
+
+inputs:
+  toolchain:
+    description: The pinned nightly, which must match backend-cuda's rust-toolchain.toml.
+    required: false
+    default: nightly-2026-09-17
+
+runs:
+  using: composite
+  steps:
+    - name: Install pinned Rust nightly for the PTX kernels
+      shell: bash
+      run: |
+        set -euo pipefail
+        rustup toolchain install "${{ inputs.toolchain }}" --profile minimal --no-self-update
+        rustup component add --toolchain "${{ inputs.toolchain }}" \
+          clippy rustfmt rust-src llvm-bitcode-linker llvm-tools
+        rustup target add --toolchain "${{ inputs.toolchain }}" nvptx64-nvidia-cuda

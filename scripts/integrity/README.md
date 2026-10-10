@@ -6,6 +6,7 @@ defect, so nobody has to guess why the check is there or whether it still matter
 | check | the defect it exists for |
 | --- | --- |
 | `check-evidence-references.py` | A 0.3.56 CHANGELOG entry cited an evidence directory dated `2026-10-08-q4-1-exact-path`, which never existed — the real one is dated `2026-10-09-q4-1-support`. A number is only evidence if the artifact it points at is real. |
+| `check-workflow-duplication.py` | The PTX toolchain install was copied into five workflows. Four had it, `docs` did not, so Deploy Docs failed on main for every run from 2026-10-09 with `rust-src` absent while the other four stayed green. |
 | `mutation-check.py` | A check meant to catch a fixed-name kernel reference used `[a-z0-9_]+`, which cannot match `models-kernels-linux-x86_64.jar` because the name has hyphens. It passed while the defect was present. |
 
 ## The mutation check is the important one
