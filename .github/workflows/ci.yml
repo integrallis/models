@@ -80,6 +80,16 @@ jobs:
           python3 -m unittest discover -s scripts/fleet -p '*_test.py' -v
           bash scripts/fleet/qual-worker-guards-test.sh
 
+      # Integrity checks. These exist because of specific defects that shipped, each named in the
+      # script that catches it. The mutation check runs LAST because it is the one that proves the
+      # others can fail -- a guard that cannot detect its own defect reports green and everyone
+      # stops looking, which has already happened here.
+      - name: Check cited evidence exists
+        run: python3 scripts/integrity/check-evidence-references.py
+
+      - name: Prove every integrity guard can fail
+        run: python3 scripts/integrity/mutation-check.py
+
       - name: Generate SBOM
         run: ./gradlew cyclonedxDirectBom
 

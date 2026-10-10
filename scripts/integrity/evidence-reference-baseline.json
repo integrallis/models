@@ -1,0 +1,31 @@
+{
+  "_comment": "Evidence references that do not resolve and were already broken before the check existed. The check is LIVE for every other reference. This list may shrink and must never grow: a new unresolvable reference fails CI, and an entry here that starts resolving also fails CI so the baseline cannot hide a later break.",
+  "_recorded": "2026-10-09",
+  "known": [
+    {
+      "document": "benchmark-results/2026-09-07-ragged-prefill/README.md",
+      "references": [
+        "benchmark-results/2026-09-07-ragged-prefill/result.json"
+      ],
+      "reason": "result.json was never committed; the README's numbers cannot be re-derived from this directory."
+    },
+    {
+      "document": "benchmark-results/2026-09-18-gpu-large-model/REPRODUCE-RUST-PTX.md",
+      "references": [
+        "benchmark-results/2026-09-18-gpu-large-model/PREREGISTRATION.md",
+        "benchmark-results/2026-09-18-gpu-large-model/cpu-control-module-present.json",
+        "benchmark-results/2026-09-18-gpu-large-model/rust-ptx-capability.json",
+        "benchmark-results/2026-09-18-gpu-large-model/rust-ptx-decode.json",
+        "benchmark-results/2026-09-18-gpu-large-model/rust-ptx-parity.json"
+      ],
+      "reason": "promises five artifacts it does not contain. rust-ptx-{decode,parity,capability}.json exist only under the 2026-10-07 g1-parity and g4-dualpath directories, produced by later runs; cpu-control-module-present.json and a PREREGISTRATION.md for this study exist nowhere. Not repointed, because it is not established that the October artifacts are the ones this document meant."
+    },
+    {
+      "document": "benchmark-results/README.md",
+      "references": [
+        "benchmark-results/certified-20260827/tool-calling/needle2-cact-pure-java.json"
+      ],
+      "reason": "cites a certified-20260827 tool-calling report that is not in the tree."
+    }
+  ]
+}
