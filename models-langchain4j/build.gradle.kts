@@ -9,7 +9,7 @@ dependencies {
     api(project(":models-runtime"))
     api(project(":models-router"))
 
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.21.7")
+    implementation("com.fasterxml.jackson.core:jackson-databind:${rootProject.extra["jacksonVersion"]}")
 
     compileOnly("dev.langchain4j:langchain4j-core:$langchain4jVersion")
     testImplementation("dev.langchain4j:langchain4j-core:$langchain4jVersion")

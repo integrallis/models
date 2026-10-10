@@ -549,6 +549,9 @@ public final class InferencePipeline
   /** Closes the owned backend exactly once. */
   @Override
   public void close() {
+    if (continuousBatching != null) {
+      continuousBatching.requireOutsideCallback();
+    }
     Set<TextGenerationSession> sessionsToClose;
     synchronized (backend) {
       if (!closed.compareAndSet(false, true)) {

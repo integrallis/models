@@ -37,10 +37,6 @@ import jdk.incubator.vector.VectorSpecies;
  */
 public final class GroupedQueryAttentionKernel {
   static final VectorSpecies<Float> SPECIES = species();
-  private static final VectorShuffle<Float> ROTATE_8 = rotation(8);
-  private static final VectorShuffle<Float> ROTATE_4 = rotation(4);
-  private static final VectorShuffle<Float> ROTATE_2 = rotation(2);
-  private static final VectorShuffle<Float> ROTATE_1 = rotation(1);
 
   /**
    * The score and softmax-sum reductions are pinned to a fixed 8-lane shape, on every host.
@@ -423,35 +419,8 @@ public final class GroupedQueryAttentionKernel {
     }
   }
 
-  private static VectorShuffle<Float> rotation(int distance) {
-    int mask = SPECIES.length() - 1;
-    return VectorShuffle.fromOp(SPECIES, lane -> (lane + distance) & mask);
-  }
-
-  /**
-   * Sums the lanes through an explicit rotate-and-add tree. {@code reduceLanes(ADD)} is not used
-   * because its compiled form reduces as a tree while its pre-compilation fallback sums lanes in
-   * sequence, so the same input would round differently by JIT tier; this tree is the same sequence
-   * of lanewise adds in both.
-   */
-  private static float reduceAddFixedTree(FloatVector vector) {
-    int lanes = vector.length();
-    if (lanes == 16) {
-      vector = vector.add(vector.rearrange(ROTATE_8));
-    }
-    if (lanes >= 8) {
-      vector = vector.add(vector.rearrange(ROTATE_4));
-    }
-    if (lanes >= 4) {
-      vector = vector.add(vector.rearrange(ROTATE_2));
-    }
-    if (lanes >= 2) {
-      vector = vector.add(vector.rearrange(ROTATE_1));
-    }
-    return vector.lane(0);
-  }
-
   private static final float LOG2E = 1.44269504f;
+
   private static final float LN2_HI = 0.693145752f;
   private static final float LN2_LO = 1.42860677e-6f;
   private static final float EXP_LOWER = -87.0f;

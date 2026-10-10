@@ -40,6 +40,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * pipelines configured with {@link ContinuousBatchingOptions} may advance compatible sessions in
  * one physical-model call. Closing a session releases only its request-specific state; closing the
  * owning pipeline closes every remaining session and the model.
+ *
+ * <p>Continuous-batching callbacks may read session metrics and state. They must not synchronously
+ * generate, prefill, reset or close a session or its pipeline: those operations require the same
+ * scheduler to make progress and throw {@link IllegalStateException} from its callback thread. Use
+ * {@link TokenStream#isCancelled()} to request cancellation during generation.
  */
 public final class TextGenerationSession implements ConstrainedTextGenerationModel, AutoCloseable {
   private final Object executionLock;
@@ -96,32 +101,26 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
 
   /** Returns the active context capacity and next token position for this session. */
   public InferenceContextWindow contextWindow() {
-    synchronized (operationLock) {
+    synchronized (executionLock) {
       requireOpen();
-      synchronized (executionLock) {
-        return new InferenceContextWindow(
-            backend.contextCapacity(), java.util.OptionalInt.of(backend.checkpoint()));
-      }
+      return new InferenceContextWindow(
+          backend.contextCapacity(), java.util.OptionalInt.of(backend.checkpoint()));
     }
   }
 
   /** Returns phase, token-usage, and prompt-cache measurements for this session's latest call. */
   public GenerationMetrics lastGenerationMetrics() {
-    synchronized (operationLock) {
-      requireOpen();
-      return continuousBatching == null
-          ? generationLoop.lastGenerationMetrics()
-          : continuousBatchingState.lastGenerationMetrics();
-    }
+    requireOpen();
+    return continuousBatching == null
+        ? generationLoop.lastGenerationMetrics()
+        : continuousBatchingState.lastGenerationMetrics();
   }
 
   /** Returns the physical bytes allocated for this session's backend state, when measurable. */
   public OptionalLong allocatedInferenceStateBytes() {
-    synchronized (operationLock) {
+    synchronized (executionLock) {
       requireOpen();
-      synchronized (executionLock) {
-        return backend.allocatedStateBytes();
-      }
+      return backend.allocatedStateBytes();
     }
   }
 
@@ -132,6 +131,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
    * belongs only to this model and session; it cannot be transferred to another model.
    */
   public PromptPrefillMetrics prefillPrompt(ModelPrompt prompt) {
+    requireOutsideSchedulerCallback();
     synchronized (operationLock) {
       requireOpen();
       if (continuousBatching != null) {
@@ -146,6 +146,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
   /** Prefills trusted token IDs while preserving this session's exact cache lineage. */
   PromptPrefillMetrics prefillTokenPrefix(int[] promptTokens) {
     Objects.requireNonNull(promptTokens, "promptTokens");
+    requireOutsideSchedulerCallback();
     synchronized (operationLock) {
       requireOpen();
       if (continuousBatching != null) {
@@ -160,6 +161,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
 
   float[] nextTokenLogits(ModelPrompt prompt) {
     Objects.requireNonNull(prompt, "prompt");
+    requireOutsideSchedulerCallback();
     synchronized (operationLock) {
       requireOpen();
       if (continuousBatching != null) {
@@ -174,6 +176,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
 
   float[] nextTokenHiddenState(ModelPrompt prompt) {
     Objects.requireNonNull(prompt, "prompt");
+    requireOutsideSchedulerCallback();
     synchronized (operationLock) {
       requireOpen();
       if (continuousBatching != null) {
@@ -193,6 +196,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
    * ordinary session returns to an empty context.
    */
   public void resetContext() {
+    requireOutsideSchedulerCallback();
     synchronized (operationLock) {
       requireOpen();
       synchronized (executionLock) {
@@ -241,6 +245,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
       SharedPrefixInferenceBackend owner, int[] promptTokens) {
     Objects.requireNonNull(owner, "owner");
     Objects.requireNonNull(promptTokens, "promptTokens");
+    requireOutsideSchedulerCallback();
     synchronized (operationLock) {
       requireOpen();
       if (continuousBatching != null) {
@@ -265,6 +270,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
       SharedPrefixInferenceBackend owner, int[] promptTokens) {
     Objects.requireNonNull(owner, "owner");
     Objects.requireNonNull(promptTokens, "promptTokens");
+    requireOutsideSchedulerCallback();
     synchronized (operationLock) {
       requireOpen();
       if (continuousBatching != null) {
@@ -291,27 +297,23 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
 
   @Override
   public String modelName() {
-    synchronized (operationLock) {
+    synchronized (executionLock) {
       requireOpen();
-      synchronized (executionLock) {
-        return backend.metadata().modelName();
-      }
+      return backend.metadata().modelName();
     }
   }
 
   @Override
   public BackendDiagnostics diagnostics() {
-    synchronized (operationLock) {
+    synchronized (executionLock) {
       requireOpen();
-      synchronized (executionLock) {
-        return backend.diagnostics();
-      }
+      return backend.diagnostics();
     }
   }
 
   @Override
   public Tokenizer tokenizer() {
-    synchronized (operationLock) {
+    synchronized (executionLock) {
       requireOpen();
       return backend.tokenizer();
     }
@@ -319,6 +321,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
 
   @Override
   public String generate(String prompt, SamplingOptions options) {
+    requireOutsideSchedulerCallback();
     synchronized (operationLock) {
       requireOpen();
       return continuousBatching == null
@@ -333,6 +336,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
 
   @Override
   public String generate(ModelPrompt prompt, SamplingOptions options) {
+    requireOutsideSchedulerCallback();
     synchronized (operationLock) {
       requireOpen();
       return continuousBatching == null
@@ -349,6 +353,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
 
   @Override
   public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+    requireOutsideSchedulerCallback();
     synchronized (operationLock) {
       requireOpen();
       generateScheduledOrSequential(prompt, options, stream, TokenConstraint.unrestricted());
@@ -358,6 +363,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
   @Override
   public void generate(
       ModelPrompt prompt, SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
+    requireOutsideSchedulerCallback();
     synchronized (operationLock) {
       requireOpen();
       generateScheduledOrSequential(prompt, options, stream, constraint);
@@ -366,6 +372,7 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
 
   @Override
   public void close() {
+    requireOutsideSchedulerCallback();
     synchronized (operationLock) {
       synchronized (executionLock) {
         if (closed.compareAndSet(false, true)) {
@@ -395,6 +402,12 @@ public final class TextGenerationSession implements ConstrainedTextGenerationMod
       return;
     }
     continuousBatching.generate(continuousBatchingState, prompt, options, stream, constraint);
+  }
+
+  private void requireOutsideSchedulerCallback() {
+    if (continuousBatching != null) {
+      continuousBatching.requireOutsideCallback();
+    }
   }
 
   private void requireOpen() {

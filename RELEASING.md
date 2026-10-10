@@ -32,6 +32,13 @@ can opt into it and read the gates.
 4. Run **Actions → Release** with `dry_run` enabled.
 5. After validation succeeds, rerun with `dry_run` disabled.
 
+Publish and verify the configured Vectors version first. `complianceCheck` verifies the actual
+upstream JAR dependency manifests and stages every Models publication for independent Maven and
+Gradle consumers. Retain `build/reports/release-dependencies/` and `build/published-consumers/`;
+the release workflow repeats the consumers against Central before creating the GitHub release.
+See [the shared dependency policy](gradle/DEPENDENCY-POLICY.md). A sibling checkout is not release
+evidence, and a changed upstream version invalidates the downstream dependency receipts.
+
 `backend-java` depends on the released `vectors-core` artifact for JDK Vector
 API numeric kernels. The release workflow builds and tests the Models-owned
 Rust kernels on every supported native platform and compiles the Apple

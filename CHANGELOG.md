@@ -4,6 +4,33 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.57] - 2026-10-10
+
+### Fixed
+
+- The default smoke worker loads Qwen2.5 BF16 as a complete Safetensors snapshot. It verifies the
+  weights, configuration and tokenizer files against their declared SHA-256 and size before passing
+  the directory to the pure-Java runtime. The previous worker downloaded only the weights as GGUF.
+- Continuous-batching token, completion and error callbacks can read session metrics and state
+  without deadlocking the waiting generation caller. Mutating session or pipeline operations from
+  the scheduler callback thread fail promptly; cancellation remains available through TokenStream.
+- Remove unused private helpers in the Gemma 4 parser, grouped-query attention kernel, Qwen 3.5
+  forward pass and router fleet. Active numeric kernels are unchanged.
+
+### Build and dependencies
+
+- Consume released Vectors 0.1.29. Verify actual upstream JAR manifests, internal dependency direction,
+  resolved versions and the shared external policy for every published module.
+- Align Jackson to BOM 2.22.3 and SLF4J to 2.0.20, with clean staged and Central Maven/Gradle consumers.
+
+### CUDA device evidence
+
+No CUDA numeric path changed and device gates were not rerun for this patch. The last G1 result is
+1280/1280 exact token IDs across 20 prompts on an RTX 4090 (capability 8.9), Granite 4.1 3B Q4_K_M,
+2026-10-07 (`benchmark-results/2026-10-07-g1-parity`). The same host/model's G4 result is 6.184x,
+31.26 versus 5.06 tok/s (`benchmark-results/2026-10-07-g4-dualpath`). These results do not establish
+parity on A40 or L40S. The opt-in artifact and kill switch remain unchanged.
+
 ## [0.3.56] - 2026-10-09
 
 ### Added

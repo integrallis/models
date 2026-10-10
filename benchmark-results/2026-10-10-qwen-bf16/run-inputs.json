@@ -1,0 +1,340 @@
+{
+  "kind": "candidate correctness, not a released-artifact or performance claim",
+  "sourceBase": "be4493e1cc3a7570413b3f84289512c3ad31eed4",
+  "workingTreePatchSha256": "7df05987c301e5215026b5826e384c33e253857d1de45713d2d2938c9180cbed",
+  "backendVersion": "models@0.3.57+candidate-be4493e1cc3a-diff-7df05987c301",
+  "javaVersion": "openjdk version \"25.0.3\" 2026-04-21 LTS\nOpenJDK Runtime Environment Temurin-25.0.3+9 (build 25.0.3+9-LTS)\nOpenJDK 64-Bit Server VM Temurin-25.0.3+9 (build 25.0.3+9-LTS, mixed mode)\n",
+  "command": [
+    "/Users/briansam-bodden/.sdkman/candidates/java/25.0.3-tem/bin/java",
+    "--add-modules",
+    "jdk.incubator.vector",
+    "--enable-native-access=ALL-UNNAMED",
+    "-cp",
+    "/Users/briansam-bodden/Code/java-ai/projects/models/models-rag-bench/build/install/models-rag-bench/lib/*",
+    "com.integrallis.models.rag.RagBenchmarkCli",
+    "--framework",
+    "plain-java",
+    "--backend",
+    "pure-java",
+    "--backend-version",
+    "models@0.3.57+candidate-be4493e1cc3a-diff-7df05987c301",
+    "--model",
+    "/Users/briansam-bodden/Code/java-ai/projects/models/build/real-model-fixtures/qwen_qwen2_5_0_5b_instruct_bf16",
+    "--model-id",
+    "qwen_qwen2_5_0_5b_instruct_bf16",
+    "--workload",
+    "general",
+    "--prompt-template",
+    "chatml",
+    "--context",
+    "2048",
+    "--threads",
+    "8",
+    "--max-tokens",
+    "64",
+    "--top-k",
+    "1",
+    "--warmups",
+    "0",
+    "--iterations",
+    "1",
+    "--output",
+    "/Users/briansam-bodden/Code/java-ai/projects/models/benchmark-results/2026-10-10-qwen-bf16/default-correctness/models-pure-java.json"
+  ],
+  "runtimeArtifacts": [
+    {
+      "file": "HdrHistogram-2.2.2.jar",
+      "sizeBytes": 177206,
+      "sha256": "22d1d4316c4ec13a68b559e98c8256d69071593731da96136640f864fa14fad8"
+    },
+    {
+      "file": "ST4-4.3.4.jar",
+      "sizeBytes": 251081,
+      "sha256": "f927ac384c46d749f8b5ec68972a53aed21e00313509299616edb73bfa15ff33"
+    },
+    {
+      "file": "antlr-runtime-3.5.3.jar",
+      "sizeBytes": 173220,
+      "sha256": "68bf9f5a33dfcb34033495c587e6236bef4e37aa6612919f5b1e843b90669fb9"
+    },
+    {
+      "file": "antlr4-runtime-4.13.1.jar",
+      "sizeBytes": 326305,
+      "sha256": "54665d2838cc66458343468efc539e454fc95b46a8a04b13c6ac43fc9be63505"
+    },
+    {
+      "file": "backend-java-0.3.57.jar",
+      "sizeBytes": 967251,
+      "sha256": "b882e2f7315acb225b3c7224ac341bc141ab42d27b14e9a9d37a5f1e143f6abd"
+    },
+    {
+      "file": "backend-native-0.3.57.jar",
+      "sizeBytes": 48049,
+      "sha256": "a95b11e354bb1a439ef40525229f7f428792c1e04f66781f83f5ebce999d24d6"
+    },
+    {
+      "file": "classmate-1.7.2.jar",
+      "sizeBytes": 68424,
+      "sha256": "a9bbe12ffbe65a68acc4df47485fe2391c3071cc261c2038efe6438fc17aac00"
+    },
+    {
+      "file": "commons-logging-1.3.5.jar",
+      "sizeBytes": 73737,
+      "sha256": "6d7a744e4027649fbb50895df9497d109f98c766a637062fe8d2eabbb3140ba4"
+    },
+    {
+      "file": "context-propagation-1.2.1.jar",
+      "sizeBytes": 35890,
+      "sha256": "5b69e2100640879ccf4b20673ced86de560b8e217b55542f85a53d3563b72aaa"
+    },
+    {
+      "file": "itu-1.14.0.jar",
+      "sizeBytes": 57633,
+      "sha256": "5cf40ab0cc77828ab2b875b1f3ecd71c8295d7721933476abc2e08fddcea164a"
+    },
+    {
+      "file": "jackson-annotations-2.22.jar",
+      "sizeBytes": 84211,
+      "sha256": "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0"
+    },
+    {
+      "file": "jackson-core-2.22.3.jar",
+      "sizeBytes": 594776,
+      "sha256": "8a501126a385b25841915d839508f8a66e2a0dbc8a6709d055ef3b3e852b094c"
+    },
+    {
+      "file": "jackson-core-3.1.4.jar",
+      "sizeBytes": 598562,
+      "sha256": "3bda1cd6eff0a8d47bdfcaeae7c2bd5311d6c8ed494ef5f3e51029bb44aa9bdf"
+    },
+    {
+      "file": "jackson-databind-2.22.3.jar",
+      "sizeBytes": 1709604,
+      "sha256": "556db5439e206114346043f68d200497dc96a0bca62a360a81784092ebd0e0a9"
+    },
+    {
+      "file": "jackson-databind-3.1.4.jar",
+      "sizeBytes": 1940679,
+      "sha256": "14034bfdf392b6ebec1b4bb6c1de29d604f0aa97251259a19d5f19af8719bb20"
+    },
+    {
+      "file": "json-schema-validator-3.0.1.jar",
+      "sizeBytes": 579543,
+      "sha256": "271e37c705eea7d0fd9b95d3a601ab9531a0ca49a86beba2e2b792583670494b"
+    },
+    {
+      "file": "jsonschema-generator-5.0.0.jar",
+      "sizeBytes": 165536,
+      "sha256": "dc17156260641870fd0f2dcbda5866f7d2fdffc668a41928487b1008ae3335c0"
+    },
+    {
+      "file": "jsonschema-module-jackson-5.0.0.jar",
+      "sizeBytes": 35298,
+      "sha256": "5c0d08b4696fd734b314c1b9dd517d932de4055f1cf9a074eafc95a580bb8da2"
+    },
+    {
+      "file": "jsonschema-module-swagger-2-5.0.0.jar",
+      "sizeBytes": 19252,
+      "sha256": "5c4d6931de56b4b58917c7b9bd3e801b041744ecce1bfed14b0e525379e570c3"
+    },
+    {
+      "file": "jspecify-1.0.0.jar",
+      "sizeBytes": 3819,
+      "sha256": "1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab"
+    },
+    {
+      "file": "jtokkit-1.1.0.jar",
+      "sizeBytes": 3246331,
+      "sha256": "1501ce0259ab897c6746ccfafa1d208acd404fb17e1ac62e157172f2678b1183"
+    },
+    {
+      "file": "langchain4j-1.17.2.jar",
+      "sizeBytes": 321226,
+      "sha256": "d3d584b1539edae6d936622024d89567ba9d06c8834c3b0c93d884812bdd873a"
+    },
+    {
+      "file": "langchain4j-core-1.17.2.jar",
+      "sizeBytes": 585053,
+      "sha256": "dfb88213918302a55c42f3c78803363a07815d5798e16dac9bf77520c01e8eef"
+    },
+    {
+      "file": "lucene-core-10.4.0.jar",
+      "sizeBytes": 4596517,
+      "sha256": "8f894d211a8123938ccb9ff6827d136747e0eb6b1782ada6ac9086aa911b52e2"
+    },
+    {
+      "file": "micrometer-commons-1.17.0.jar",
+      "sizeBytes": 51805,
+      "sha256": "03919dc71e2417ec4b5c254c4ba924963c972e124190f73cdcb68ed51c6eede6"
+    },
+    {
+      "file": "micrometer-core-1.17.0.jar",
+      "sizeBytes": 915149,
+      "sha256": "73503e701a377fafeaf33b71b9b8910a8d7884cbba88ab27971b33b3753b65aa"
+    },
+    {
+      "file": "micrometer-observation-1.17.0.jar",
+      "sizeBytes": 84304,
+      "sha256": "2fc95a327578d3b2a81c3ff40e646a4a21e46b0153ccbbf91690142bf80d9661"
+    },
+    {
+      "file": "models-api-0.3.57.jar",
+      "sizeBytes": 73028,
+      "sha256": "cbdddd8b305aa354ec8c95058e8b64cfc2844786b30ed74f626e2edfa051886f"
+    },
+    {
+      "file": "models-langchain4j-0.3.57.jar",
+      "sizeBytes": 67519,
+      "sha256": "7a481fd4508b4fa49b86771d63de323dbbecaf98a7915d71d732844651449446"
+    },
+    {
+      "file": "models-rag-0.3.57.jar",
+      "sizeBytes": 24371,
+      "sha256": "88180adae96f1d46ab091b33812d0af953b77bd612ab50077298ce576f53b097"
+    },
+    {
+      "file": "models-rag-bench-0.3.57.jar",
+      "sizeBytes": 180407,
+      "sha256": "233b09c333eaca4cb991c8f8bd599a4d7a22f2c6d58808c1df9873ad752ae799"
+    },
+    {
+      "file": "models-router-0.3.57.jar",
+      "sizeBytes": 795554,
+      "sha256": "e719dba01b6b3824309093f349fd758451b903b1cf52bd967b9077a7de5eaf17"
+    },
+    {
+      "file": "models-runtime-0.3.57.jar",
+      "sizeBytes": 226953,
+      "sha256": "e82733564d5b9dd59dc355f212a3fc4e87ca1fd286e9013174ad861d3cf06c9a"
+    },
+    {
+      "file": "models-spring-ai-0.3.57.jar",
+      "sizeBytes": 52317,
+      "sha256": "862fa242386db0998c82fc08e21291b6e2d136a950fa5aa17eba942fb99ff2de"
+    },
+    {
+      "file": "opennlp-tools-2.5.9.jar",
+      "sizeBytes": 1396264,
+      "sha256": "bc2d28082607b211fdf3185c1496ea8e130fa1fe1bead85622d38487920017e2"
+    },
+    {
+      "file": "reactive-streams-1.0.4.jar",
+      "sizeBytes": 11640,
+      "sha256": "f75ca597789b3dac58f61857b9ac2e1034a68fa672db35055a8fb4509e325f28"
+    },
+    {
+      "file": "reactor-core-3.8.6.jar",
+      "sizeBytes": 1938752,
+      "sha256": "ffc646b225465efce55d3ea350f1bcd1d27d4a56e912323e316dd8e6d04bff11"
+    },
+    {
+      "file": "slf4j-api-2.0.20.jar",
+      "sizeBytes": 70255,
+      "sha256": "7e1446499b359675d8aabe6af2de86b85e72ae8a2a932c0b40d0e5ba57097439"
+    },
+    {
+      "file": "spring-ai-client-chat-2.0.0.jar",
+      "sizeBytes": 149121,
+      "sha256": "cb0e199611d1397eec67f8992c0b16a626d316547cf709d483a90d73fc47aeba"
+    },
+    {
+      "file": "spring-ai-commons-2.0.0.jar",
+      "sizeBytes": 82988,
+      "sha256": "ebf49507c65302069abfa425ed573ef944f3a937b8afa20c6ffa2700f80f39fc"
+    },
+    {
+      "file": "spring-ai-model-2.0.0.jar",
+      "sizeBytes": 407834,
+      "sha256": "23d91239aa950445d25e269faaed53facf66ff48dcba5284659e59ca62e5e9dc"
+    },
+    {
+      "file": "spring-ai-rag-2.0.0.jar",
+      "sizeBytes": 49016,
+      "sha256": "e486b2b3c150027ac7d847e443e150f29b195988a163a236aca048c3c738b4e6"
+    },
+    {
+      "file": "spring-ai-template-st-2.0.0.jar",
+      "sizeBytes": 8557,
+      "sha256": "65704f0a2b0f808420b8c4a0fb36760eaa514a55fd143ddfa2086d0bccbc94da"
+    },
+    {
+      "file": "spring-ai-vector-store-2.0.0.jar",
+      "sizeBytes": 131042,
+      "sha256": "75ccdddb9bc8bd558bbbb418d0e1d23945ff98ea328bf2234eeaa2e4cd55ff84"
+    },
+    {
+      "file": "spring-aop-7.0.8.jar",
+      "sizeBytes": 426204,
+      "sha256": "1178f039e087884174e2affc46e484f4a8bd7f2a4e011d33dd9137709f740f80"
+    },
+    {
+      "file": "spring-beans-7.0.8.jar",
+      "sizeBytes": 928037,
+      "sha256": "6ec2e361a8872a71d8b1ff66f1bcb8cfa29fcc437931998919da7cecfb59b45b"
+    },
+    {
+      "file": "spring-context-7.0.8.jar",
+      "sizeBytes": 1398484,
+      "sha256": "1eb7d552414ebac00e30ab3e809138d810785f6d2c4271db77cdf0181f308f19"
+    },
+    {
+      "file": "spring-core-7.0.8.jar",
+      "sizeBytes": 2035553,
+      "sha256": "726ba2a5130833644bdf267a55ff26e1f52e8dcc9aa1ffa06904ca9c14619f25"
+    },
+    {
+      "file": "spring-expression-7.0.8.jar",
+      "sizeBytes": 325993,
+      "sha256": "3c97c38ab59c77ee886e08ccf8096f6bb58a1245f68dfed7a40e93f41c435f9a"
+    },
+    {
+      "file": "spring-messaging-7.0.8.jar",
+      "sizeBytes": 613599,
+      "sha256": "0f96694ebb88fed6bf4aef608010c23ee922a476dd71e0fab76ca9ed0eaa70b0"
+    },
+    {
+      "file": "swagger-annotations-jakarta-2.2.38.jar",
+      "sizeBytes": 50578,
+      "sha256": "cf15aa4ab7e8c747d7b3d979660a49320ea56c0dc88b7021e48cc909c13b997b"
+    },
+    {
+      "file": "vectors-core-0.1.29.jar",
+      "sizeBytes": 286525,
+      "sha256": "21eeae4fcaa56fa26ed45d99610142f794cdec0e1d852894e637263f5bd0b40c"
+    },
+    {
+      "file": "vectors-db-0.1.29.jar",
+      "sizeBytes": 353510,
+      "sha256": "d6ac2e6f03cced3c8f5a57d8c97fc678886f0946ac709af1c26bc3d4cfb8b9b5"
+    },
+    {
+      "file": "vectors-hnsw-0.1.29.jar",
+      "sizeBytes": 69643,
+      "sha256": "9dfcfd2e4457c3cb0d1031516bdcf7e92dcb57f9369cd0a2eb772c485c9dacce"
+    },
+    {
+      "file": "vectors-ivf-0.1.29.jar",
+      "sizeBytes": 60517,
+      "sha256": "06eb621153278f5ced4851c50c6a5ec293210213ea3f73c6d6afc9e654fb05ff"
+    },
+    {
+      "file": "vectors-quantization-0.1.29.jar",
+      "sizeBytes": 118868,
+      "sha256": "d4c9e4b679590c33d9aad16834e07b5e908d1aefd25951ca0850071a1fe32406"
+    },
+    {
+      "file": "vectors-storage-0.1.29.jar",
+      "sizeBytes": 85989,
+      "sha256": "ca7e303ae7e693945537b692eb88939ba56018a0a8f71249e5f494add3a3412e"
+    },
+    {
+      "file": "vectors-vamana-0.1.29.jar",
+      "sizeBytes": 39459,
+      "sha256": "15b80d088fef22ce53898d8c10afba60c6884d500f591db00bf497f8861b0de0"
+    }
+  ],
+  "tuningSystemProperties": [],
+  "startedAt": "2026-10-10T18:22:44Z",
+  "exitCode": 0,
+  "completedAt": "2026-10-10T18:23:42Z"
+}

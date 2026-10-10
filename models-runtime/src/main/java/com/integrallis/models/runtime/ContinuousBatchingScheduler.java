@@ -154,8 +154,16 @@ final class ContinuousBatchingScheduler implements AutoCloseable {
         repetitionLoopStops.get());
   }
 
+  void requireOutsideCallback() {
+    if (Thread.currentThread() == worker) {
+      throw new IllegalStateException(
+          "mutating session operations are not supported from a continuous-batching callback");
+    }
+  }
+
   @Override
   public void close() {
+    requireOutsideCallback();
     if (!closed) {
       closed = true;
       worker.interrupt();

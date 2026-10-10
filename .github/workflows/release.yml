@@ -222,8 +222,10 @@ jobs:
           -PmodelsAppleBridgeArtifactDirectory=apple-release-artifacts
           --no-daemon --stacktrace
 
-      - name: Verify independent Maven consumers
-        run: python3 scripts/verify-maven-runtime.py --repository build/staging-deploy
+      - name: Test dependency policy rejection cases
+        run: |
+          python3 scripts/test-dependency-policy.py
+          python3 scripts/test-published-consumers.py
 
       - name: Prepare staged-release notebook classpath
         env:
@@ -337,6 +339,10 @@ jobs:
           echo "::error::Published deployment did not synchronize to $artifact_url"
           exit 1
 
+      - name: Verify released consumer graphs
+        if: ${{ !inputs.dry_run && !inputs.skip_deploy }}
+        run: python3 scripts/verify-maven-runtime.py --central --output build/central-consumers
+
       - name: Publish GitHub release
         if: ${{ !inputs.dry_run }}
         env:
@@ -362,4 +368,6 @@ jobs:
           path: |
             models/out/jreleaser/trace.log
             models/out/jreleaser/output.properties
-            models/build/maven-runtime-smoke/
+            models/build/reports/release-dependencies/
+            models/build/published-consumers/
+            models/build/central-consumers/

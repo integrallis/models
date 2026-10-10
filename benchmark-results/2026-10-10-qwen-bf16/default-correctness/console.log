@@ -1,0 +1,19 @@
+Running actual Qwen BF16 candidate default smoke: models@0.3.57+candidate-be4493e1cc3a-diff-7df05987c301
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 10, 2026 11:22:45 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 10, 2026 11:22:45 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=12 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Oct 10, 2026 11:22:46 AM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256
+iteration 1/1 case=auto-glass-deadline correct=true retrieval=53.2ms ttft=6115.9ms decode=6.91 tok/s e2e=10389.9ms
+iteration 1/1 case=travel-limit correct=true retrieval=3.5ms ttft=1988.1ms decode=6.38 tok/s e2e=5759.5ms
+iteration 1/1 case=telemedicine-benefit correct=true retrieval=2.8ms ttft=2056.4ms decode=6.35 tok/s e2e=5209.2ms
+iteration 1/1 case=claim-payment-times correct=true retrieval=2.4ms ttft=1934.3ms decode=6.30 tok/s e2e=4954.2ms
+iteration 1/1 case=chargeback-evidence correct=true retrieval=2.2ms ttft=1886.5ms decode=7.12 tok/s e2e=5263.2ms
+iteration 1/1 case=break-glass correct=true retrieval=2.6ms ttft=2081.5ms decode=7.46 tok/s e2e=6376.0ms
+iteration 1/1 case=idempotency correct=true retrieval=2.4ms ttft=2557.7ms decode=6.99 tok/s e2e=5281.6ms
+iteration 1/1 case=priority-one correct=true retrieval=2.1ms ttft=1972.1ms decode=7.41 tok/s e2e=6025.8ms
+iteration 1/1 case=unsupported-lunar-vehicle correct=true retrieval=2.4ms ttft=2069.8ms decode=4.84 tok/s e2e=2487.6ms
+plain-java/pure-java/qwen_qwen2_5_0_5b_instruct_bf16: tier=PERFORMANCE_REDUCED success=9/9 p95-retrieval=33.3ms p95-ttft=4692.6ms p50-decode=6.91 tok/s p95-e2e=8784.4ms correct=100.0% model-answered=55.6% of-those-correct=100.0% extractive-fallback=33.3% truncated=0.0%
+report: /Users/briansam-bodden/Code/java-ai/projects/models/benchmark-results/2026-10-10-qwen-bf16/default-correctness/models-pure-java.json
