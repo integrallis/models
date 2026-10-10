@@ -299,19 +299,92 @@ class Overrides(unittest.TestCase):
                          "--start-shard", "900", "--mt-override", "zzz=1"])
 
 
+DIMS = {"parameterCount": 1_543_714_304, "blockCount": 28, "embeddingLength": 1536}
+
+
 class Precedent(unittest.TestCase):
-    def test_precedent_reports_what_comparable_models_ran_with(self):
+    def test_recent_reports_are_counted_separately_from_qualifications(self):
         prior = {"b": rec("coding", "chatml"), "other": rec("general", "llama3")}
         catalog = dict(CATALOG)
         catalog["other"] = {"id": "other", "format": "gguf", "downloadUri": "u", "sizeBytes": 1,
                             "architecture": "llama", "capabilities": ["chat"]}
         p = bs.precedent(catalog, prior, "a")
         self.assertEqual(p["architecture"], "qwen2")
-        self.assertEqual(p["templates"], {"chatml": 1},
+        self.assertEqual(p["templatesRecent"], {"chatml": 1},
                          "only same-architecture models inform the template")
         # 'a' shares the 'chat' capability with both, so both workloads are offered -- and the
         # ambiguity is the point: it is why the tool refuses instead of picking one.
-        self.assertEqual(p["workloads"], {"coding": 1, "general": 1})
+        self.assertEqual(p["workloadsRecent"], {"coding": 1, "general": 1})
+        self.assertEqual(p["templates"], {}, "no qualifications were supplied")
+
+    def test_qualified_models_in_the_catalog_are_the_primary_precedent(self):
+        # A campaign's own reports are what was TRIED; the catalog records what EARNED a verdict,
+        # across every campaign there has ever been. The second is the better advice.
+        catalog = dict(CATALOG)
+        catalog["q1"] = {"id": "q1", "format": "gguf", "downloadUri": "u", "sizeBytes": 1,
+                         "architecture": "qwen2", "capabilities": ["chat", "math"]}
+        qualified = {"q1": {"workload": "math", "promptTemplate": "chatml-direct"}}
+        p = bs.precedent(catalog, {}, "a", qualified)
+        self.assertEqual(p["templates"], {"chatml-direct": 1})
+        self.assertEqual(p["workloads"], {"math": 1})
+
+    def test_a_rejected_models_settings_are_not_precedent(self):
+        # qualification_precedent only admits qualified:true rows, so a rejection cannot advise.
+        with tempfile.TemporaryDirectory() as tmp:
+            cat = pathlib.Path(tmp, "catalog"); cat.mkdir()
+            (cat / "qualifications.json").write_text(json.dumps({"entries": [
+                {"modelId": "good", "workload": "math", "promptTemplate": "chatml",
+                 "qualified": True},
+                {"modelId": "bad", "workload": "sql", "promptTemplate": "zephyr",
+                 "qualified": False, "verdict": "FAILED_MODEL_CONTRIBUTION_GATE"},
+            ]}))
+            got = bs.qualification_precedent(str(cat / "models.json"))
+        self.assertIn("good", got)
+        self.assertNotIn("bad", got, "a rejected row is not precedent for anything")
+
+    def test_a_missing_catalog_narrows_the_advice_rather_than_raising(self):
+        self.assertEqual(bs.qualification_precedent("/nope/models.json"), {})
+        self.assertEqual(bs.qualification_precedent(None), {})
+
+    def test_identical_dimensions_are_reported_as_the_same_base_model(self):
+        # The sharpest signal available: nexus-science is byte-for-byte nexus-legal in every
+        # dimension, and legal is qualified. Architecture alone would have pointed at the most
+        # common template across fifteen unrelated qwen2 models instead.
+        catalog = {
+            "new": {"id": "new", "format": "gguf", "downloadUri": "u", "sizeBytes": 1,
+                    "architecture": "qwen2", "capabilities": ["chat"], "dimensions": dict(DIMS)},
+            "sib": {"id": "sib", "format": "gguf", "downloadUri": "u", "sizeBytes": 1,
+                    "architecture": "qwen2", "capabilities": ["chat"], "dimensions": dict(DIMS)},
+            "cousin": {"id": "cousin", "format": "gguf", "downloadUri": "u", "sizeBytes": 1,
+                       "architecture": "qwen2", "capabilities": ["chat"],
+                       "dimensions": {"parameterCount": 999}},
+        }
+        qualified = {"sib": {"workload": "legal", "promptTemplate": "chatml-direct"},
+                     "cousin": {"workload": "general", "promptTemplate": "chatml"}}
+        p = bs.precedent(catalog, {}, "new", qualified)
+        self.assertEqual(p["sameBase"], {"chatml-direct": 1})
+        self.assertEqual(p["sameBaseModels"], [("sib", "chatml-direct", "legal")])
+        self.assertNotIn("cousin", [m for m, _, _ in p["sameBaseModels"]],
+                         "a different parameter count is a different base model")
+
+    def test_a_model_is_not_its_own_same_base_precedent(self):
+        catalog = {"a": {"id": "a", "format": "gguf", "downloadUri": "u", "sizeBytes": 1,
+                         "architecture": "qwen2", "capabilities": ["chat"],
+                         "dimensions": dict(DIMS)}}
+        p = bs.precedent(catalog, {}, "a", {"a": {"workload": "general",
+                                                  "promptTemplate": "chatml"}})
+        self.assertEqual(p["sameBaseModels"], [])
+
+    def test_a_model_with_no_dimensions_claims_no_same_base_precedent(self):
+        catalog = {"a": {"id": "a", "format": "gguf", "downloadUri": "u", "sizeBytes": 1,
+                         "architecture": "qwen2", "capabilities": ["chat"]},
+                   "sib": {"id": "sib", "format": "gguf", "downloadUri": "u", "sizeBytes": 1,
+                           "architecture": "qwen2", "capabilities": ["chat"],
+                           "dimensions": dict(DIMS)}}
+        p = bs.precedent(catalog, {}, "a",
+                         {"sib": {"workload": "legal", "promptTemplate": "chatml-direct"}})
+        self.assertEqual(p["sameBaseModels"], [],
+                         "absent dimensions must not match another model's absent dimensions")
 
 
 class ShardFilesAreImmutable(unittest.TestCase):

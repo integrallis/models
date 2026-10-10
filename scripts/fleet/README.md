@@ -165,6 +165,19 @@ python3 scripts/fleet/build-shards.py --ids slate.txt --reports <prior> \
 letting the other fall back to a default would be the same guess the tool exists not to make, so
 one without the other is still a refusal and the message says which is missing.
 
+To inform that choice the refusal prints the precedent it found, strongest first:
+
+- **same base model** — models whose `dimensions` are *identical*, which means the same base at the
+  same quantization. This is the sharpest signal there is: `nexus-science` matches `nexus-legal` in
+  every dimension, and legal is already qualified, so what legal ran with is the precedent that
+  matters. Architecture alone would have pointed at the most common template across fifteen
+  unrelated `qwen2` models.
+- **same architecture, among models that have QUALIFIED** — read from the catalog's
+  `qualifications.json`, which records the template that earned each verdict across every campaign.
+  Only `qualified: true` rows count; what a *rejected* model ran with is not precedent for
+  anything.
+- **what was tried in the reports being read** — counted separately, because tried is not earned.
+
 Declared jobs are printed as `DECLARED on the command line`, counted separately in the summary, and
 noted as comparable only to a later run that holds the same declaration. `--mt-override` and
 `--dt-override` are optional on top; without them the cap falls back to the worker default of 256

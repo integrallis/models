@@ -82,23 +82,83 @@ def index_prior_reports(report_dirs):
     return found
 
 
-def precedent(catalog_by_id, prior, model_id):
-    """What comparable models actually ran with, for a human to choose from."""
+def qualification_precedent(catalog_dir):
+    """modelId -> {workload, promptTemplate} for every QUALIFIED model in the catalog.
+
+    Richer and more durable than one campaign's reports: the catalog records the template and
+    workload that actually earned each verdict, across every campaign there has ever been. Only
+    rows with ``qualified`` true are read -- `entries` also holds rejections, and what a rejected
+    model ran with is not precedent for anything.
+
+    Returns an empty mapping rather than raising when the catalog is not to hand, because
+    precedent is advisory: the tool refuses either way, and a missing catalog should narrow the
+    advice, not break the refusal.
+    """
+    if not catalog_dir:
+        return {}
+    path = pathlib.Path(catalog_dir).parent / "qualifications.json"
+    if not path.exists():
+        return {}
+    try:
+        entries = json.loads(path.read_text())["entries"]
+    except (json.JSONDecodeError, KeyError, OSError):
+        return {}
+    out = {}
+    for e in entries:
+        if e.get("qualified") is not True:
+            continue
+        out[e["modelId"]] = {"workload": e.get("workload"),
+                             "promptTemplate": e.get("promptTemplate")}
+    return out
+
+
+def precedent(catalog_by_id, prior, model_id, qualified=None):
+    """What comparable models actually ran with, for a person to choose from.
+
+    Two sources, counted separately so their weight is visible: models QUALIFIED in the catalog
+    (what earned a verdict) and reports from the runs being read now (what was tried recently).
+    """
     me = catalog_by_id.get(model_id, {})
     my_arch = me.get("architecture")
     my_caps = set(me.get("capabilities", []))
-    tpl = collections.Counter()
-    wl = collections.Counter()
+    my_dims = me.get("dimensions")
+    tpl_q, wl_q = collections.Counter(), collections.Counter()
+    tpl_r, wl_r = collections.Counter(), collections.Counter()
+    # Identical dimensions mean the same base model at the same quantization -- a far sharper
+    # signal than a shared architecture. nexus-science is byte-for-byte nexus-legal in every
+    # dimension, and legal is already qualified, so what legal ran with is the precedent that
+    # matters; architecture qwen2 alone would have pointed at the most common template across
+    # fifteen unrelated models instead.
+    same_base = collections.Counter()
+    same_base_models = []
+
+    for mid, info in (qualified or {}).items():
+        other = catalog_by_id.get(mid)
+        if not other:
+            continue
+        if other.get("architecture") == my_arch and info.get("promptTemplate"):
+            tpl_q[info["promptTemplate"]] += 1
+        if my_caps and (my_caps & set(other.get("capabilities", []))) and info.get("workload"):
+            wl_q[info["workload"]] += 1
+        if (my_dims and other.get("dimensions") == my_dims and mid != model_id
+                and info.get("promptTemplate")):
+            same_base[info["promptTemplate"]] += 1
+            same_base_models.append((mid, info["promptTemplate"], info.get("workload")))
+
     for mid, rec in prior.items():
         other = catalog_by_id.get(mid)
         if not other:
             continue
-        s = rec["settings"]
-        if other.get("architecture") == my_arch:
-            tpl[s.get("promptTemplate")] += 1
-        if my_caps and (my_caps & set(other.get("capabilities", []))):
-            wl[s.get("workload")] += 1
-    return {"architecture": my_arch, "templates": dict(tpl), "workloads": dict(wl)}
+        st = rec["settings"]
+        if other.get("architecture") == my_arch and st.get("promptTemplate"):
+            tpl_r[st["promptTemplate"]] += 1
+        if my_caps and (my_caps & set(other.get("capabilities", []))) and st.get("workload"):
+            wl_r[st["workload"]] += 1
+
+    return {"architecture": my_arch,
+            "templates": dict(tpl_q), "workloads": dict(wl_q),
+            "templatesRecent": dict(tpl_r), "workloadsRecent": dict(wl_r),
+            "sameBase": dict(same_base), "sameBaseModels": sorted(same_base_models)}
 
 
 def decode_threads(rec):
@@ -264,6 +324,7 @@ def main(argv=None):
         if k not in ids:
             sys.exit(f"override names {k!r}, which is not in --ids")
 
+    qualified = qualification_precedent(args.catalog)
     missing = []
     jobs = build_jobs(ids, catalog_by_id, prior, mt_override, wl_override, missing,
                       tpl_override, dt_override)
@@ -273,14 +334,28 @@ def main(argv=None):
               f"evidence.\n")
         for model_id, why in missing:
             print(f"  {model_id}: {why}")
-            p = precedent(catalog_by_id, prior, model_id)
-            if p["templates"] or p["workloads"]:
-                print(f"      precedent for architecture {p['architecture']}: "
-                      f"templates {p['templates'] or '(none)'}")
-                print(f"      precedent for its capabilities: workloads "
+            p = precedent(catalog_by_id, prior, model_id, qualified)
+            if p["sameBaseModels"]:
+                print(f"      SAME BASE MODEL -- identical dimensions to "
+                      f"{len(p['sameBaseModels'])} already-qualified model(s), which is the "
+                      f"strongest precedent available:")
+                for mid2, tpl2, wl2 in p["sameBaseModels"]:
+                    print(f"          {mid2:<46} tpl={tpl2}  qualified on {wl2}")
+            if any(p[k] for k in ("templates", "workloads", "templatesRecent",
+                                  "workloadsRecent")):
+                print(f"      architecture {p['architecture']} -- templates that have QUALIFIED: "
+                      f"{p['templates'] or '(none)'}")
+                if p["templatesRecent"]:
+                    print(f"          templates tried in the reports read here: "
+                          f"{p['templatesRecent']}")
+                print(f"      its capabilities -- workloads that have QUALIFIED: "
                       f"{p['workloads'] or '(none)'}")
-                print(f"      neither is a safe default -- see this script's docstring. Pass the "
-                      f"choice explicitly or add a prior report.")
+                if p["workloadsRecent"]:
+                    print(f"          workloads tried in the reports read here: "
+                          f"{p['workloadsRecent']}")
+                print(f"      none of these is a safe default -- see this script's docstring. "
+                      f"Declare --wl-override and --tpl-override together, or add a prior "
+                      f"report.")
         print()
         return 1
 
