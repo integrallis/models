@@ -20,6 +20,12 @@ jobs:
         uses: actions/checkout@v5
         with:
           path: models
+          # Full history. The evidence scripts resolve commit ranges -- derive.py checks that a
+          # paired measurement's two arms came from builds whose delta misses the measured path
+          # -- and on a shallow clone they cannot, so they fail closed and the build goes red.
+          # The alternative was to let them trust a record they cannot verify, which is the hole
+          # that ran a September kernel for a whole campaign.
+          fetch-depth: 0
 
       - uses: actions/setup-java@v5
         with:
@@ -79,6 +85,16 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/fleet -p '*_test.py' -v
           bash scripts/fleet/qual-worker-guards-test.sh
+
+      # Integrity checks. These exist because of specific defects that shipped, each named in the
+      # script that catches it. The mutation check runs LAST because it is the one that proves the
+      # others can fail -- a guard that cannot detect its own defect reports green and everyone
+      # stops looking, which has already happened here.
+      - name: Check cited evidence exists
+        run: python3 scripts/integrity/check-evidence-references.py
+
+      - name: Prove every integrity guard can fail
+        run: python3 scripts/integrity/mutation-check.py
 
       - name: Generate SBOM
         run: ./gradlew cyclonedxDirectBom

@@ -1,0 +1,30 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v6",
+  "candidate" : {
+    "path" : "/work/out/eurollm_1_7b_instruct_q5_k_m.json",
+    "sha256" : "96c507338de0e32ef0ee51532315ebcc4448306fc4c77f49fdd0dc00830e000a"
+  },
+  "comparators" : [ {
+    "path" : "/work/out/eurollm_1_7b_instruct_q5_k_m.comparator.json",
+    "sha256" : "be9c4bb6f9d2b89af29a307a0639d6e11a3a5acd6d4026d1af3c88fca23c2836"
+  } ],
+  "qualification" : {
+    "modelId" : "eurollm_1_7b_instruct_q5_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "a096f81416ca799e9e9af6f3212f9e76fd903b88123fb33a074b892c729c9e60",
+    "absoluteTier" : "PRODUCTION_READY",
+    "verdict" : "NO_COMPARABLE_BASELINE",
+    "qualified" : false,
+    "modelAnswerCount" : 24,
+    "modelAnswerRate" : 0.8888888888888888,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ ],
+    "comparisons" : [ ],
+    "exclusions" : {
+      "ollama" : "baseline failed runtime or quality gate"
+    }
+  }
+}

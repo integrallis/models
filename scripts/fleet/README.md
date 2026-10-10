@@ -61,10 +61,11 @@ and is now one per-job variable handed to **both** arms, because `sameWorkload()
 tokens and a mismatch excludes the comparator.
 
 
-## The payload and the version label are required inputs
+## The payload, the kernels JAR and the version label are required inputs
 
-`QUAL_PAYLOAD` and `QUAL_BACKEND_VERSION` must both be set in the bootstrap's environment. The
-worker refuses to start without them, and refuses to start if they disagree.
+`QUAL_PAYLOAD`, `QUAL_KERNELS` and `QUAL_BACKEND_VERSION` must all be set in the bootstrap's
+environment. The worker refuses to start without them, and refuses to start if any of them
+disagree.
 
 Both used to be hard-coded in `qual-worker-two-arm.sh`, and both went stale. The committed file
 said `models-rag-bench-0.3.50-v23.tar` and `BACKEND_VERSION="models@0.3.50+v23-08d9b5e1cef8"`
@@ -84,6 +85,28 @@ name:
 | `models@0.3.56+v24-7ac4153` | `models-rag-bench-0.3.56-v24.tar` | starts |
 | `models@0.3.56+v24-7ac4153` | `models-rag-bench-0.3.50-v23.tar` | `VERSION_PAYLOAD_MISMATCH` |
 | `local` | anything | refused: a label naming no version cannot be checked |
+
+### The kernels JAR was the worse case
+
+`backend-native`'s published JAR carries **classes only** — zero `META-INF/models/native` entries
+— so the `.so` comes *exclusively* from a separate platform JAR. The worker used to fetch that
+under the fixed name `models-kernels-linux-x86_64.jar`, and the object on S3 under that name dated
+from **2026-09-28** while the Java side was 0.3.56.
+
+So every run measured a September Rust kernel against a current library, and said nothing about
+it. Both declare `abi=6`, so it loaded cleanly and nothing looked wrong:
+
+| | sha256 | size |
+| --- | --- | --- |
+| released 0.3.56 | `064cfae7…` | 485,960 |
+| the one in use | `ce25a986…` | 480,536 |
+
+The kernels JAR is now a required, version-checked input like the payload, and the worker logs the
+`.so` digest from the JAR's own `native.properties` so a report can be checked against the kernel
+that produced it rather than trusted. A versionless `models-kernels-linux-x86_64.jar` is refused.
+
+The released platform JARs are artifacts of the release run itself
+(`release-native-<platform>`), which is where to get one rather than rebuilding it.
 
 The check is a named function bracketed by `# >>> BEGIN payload_label_version` markers.
 `qual-worker-guards-test.sh` extracts that block and exercises **the shipped implementation**

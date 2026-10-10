@@ -103,11 +103,13 @@ cd /work
 # edited copy, so the committed one -- the whole reason this script is in the repository -- named
 # a build nobody had run. A wrong BACKEND_VERSION is not a cosmetic defect; it is a false
 # provenance claim on evidence that goes into the catalog.
-if [ -z "${QUAL_PAYLOAD:-}" ] || [ -z "${QUAL_BACKEND_VERSION:-}" ]; then
-  say "FATAL QUAL_PAYLOAD and QUAL_BACKEND_VERSION are required; refusing to guess a build"
+if [ -z "${QUAL_PAYLOAD:-}" ] || [ -z "${QUAL_BACKEND_VERSION:-}" ] \
+   || [ -z "${QUAL_KERNELS:-}" ]; then
+  say "FATAL QUAL_PAYLOAD, QUAL_KERNELS and QUAL_BACKEND_VERSION are required; refusing to guess"
   STATUS=NO_PAYLOAD_INPUTS; exit 1
 fi
 PAYLOAD="$QUAL_PAYLOAD"
+KERNELS="$QUAL_KERNELS"
 BACKEND_VERSION="$QUAL_BACKEND_VERSION"
 # The version in the label must be the version in the payload, or the reports describe a build that
 # was not measured. models@0.3.56+v24-abc -> 0.3.56, which must appear in the payload object name.
@@ -133,16 +135,32 @@ if ! payload_matches_label "$PAYLOAD" "$BACKEND_VERSION"; then
   say "FATAL BACKEND_VERSION $BACKEND_VERSION does not name the payload $PAYLOAD"
   STATUS=VERSION_PAYLOAD_MISMATCH; exit 1
 fi
-say "payload $PAYLOAD labelled $BACKEND_VERSION"
+# The Rust kernel is checked the same way and for the same reason. backend-native's published JAR
+# carries CLASSES ONLY -- zero META-INF/models/native entries -- so the .so comes exclusively from
+# this separate platform JAR, and the worker used to fetch it under the fixed name
+# models-kernels-linux-x86_64.jar. That object on S3 dated from 2026-09-28 while the Java side was
+# 0.3.56, so every run measured a September kernel against a current library and said nothing about
+# it. Both declare abi=6, so it loaded cleanly and the mismatch was invisible: released 0.3.56 is
+# sha256 064cfae7... at 485960 bytes, the September build ce25a986... at 480536.
+if ! payload_matches_label "$KERNELS" "$BACKEND_VERSION"; then
+  say "FATAL BACKEND_VERSION $BACKEND_VERSION does not name the kernels jar $KERNELS"
+  STATUS=VERSION_KERNELS_MISMATCH; exit 1
+fi
+say "payload $PAYLOAD kernels $KERNELS labelled $BACKEND_VERSION"
 aws s3 cp "s3://$BUCKET/payload/$PAYLOAD" . --only-show-errors
-aws s3 cp "s3://$BUCKET/payload/models-kernels-linux-x86_64.jar" . --only-show-errors
+aws s3 cp "s3://$BUCKET/payload/$KERNELS" . --only-show-errors
 aws s3 cp "s3://$BUCKET/payload/fleet-shard-$SHARD.json" /work/shard.json --only-show-errors
 [ -s "$PAYLOAD" ] || { STATUS=NO_DIST; exit 1; }
-[ -s /work/models-kernels-linux-x86_64.jar ] || { STATUS=NO_KERNEL_JAR; exit 1; }
+[ -s "/work/$KERNELS" ] || { STATUS=NO_KERNEL_JAR; exit 1; }
 [ -s /work/shard.json ] || { STATUS=NO_SHARD; exit 1; }
 tar xf "$PAYLOAD" || { STATUS=NO_DIST_UNPACK; exit 1; }
 DIST=$(ls -d /work/models-rag-bench-*/ | head -1)
-CP="$DIST/lib/*:/work/models-kernels-linux-x86_64.jar"
+CP="$DIST/lib/*:/work/$KERNELS"
+# Record what the kernel actually is, so a report can be checked against it afterwards rather than
+# trusted. The .so's digest is the only thing that distinguishes two ABI-6 kernels.
+KERNEL_SHA=$(unzip -p "/work/$KERNELS" "META-INF/models/native/linux-x86_64/native.properties" \
+  2>/dev/null | sed -n 's/^sha256=//p')
+say "kernel $KERNELS sha256=${KERNEL_SHA:-unknown}"
 JOBS=$(python3 -c "import json;print(len(json.load(open('/work/shard.json'))))")
 say "payload ok, $JOBS jobs"
 # QUAL_THREADS lets a shard pin the thread count. Both arms receive it -- the CLI sends

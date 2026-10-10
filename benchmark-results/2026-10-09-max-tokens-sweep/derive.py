@@ -107,7 +107,14 @@ def backend_delta_paths(sha_a, sha_b):
         return live, "git"
 
     if os.path.exists(record):
-        return [ln for ln in open(record).read().splitlines() if ln.strip()], "record"
+        # git could not answer, so the record cannot be checked against anything. It is a file in
+        # the working tree that anyone can edit, and trusting it here would let a tampered record
+        # admit a pair whose two arms differ on the measured path. Found by
+        # scripts/integrity/mutation-check.py, which runs this script in a copy with no .git and
+        # saw the tamper pass unnoticed. Admissible only when the caller says so explicitly.
+        if os.environ.get("SWEEP_ALLOW_UNVERIFIED_DELTA") == "1":
+            return [ln for ln in open(record).read().splitlines() if ln.strip()], "record"
+        return None, "unverifiable"
     return None, None
 
 
@@ -141,7 +148,12 @@ def main():
             if bad is None and a["backendVersion"] != b["backendVersion"]:
                 paths, src = backend_delta_paths(version_sha(a["backendVersion"]),
                                                  version_sha(b["backendVersion"]))
-                if paths is None:
+                if paths is None and src == "unverifiable":
+                    bad = (f"backendVersion differs ({a['backendVersion']} vs "
+                           f"{b['backendVersion']}); git cannot resolve the delta and the "
+                           f"committed record cannot be verified without it. Set "
+                           f"SWEEP_ALLOW_UNVERIFIED_DELTA=1 to accept the record on trust.")
+                elif paths is None:
                     bad = (f"backendVersion differs ({a['backendVersion']} vs "
                            f"{b['backendVersion']}) and git cannot resolve the delta")
                 else:
@@ -230,6 +242,19 @@ def main():
                 print(f"  {m} [{wl}]: {n} files differ, none on the measured path ({how})")
         print()
     rc = check_notes(rows)
+    if not rows:
+        print()
+        print("NO ADMISSIBLE PAIRS. Every candidate pair was rejected or unpaired, so this script")
+        print("derived nothing. Exiting non-zero: a derivation that produced no numbers has not")
+        print("succeeded, whatever its reasons were. Found by mutation-check.py, which saw this")
+        print("script reject every pair and still exit 0.")
+        rc = 1
+    if rejected:
+        print()
+        print(f"{len(rejected)} pair(s) REJECTED as inadmissible. Exiting non-zero: a rejected")
+        print("pair is a measurement this script refused to stand behind, and a run that refuses")
+        print("data must not report success.")
+        rc = 1
     print()
     versions = sorted({r["backendVersion"] for got in runs.values() for r in got})
     print("backendVersion present in these artifacts:")
@@ -251,6 +276,12 @@ def check_notes(rows):
     if not os.path.exists(notes_path):
         print("NOTES.md absent; nothing to check.")
         return 0
+    if not rows:
+        # Zero derived pairs means this check compared the write-up against nothing and would
+        # report success for any prose at all. Vacuous green is worse than red.
+        print("NOTES.md NOT CHECKED: no pairs were derived, so there was nothing to check it")
+        print("  against. A write-up verified against an empty result set is not verified.")
+        return 1
     notes = open(notes_path).read()
     problems = []
     for a, b in rows:
