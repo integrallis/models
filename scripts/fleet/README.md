@@ -148,3 +148,28 @@ Shard numbers are immutable — a number that has been launched names a payload 
 prefix — so the tool refuses to overwrite an existing shard file rather than reusing a number.
 
 Tests: `python3 -m unittest discover -s scripts/fleet -p 'build_shards_test.py'` (stdlib only).
+
+## Workload coverage: `workload-coverage.py`
+
+```
+python3 scripts/fleet/workload-coverage.py --catalog ../model-jars/catalog \
+    [--check-doc docs/WORKLOAD-COVERAGE.md] [--fail-on-zero]
+```
+
+Reports which RAG workloads have qualified models. The workload list is **parsed out of
+`RagWorkload.java`**, not written in the script, so a workload the enum gains cannot go missing
+from the report; a constant the parser cannot read is printed as a warning rather than skipped.
+
+It keeps apart two states that both look like a zero:
+
+- **no corpus** — the documents or cases resource is missing or empty, so no model *could* qualify
+  there. That is "no data".
+- **no qualified model** — the corpus has cases and nothing has passed the gate yet. That is a gap
+  a campaign closes.
+
+`--check-doc` verifies that `docs/WORKLOAD-COVERAGE.md` still states what this tool derives: the
+pasted table, the quoted case questions, and the answerable/unanswerable split. Markdown
+blockquote markers are stripped first, because a quoted question wraps across lines. `--fail-on-zero`
+turns the report into a gate.
+
+The candidate slate for the open gaps lives in `docs/WORKLOAD-COVERAGE.md`.
