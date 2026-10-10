@@ -71,7 +71,8 @@ jobs:
 
       # The fleet tooling decides what every qualification measures, so its tests belong in CI
       # rather than with whoever remembers to run them. Stdlib unittest and plain bash, no
-      # dependencies. Cases needing the ModelJars catalog skip when it is not checked out here.
+      # dependencies. A committed catalog fixture exercises catalog cases without a reverse build
+      # dependency on the downstream ModelJars repository.
       - name: Test fleet tooling
         run: |
           python3 -m unittest discover -s scripts/fleet -p '*_test.py' -v
@@ -86,6 +87,12 @@ jobs:
 
       - name: Check no workflow duplicates a shared setup step
         run: python3 scripts/integrity/check-workflow-duplication.py
+
+      - name: Check the candidate inventory matches the catalog
+        run: >-
+          python3 scripts/fleet/candidate-inventory.py
+          --catalog scripts/fleet/fixtures/candidate-catalog
+          --check-doc docs/CANDIDATE-INVENTORY.md
 
       - name: Prove every integrity guard can fail
         run: python3 scripts/integrity/mutation-check.py
