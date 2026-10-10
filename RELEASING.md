@@ -46,3 +46,40 @@ gates are `cuda-kernel-gate --mode capability|parity|decode` and need no externa
 The workflow uses the same Maven Central and GPG secrets as `mfcqi-java`:
 `MAVENCENTRAL_USERNAME`, `MAVENCENTRAL_PASSWORD`, `GPG_PUBLIC_KEY`,
 `GPG_SECRET_KEY`, and `GPG_PASSPHRASE`.
+
+## When a native platform job fails, decide before you touch anything
+
+A failed native platform job stops the release. The bundle is assembled only after **every**
+native succeeds, so this cannot produce a partial publish — observed on 0.3.56, run
+`38008419296`: `Native windows-x86_64` failed, `Release to Maven Central and GitHub` was
+**skipped**, every artifact returned 404, and no tag was created. That is worth knowing as
+behaviour and not merely as intent, because it means a failed run is safe to diagnose calmly
+rather than urgently.
+
+The question is only whether the failure is the code or the infrastructure. Read the root cause
+before re-dispatching, and check these four things:
+
+1. **Where in the job did it die?** `BUILD FAILED in 34s` is not a compilation failure. Grep the
+   log for `What went wrong` rather than reading the Gradle stack trace, which is always the
+   bottom of the log and never the cause.
+2. **Did the other platforms pass?** Five of six passing on the same commit rules out most code
+   explanations immediately.
+3. **Did the dry run pass on effectively the same tree?** Compare the two runs' shas with
+   `git diff --name-only <dry> <real>` and look for anything on the path that failed. If the delta
+   is docs and scripts, the code did not change.
+4. **Is the thing it could not find actually there?** Fetch it yourself.
+
+Worked example, 0.3.56. The cause was
+`Plugin [id: 'com.integrallis.mfcqi', version: '0.7.0'] was not found`, at 34 seconds, during
+plugin resolution before any compilation. The plugin's POM returned **200** from
+`repo1.maven.org` when checked by hand; five other platforms resolved the same plugin in the same
+run; the dry run had passed the identical job fifteen minutes earlier; and the only commit delta
+was `scripts/fleet/**` and `docs/**`, nothing touching Rust. Four signals, all pointing at
+transient resolution on one runner. Re-dispatched unchanged as run `38009139958` and
+`Native windows-x86_64` passed.
+
+**Re-dispatch is the right action only once that case is made.** Re-running a release because a
+job is red, without knowing why it was red, is how a real defect gets published on the second
+attempt. Equally, do not "fix" the workflow after a single flake: adding retries or a repository
+mirror to the release path on one data point is speculative surgery on the one pipeline that must
+be trustworthy. Wait for a second occurrence and a reason.
