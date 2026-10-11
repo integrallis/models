@@ -51,7 +51,7 @@ that fork as comparator. No authoritative baseline was fabricated, no policy flo
 and no performance or RAG-quality qualification is claimed for Bonsai here.
 
 Remaining Bonsai publication gates: supported authoritative engine over the exact artifact;
-complete default smoke and controlled workload; model-contribution, absolute and relative gates;
+controlled paired workload; model-contribution, absolute and relative gates;
 released-runtime evidence; marker staging/finalization and Central verification. Image understanding
 also requires its separate projector and modality gates. EmbeddingGemma's other modalities likewise
 remain separate work.
@@ -82,4 +82,47 @@ not a retrieval-quality or performance comparison. Other workloads were active o
 python3 benchmark-results/2026-10-11-model-onboarding/verify-released-runtime.py \
   --models /absolute/path/to/models --output /tmp/models-0358-published \
   --model /absolute/path/to/embeddinggemma2.gguf
+```
+
+## Bonsai default RAG smoke result
+
+`bonsai2-default.json` and its unmodified `.log` retain all nine cases from the
+predeclared default workload. `bonsai2-default-provenance.json` records file hashes
+and runtime identity. The source build is `3e4f0c56471bd0f4217f9ead6853ed737664e030`;
+the five runtime/harness source trees listed in the receipt are unchanged at the
+0.3.58 release commit. This is still a source-build run, not a published-artifact run.
+
+All nine attempts completed without failure. Four returned `MODEL_ANSWER`, four
+returned `EXTRACTIVE_FALLBACK`, and one returned `RETRIEVAL_ABSTENTION`. All returned
+answers and the abstention passed the workload checks. Model-answer rate was 4/9
+(44.44%); correctness among those four answers was 100%; no answer was truncated.
+The raw-output evaluator also marked all nine correct. This small synthetic smoke
+set does not establish general answer quality, and pipeline correctness does not
+mean the model supplied every returned answer.
+
+The observed median decode rate was 0.2399 tokens/second and p95 end-to-end time
+was 1028.6 seconds. Builds and recordings shared this Intel host, there was one
+iteration and no warmup, and there was no paired comparator. These timings are
+retained observations, not controlled performance claims. `peakRssBytes: 0` means
+no RSS observation was captured; it must not be interpreted as zero memory use.
+Diagnostics report that PTQ1_0 has no retained batched-prefill kernel.
+
+The absolute model-contribution smoke floors are met, but this does not satisfy
+the full production qualification gate. Authoritative same-artifact comparison,
+controlled relative gates and released-runtime workload evidence remain open.
+Bonsai remains an unpublished catalog candidate.
+
+Reproduce the declared source-build smoke (the complete command is also reflected
+in the report settings):
+
+```sh
+JAVA_OPTS='--enable-native-access=ALL-UNNAMED -Xmx8g -XX:ActiveProcessorCount=12' \
+  models-rag-bench/build/install/models-rag-bench/bin/models-rag-bench \
+  --framework plain-java --backend pure-java \
+  --backend-version models-0.3.58-source-3e4f0c56 \
+  --model /absolute/path/to/bonsai2.gguf \
+  --model-id prism_ml_ternary_bonsai_2_27b_gguf_ptq1_0 \
+  --workload general --prompt-template chatml-no-think \
+  --context 2048 --threads 12 --top-k 1 --max-tokens 64 \
+  --warmups 0 --iterations 1 --output /tmp/bonsai2-default.json
 ```

@@ -1,0 +1,18 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 11, 2026 8:58:42 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 11, 2026 8:58:42 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=12 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Oct 11, 2026 8:58:43 AM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256
+iteration 1/1 case=auto-glass-deadline correct=true retrieval=50.2ms ttft=606724.4ms decode=0.20 tok/s e2e=753980.7ms
+iteration 1/1 case=travel-limit correct=true retrieval=15.0ms ttft=609016.9ms decode=0.36 tok/s e2e=689174.7ms
+iteration 1/1 case=telemedicine-benefit correct=true retrieval=3.5ms ttft=692230.2ms decode=0.25 tok/s e2e=814761.8ms
+iteration 1/1 case=claim-payment-times correct=true retrieval=5.3ms ttft=548977.4ms decode=0.33 tok/s e2e=631157.3ms
+iteration 1/1 case=chargeback-evidence correct=true retrieval=6.3ms ttft=508615.0ms decode=0.30 tok/s e2e=603217.6ms
+iteration 1/1 case=break-glass correct=true retrieval=9.2ms ttft=633546.9ms decode=0.23 tok/s e2e=746028.2ms
+iteration 1/1 case=idempotency correct=true retrieval=10.1ms ttft=1004715.5ms decode=0.24 tok/s e2e=1146474.7ms
+iteration 1/1 case=priority-one correct=true retrieval=25.8ms ttft=639784.1ms decode=0.15 tok/s e2e=851816.5ms
+iteration 1/1 case=unsupported-lunar-vehicle correct=true retrieval=7.4ms ttft=823988.4ms decode=0.19 tok/s e2e=839757.5ms
+plain-java/pure-java/prism_ml_ternary_bonsai_2_27b_gguf_ptq1_0: tier=PERFORMANCE_REDUCED success=9/9 p95-retrieval=40.4ms p95-ttft=932424.6ms p50-decode=0.24 tok/s p95-e2e=1028611.4ms correct=100.0% model-answered=44.4% of-those-correct=100.0% extractive-fallback=44.4% truncated=0.0%
+report: /Users/briansam-bodden/Code/java-ai/projects/models/benchmark-results/2026-10-11-model-onboarding/bonsai2-default.json

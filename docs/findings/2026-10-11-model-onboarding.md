@@ -68,3 +68,13 @@ Use the public pure-Java backend with no Models tuning properties. This is the e
 versioned controlled workload, not a new authored corpus. Record model contribution separately
 from pipeline correctness. Until the authoritative comparator supports PTQ1_0, this run is
 compatibility/quality evidence only and does not qualify publication or throughput.
+
+## Default workload outcome
+
+The [complete Bonsai smoke report](../../benchmark-results/2026-10-11-model-onboarding/bonsai2-default.json)
+completed all nine cases: four model answers, four extractive fallbacks and one
+retrieval abstention. All passed the existing checks; there were no failures or
+truncations. Model contribution was 44.44%, with 100% correctness among accepted
+model answers. This source-build smoke meets the absolute contribution floors,
+but does not replace the missing authoritative paired evaluation or released-runtime
+workload evidence. See the [provenance and limits](../../benchmark-results/2026-10-11-model-onboarding/README.md#bonsai-default-rag-smoke-result).
