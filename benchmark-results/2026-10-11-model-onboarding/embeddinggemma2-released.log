@@ -1,0 +1,18 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 11, 2026 10:09:27 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 11, 2026 10:09:27 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=12 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+EmbeddingGemma 2 Q8_0 text GGUF vs llama.cpp 5c8854fd88319125125dc4b836c98b1b215b0f23 | 8 probes | mean pooling, dim 768
+  0.9999421  The cat sat on the mat.
+  0.9998255  How do I reset my password?
+  0.9999077  Quantum chromodynamics describes the strong interaction.
+  0.9999391  a
+  0.9999080  The quick brown fox jumps over the lazy dog near the ...
+  0.9999168  Database backups are retained for 30 days.
+  0.9998087  def add(a, b): return a + b
+  0.9999564  ¿Dónde está la biblioteca?
+min 0.9998087  mean 0.9999005  max component delta 0.002792  floor 0.9990
+unit length: held (max deviation 7.68e-09, floor 1e-03)
+REPRODUCED in 15.4s
+report: /private/tmp/models-0358-published/embeddinggemma2-released-equivalence.json

@@ -1,0 +1,146 @@
+{
+  "timestamp": "2026-10-11T17:09:42.891922+00:00",
+  "command": [
+    "java",
+    "--add-modules",
+    "jdk.incubator.vector",
+    "--enable-native-access=ALL-UNNAMED",
+    "-Xmx4g",
+    "-cp",
+    "/private/tmp/models-0358-published/lib/*",
+    "com.integrallis.models.bench.InferenceBenchmarkCli",
+    "embedding-equivalence",
+    "--model",
+    "/Users/briansam-bodden/.cache/models-onboarding/embeddinggemma2.gguf",
+    "--report",
+    "/private/tmp/models-0358-published/embeddinggemma2-released-equivalence.json"
+  ],
+  "exitCode": 0,
+  "classpath": [
+    {
+      "file": "backend-cuda-0.3.58.jar",
+      "coordinate": "com.integrallis:backend-cuda:0.3.58",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/backend-cuda/0.3.58/backend-cuda-0.3.58.jar",
+      "sha256": "0ca5764f364a96303f32a1de61adb45f880dabadba03b84633ffcde89ec9ca88",
+      "centralSha1": "0587457b0e7469c2fd6a13d7802a2b643258cccc"
+    },
+    {
+      "file": "backend-java-0.3.58.jar",
+      "coordinate": "com.integrallis:backend-java:0.3.58",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/backend-java/0.3.58/backend-java-0.3.58.jar",
+      "sha256": "51c6a69803604c7b115f55de4bb797cd2b4a65aaf07b2869a29b4b0155bfd28a",
+      "centralSha1": "14d7f4f105683e6ef90b310c3a27c991b1947910"
+    },
+    {
+      "file": "jackson-annotations-2.22.jar",
+      "coordinate": "com.fasterxml.jackson.core:jackson-annotations:2.22",
+      "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar",
+      "sha256": "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0",
+      "centralSha1": "15c67f9498d6934cff9510fc70c5a12e52290457"
+    },
+    {
+      "file": "jackson-core-2.22.3.jar",
+      "coordinate": "com.fasterxml.jackson.core:jackson-core:2.22.3",
+      "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-core/2.22.3/jackson-core-2.22.3.jar",
+      "sha256": "8a501126a385b25841915d839508f8a66e2a0dbc8a6709d055ef3b3e852b094c",
+      "centralSha1": "8695aab38355c65b60e242ec62edf13c52916d88"
+    },
+    {
+      "file": "jackson-databind-2.22.3.jar",
+      "coordinate": "com.fasterxml.jackson.core:jackson-databind:2.22.3",
+      "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.22.3/jackson-databind-2.22.3.jar",
+      "sha256": "556db5439e206114346043f68d200497dc96a0bca62a360a81784092ebd0e0a9",
+      "centralSha1": "d0d4b2cdb0a1440ac02178fc2ff01dfb05cd06a8"
+    },
+    {
+      "file": "jackson-datatype-jdk8-2.22.3.jar",
+      "coordinate": "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.22.3",
+      "url": "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.22.3/jackson-datatype-jdk8-2.22.3.jar",
+      "sha256": "f223061a5aaecdc9506458143807c73bcd1a744d6b3bbb8da4703a0abc408f7d",
+      "centralSha1": "1c8e07b4eefb9ccb6a2247c54f42f293ff0dc8aa"
+    },
+    {
+      "file": "models-api-0.3.58.jar",
+      "coordinate": "com.integrallis:models-api:0.3.58",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/models-api/0.3.58/models-api-0.3.58.jar",
+      "sha256": "f2dbd2bc50f5592cceb05dc71a7030ffa4e14bfa41e6b3cbf79baf6eb504d37e",
+      "centralSha1": "ec83c4bdc5abfc728e1f20147b5902ba17b8790d"
+    },
+    {
+      "file": "models-bench-0.3.58.jar",
+      "source": "local unpublished measurement harness",
+      "sha256": "5a21be64fe254e2345b3a2e3582588b3eb484e857aeaa95d25ff3e1015faa93f"
+    },
+    {
+      "file": "models-router-0.3.58.jar",
+      "coordinate": "com.integrallis:models-router:0.3.58",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/models-router/0.3.58/models-router-0.3.58.jar",
+      "sha256": "61985cb27ba2c895f6e7ac4489d8663e67aa36c9af03925005a5ab559bee04eb",
+      "centralSha1": "2c82edc5bdb31f03c2f67368dd780ba07f135e1f"
+    },
+    {
+      "file": "models-runtime-0.3.58.jar",
+      "coordinate": "com.integrallis:models-runtime:0.3.58",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/models-runtime/0.3.58/models-runtime-0.3.58.jar",
+      "sha256": "d3b9cc7c5239c754b3fb389ca67e24f46b666b5473926bed1de6ade22f422883",
+      "centralSha1": "f9648bd24406041e83145d96f6a6d14daf626002"
+    },
+    {
+      "file": "slf4j-api-2.0.20.jar",
+      "coordinate": "org.slf4j:slf4j-api:2.0.20",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.20/slf4j-api-2.0.20.jar",
+      "sha256": "7e1446499b359675d8aabe6af2de86b85e72ae8a2a932c0b40d0e5ba57097439",
+      "centralSha1": "7fea9d92ba67e9b3c8f03515fb202b86a1fe44f6"
+    },
+    {
+      "file": "vectors-core-0.1.29.jar",
+      "coordinate": "com.integrallis:vectors-core:0.1.29",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/vectors-core/0.1.29/vectors-core-0.1.29.jar",
+      "sha256": "21eeae4fcaa56fa26ed45d99610142f794cdec0e1d852894e637263f5bd0b40c",
+      "centralSha1": "9a9831f6b838978ea5cbca052e6045573f556390"
+    },
+    {
+      "file": "vectors-db-0.1.29.jar",
+      "coordinate": "com.integrallis:vectors-db:0.1.29",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/vectors-db/0.1.29/vectors-db-0.1.29.jar",
+      "sha256": "d6ac2e6f03cced3c8f5a57d8c97fc678886f0946ac709af1c26bc3d4cfb8b9b5",
+      "centralSha1": "8949eef3cd7c6969e3f9df7acc2f5f94d1fdcd5e"
+    },
+    {
+      "file": "vectors-hnsw-0.1.29.jar",
+      "coordinate": "com.integrallis:vectors-hnsw:0.1.29",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/vectors-hnsw/0.1.29/vectors-hnsw-0.1.29.jar",
+      "sha256": "9dfcfd2e4457c3cb0d1031516bdcf7e92dcb57f9369cd0a2eb772c485c9dacce",
+      "centralSha1": "aaee26a4def1846755e01eecfe6f430c0bbd4111"
+    },
+    {
+      "file": "vectors-ivf-0.1.29.jar",
+      "coordinate": "com.integrallis:vectors-ivf:0.1.29",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/vectors-ivf/0.1.29/vectors-ivf-0.1.29.jar",
+      "sha256": "06eb621153278f5ced4851c50c6a5ec293210213ea3f73c6d6afc9e654fb05ff",
+      "centralSha1": "f06f898a6b7b0ed3b1a0e07e576cbfefe4684997"
+    },
+    {
+      "file": "vectors-quantization-0.1.29.jar",
+      "coordinate": "com.integrallis:vectors-quantization:0.1.29",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/vectors-quantization/0.1.29/vectors-quantization-0.1.29.jar",
+      "sha256": "d4c9e4b679590c33d9aad16834e07b5e908d1aefd25951ca0850071a1fe32406",
+      "centralSha1": "0a7e67d4dd4cdc156e6afe06a31c3a6b8d33c1f9"
+    },
+    {
+      "file": "vectors-storage-0.1.29.jar",
+      "coordinate": "com.integrallis:vectors-storage:0.1.29",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/vectors-storage/0.1.29/vectors-storage-0.1.29.jar",
+      "sha256": "ca7e303ae7e693945537b692eb88939ba56018a0a8f71249e5f494add3a3412e",
+      "centralSha1": "0d7092a013b48be5b6afcc02e6aa8568c8f07627"
+    },
+    {
+      "file": "vectors-vamana-0.1.29.jar",
+      "coordinate": "com.integrallis:vectors-vamana:0.1.29",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/vectors-vamana/0.1.29/vectors-vamana-0.1.29.jar",
+      "sha256": "15b80d088fef22ce53898d8c10afba60c6884d500f591db00bf497f8861b0de0",
+      "centralSha1": "96c7e741d3e039eac0d280ada706feb3137b4c38"
+    }
+  ],
+  "scope": "The unpublished benchmark harness is local. All executable Models/Vectors runtime and external dependency JARs are fetched from Central, checksum-verified, and isolated from the source build classpath."
+}

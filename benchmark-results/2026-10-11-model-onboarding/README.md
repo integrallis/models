@@ -60,5 +60,26 @@ remain separate work.
 
 `build-verification.json` records the complete 0.3.58 build/compliance result and test counts.
 The refreshed embedding report retains every Java vector and token sequence; all eight token
-sequences match the independent oracle exactly. Its qualification is numerical evidence for
-the working tree, pending released-artifact verification before catalog publication.
+sequences match the independent oracle exactly. The original report records the working tree. The separate released-artifact report below
+provides the catalog publication evidence.
+
+## Released runtime verification
+
+Models 0.3.58 was published by [release run 38156648214](https://github.com/integrallis/models/actions/runs/38156648214)
+from `fab199754d219f53623e7810ccc05be68f8186df`. All ten release jobs, including
+independent Maven and Gradle consumers, completed successfully. Vectors remains 0.1.29.
+
+`verify-released-runtime.py` fetches each runtime JAR from Maven Central into an isolated
+classpath and checks its Central checksum. Only the unpublished measurement harness comes
+from the local build. `released-classpath.json` records every coordinate, URL, SHA-256,
+command and exit code; `embeddinggemma2-released.log` is its execution log.
+`embeddinggemma2-released-equivalence.json` retains all eight Java vectors and token sequences.
+All eight probes pass: minimum cosine 0.9998087162015021, maximum norm deviation
+7.675834412523841e-9, and 768 output dimensions. These are numerical conformance measurements,
+not a retrieval-quality or performance comparison. Other workloads were active on the host.
+
+```sh
+python3 benchmark-results/2026-10-11-model-onboarding/verify-released-runtime.py \
+  --models /absolute/path/to/models --output /tmp/models-0358-published \
+  --model /absolute/path/to/embeddinggemma2.gguf
+```
