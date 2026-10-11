@@ -35,6 +35,7 @@ final class Qwen35Weights {
       Set.of(
           GgufTensorType.F32,
           GgufTensorType.BF16,
+          GgufTensorType.PTQ1_0,
           GgufTensorType.Q4_0,
           GgufTensorType.Q5_0,
           GgufTensorType.Q8_0,
@@ -45,7 +46,11 @@ final class Qwen35Weights {
           // GGUF, not assumed: every other matrix in that file is a K-quant.
           GgufTensorType.MXFP4);
 
-  record Matrix(MemorySegment data, GgufTensorType type, int rows, int columns) {
+  record Matrix(MemorySegment data, GgufTensorType type, int rows, int columns, String name) {
+    Matrix(MemorySegment data, GgufTensorType type, int rows, int columns) {
+      this(data, type, rows, columns, "");
+    }
+
     Matrix {
       Objects.requireNonNull(data, "data");
       Objects.requireNonNull(type, "type");
@@ -129,6 +134,7 @@ final class Qwen35Weights {
   private final Matrix outputHead;
 
   private final Layer[] layers;
+  private final PrismHadamard hadamard;
 
   private Qwen35Weights(
       MemorySegment tokenEmbedding,
@@ -137,7 +143,8 @@ final class Qwen35Weights {
       int vocabSize,
       float[] outputNorm,
       Matrix outputHead,
-      Layer[] layers) {
+      Layer[] layers,
+      PrismHadamard hadamard) {
     this.tokenEmbedding = tokenEmbedding;
     this.tokenEmbeddingType = tokenEmbeddingType;
     this.embeddingDim = embeddingDim;
@@ -145,6 +152,11 @@ final class Qwen35Weights {
     this.outputNorm = outputNorm;
     this.outputHead = outputHead;
     this.layers = layers;
+    this.hadamard = hadamard;
+    Set<String> routed = new java.util.HashSet<>();
+    if (outputHead != null) routed.add(outputHead.name());
+    for (Layer layer : layers) for (Matrix matrix : layerMatrices(layer)) routed.add(matrix.name());
+    hadamard.requireRouted(routed);
   }
 
   static Qwen35Weights fromGgufFile(GgufFile file, Qwen35Config config) {
@@ -255,7 +267,8 @@ final class Qwen35Weights {
         config.vocabSize(),
         vector(file, "output_norm.weight", config.embeddingDim()),
         optionalOutputHead(file, config),
-        layers);
+        layers,
+        PrismHadamard.load(file, config));
   }
 
   /**
@@ -349,6 +362,11 @@ final class Qwen35Weights {
       throw new IllegalArgumentException("token out of range: " + token);
     }
     GgufTensorValues.dequantizeRow(tokenEmbedding, tokenEmbeddingType, token, embeddingDim, output);
+    hadamard.restoreEmbedding(output);
+  }
+
+  PrismHadamard hadamard() {
+    return hadamard;
   }
 
   Matrix output() {
@@ -478,7 +496,7 @@ final class Qwen35Weights {
 
   private static Matrix matrix(GgufFile file, String name, int rows, int columns) {
     GgufTensorData tensor = matrixTensor(file, name, rows, columns);
-    return new Matrix(tensor.dataSegment(), tensor.type(), rows, columns);
+    return new Matrix(tensor.dataSegment(), tensor.type(), rows, columns, name);
   }
 
   private static GgufTensorData matrixTensor(GgufFile file, String name, int rows, int columns) {

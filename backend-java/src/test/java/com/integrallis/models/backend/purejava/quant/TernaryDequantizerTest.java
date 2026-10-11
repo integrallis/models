@@ -43,6 +43,31 @@ import org.junit.jupiter.api.Test;
 class TernaryDequantizerTest {
 
   @Test
+  void packedPtqProductAgreesWithScalarUnpackingAcrossOffsetsAndScales() {
+    var random = new java.util.Random(213);
+    for (int blocks : new int[] {1, 3, 40, 136}) {
+      byte[] bytes = new byte[13 + blocks * 28];
+      random.nextBytes(bytes);
+      float[] input = new float[7 + blocks * 128];
+      for (int i = 0; i < input.length; i++) input[i] = random.nextFloat() * 2 - 1;
+      // Finite positive/negative half scales, including zero and subnormal.
+      int[] scales = {0, 1, 0x3000, 0x3c00, 0xbc00, 0x1400};
+      for (int block = 0; block < blocks; block++) {
+        int scale = scales[block % scales.length];
+        bytes[13 + block * 28 + 26] = (byte) scale;
+        bytes[13 + block * 28 + 27] = (byte) (scale >>> 8);
+      }
+      var source = MemorySegment.ofArray(bytes);
+      float[] unpacked = new float[blocks * 128];
+      TernaryDequantizer.dequantizePtq1_0(source, 13, unpacked, 0, unpacked.length);
+      double expected = 0;
+      for (int i = 0; i < unpacked.length; i++) expected += (double) unpacked[i] * input[i + 7];
+      assertThat(TernaryDequantizer.dotProductPtq1_0(source, 13, input, 7, unpacked.length))
+          .isCloseTo((float) expected, org.assertj.core.data.Offset.offset(1e-4f));
+    }
+  }
+
+  @Test
   void dequantizePtq1_0MatchesTheReference() {
     byte[] block = {
       (byte) 0x8f,

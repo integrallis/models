@@ -49,3 +49,22 @@ full build/compliance and integration gates, then a Models release. Qualificatio
 must name that released version. ModelJars marker publication follows its documented
 verify → Central staging → finalization → artifact download verification → Pages
 sequence. Unsupported modalities and unsuccessful gates remain explicit.
+
+## Bonsai reference pin (before any Java comparison)
+
+PrismML-Eng/llama.cpp `e8fd209c975c80aa7fb36a8423571ff3b1b7e955`,
+CPU, context 512, 12 threads, temperature 0, seed 1. First continuation smoke:
+raw completion prompt `The quick brown fox`, eight generated tokens, no chat wrapper.
+The signed transform applies before listed projections and in inverse order after
+token lookup. The reference reorders tiled recurrent value heads before `ssm_out`;
+Java's recurrence also emits tiled heads (`head % keyHeadCount`), so the same
+tiled-to-grouped permutation is required before signs and Hadamard at `ssm_out`.
+
+## Bonsai default workload (declared before execution)
+
+Run all nine `general` cases once, no warmups, `chatml-no-think`, context 2048,
+64 output tokens, retrieval top-k 1, 12 threads, default greedy generation controls.
+Use the public pure-Java backend with no Models tuning properties. This is the existing
+versioned controlled workload, not a new authored corpus. Record model contribution separately
+from pipeline correctness. Until the authoritative comparator supports PTQ1_0, this run is
+compatibility/quality evidence only and does not qualify publication or throughput.

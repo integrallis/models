@@ -84,9 +84,10 @@ jobs:
             ~/.jvllm/models/Qwen2.5-Math-1.5B-Instruct-Q4_K_M.gguf
             ~/.jvllm/models/EuroLLM-1.7B-Instruct.Q4_K_M.gguf
             ~/.jvllm/models/all-MiniLM-L6-v2-Q4_K_M.gguf
+            ~/.jvllm/models/embeddinggemma-2-Q8_0.gguf
             ~/.jvllm/models/needle2.cact
             ~/.jvllm/models/mxbai-rerank-xsmall-v1
-          key: purejava-model-fixtures-v7
+          key: purejava-model-fixtures-v8
 
       - name: Download pure-Java model fixtures
         working-directory: models
@@ -110,6 +111,12 @@ jobs:
           :backend-java:downloadNeedle2Cact
           --no-daemon
           --stacktrace
+
+      - name: Run EmbeddingGemma 2 text integration and oracle equivalence
+        working-directory: models
+        run: |
+          ./gradlew :backend-java:embeddingGemma2IntegrationTest --no-daemon --stacktrace
+          ./gradlew :models-bench:run --args="embedding-equivalence --model $HOME/.jvllm/models/embeddinggemma-2-Q8_0.gguf" --no-daemon --stacktrace
 
       - name: Run MiniLM embedding framework integrations
         working-directory: models

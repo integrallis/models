@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.integrallis.models.backend.purejava.Bonsai2ModelFixtureIntegrationTest" tests="1" skipped="0" failures="1" errors="0" timestamp="2026-10-11T15:29:26.968Z" hostname="Brians-MacBook-Pro.local" time="1.092">
+  <properties/>
+  <testcase name="generatesFromTheSignedHadamardTernaryArtifact()" classname="com.integrallis.models.backend.purejava.Bonsai2ModelFixtureIntegrationTest" time="1.063">
+    <failure message="java.lang.IllegalArgumentException: token_embd.weight has unsupported matrix type PTQ1_0" type="java.lang.IllegalArgumentException">java.lang.IllegalArgumentException: token_embd.weight has unsupported matrix type PTQ1_0
+	at com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.matrixTensor(Qwen35Weights.java:488)
+	at com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.fromGgufFile(Qwen35Weights.java:154)
+	at com.integrallis.models.backend.purejava.qwen35.Qwen35ForwardPass.fromGgufFile(Qwen35ForwardPass.java:153)
+	at com.integrallis.models.backend.purejava.qwen35.Qwen35ForwardPass.fromGgufFile(Qwen35ForwardPass.java:143)
+	at com.integrallis.models.backend.purejava.PureJavaBackend.loadQwen35(PureJavaBackend.java:1064)
+	at com.integrallis.models.backend.purejava.PureJavaBackend.load(PureJavaBackend.java:497)
+	at com.integrallis.models.backend.purejava.PureJavaBackend.load(PureJavaBackend.java:380)
+	at com.integrallis.models.backend.purejava.PureJavaBackend.load(PureJavaBackend.java:217)
+	at com.integrallis.models.backend.purejava.Bonsai2ModelFixtureIntegrationTest.generatesFromTheSignedHadamardTernaryArtifact(Bonsai2ModelFixtureIntegrationTest.java:34)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Oct 11, 2026 8:29:27 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 11, 2026 8:29:27 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=12 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+]]></system-err>
+</testsuite>

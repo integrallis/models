@@ -1870,6 +1870,7 @@ public final class Qwen35ForwardPass {
   }
 
   private static final class ProjectionScratch {
+    private final float[] transformedActivation;
     private final byte[] quantizedActivation;
     private final float[] quantizedActivationScales;
     private final int[] quantizedActivationZeroPointCorrections;
@@ -1879,6 +1880,7 @@ public final class Qwen35ForwardPass {
       // Asked of the weights rather than assembled from the config's widths: see
       // Qwen35Weights.widestProjectionInput for why an enumeration here was the wrong shape.
       int maximumProjectionInput = weights.widestProjectionInput();
+      transformedActivation = new float[maximumProjectionInput];
       quantizedActivation = new byte[maximumProjectionInput];
       quantizedActivationScales = new float[(maximumProjectionInput + 31) / 32];
       quantizedActivationZeroPointCorrections = new int[(maximumProjectionInput + 3) / 4];
@@ -1887,6 +1889,11 @@ public final class Qwen35ForwardPass {
   }
 
   private void project(float[] output, float[] input, Matrix weights, ProjectionScratch scratch) {
+    PrismHadamard.Transform transform = this.weights.hadamard().projection(weights.name());
+    if (transform != null) {
+      transform.forward(input, scratch.transformedActivation);
+      input = scratch.transformedActivation;
+    }
     if (batchedMatrixKernel.isEligible(weights.type(), 1, weights.rows(), weights.columns())) {
       batchedMatrixKernel.multiply(
           output, input, weights.data(), weights.type(), 1, weights.rows(), weights.columns());
@@ -1913,6 +1920,12 @@ public final class Qwen35ForwardPass {
       Matrix secondWeights,
       float[] input,
       ProjectionScratch scratch) {
+    if (this.weights.hadamard().projection(firstWeights.name()) != null
+        || this.weights.hadamard().projection(secondWeights.name()) != null) {
+      project(firstOutput, input, firstWeights, scratch);
+      project(secondOutput, input, secondWeights, scratch);
+      return;
+    }
     if (firstWeights.columns() != secondWeights.columns()) {
       throw new IllegalArgumentException("grouped projections must share their input width");
     }
@@ -1964,6 +1977,14 @@ public final class Qwen35ForwardPass {
       Matrix thirdWeights,
       float[] input,
       ProjectionScratch scratch) {
+    if (this.weights.hadamard().projection(firstWeights.name()) != null
+        || this.weights.hadamard().projection(secondWeights.name()) != null
+        || this.weights.hadamard().projection(thirdWeights.name()) != null) {
+      project(firstOutput, input, firstWeights, scratch);
+      project(secondOutput, input, secondWeights, scratch);
+      project(thirdOutput, input, thirdWeights, scratch);
+      return;
+    }
     if (firstWeights.columns() != secondWeights.columns()
         || firstWeights.columns() != thirdWeights.columns()) {
       throw new IllegalArgumentException("grouped projections must share their input width");
@@ -2024,8 +2045,9 @@ public final class Qwen35ForwardPass {
       int batchSize,
       ProjectionScratch scalarScratch,
       BatchProjectionScratch batchScratch) {
-    if (batchedMatrixKernel.isEligible(
-        weights.type(), batchSize, weights.rows(), weights.columns())) {
+    if (this.weights.hadamard().projection(weights.name()) == null
+        && batchedMatrixKernel.isEligible(
+            weights.type(), batchSize, weights.rows(), weights.columns())) {
       batchedMatrixKernel.multiply(
           output,
           input,
@@ -2036,7 +2058,8 @@ public final class Qwen35ForwardPass {
           weights.columns());
       return;
     }
-    if (!TensorOps.supportsBatchedMatmul(weights.type())) {
+    if (this.weights.hadamard().projection(weights.name()) != null
+        || !TensorOps.supportsBatchedMatmul(weights.type())) {
       PerformanceCliffs.report(
           PerformanceCliff.ROW_BY_ROW_PROJECTION,
           "architecture=qwen35, tensor-type="
@@ -2078,6 +2101,12 @@ public final class Qwen35ForwardPass {
       int batchSize,
       ProjectionScratch scalarScratch,
       BatchProjectionScratch batchScratch) {
+    if (this.weights.hadamard().projection(firstWeights.name()) != null
+        || this.weights.hadamard().projection(secondWeights.name()) != null) {
+      projectBatched(firstOutput, input, firstWeights, batchSize, scalarScratch, batchScratch);
+      projectBatched(secondOutput, input, secondWeights, batchSize, scalarScratch, batchScratch);
+      return;
+    }
     if (firstWeights.columns() != secondWeights.columns()) {
       throw new IllegalArgumentException("grouped projections must share their input width");
     }
@@ -2140,6 +2169,14 @@ public final class Qwen35ForwardPass {
       int batchSize,
       ProjectionScratch scalarScratch,
       BatchProjectionScratch batchScratch) {
+    if (this.weights.hadamard().projection(firstWeights.name()) != null
+        || this.weights.hadamard().projection(secondWeights.name()) != null
+        || this.weights.hadamard().projection(thirdWeights.name()) != null) {
+      projectBatched(firstOutput, input, firstWeights, batchSize, scalarScratch, batchScratch);
+      projectBatched(secondOutput, input, secondWeights, batchSize, scalarScratch, batchScratch);
+      projectBatched(thirdOutput, input, thirdWeights, batchSize, scalarScratch, batchScratch);
+      return;
+    }
     if (firstWeights.columns() != secondWeights.columns()
         || firstWeights.columns() != thirdWeights.columns()) {
       throw new IllegalArgumentException("grouped projections must share their input width");

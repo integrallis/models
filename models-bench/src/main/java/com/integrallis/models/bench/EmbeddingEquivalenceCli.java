@@ -107,6 +107,7 @@ public final class EmbeddingEquivalenceCli {
 
     List<float[]> measured = new ArrayList<>(probes.size());
     List<Double> millis = new ArrayList<>(probes.size());
+    List<int[]> tokenIds = new ArrayList<>(probes.size());
     long start = System.nanoTime();
     try (PureJavaBackend backend = PureJavaBackend.load(artifact);
         GgufEmbeddingBackend embedding =
@@ -120,6 +121,7 @@ public final class EmbeddingEquivalenceCli {
         return FAIL;
       }
       for (String probe : probes) {
+        tokenIds.add(backend.tokenizer().encode(probe));
         long probeStart = System.nanoTime();
         measured.add(embedding.embed(probe));
         millis.add((System.nanoTime() - probeStart) / 1_000_000.0);
@@ -132,7 +134,10 @@ public final class EmbeddingEquivalenceCli {
 
     printSummary(reference, probes, result, elapsedSeconds);
     if (report != null) {
-      write(report, buildReport(reference, probes, result, artifact, artifactSha256, millis));
+      write(
+          report,
+          buildReport(
+              reference, probes, result, artifact, artifactSha256, millis, measured, tokenIds));
       System.out.println("report: " + report.toAbsolutePath());
     }
     return result.passed() ? PASS : FAIL;
@@ -196,7 +201,9 @@ public final class EmbeddingEquivalenceCli {
       EmbeddingEquivalence.Result result,
       Path artifact,
       String artifactSha256,
-      List<Double> millis)
+      List<Double> millis,
+      List<float[]> measured,
+      List<int[]> tokenIds)
       throws IOException {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode root = mapper.createObjectNode();
@@ -229,6 +236,8 @@ public final class EmbeddingEquivalenceCli {
       entry.put("probe", probes.get(probe));
       entry.put("cosine", result.cosines().get(probe));
       entry.put("embedMillis", millis.get(probe));
+      entry.set("tokenIds", mapper.valueToTree(tokenIds.get(probe)));
+      entry.set("vector", mapper.valueToTree(measured.get(probe)));
     }
 
     root.set("environment", mapper.valueToTree(BenchmarkEnvironment.capture()));

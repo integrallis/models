@@ -17,6 +17,11 @@ package com.integrallis.models.backend.purejava.quant;
 
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.nio.ByteOrder;
+import jdk.incubator.vector.ByteVector;
+import jdk.incubator.vector.FloatVector;
+import jdk.incubator.vector.IntVector;
+import jdk.incubator.vector.VectorOperators;
 
 /**
  * Ternary and low-bit GGUF block formats: upstream {@code TQ1_0}/{@code TQ2_0} and the
@@ -92,6 +97,70 @@ public final class TernaryDequantizer {
   public static void dequantizePtq1_0(
       MemorySegment source, long sourceOffset, float[] output, int outputOffset, int count) {
     trits(source, sourceOffset, output, outputOffset, count, 128, 24, 2, /* scaleFirst= */ false);
+  }
+
+  /**
+   * Float-activation PTQ1_0 product without expanding a matrix to floats. Eight-lane blocks
+   * preserve one reduction order on every host. The scalar decoder remains the independent
+   * unpacking reference; tests compare randomized blocks, scales, and input offsets against it.
+   */
+  public static float dotProductPtq1_0(
+      MemorySegment source, long sourceOffset, float[] input, int inputOffset, int count) {
+    require(count, 128);
+    java.util.Objects.checkFromIndexSize(inputOffset, count, input.length);
+    float total = 0;
+    for (int block = 0; block < count / 128; block++) {
+      long base = sourceOffset + (long) block * 28;
+      int at = inputOffset + block * 128;
+      IntVector a = ptqBytes(source, base);
+      IntVector b = ptqBytes(source, base + 8);
+      IntVector c = ptqBytes(source, base + 16);
+      FloatVector sum = FloatVector.zero(FloatVector.SPECIES_256);
+      for (int n = 0; n < 5; n++) {
+        sum =
+            ptqTrits(a, POW3[n])
+                .fma(FloatVector.fromArray(FloatVector.SPECIES_256, input, at + n * 16), sum);
+        sum =
+            ptqTrits(b, POW3[n])
+                .fma(FloatVector.fromArray(FloatVector.SPECIES_256, input, at + n * 16 + 8), sum);
+        sum =
+            ptqTrits(c, POW3[n])
+                .fma(FloatVector.fromArray(FloatVector.SPECIES_256, input, at + 80 + n * 8), sum);
+      }
+      float even = (sum.lane(4) + sum.lane(0)) + (sum.lane(6) + sum.lane(2));
+      float odd = (sum.lane(5) + sum.lane(1)) + (sum.lane(7) + sum.lane(3));
+      float blockSum = even + odd;
+      for (int n = 0; n < 4; n++) {
+        for (int h = 0; h < 2; h++) {
+          int q =
+              (Byte.toUnsignedInt(source.get(ValueLayout.JAVA_BYTE, base + 24 + h)) * POW3[n])
+                  & 255;
+          blockSum = Math.fma(((q * 3) >>> 8) - 1, input[at + 120 + n * 2 + h], blockSum);
+        }
+      }
+      float scale = halfToFloat(source.get(LE_SHORT, base + 26));
+      total = Math.fma(blockSum, scale, total);
+    }
+    return total;
+  }
+
+  private static IntVector ptqBytes(MemorySegment source, long offset) {
+    return ((IntVector)
+            ByteVector.fromMemorySegment(
+                    ByteVector.SPECIES_64, source, offset, ByteOrder.LITTLE_ENDIAN)
+                .convertShape(VectorOperators.B2I, IntVector.SPECIES_256, 0))
+        .and(255);
+  }
+
+  private static FloatVector ptqTrits(IntVector bytes, int power) {
+    return (FloatVector)
+        bytes
+            .mul(power)
+            .and(255)
+            .mul(3)
+            .lanewise(VectorOperators.LSHR, 8)
+            .sub(1)
+            .convertShape(VectorOperators.I2F, FloatVector.SPECIES_256, 0);
   }
 
   /**

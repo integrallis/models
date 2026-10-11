@@ -47,6 +47,8 @@ import com.integrallis.models.backend.purejava.gemma3n.Gemma3nConfig;
 import com.integrallis.models.backend.purejava.gemma3n.Gemma3nForwardPass;
 import com.integrallis.models.backend.purejava.gemma4.Gemma4Config;
 import com.integrallis.models.backend.purejava.gemma4.Gemma4Decoder;
+import com.integrallis.models.backend.purejava.gemmaembedding2.EmbeddingGemma2Config;
+import com.integrallis.models.backend.purejava.gemmaembedding2.EmbeddingGemma2Encoder;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
@@ -473,7 +475,16 @@ public final class PureJavaBackend
         GgufFile file = GgufParser.parse(modelPath, arena);
         tokenizer = GgufTokenizer.fromMetadata(file.metadata());
         String modelFamily = file.metadata().getString("general.architecture").orElse("llama");
-        if ("gemma4".equals(modelFamily)) {
+        if (file.metadata().get("prism.hadamard.version").isPresent()
+            && !List.of("qwen35", "qwen35moe", "qwen3next").contains(modelFamily)) {
+          throw new UnsupportedOperationException(
+              "Prism Hadamard execution is not supported for " + modelFamily);
+        }
+        if ("gemma-embedding2".equals(modelFamily)) {
+          requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
+          loaded =
+              loadEmbeddingGemma2(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
+        } else if ("gemma4".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded =
               loadGemma4(
@@ -982,6 +993,41 @@ public final class PureJavaBackend
             config.numLayers(),
             config.numHeads(),
             config.numKvHeads());
+    return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
+  }
+
+  private static LoadedDecoder loadEmbeddingGemma2(
+      Path modelPath,
+      GgufFile file,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    EmbeddingGemma2Config config = EmbeddingGemma2Config.fromMetadata(file.metadata());
+    int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                "gemma-embedding2",
+                config.numHeads() * config.fullHeadDim(),
+                config.kvHeads().get(0) * config.headDim(0),
+                config.kvHeads().get(0) * config.headDim(0),
+                config.numLayers()),
+            planConfiguration,
+            batchedMatrixKernel);
+    PureJavaDecoder decoder =
+        new EncoderDecoderAdapter(
+            EmbeddingGemma2Encoder.fromGgufFile(file, config, contextCapacity));
+    ModelMetadata metadata =
+        new ModelMetadata(
+            "gemma-embedding2",
+            modelName(modelPath, file),
+            config.contextLength(),
+            config.vocabSize(),
+            config.outputDim(),
+            config.numLayers(),
+            config.numHeads(),
+            config.kvHeads().get(0));
     return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
   }
 

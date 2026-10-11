@@ -20,6 +20,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
 import com.integrallis.models.backend.purejava.quant.Mxfp4Dequantizer;
 import com.integrallis.models.backend.purejava.quant.Q4_1Dequantizer;
 import com.integrallis.models.backend.purejava.quant.Q5_1Dequantizer;
+import com.integrallis.models.backend.purejava.quant.TernaryDequantizer;
 import com.integrallis.vectors.core.BFloat16Matrix;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
@@ -257,7 +258,7 @@ public final class TensorOps {
               + cols);
     }
     long rowBytes = (long) (cols / Mxfp4Dequantizer.BLOCK_SIZE) * Mxfp4Dequantizer.BLOCK_BYTES;
-    int threads = mxfp4Threads(rows, rowBytes, qWeight);
+    int threads = packedProjectionThreads(rows, rowBytes, qWeight);
     if (threads <= 1) {
       mxfp4Rows(out, x, qWeight, rowBytes, cols, 0, rows);
       return;
@@ -268,7 +269,8 @@ public final class TensorOps {
       int from = first;
       int to = Math.min(rows, first + chunk);
       pending.add(
-          Mxfp4Threads.EXECUTOR.submit(() -> mxfp4Rows(out, x, qWeight, rowBytes, cols, from, to)));
+          PackedProjectionThreads.EXECUTOR.submit(
+              () -> mxfp4Rows(out, x, qWeight, rowBytes, cols, from, to)));
     }
     // The calling thread takes the first chunk rather than waiting on all of them, so a matmul on a
     // one-core host does the same work with no handoff at all.
@@ -289,6 +291,47 @@ public final class TensorOps {
         }
         throw new IllegalStateException("MXFP4 projection failed", cause);
       }
+    }
+  }
+
+  private static void ptqMatmul(
+      float[] out, float[] input, MemorySegment weight, int rows, int columns) {
+    if (columns % 128 != 0)
+      throw new IllegalArgumentException("PTQ1_0 row width must be a multiple of 128");
+    long rowBytes = (long) (columns / 128) * 28;
+    int threads = packedProjectionThreads(rows, rowBytes, weight);
+    int chunk = (rows + threads - 1) / threads;
+    List<Future<?>> pending = new ArrayList<>();
+    for (int first = chunk; first < rows; first += chunk) {
+      int from = first;
+      int to = Math.min(rows, first + chunk);
+      pending.add(
+          PackedProjectionThreads.EXECUTOR.submit(
+              () -> ptqRows(out, input, weight, rowBytes, columns, from, to)));
+    }
+    ptqRows(out, input, weight, rowBytes, columns, 0, Math.min(rows, chunk));
+    for (Future<?> future : pending) {
+      try {
+        future.get();
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("Interrupted during PTQ1_0 projection", interrupted);
+      } catch (ExecutionException failed) {
+        throw new IllegalStateException("PTQ1_0 projection failed", failed.getCause());
+      }
+    }
+  }
+
+  private static void ptqRows(
+      float[] out,
+      float[] input,
+      MemorySegment weight,
+      long rowBytes,
+      int columns,
+      int from,
+      int to) {
+    for (int index = from; index < to; index++) {
+      out[index] = TernaryDequantizer.dotProductPtq1_0(weight, index * rowBytes, input, 0, columns);
     }
   }
 
@@ -327,20 +370,20 @@ public final class TensorOps {
   }
 
   /**
-   * How many threads to split an MXFP4 projection across, 1 meaning "stay on the calling thread".
+   * How many threads to split an MXFP4 or PTQ1_0 projection across, 1 meaning "stay on the calling
+   * thread".
    *
    * <p>Thread count cannot change the result. Each output element is its own dot product over its
-   * own row, so no two threads contribute to one reduction and {@link Mxfp4Dequantizer#dotProduct}
-   * folds each row in the same order it always did. That is what makes this safe in a backend where
-   * a float reduction's order is pinned on purpose: this splits <i>which thread</i> runs a
-   * reduction, never <i>how</i> one is folded. A test asserts the parallel and serial results are
-   * bit-identical rather than close.
+   * own row, so no two threads contribute to one reduction. Each packed dot product folds its row
+   * in a fixed order. That is what makes this safe in a backend where a float reduction's order is
+   * pinned on purpose: this splits <i>which thread</i> runs a reduction, never <i>how</i> one is
+   * folded. A test asserts the parallel and serial results are bit-identical rather than close.
    *
    * <p>Only above a size threshold, because handing work to another thread costs more than a small
    * projection takes. The threshold is in weight bytes read, which is what the work actually is.
    */
-  static int mxfp4Threads(int rows, long rowBytes, MemorySegment weight) {
-    if (rows < 2 || Math.multiplyExact(rows, rowBytes) < MXFP4_PARALLEL_MIN_BYTES) {
+  static int packedProjectionThreads(int rows, long rowBytes, MemorySegment weight) {
+    if (rows < 2 || Math.multiplyExact(rows, rowBytes) < PACKED_PROJECTION_PARALLEL_MIN_BYTES) {
       return 1;
     }
     // A segment from a confined arena is readable only by the thread that allocated it, and handing
@@ -350,29 +393,29 @@ public final class TensorOps {
     // thread could read this segment is exactly the question, since a confined scope answers no for
     // every thread but its owner while a shared or global one answers yes for all of them. This is
     // the same property the execution planner already gates thread sharing on.
-    if (!weight.isAccessibleBy(Mxfp4Threads.ACCESS_PROBE)) {
+    if (!weight.isAccessibleBy(PackedProjectionThreads.ACCESS_PROBE)) {
       return 1;
     }
-    return Math.min(rows, Mxfp4Threads.COUNT);
+    return Math.min(rows, PackedProjectionThreads.COUNT);
   }
 
   /**
-   * Weight bytes below which an MXFP4 projection stays on the calling thread.
+   * Weight bytes below which a packed float-activation projection stays on the calling thread.
    *
-   * <p>Matches vectors-core's own {@code ggufParallelThreshold} of one mebibyte, so MXFP4 and the
+   * <p>Matches vectors-core's own {@code ggufParallelThreshold} of one mebibyte, so these and the
    * K-quant kernels start using threads at the same amount of work rather than at two unrelated
    * sizes.
    */
-  private static final long MXFP4_PARALLEL_MIN_BYTES = 1L << 20;
+  private static final long PACKED_PROJECTION_PARALLEL_MIN_BYTES = 1L << 20;
 
   /**
-   * The pool, created on first use by an MXFP4 model and never by any other.
+   * The pool shared by packed float-activation projections.
    *
-   * <p>A holder class so that a process which loads no MXFP4 weights -- every K-quant model, which
-   * is nearly all of them -- starts no threads at all. Daemon threads, so this never holds up JVM
-   * exit.
+   * <p>A holder class so that a process which loads neither MXFP4 nor PTQ1_0 weights -- most
+   * K-quant models, which is nearly all of them -- starts no threads at all. Daemon threads, so
+   * this never holds up JVM exit.
    */
-  private static final class Mxfp4Threads {
+  private static final class PackedProjectionThreads {
     static final int COUNT = Math.max(1, Runtime.getRuntime().availableProcessors());
 
     /**
@@ -380,18 +423,18 @@ public final class TensorOps {
      * caller could read it. Deliberately not one of the pool threads: this question has to be
      * answerable before any work is submitted.
      */
-    static final Thread ACCESS_PROBE = new Thread(() -> {}, "mxfp4-access-probe");
+    static final Thread ACCESS_PROBE = new Thread(() -> {}, "packed-projection-access-probe");
 
     static final ExecutorService EXECUTOR =
         Executors.newFixedThreadPool(
             COUNT - 1 > 0 ? COUNT - 1 : 1,
             runnable -> {
-              Thread thread = new Thread(runnable, "mxfp4-projection");
+              Thread thread = new Thread(runnable, "packed-projection");
               thread.setDaemon(true);
               return thread;
             });
 
-    private Mxfp4Threads() {}
+    private PackedProjectionThreads() {}
   }
 
   /**
@@ -496,6 +539,7 @@ public final class TensorOps {
           VectorUtil.ggufQ6_KQ8_KBatchDotProduct(
               x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
       case MXFP4 -> mxfp4Matmul(out, x, qWeight, rows, cols);
+      case PTQ1_0 -> ptqMatmul(out, x, qWeight, rows, cols);
       // Exact, like the batched Q5_1 path: the reference's integer kernel pairs Q5_1 with Q8_1
       // activations because it needs their block sums for the minimum term, and nothing on this
       // side carries a Q8_1 block sum. Dequantizing the row costs the same read either way and

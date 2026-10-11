@@ -67,6 +67,8 @@ fun modelFixture(taskName: String, id: String): ModelFixture {
 
 val modelFixtures =
     listOf(
+        modelFixture("downloadBonsai2Ptq10Model", "bonsai2_27b_ptq1_0"),
+        modelFixture("downloadEmbeddingGemma2Q80Model", "embeddinggemma2_q8_0"),
         modelFixture(
             "downloadQwen306BQ40Model",
             "qwen3_0_6b_q4_0",
@@ -1273,4 +1275,39 @@ tasks.register<Test>("greedyOracleSweepSmall") {
 tasks.register<Test>("greedyOracleSweepLarge") {
     description = "Pinned llama.cpp greedy oracles, 6B-8B fixtures (slow)"
     greedyOracleSweep(greedyOracleLarge)
+}
+
+
+tasks.register<Test>("embeddingGemma2IntegrationTest") {
+    description = "Run the pinned EmbeddingGemma 2 Q8_0 text embedding integration tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform { includeTags("integration") }
+    filter { includeTestsMatching("com.integrallis.models.backend.purejava.EmbeddingGemma2ModelFixtureIntegrationTest") }
+    dependsOn(tasks.named("downloadEmbeddingGemma2Q80Model"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+    // Real-model correctness runs do not feed the unit coverage gate.
+    extensions.configure<JacocoTaskExtension> { isEnabled = false }
+
+}
+
+
+tasks.register<Test>("bonsai2IntegrationTest") {
+    description = "Run the pinned Bonsai 2 27B PTQ1_0 real-model tests"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform { includeTags("integration") }
+    filter { includeTestsMatching("com.integrallis.models.backend.purejava.Bonsai2ModelFixtureIntegrationTest") }
+    dependsOn(tasks.named("downloadBonsai2Ptq10Model"))
+    outputs.upToDateWhen { false }
+    systemProperty("models.purejava.maxContextLength", "64")
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+    // Real-model correctness runs do not feed the unit coverage gate.
+    extensions.configure<JacocoTaskExtension> { isEnabled = false }
+
 }

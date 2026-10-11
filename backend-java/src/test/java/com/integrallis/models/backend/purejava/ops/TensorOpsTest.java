@@ -2003,10 +2003,10 @@ class TensorOpsTest {
     try (Arena arena = Arena.ofShared()) {
       MemorySegment weight = arena.allocate((long) rows * rowBytes);
 
-      assertThat(TensorOps.mxfp4Threads(rows, rowBytes, weight))
+      assertThat(TensorOps.packedProjectionThreads(rows, rowBytes, weight))
           .describedAs("this fixture must actually take the threaded path")
           .isGreaterThan(1);
-      assertThat(TensorOps.mxfp4Threads(2, rowBytes, weight))
+      assertThat(TensorOps.packedProjectionThreads(2, rowBytes, weight))
           .describedAs("a projection below the threshold stays on the calling thread")
           .isEqualTo(1);
 
@@ -2049,7 +2049,7 @@ class TensorOpsTest {
     long rowBytes = (long) blocksPerRow * Mxfp4Dequantizer.BLOCK_BYTES;
     try (Arena arena = Arena.ofShared()) {
       MemorySegment weight = arena.allocate((long) rows * rowBytes);
-      assertThat(TensorOps.mxfp4Threads(rows, rowBytes, weight)).isGreaterThan(1);
+      assertThat(TensorOps.packedProjectionThreads(rows, rowBytes, weight)).isGreaterThan(1);
       for (int block = 0; block < rows * blocksPerRow; block++) {
         long base = (long) block * Mxfp4Dequantizer.BLOCK_BYTES;
         weight.set(ValueLayout.JAVA_BYTE, base, (byte) 127);
@@ -2091,7 +2091,7 @@ class TensorOpsTest {
 
     try (Arena confined = Arena.ofConfined()) {
       MemorySegment weight = confined.allocate((long) rows * rowBytes);
-      assertThat(TensorOps.mxfp4Threads(rows, rowBytes, weight))
+      assertThat(TensorOps.packedProjectionThreads(rows, rowBytes, weight))
           .describedAs("a confined segment may only be read by its owning thread")
           .isEqualTo(1);
 

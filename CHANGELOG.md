@@ -4,6 +4,29 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.3.58] - 2026-10-11
+
+### Added
+
+- Native Java text execution for EmbeddingGemma 2 Q8_0: bidirectional symmetric-window attention,
+  per-layer projected inputs, and mean-pooled 768-dimensional output. The exact 309,855,456-byte
+  GGUF passes all eight `oracle-equivalence-v1` probes (minimum cosine 0.9998087). This does not
+  provide image, audio, or video embedding support.
+- Exact-artifact Bonsai 2 27B PTQ1_0 text compatibility, including signed blockwise Hadamard
+  projections, inverse token-embedding restoration and recurrent value-head permutation. The
+  5,946,648,928-byte artifact matches eight greedy continuation tokens from the pinned Prism
+  reference. Production RAG qualification remains pending: the current policy requires an Ollama
+  or Transformers comparator, and the PTQ1_0 artifact requires Prism's runtime.
+- Pinned fixture acquisition, real-model integration tasks and CI coverage for both artifacts;
+  independent scalar checks for the SIMD PTQ1_0 dot product and attention-window boundary tests.
+
+### Dependencies and device evidence
+
+Consumes released Vectors 0.1.29. No CUDA numeric path changed and device gates were not rerun for
+this release. The last G1 result remains 1280/1280 exact token IDs on RTX 4090, Granite 4.1 3B Q4_K_M
+(`benchmark-results/2026-10-07-g1-parity`); G4 remains 6.184x on that host/model
+(`benchmark-results/2026-10-07-g4-dualpath`). Neither result qualifies the two new artifacts on CUDA.
+
 ## [0.3.57] - 2026-10-10
 
 ### Fixed
