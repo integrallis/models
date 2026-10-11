@@ -8,9 +8,11 @@ the transformer graph, KV-cache ownership, sampling, and generation remain in Ja
 The native boundary is a versioned C ABI implemented by the Models-owned
 `jmodels-kernels` Rust crate.
 
-ABI 5 supports Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K batched projections,
-grouped dispatch, and the bounded float32 Gated DeltaNet recurrence used by
-Qwen3.5. Mixed Q4_K/Q5_K/Q6_K groups share one Q8_K activation quantization.
+ABI 6 exposes Q4_0, Q5_0, Q5_1, Q8_0, Q4_K, Q5_K, and Q6_K projections,
+grouped dispatch, attention, and experimental float32 Gated DeltaNet recurrence
+kernels. The production dispatcher leaves recurrence in Java; exported capabilities
+do not imply that every native route is enabled. Mixed Q4_K/Q5_K/Q6_K groups
+share one Q8_K activation quantization.
 
 Q5_1 was added at ABI 6 and is the one format that dots against **F32**
 activations rather than quantized ones. Every other kernel here dots in Q8_0 or
@@ -86,12 +88,15 @@ java \
 `models.native.kernels.threads` controls the worker-context size and defaults to
 the JVM-reported processor count.
 
-There is one native route and no switch to choose it. The shim serves every
-tensor type it reports a capability for, at every batch size including
-single-token decode, and the Java path runs only where there is no capability.
-Qwen3.5's recurrence goes through the same FFM boundary whenever the loaded shim
-has it; the graph, convolution, attention, state ownership, tokenizer, and
-generation loop remain in Java.
+There is one native route and no switch to choose it. The shim serves supported quantized
+projections at every batch size including single-token decode. The dispatcher
+chooses which grouped routes to use; a capability bit alone does not decide routing.
+Qwen3.5's recurrence currently stays in Java: `supportsGatedDeltaNet()` and
+`supportsGroupedGatedDeltaNet()` both return `false`. The native recurrence kernels
+remain available for experiments, but their tolerance-level parity does not establish
+greedy token identity or preservation of published qualification records. Routing them
+requires new oracle and performance qualification. The graph, convolution, state
+ownership, tokenizer, and generation loop remain in Java.
 
 `models.native.quantizedDecode`, `models.native.gatedDeltaNet`,
 `models.native.q5_0.grouped` and `models.native.loadWarmup` were removed. Each
@@ -104,7 +109,7 @@ USABLE. Meanwhile every certified qualification run forced the setting on, so th
 published tiers described a route users did not get. Setting a removed property
 now fails with a message saying it is gone, rather than being ignored.
 
-Q5_0 is the one exception, and it is a decision rather than a setting: Q5_0
+Q5_0 grouping is another explicit routing decision rather than a setting: Q5_0
 projections always run independently. On the controlled Qwen2.5-0.5B x86-64
 profile, fused grouping recovered worker-barrier overhead and still decoded at
 37.33 tokens/second against 38.94 for independent projections, so the grouped
