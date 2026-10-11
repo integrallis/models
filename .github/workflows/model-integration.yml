@@ -59,6 +59,9 @@ jobs:
           rustup toolchain install 1.96.0 --profile minimal --no-self-update
           rustup component add --toolchain 1.96.0 clippy rustfmt
 
+      - name: Install the PTX toolchain for the oracle harness
+        uses: ./models/.github/actions/ptx-toolchain
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
       - name: Warm the Gradle distribution

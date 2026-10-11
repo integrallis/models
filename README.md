@@ -66,13 +66,15 @@ Implemented functionality includes:
 - GGUF v2/v3 parsing with memory-mapped tensor access
 - strict, memory-mapped single-file and sharded Safetensors bundles
 - CACT parsing and the Needle 2 CQ2/CQ4 execution path
-- BERT/MiniLM encoders plus Llama, Qwen2, Qwen3, dense Qwen3.5, Gemma 4,
+- BERT/MiniLM and EmbeddingGemma 2 text encoders plus Llama, Qwen2, Qwen3, dense Qwen3.5, Gemma 4,
   MobileMoE, GPT-OSS, and Needle 2 decoder architectures
-- F32, F16, BF16, MXFP4, CQ2/CQ4, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths
+- F32, F16, BF16, MXFP4, PTQ1_0, CQ2/CQ4, Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, and Q6_K tensor paths
 - BERT WordPiece, T5/SentencePiece unigram, byte-level BPE, and Llama SentencePiece tokenizers
 - grouped-query attention, RoPE, SwiGLU, KV caching, and autoregressive decode
 - Qwen3.5 hybrid full-attention/Gated DeltaNet execution with batched prefill and reusable
   recurrent state
+- Bonsai 2 PTQ1_0 text execution with the artifact-declared signed Hadamard transforms;
+  real-weight compatibility is tested, while production catalog qualification remains pending
 - greedy, temperature, top-k, top-p, and repetition-penalty sampling
 - tool calling across Qwen, Hermes, Llama 3, GPT-OSS Harmony, Needle 2, Gemma 4, and
   MiniCPM5 formats,

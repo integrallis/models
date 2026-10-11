@@ -20,12 +20,23 @@ xref:embeddings.adoc#equivalence-gating[Equivalence Gating].
 
 == Supported Runtime Surface
 
+EmbeddingGemma 2 Q8_0 text execution produces 768-dimensional embeddings through a
+dedicated bidirectional encoder with symmetric local attention, full-attention layers,
+and per-layer input projections. The pinned text artifact passes the unchanged eight-probe
+independent oracle gate. Image, audio and video towers are separate, unsupported artifacts.
+
+Bonsai 2 27B PTQ1_0 text execution applies the artifact's signed Hadamard transforms and
+recurrent-head layout before its packed projections. The 5,946,648,928-byte file is the
+approximately 6 GB variant; this size is not a runtime-memory estimate. Its eight-token
+continuation matches the pinned Prism reference. Production ModelJars qualification
+remains pending the required authoritative comparator and controlled workload gates.
+See the https://github.com/integrallis/models/tree/main/benchmark-results/2026-10-11-model-onboarding[exact-artifact evidence and scope].
+
 The GGUF runtime recognizes the `bert`, `llama`, `qwen2`, `qwen3`, `qwen3moe`,
 `qwen35`, `qwen35moe`, `qwen3next`, `gemma4`, `gemma3n`, `deepseek2`, `lfm2`,
-`mistral3`, and `gpt-oss` metadata prefixes. The `bert` path is a dedicated bidirectional
+`mistral3`, `gemma-embedding2`, and `gpt-oss` metadata prefixes. The `bert` path is a dedicated bidirectional
 encoder with learned-bias LayerNorm, GELU feed-forward layers, WordPiece
-tokenization, and model-declared mean or CLS pooling. Qwen3.5 support is
-covers dense and mixture-of-experts
+tokenization, and model-declared mean or CLS pooling. Qwen3.5 support covers dense and mixture-of-experts
 text-only GGUF checkpoints; its vision and MTP paths are not supported. A routed
 model runs its expert branch one token at a time, because expert selection
 differs per token and a batched matmul cannot serve rows needing different
