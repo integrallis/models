@@ -24,6 +24,7 @@ import com.integrallis.models.backend.purejava.quant.TernaryDequantizer;
 import com.integrallis.vectors.core.BFloat16Matrix;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
+import com.integrallis.vectors.core.GgufStagePlan;
 import com.integrallis.vectors.core.PanamaConstants;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
@@ -64,6 +65,10 @@ public final class TensorOps {
     FIRST_THIRD,
     SECOND_THIRD
   }
+
+  private static final Thread EXACT_ACCESS_PROBE = Thread.ofPlatform().unstarted(() -> {});
+  private static final ThreadLocal<float[]> EXACT_WEIGHT_ROW =
+      ThreadLocal.withInitial(() -> new float[0]);
 
   private TensorOps() {}
 
@@ -1532,7 +1537,43 @@ public final class TensorOps {
       throw new IllegalArgumentException(
           "decoded weight row is too small: " + decodedWeightRow.length + " < " + columns);
     }
-    for (int row = 0; row < rows; row++) {
+    // Preserve the F32 reduction while sharing one decoded weight row across the batch.
+    // Use the existing GGUF executor and threshold; confined segments stay on their owner.
+    if (type == GgufTensorType.Q5_1
+        && rows > 1
+        && (long) batchSize * rows * columns
+            >= Math.max(1L, Long.getLong("vectors.gguf.parallelThreshold", 1_048_576L))
+        && weights.isAccessibleBy(EXACT_ACCESS_PROBE)) {
+      GgufStagePlan.of(
+              GgufStagePlan.stage(
+                  rows,
+                  (from, to) -> {
+                    float[] local = EXACT_WEIGHT_ROW.get();
+                    if (local.length < columns) {
+                      local = new float[columns];
+                      EXACT_WEIGHT_ROW.set(local);
+                    }
+                    exactRows(
+                        output, input, weights, type, batchSize, rows, columns, local, from, to);
+                  }))
+          .execute();
+      return;
+    }
+    exactRows(output, input, weights, type, batchSize, rows, columns, decodedWeightRow, 0, rows);
+  }
+
+  private static void exactRows(
+      float[] output,
+      float[] input,
+      MemorySegment weights,
+      GgufTensorType type,
+      int batchSize,
+      int rows,
+      int columns,
+      float[] decodedWeightRow,
+      int from,
+      int to) {
+    for (int row = from; row < to; row++) {
       GgufTensorValues.dequantizeRow(weights, type, row, columns, decodedWeightRow);
       for (int batch = 0; batch < batchSize; batch++) {
         output[batch * rows + row] =
