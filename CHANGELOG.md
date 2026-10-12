@@ -4,6 +4,21 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Keep independent recurrent columns in SIMD registers and run heads through the existing Vectors
+  executor. Preserve the per-column reduction order, caller-owned state, and grouped state slots.
+  Remove obsolete per-session scratch and move test-only recurrence conveniences into test code.
+
+### Removed
+
+- Remove unused Rust Gated DeltaNet recurrence kernels, FFM bindings, and recurrence hooks from
+  `GgufBatchedMatrixKernel`. Qwen recurrence continues to execute in Java, including grouped
+  decisions. Remove the misleading missing-native-recurrence performance diagnostic.
+- Advance the CPU native ABI to 7 because the unused recurrence exports were removed; reserve
+  capability bits 18 and 22. Java bindings and native platform artifacts must be upgraded together.
+  Custom implementations using the removed recurrence SPI methods must remove those overrides.
+
 ## [0.3.59] - 2026-10-11
 
 ### Added and fixed

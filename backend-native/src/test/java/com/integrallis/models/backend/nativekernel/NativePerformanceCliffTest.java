@@ -75,12 +75,12 @@ class NativePerformanceCliffTest {
 
     assertThat(backend.diagnostics()).isEqualTo(loaded);
 
-    PerformanceCliffs.report(PerformanceCliff.NATIVE_GATED_DELTA_NET_UNAVAILABLE, "kernel=rust");
+    PerformanceCliffs.report(PerformanceCliff.NATIVE_GROUPED_ATTENTION_UNAVAILABLE, "kernel=rust");
 
     assertThat(backend.diagnostics().environment())
         .containsEntry("a", "b")
-        .containsEntry("performance-cliff.native-gated-delta-net-unavailable", "kernel=rust")
-        .containsEntry("performance-cliffs", "native-gated-delta-net-unavailable");
+        .containsEntry("performance-cliff.native-grouped-attention-unavailable", "kernel=rust")
+        .containsEntry("performance-cliffs", "native-grouped-attention-unavailable");
     PerformanceCliffs.reset();
   }
 

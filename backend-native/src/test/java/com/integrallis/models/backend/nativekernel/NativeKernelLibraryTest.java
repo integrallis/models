@@ -40,6 +40,17 @@ class NativeKernelLibraryTest {
       ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN);
 
   @Test
+  @SuppressWarnings("restricted") // Inspect the built library's exported symbols in a scoped arena.
+  void retiredRecurrenceIsAbsentFromTheNativeBinary() {
+    try (Arena arena = Arena.ofConfined()) {
+      var symbols = java.lang.foreign.SymbolLookup.libraryLookup(libraryPath(), arena);
+      assertThat(symbols.find("jmodels_gated_delta_net_f32_with_context")).isEmpty();
+      assertThat(symbols.find("jmodels_gated_delta_net_group_f32_with_context")).isEmpty();
+    }
+    assertThat(NativeKernelLibrary.ABI_VERSION).isEqualTo(7);
+  }
+
+  @Test
   void exposesVersionedQuantizedKernelCapabilities() {
     try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath())) {
       assertThat(kernels.abiVersion()).isEqualTo(NativeKernelLibrary.ABI_VERSION);
@@ -62,225 +73,7 @@ class NativeKernelLibraryTest {
       assertThat(kernels.supports(NativeKernelCapability.Q4_K_BATCH_VECTOR_ACCUMULATION)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.MANY_GROUPED_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.INDEPENDENT_BATCHED_MATMUL)).isTrue();
-      assertThat(kernels.supports(NativeKernelCapability.GATED_DELTA_NET_F32)).isTrue();
-      assertThat(kernels.supports(NativeKernelCapability.GROUPED_GATED_DELTA_NET_F32)).isTrue();
-      assertThat(kernels.supportsGroupedGatedDeltaNet()).isTrue();
     }
-  }
-
-  /**
-   * A grouped launch must equal each row advanced on its own.
-   *
-   * <p>The slot table is deliberately scattered rather than the identity: questions of unequal
-   * length drop out as they finish, so the rows still advancing address slots out of order. An
-   * identity-only test would pass while every ragged group read another question's state.
-   */
-  @Test
-  void groupedGatedDeltaNetMatchesEachRowAdvancedAlone() {
-    int rows = 3;
-    int slots = 5;
-    int heads = 2;
-    int dimension = 2;
-    int statePerSlot = heads * dimension * dimension;
-    int[] rowSlot = {4, 0, 2};
-
-    float[] query = fixture(11, rows * heads * dimension);
-    float[] key = fixture(12, rows * heads * dimension);
-    float[] value = fixture(13, rows * heads * dimension);
-    float[] beta = fixture(14, rows * heads);
-    float[] logDecay = fixture(15, rows * heads);
-    for (int index = 0; index < logDecay.length; index++) {
-      logDecay[index] = -Math.abs(logDecay[index]);
-    }
-    float[] initial = fixture(16, slots * statePerSlot);
-
-    float[] groupedState = initial.clone();
-    float[] groupedOutput = new float[rows * heads * dimension];
-    float[] expectedState = initial.clone();
-    float[] expectedOutput = new float[rows * heads * dimension];
-
-    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 4)) {
-      kernels.groupedGatedDeltaNetF32(
-          query,
-          key,
-          value,
-          logDecay,
-          beta,
-          groupedState,
-          groupedOutput,
-          rowSlot,
-          rows,
-          slots,
-          heads,
-          heads,
-          dimension,
-          dimension);
-
-      for (int row = 0; row < rows; row++) {
-        int span = heads * dimension;
-        float[] rowState =
-            Arrays.copyOfRange(
-                expectedState, rowSlot[row] * statePerSlot, (rowSlot[row] + 1) * statePerSlot);
-        float[] rowOutput = new float[span];
-        kernels.gatedDeltaNetF32(
-            Arrays.copyOfRange(query, row * span, (row + 1) * span),
-            Arrays.copyOfRange(key, row * span, (row + 1) * span),
-            Arrays.copyOfRange(value, row * span, (row + 1) * span),
-            Arrays.copyOfRange(logDecay, row * heads, (row + 1) * heads),
-            Arrays.copyOfRange(beta, row * heads, (row + 1) * heads),
-            rowState,
-            rowOutput,
-            1,
-            heads,
-            heads,
-            dimension,
-            dimension);
-        System.arraycopy(rowOutput, 0, expectedOutput, row * span, span);
-        System.arraycopy(rowState, 0, expectedState, rowSlot[row] * statePerSlot, statePerSlot);
-      }
-    }
-
-    assertThat(groupedOutput).containsExactly(expectedOutput);
-    assertThat(groupedState).containsExactly(expectedState);
-  }
-
-  /** A slot outside the state buffer must be rejected, not written on a worker thread. */
-  @Test
-  void groupedGatedDeltaNetRejectsASlotOutsideTheState() {
-    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 2)) {
-      assertThatThrownBy(
-              () ->
-                  kernels.groupedGatedDeltaNetF32(
-                      new float[4],
-                      new float[4],
-                      new float[4],
-                      new float[2],
-                      new float[2],
-                      new float[2 * 4],
-                      new float[4],
-                      new int[] {0, 7},
-                      2,
-                      2,
-                      1,
-                      1,
-                      2,
-                      2))
-          .isInstanceOf(IllegalStateException.class)
-          .hasMessageContaining("invalid shape");
-    }
-  }
-
-  /**
-   * Every argument the grouped entry rejects, rejected in Java before the boundary.
-   *
-   * <p>A slot table or a length the native side cannot serve becomes an out-of-bounds write on a
-   * worker thread, which is not a failure that reports itself. These are cheap checks guarding an
-   * expensive mistake, so each one is pinned.
-   */
-  @Test
-  void groupedGatedDeltaNetRejectsArgumentsItCannotServe() {
-    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 2)) {
-      assertThatThrownBy(() -> call(kernels, null, new int[] {0, 1}, 2, 2, 1, 1, 2, 2))
-          .isInstanceOf(NullPointerException.class);
-      assertThatThrownBy(() -> call(kernels, new float[8], new int[] {0, 1}, 0, 2, 1, 1, 2, 2))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("rowCount");
-      assertThatThrownBy(() -> call(kernels, new float[8], new int[] {0, 1}, 2, 1, 1, 1, 2, 2))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("stateSlotCount must be at least rowCount");
-      assertThatThrownBy(() -> call(kernels, new float[8], new int[] {0, 1}, 2, 2, 2, 3, 2, 2))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("divisible");
-      assertThatThrownBy(() -> call(kernels, new float[8], new int[] {0, 1}, 2, 2, 1, 1, 257, 2))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("256");
-      assertThatThrownBy(() -> call(kernels, new float[8], new int[] {0}, 2, 2, 1, 1, 2, 2))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("rowStateSlot holds");
-      assertThatThrownBy(() -> call(kernels, new float[4], new int[] {0, 1}, 2, 2, 1, 1, 2, 2))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("state");
-    }
-  }
-
-  /** A null slot table means row i owns slot i, which must agree with spelling that out. */
-  @Test
-  void groupedGatedDeltaNetTreatsANullSlotTableAsTheIdentity() {
-    int rows = 2;
-    int heads = 1;
-    int dimension = 2;
-    float[] query = fixture(31, rows * heads * dimension);
-    float[] value = fixture(32, rows * heads * dimension);
-    float[] gates = fixture(33, rows * heads);
-    float[] initial = fixture(34, rows * heads * dimension * dimension);
-
-    float[] implicitState = initial.clone();
-    float[] implicitOutput = new float[rows * heads * dimension];
-    float[] explicitState = initial.clone();
-    float[] explicitOutput = new float[rows * heads * dimension];
-
-    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 2)) {
-      kernels.groupedGatedDeltaNetF32(
-          query,
-          query,
-          value,
-          gates,
-          gates,
-          implicitState,
-          implicitOutput,
-          null,
-          rows,
-          rows,
-          heads,
-          heads,
-          dimension,
-          dimension);
-      kernels.groupedGatedDeltaNetF32(
-          query,
-          query,
-          value,
-          gates,
-          gates,
-          explicitState,
-          explicitOutput,
-          new int[] {0, 1},
-          rows,
-          rows,
-          heads,
-          heads,
-          dimension,
-          dimension);
-    }
-
-    assertThat(implicitOutput).containsExactly(explicitOutput);
-    assertThat(implicitState).containsExactly(explicitState);
-  }
-
-  private static void call(
-      NativeKernelLibrary kernels,
-      float[] state,
-      int[] slots,
-      int rowCount,
-      int stateSlotCount,
-      int keyHeads,
-      int valueHeads,
-      int keyDimension,
-      int valueDimension) {
-    kernels.groupedGatedDeltaNetF32(
-        new float[64],
-        new float[64],
-        new float[64],
-        new float[64],
-        new float[64],
-        state,
-        new float[64],
-        slots,
-        rowCount,
-        stateSlotCount,
-        keyHeads,
-        valueHeads,
-        keyDimension,
-        valueDimension);
   }
 
   private static float[] fixture(int seed, int count) {
@@ -290,64 +83,6 @@ class NativeKernelLibraryTest {
       values[index] = (float) (random.nextDouble() * 2.0 - 1.0);
     }
     return values;
-  }
-
-  @Test
-  void gatedDeltaNetMatchesThePinnedFreeTokenRecurrence() {
-    float[] query = {
-      0.5f, -1.0f, 1.5f, 0.25f,
-      -0.75f, 0.5f, 0.1f, -0.4f,
-      1.25f, 0.75f, -0.3f, 0.9f
-    };
-    float[] key = {
-      0.2f, 0.8f, -0.6f, 0.9f,
-      1.0f, -0.5f, 0.7f, 0.2f,
-      -0.4f, 0.3f, 0.25f, -0.75f
-    };
-    float[] value = {
-      0.3f, -0.7f, 1.1f, 0.4f,
-      -0.2f, 0.9f, 0.5f, -1.2f,
-      0.8f, 0.1f, -0.6f, 0.7f
-    };
-    float[] logDecay = {-0.1f, -0.3f, -0.5f, -0.2f, -0.05f, -0.7f};
-    float[] beta = {0.7f, 0.2f, 0.4f, 0.9f, 1.0f, 0.6f};
-    float[] state = {0.1f, -0.2f, 0.3f, 0.4f, -0.5f, 0.2f, 0.1f, -0.3f};
-    float[] output = new float[value.length];
-
-    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 2)) {
-      kernels.gatedDeltaNetF32(query, key, value, logDecay, beta, state, output, 3, 2, 2, 2, 2);
-    }
-
-    assertThat(output)
-        .containsExactly(
-            new float[] {
-              -0.148594886f,
-              0.0923976079f,
-              -0.29807961f,
-              0.0387914963f,
-              0.0826374739f,
-              -0.232684523f,
-              -0.201746792f,
-              0.0990339369f,
-              -0.115048051f,
-              -0.159083426f,
-              0.29010731f,
-              -0.305043638f
-            },
-            within(2.0e-6f));
-    assertThat(state)
-        .containsExactly(
-            new float[] {
-              -0.549856126f,
-              -0.20131427f,
-              0.600189984f,
-              -0.101754844f,
-              0.0727154538f,
-              -0.372453094f,
-              0.456705213f,
-              -0.578883469f
-            },
-            within(2.0e-6f));
   }
 
   @Test
@@ -494,7 +229,10 @@ class NativeKernelLibraryTest {
     }
     float[] actual = new float[2 + numHeads * valueLength];
     float[] scores = new float[numHeads * total];
-    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 4)) {
+    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 4);
+        RustGgufBatchedMatrixKernel dispatcher =
+            RustGgufBatchedMatrixKernel.open(libraryPath(), new NativeKernelSettings(4))) {
+      assertThat(dispatcher.supportsGroupedAttention()).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.GROUPED_ATTENTION_F32)).isTrue();
       kernels.groupedAttentionF32(
           query,
@@ -562,7 +300,7 @@ class NativeKernelLibraryTest {
             0,
             positionsA);
       }
-      kernels.groupedAttentionF32(
+      dispatcher.groupedAttention(
           query,
           3,
           keysA,
@@ -679,11 +417,8 @@ class NativeKernelLibraryTest {
     try (RustGgufBatchedMatrixKernel kernel =
         RustGgufBatchedMatrixKernel.open(libraryPath(), settings)) {
       assertThat(kernel.threadCount()).isEqualTo(4);
-      // Capability, not configuration, decides what the shim serves -- with two routes deliberately
-      // not taken: the recurrence, because adopting it would change bytes published records claim,
-      // and grouped Q5_0, because it measured slower. Both are decisions in code, not settings.
+      // Grouped Q5_0 is excluded by routing because it measured slower.
       assertThat(kernel.supportsQ5_0Grouped()).as("the shim has the kernel").isTrue();
-      assertThat(kernel.supportsGatedDeltaNet()).as("but it is not routed to").isFalse();
     }
   }
 

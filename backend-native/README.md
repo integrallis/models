@@ -8,11 +8,12 @@ the transformer graph, KV-cache ownership, sampling, and generation remain in Ja
 The native boundary is a versioned C ABI implemented by the Models-owned
 `jmodels-kernels` Rust crate.
 
-ABI 6 exposes Q4_0, Q5_0, Q5_1, Q8_0, Q4_K, Q5_K, Q6_K, and PTQ1_0 projections,
-grouped dispatch, attention, and experimental float32 Gated DeltaNet recurrence
-kernels. The production dispatcher leaves recurrence in Java; exported capabilities
-do not imply that every native route is enabled. Mixed Q4_K/Q5_K/Q6_K groups
-share one Q8_K activation quantization.
+ABI 7 exposes Q4_0, Q5_0, Q5_1, Q8_0, Q4_K, Q5_K, Q6_K, and PTQ1_0 projections,
+grouped dispatch, and attention. The unused Gated DeltaNet exports, bindings, and
+injection hooks have been removed. Capability bits 18 and 22 remain reserved.
+Older native binaries are rejected by the ABI check; update the Java binding and
+platform artifact together. Mixed Q4_K/Q5_K/Q6_K groups share one Q8_K activation
+quantization.
 
 PTQ1_0 uses Q8_0 activations in both Java and Rust: nearest-even integer rounding,
 32-value activation blocks with binary16-rounded scales, and a pinned FMA fold.
@@ -70,7 +71,7 @@ Gradle builds the host library with Cargo under
 
 When the matching platform artifact is present on the runtime classpath,
 `RustFfmBackend` verifies its ABI/platform metadata and SHA-256, extracts it to
-`~/.models/native-kernels/abi-6/<platform>/<sha256>/`, and opens it through Java
+`~/.models/native-kernels/abi-7/<platform>/<sha256>/`, and opens it through Java
 25 FFM:
 
 ```java
@@ -100,12 +101,9 @@ the JVM-reported processor count.
 There is one native route and no switch to choose it. The shim serves supported quantized
 projections at every batch size including single-token decode. The dispatcher
 chooses which grouped routes to use; a capability bit alone does not decide routing.
-Qwen3.5's recurrence currently stays in Java: `supportsGatedDeltaNet()` and
-`supportsGroupedGatedDeltaNet()` both return `false`. The native recurrence kernels
-remain available for experiments, but their tolerance-level parity does not establish
-greedy token identity or preservation of published qualification records. Routing them
-requires new oracle and performance qualification. The graph, convolution, state
-ownership, tokenizer, and generation loop remain in Java.
+Qwen3.5's recurrence runs in Java. The unused Rust recurrence experiment has been
+removed; its historical implementation and measurements remain in version history.
+The graph, convolution, state ownership, tokenizer, and generation loop remain in Java.
 
 `models.native.quantizedDecode`, `models.native.gatedDeltaNet`,
 `models.native.q5_0.grouped` and `models.native.loadWarmup` were removed. Each

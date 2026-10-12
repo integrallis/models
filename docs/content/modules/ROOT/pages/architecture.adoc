@@ -151,10 +151,8 @@ activation workspaces belong to each Java session and are reused across prefill
 and decode. The execution planner derives batch and quantized-kernel choices
 from the tensors actually loaded rather than assuming a Llama-shaped graph.
 Java Vector API kernels fuse the causal depthwise convolution with SiLU and
-vectorize the gate transforms and SwiGLU. On an exact qualified artifact, the
-planner may additionally move the measured Gated DeltaNet recurrence hot loop
-through the small Models-owned FFM kernel; that option does not move the model
-graph or session state out of Java.
+vectorize the gate transforms and SwiGLU. Gated DeltaNet recurrence runs in Java;
+the unused native recurrence experiment and its dispatch hooks have been removed.
 The implementation does not invoke a FreeToken, Python, or external inference
 runtime; FreeToken and llama.cpp are test references.
 

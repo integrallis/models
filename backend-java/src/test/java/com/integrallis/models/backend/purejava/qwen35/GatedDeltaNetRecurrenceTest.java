@@ -102,8 +102,8 @@ class GatedDeltaNetRecurrenceTest {
   void matchesThePinnedFreeTokenFloat32Recurrence() {
     float[] initialState = INITIAL_STATE.clone();
 
-    GatedDeltaNetRecurrence.Result actual =
-        GatedDeltaNetRecurrence.forward(
+    Result actual =
+        forward(
             QUERY, KEY, VALUE, LOG_DECAY, BETA, initialState, TOKENS, HEADS, KEY_DIM, VALUE_DIM);
 
     assertThat(actual.output()).containsExactly(EXPECTED_OUTPUT, within(2.0e-6f));
@@ -113,12 +113,12 @@ class GatedDeltaNetRecurrenceTest {
 
   @Test
   void continuationMatchesOneUninterruptedPass() {
-    GatedDeltaNetRecurrence.Result expected =
-        GatedDeltaNetRecurrence.forward(
+    Result expected =
+        forward(
             QUERY, KEY, VALUE, LOG_DECAY, BETA, INITIAL_STATE, TOKENS, HEADS, KEY_DIM, VALUE_DIM);
 
-    GatedDeltaNetRecurrence.Result first =
-        GatedDeltaNetRecurrence.forward(
+    Result first =
+        forward(
             firstTokens(QUERY, KEY_DIM, 2),
             firstTokens(KEY, KEY_DIM, 2),
             firstTokens(VALUE, VALUE_DIM, 2),
@@ -129,8 +129,8 @@ class GatedDeltaNetRecurrenceTest {
             HEADS,
             KEY_DIM,
             VALUE_DIM);
-    GatedDeltaNetRecurrence.Result second =
-        GatedDeltaNetRecurrence.forward(
+    Result second =
+        forward(
             lastToken(QUERY, KEY_DIM),
             lastToken(KEY, KEY_DIM),
             lastToken(VALUE, VALUE_DIM),
@@ -153,14 +153,10 @@ class GatedDeltaNetRecurrenceTest {
   @Test
   void inPlaceExecutionMatchesTheReferenceWithoutReplacingState() {
     float[] initialState = {0.2f, -0.1f, 0.05f, 0.3f, -0.2f, 0.4f, 0.1f, -0.05f};
-    var expected =
-        GatedDeltaNetRecurrence.forward(
-            QUERY, KEY, VALUE, LOG_DECAY, BETA, initialState, 3, 2, 2, 2);
+    var expected = forward(QUERY, KEY, VALUE, LOG_DECAY, BETA, initialState, 3, 2, 2, 2);
     float[] mutableState = initialState.clone();
 
-    var actual =
-        GatedDeltaNetRecurrence.forwardInPlace(
-            QUERY, KEY, VALUE, LOG_DECAY, BETA, mutableState, 3, 2, 2, 2);
+    var actual = advance(QUERY, KEY, VALUE, LOG_DECAY, BETA, mutableState, 3, 2, 2, 2, 2);
 
     assertThat(actual.output()).containsExactly(expected.output());
     assertThat(actual.finalState()).isSameAs(mutableState).containsExactly(expected.finalState());
@@ -170,12 +166,8 @@ class GatedDeltaNetRecurrenceTest {
   void callerOwnedWorkspaceMatchesTheReferenceWithoutAllocatingAnOutput() {
     float[] mutableState = INITIAL_STATE.clone();
     float[] output = new float[EXPECTED_OUTPUT.length];
-    float[] normalizedQuery = new float[KEY_DIM];
-    float[] normalizedKey = new float[KEY_DIM];
-    float[] memory = new float[VALUE_DIM];
-    float[] delta = new float[VALUE_DIM];
 
-    GatedDeltaNetRecurrence.forwardInPlace(
+    GatedDeltaNetRecurrence.forwardPrefixInPlace(
         QUERY,
         KEY,
         VALUE,
@@ -183,10 +175,6 @@ class GatedDeltaNetRecurrenceTest {
         BETA,
         mutableState,
         output,
-        normalizedQuery,
-        normalizedKey,
-        memory,
-        delta,
         TOKENS,
         HEADS,
         HEADS,
@@ -205,8 +193,7 @@ class GatedDeltaNetRecurrenceTest {
     float[] logDecay = {0.0f, 0.0f, 0.0f, 0.0f};
     float[] beta = {1.0f, 1.0f, 1.0f, 1.0f};
 
-    var actual =
-        GatedDeltaNetRecurrence.forward(query, key, value, logDecay, beta, null, 1, 2, 4, 2, 1);
+    var actual = forward(query, key, value, logDecay, beta, null, 1, 2, 4, 2, 1);
 
     assertThat(actual.output())
         .containsExactly(new float[] {0.70710605f, 0.0f, 2.121318f, 0.0f}, within(2.0e-6f));
@@ -214,6 +201,90 @@ class GatedDeltaNetRecurrenceTest {
         .containsExactly(
             new float[] {0.9999995f, 0.0f, 0.0f, 1.999999f, 2.9999986f, 0.0f, 0.0f, 3.999998f},
             within(2.0e-6f));
+  }
+
+  private record Result(float[] output, float[] finalState) {}
+
+  private static Result forward(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] initial,
+      int tokens,
+      int heads,
+      int keyDimension,
+      int valueDimension) {
+    return forward(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        initial,
+        tokens,
+        heads,
+        heads,
+        keyDimension,
+        valueDimension);
+  }
+
+  private static Result forward(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] initial,
+      int tokens,
+      int keyHeads,
+      int valueHeads,
+      int keyDimension,
+      int valueDimension) {
+    float[] state =
+        initial == null ? new float[valueHeads * keyDimension * valueDimension] : initial.clone();
+    return advance(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        state,
+        tokens,
+        keyHeads,
+        valueHeads,
+        keyDimension,
+        valueDimension);
+  }
+
+  private static Result advance(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] state,
+      int tokens,
+      int keyHeads,
+      int valueHeads,
+      int keyDimension,
+      int valueDimension) {
+    float[] output = new float[tokens * valueHeads * valueDimension];
+    GatedDeltaNetRecurrence.forwardPrefixInPlace(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        state,
+        output,
+        tokens,
+        keyHeads,
+        valueHeads,
+        keyDimension,
+        valueDimension);
+    return new Result(output, state);
   }
 
   private static float[] firstTokens(float[] values, int dimension, int tokenCount) {

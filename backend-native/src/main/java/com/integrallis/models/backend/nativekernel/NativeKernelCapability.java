@@ -35,13 +35,12 @@ public enum NativeKernelCapability {
   Q4_K_BATCH_VECTOR_ACCUMULATION(1L << 15),
   MANY_GROUPED_BATCHED_MATMUL(1L << 16),
   INDEPENDENT_BATCHED_MATMUL(1L << 17),
-  GATED_DELTA_NET_F32(1L << 18),
+  // Bit 18 is retired; do not reuse it.
   ACTIVE_THREADS(1L << 19),
   GROUPED_ATTENTION_F32(1L << 20),
   /** The worker pool's poll budget before parking is settable per context. */
   POLL_BUDGET(1L << 21),
-  /** Several sequences advance one token each in one launch, against one recurrent state apiece. */
-  GROUPED_GATED_DELTA_NET_F32(1L << 22),
+  // Bit 22 is retired; do not reuse it.
   /**
    * Q5_1 rows against F32 activations rather than quantized ones.
    *

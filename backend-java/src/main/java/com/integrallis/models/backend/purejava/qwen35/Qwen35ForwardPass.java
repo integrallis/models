@@ -802,17 +802,8 @@ public final class Qwen35ForwardPass {
   }
 
   /**
-   * Advances every active branch's recurrent state by one token.
-   *
-   * <p>Issued as one call rather than one per branch. A kernel asked to advance a single sequence
-   * by a single token has nothing to spread across its threads and deliberately stays on the
-   * caller, so asking N times in a row answered N questions on one core while every projection
-   * around it used the whole machine. MEASURED 2026-09-24 on a Hetzner CCX33: twenty questions cost
-   * 12.39 s grouped that way, and 10.79 s once the whole group went in one call. Handed the whole
-   * group, the kernel has rows x heads independent recurrences.
-   *
-   * <p>{@code active} is also the row-to-slot table: questions of unequal length drop out as they
-   * finish, so the rows still advancing are a scattered subset of the group's state slots.
+   * Advances each active branch in Java. The active row-to-slot table preserves each branch's
+   * recurrent state when shorter questions finish before their neighbors.
    */
   private void groupedRecurrence(
       int layer, int rows, int[] active, Qwen35GroupedDecision group, BatchScratch batch) {
@@ -821,26 +812,6 @@ public final class Qwen35ForwardPass {
     int valueHeads = config.gdnValueHeads();
     int headDimension = config.gdnHeadDim();
     float[] groupState = group.recurrentState(layer);
-    if (batchedMatrixKernel.supportsGroupedGatedDeltaNet()) {
-      batchedMatrixKernel.groupedGatedDeltaNet(
-          batch.gdnQuery,
-          batch.gdnKey,
-          batch.gdnValue,
-          batch.logDecay,
-          batch.beta,
-          groupState,
-          batch.recurrent,
-          active,
-          rows,
-          group.groupSize(),
-          config.gdnKeyHeads(),
-          valueHeads,
-          headDimension,
-          headDimension);
-      return;
-    }
-    // No grouped kernel: step each row into its own slot of the same array the kernel would have
-    // written, so both paths address state identically and the parity test covers both.
     int elements = group.recurrentStateElements();
     float[] rowOutput = batch.rowRecurrent;
     for (int row = 0; row < rows; row++) {
@@ -853,10 +824,6 @@ public final class Qwen35ForwardPass {
           groupState,
           active[row] * elements,
           rowOutput,
-          batch.normalizedQuery,
-          batch.normalizedKey,
-          batch.memory,
-          batch.delta,
           config.gdnKeyHeads(),
           valueHeads,
           headDimension,
@@ -1327,10 +1294,6 @@ public final class Qwen35ForwardPass {
         batch.beta,
         session.recurrentState[layer],
         batch.recurrent,
-        batch.normalizedQuery,
-        batch.normalizedKey,
-        batch.memory,
-        batch.delta,
         batchSize,
         config.gdnKeyHeads(),
         valueHeads,
@@ -1589,10 +1552,6 @@ public final class Qwen35ForwardPass {
         beta,
         session.recurrentState[layer],
         recurrent,
-        workspace.normalizedQuery,
-        workspace.normalizedKey,
-        workspace.memory,
-        workspace.delta,
         1,
         config.gdnKeyHeads(),
         heads,
@@ -1621,56 +1580,11 @@ public final class Qwen35ForwardPass {
       float[] beta,
       float[] state,
       float[] output,
-      float[] normalizedQuery,
-      float[] normalizedKey,
-      float[] memory,
-      float[] delta,
       int tokenCount,
       int keyHeadCount,
       int valueHeadCount,
       int keyDimension,
       int valueDimension) {
-    if (batchedMatrixKernel.supportsGatedDeltaNet()) {
-      batchedMatrixKernel.gatedDeltaNet(
-          query,
-          key,
-          value,
-          logDecay,
-          beta,
-          state,
-          output,
-          tokenCount,
-          keyHeadCount,
-          valueHeadCount,
-          keyDimension,
-          valueDimension);
-      return;
-    }
-    if (batchedMatrixKernel != GgufBatchedMatrixKernel.none()) {
-      PerformanceCliffs.report(
-          PerformanceCliff.NATIVE_GATED_DELTA_NET_UNAVAILABLE,
-          "architecture=qwen35, kernel=" + batchedMatrixKernel.implementation());
-    }
-    if (tokenCount == 1) {
-      GatedDeltaNetRecurrence.forwardInPlace(
-          query,
-          key,
-          value,
-          logDecay,
-          beta,
-          state,
-          output,
-          normalizedQuery,
-          normalizedKey,
-          memory,
-          delta,
-          tokenCount,
-          keyHeadCount,
-          valueHeadCount,
-          keyDimension,
-          valueDimension);
-      return;
-    }
     GatedDeltaNetRecurrence.forwardPrefixInPlace(
         query,
         key,
@@ -1679,10 +1593,6 @@ public final class Qwen35ForwardPass {
         beta,
         state,
         output,
-        normalizedQuery,
-        normalizedKey,
-        memory,
-        delta,
         tokenCount,
         keyHeadCount,
         valueHeadCount,
@@ -1769,10 +1679,6 @@ public final class Qwen35ForwardPass {
     private final float[] gdnValue;
     private final float[] recurrent;
     private final float[] rowRecurrent;
-    private final float[] normalizedQuery;
-    private final float[] normalizedKey;
-    private final float[] memory;
-    private final float[] delta;
     private final BatchProjectionScratch projectionScratch;
 
     private BatchScratch(Qwen35Config config, Qwen35Weights weights, int capacity, int batchSize) {
@@ -1799,10 +1705,6 @@ public final class Qwen35ForwardPass {
       gdnValue = batchBuffer(batchSize, config.gdnValueDim());
       recurrent = batchBuffer(batchSize, config.gdnValueDim());
       rowRecurrent = new float[config.gdnValueDim()];
-      normalizedQuery = new float[config.gdnHeadDim()];
-      normalizedKey = new float[config.gdnHeadDim()];
-      memory = new float[config.gdnHeadDim()];
-      delta = new float[config.gdnHeadDim()];
       projectionScratch = new BatchProjectionScratch(config, weights, batchSize);
     }
   }
@@ -1849,10 +1751,6 @@ public final class Qwen35ForwardPass {
     private final float[] value;
     private final float[] logDecay;
     private final float[] recurrent;
-    private final float[] normalizedQuery;
-    private final float[] normalizedKey;
-    private final float[] memory;
-    private final float[] delta;
 
     private GatedDeltaNetScratch(Qwen35Config config) {
       mixed = new float[config.gdnConvDim()];
@@ -1867,10 +1765,6 @@ public final class Qwen35ForwardPass {
       value = new float[config.gdnValueDim()];
       logDecay = new float[config.gdnValueHeads()];
       recurrent = new float[config.gdnValueDim()];
-      normalizedQuery = new float[config.gdnHeadDim()];
-      normalizedKey = new float[config.gdnHeadDim()];
-      memory = new float[config.gdnHeadDim()];
-      delta = new float[config.gdnHeadDim()];
     }
   }
 

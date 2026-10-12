@@ -353,52 +353,12 @@ class Qwen35ForwardPassTest {
     Path model = writeToyModel(directory);
 
     AtomicInteger invocations = new AtomicInteger();
-    AtomicInteger gatedDeltaNetInvocations = new AtomicInteger();
     AtomicInteger maximumBatchSize = new AtomicInteger();
     GgufBatchedMatrixKernel kernel =
         new GgufBatchedMatrixKernel() {
           @Override
           public boolean supports(GgufTensorType type) {
             return type == GgufTensorType.F32;
-          }
-
-          @Override
-          public boolean supportsGatedDeltaNet() {
-            return true;
-          }
-
-          @Override
-          public void gatedDeltaNet(
-              float[] query,
-              float[] key,
-              float[] value,
-              float[] logDecay,
-              float[] beta,
-              float[] state,
-              float[] output,
-              int tokenCount,
-              int keyHeadCount,
-              int valueHeadCount,
-              int keyDimension,
-              int valueDimension) {
-            gatedDeltaNetInvocations.incrementAndGet();
-            GatedDeltaNetRecurrence.forwardPrefixInPlace(
-                query,
-                key,
-                value,
-                logDecay,
-                beta,
-                state,
-                output,
-                new float[keyDimension],
-                new float[keyDimension],
-                new float[valueDimension],
-                new float[valueDimension],
-                tokenCount,
-                keyHeadCount,
-                valueHeadCount,
-                keyDimension,
-                valueDimension);
           }
 
           @Override
@@ -428,45 +388,24 @@ class Qwen35ForwardPassTest {
       float[] actual = accelerated.prefill(new int[] {1, 2, 3, 4}, 0);
 
       assertThat(invocations).hasValueGreaterThan(0);
-      assertThat(gatedDeltaNetInvocations).hasValueGreaterThan(0);
       assertThat(maximumBatchSize).hasValueGreaterThanOrEqualTo(1);
       assertThat(actual).containsExactly(expected);
     }
   }
 
   @Test
-  void injectedKernelWithoutGatedDeltaNetReportsTheCliffOncePerProcess(@TempDir Path directory)
+  void injectedBatchedProjectionsKeepRecurrenceInJavaWithoutReportingACliff(@TempDir Path directory)
       throws Exception {
     Path model = writeToyModel(directory);
-    GgufBatchedMatrixKernel kernel = f32Kernel(false);
 
     try (PerformanceCliffRecording recording = PerformanceCliffRecording.start();
-        PureJavaBackend accelerated = PureJavaBackend.load(model, kernel)) {
-      for (int request = 0; request < 3; request++) {
-        accelerated.prefill(new int[] {1, 2, 3, 4}, 0);
-        accelerated.forward(5, 4);
-        accelerated.reset();
-      }
-
-      assertThat(recording.count(PerformanceCliff.NATIVE_GATED_DELTA_NET_UNAVAILABLE)).isEqualTo(1);
-      assertThat(recording.count(PerformanceCliff.ROW_BY_ROW_PROJECTION)).isZero();
-      assertThat(accelerated.diagnostics().environment())
-          .containsKey("performance-cliff.native-gated-delta-net-unavailable");
-    }
-  }
-
-  @Test
-  void injectedKernelWithGatedDeltaNetAndBatchedProjectionsReportsNeitherCliff(
-      @TempDir Path directory) throws Exception {
-    Path model = writeToyModel(directory);
-
-    try (PerformanceCliffRecording recording = PerformanceCliffRecording.start();
-        PureJavaBackend accelerated = PureJavaBackend.load(model, f32Kernel(true))) {
+        PureJavaBackend accelerated = PureJavaBackend.load(model, f32Kernel())) {
       accelerated.prefill(new int[] {1, 2, 3, 4}, 0);
       accelerated.forward(5, 4);
 
-      assertThat(recording.count(PerformanceCliff.NATIVE_GATED_DELTA_NET_UNAVAILABLE)).isZero();
       assertThat(recording.count(PerformanceCliff.ROW_BY_ROW_PROJECTION)).isZero();
+      assertThat(accelerated.diagnostics().environment())
+          .doesNotContainKey("performance-cliff.native-gated-delta-net-unavailable");
     }
   }
 
@@ -488,8 +427,6 @@ class Qwen35ForwardPassTest {
 
       assertThat(recording.count(PerformanceCliff.BATCHED_PREFILL_UNSUPPORTED_TENSOR_TYPE))
           .isEqualTo(1);
-      // No kernel was injected, so the Java recurrence is the chosen path, not a fallback.
-      assertThat(recording.count(PerformanceCliff.NATIVE_GATED_DELTA_NET_UNAVAILABLE)).isZero();
     }
   }
 
@@ -525,49 +462,11 @@ class Qwen35ForwardPassTest {
     }
   }
 
-  private static GgufBatchedMatrixKernel f32Kernel(boolean gatedDeltaNet) {
+  private static GgufBatchedMatrixKernel f32Kernel() {
     return new GgufBatchedMatrixKernel() {
       @Override
       public boolean supports(GgufTensorType type) {
         return type == GgufTensorType.F32;
-      }
-
-      @Override
-      public boolean supportsGatedDeltaNet() {
-        return gatedDeltaNet;
-      }
-
-      @Override
-      public void gatedDeltaNet(
-          float[] query,
-          float[] key,
-          float[] value,
-          float[] logDecay,
-          float[] beta,
-          float[] state,
-          float[] output,
-          int tokenCount,
-          int keyHeadCount,
-          int valueHeadCount,
-          int keyDimension,
-          int valueDimension) {
-        GatedDeltaNetRecurrence.forwardPrefixInPlace(
-            query,
-            key,
-            value,
-            logDecay,
-            beta,
-            state,
-            output,
-            new float[keyDimension],
-            new float[keyDimension],
-            new float[valueDimension],
-            new float[valueDimension],
-            tokenCount,
-            keyHeadCount,
-            valueHeadCount,
-            keyDimension,
-            valueDimension);
       }
 
       @Override

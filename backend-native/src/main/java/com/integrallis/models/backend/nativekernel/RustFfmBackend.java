@@ -375,7 +375,6 @@ public final class RustFfmBackend
     environment.put(
         "native-grouped-attention", Boolean.toString(kernel.supportsGroupedAttention()));
     environment.put("native-q5-0-grouped", "false");
-    environment.put("native-gated-delta-net", Boolean.toString(kernel.supportsGatedDeltaNet()));
     List<OptimizationDecision> optimizations = new ArrayList<>(javaDiagnostics.optimizations());
     boolean ptq =
         kernel.supports(com.integrallis.models.backend.purejava.gguf.GgufTensorType.PTQ1_0);
@@ -417,34 +416,6 @@ public final class RustFfmBackend
         nativeQuantizedDecision(
             "rust-mixed-k-grouped-matmul",
             "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization"));
-    optimizations.add(
-        new OptimizationDecision(
-            "rust-gated-delta-net",
-            OptimizationStatus.DISABLED,
-            "the Qwen 3.5 recurrence stays in Java: the shim's chunked recurrence agrees only to"
-                + " 2.0e-4 relative, every certified Qwen 3.5 record was produced with the Java one,"
-                + " and whether the shim is faster here is unmeasured. Adopting it is an epoch"
-                + " change, not a setting",
-            Map.of(
-                "abi",
-                Integer.toString(NativeKernelLibrary.ABI_VERSION),
-                "boundary",
-                "panama-ffm-critical",
-                "state",
-                "caller-owned-java-array")));
-    optimizations.add(
-        new OptimizationDecision(
-            "rust-grouped-gated-delta-net",
-            OptimizationStatus.DISABLED,
-            "unrouted for the same reason as rust-gated-delta-net: adopting it would change the"
-                + " bytes published Qwen 3.5 records claim",
-            Map.of(
-                "abi",
-                Integer.toString(NativeKernelLibrary.ABI_VERSION),
-                "boundary",
-                "panama-ffm-critical",
-                "state",
-                "branch-major-caller-owned-java-array")));
     optimizations.add(
         new OptimizationDecision(
             "rust-q5-0-grouped-matmul",

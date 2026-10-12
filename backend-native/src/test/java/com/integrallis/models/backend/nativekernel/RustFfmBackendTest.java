@@ -219,13 +219,8 @@ class RustFfmBackendTest {
     assertThat(diagnostics.optimization("rust-q6-k-batched-matmul"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
-    assertThat(diagnostics.optimization("rust-gated-delta-net"))
-        .as("the recurrence stays in Java until an epoch change adopts the shim's")
-        .hasValueSatisfying(
-            decision -> {
-              assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
-              assertThat(decision.reason()).contains("2.0e-4");
-            });
+    assertThat(diagnostics.optimization("rust-gated-delta-net")).isEmpty();
+    assertThat(diagnostics.optimization("rust-grouped-gated-delta-net")).isEmpty();
   }
 
   @Test
@@ -245,12 +240,8 @@ class RustFfmBackendTest {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
               assertThat(decision.reason()).contains("run independently");
             });
-    assertThat(diagnostics.optimization("rust-gated-delta-net"))
-        .hasValueSatisfying(
-            decision -> {
-              assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
-              assertThat(decision.reason()).contains("epoch change");
-            });
+    assertThat(diagnostics.optimization("rust-gated-delta-net")).isEmpty();
+    assertThat(diagnostics.optimization("rust-grouped-gated-delta-net")).isEmpty();
     assertThat(diagnostics.optimization("rust-ptq1-0-q8-0-batched-matmul"))
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED));

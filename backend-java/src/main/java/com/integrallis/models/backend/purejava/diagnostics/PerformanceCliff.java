@@ -97,12 +97,6 @@ public enum PerformanceCliff {
       "native-grouped-attention-span-limit",
       "the KV cache view has more than two spans; native grouped attention falls back to Java"),
   /**
-   * An injected native kernel does not provide the Gated DeltaNet recurrence, so it runs in Java.
-   */
-  NATIVE_GATED_DELTA_NET_UNAVAILABLE(
-      "native-gated-delta-net-unavailable",
-      "the injected kernel has no Gated DeltaNet recurrence; it runs in Java"),
-  /**
    * The loaded native kernel library lacks the poll-budget capability, so its workers keep the
    * library's built-in poll-before-park behaviour instead of the configured budget.
    */

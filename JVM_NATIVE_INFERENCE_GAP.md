@@ -36,12 +36,14 @@ one is independently reproducible, attributable to the right layer, and closable
 ## The current native boundary
 
 Models does not embed llama.cpp, Ollama, FreeToken, Needle, or another inference engine. The
-Models-owned ABI 5 crate exposes a persistent worker context and these compute operations:
+Models-owned CPU crate exposes a persistent worker context and selected compute operations.
+The earlier description of native Gated DeltaNet as necessary was incorrect: production used
+Java recurrence, and the inactive Rust implementation and its bindings have now been removed.
+Historical measurements elsewhere in this brief retain their original runtime scope.
 
 | Native operation | Formats or graph | Java ownership outside the call | Current reason to keep it |
 | --- | --- | --- | --- |
 | Batched, grouped, and independent quantized matrix projection | Q4_0, Q5_0, Q8_0, Q4_K, Q5_K, Q6_K, and mixed K-quant groups | Artifact mapping, activation lifetime, graph scheduling, attention, KV cache, sampling, and generation | Exact x86 profiles can use AVX2/FMA integer dots, weight reuse, and a persistent worker pool more predictably than the current portable lowering. |
-| Gated DeltaNet recurrence | F32 recurrent state used by Qwen3.5 | Convolution, projections, state ownership, attention, tokenizer, and generation | The Java recurrence is correct and vectorized, but the exact Qwen3.5 0.8B production profile needs the narrow FFM recurrence to meet its TTFT policy. |
 
 The [backend contract](backend-native/README.md) is versioned, checksum-verified, optional, and
 replaceable. Every native-selected model also runs a library-default Java correctness smoke. This
@@ -300,9 +302,8 @@ qualification.
 
 ## Native-removal experiment order
 
-1. **Qwen3.5 recurrence:** compare current Java SIMD and ABI 5 recurrence in counterbalanced
-   full-model runs on x86 and Apple Silicon; inspect generated code before adding another Java
-   formulation. Remove the native recommendation if Java clears the existing 0.8B policy.
+1. **Qwen3.5 recurrence:** completed native removal. Recurrence executes in Java; the unused Rust
+   implementation and native injection hooks were deleted. Preserve the existing Java model gates.
 2. **Qwen2.5 3B quantized decode:** isolate the selected Q4_K/Q5_K/Q6_K projection shapes, test
    current HotSpot and Graal builds, then rerun the 27-case workload. The goal is the current
    Rust/FFM tier with identical output hashes, not a synthetic microbenchmark win.

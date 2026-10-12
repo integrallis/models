@@ -87,7 +87,7 @@ class PerformanceCliffsTest {
                               () -> {
                                 for (int call = 0; call < 1_000; call++) {
                                   PerformanceCliffs.report(
-                                      PerformanceCliff.NATIVE_GATED_DELTA_NET_UNAVAILABLE,
+                                      PerformanceCliff.NATIVE_GROUPED_ATTENTION_UNAVAILABLE,
                                       "thread " + thread);
                                 }
                               }))
@@ -96,7 +96,8 @@ class PerformanceCliffsTest {
         thread.join();
       }
 
-      assertThat(recording.count(PerformanceCliff.NATIVE_GATED_DELTA_NET_UNAVAILABLE)).isEqualTo(1);
+      assertThat(recording.count(PerformanceCliff.NATIVE_GROUPED_ATTENTION_UNAVAILABLE))
+          .isEqualTo(1);
     }
   }
 

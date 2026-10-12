@@ -107,9 +107,6 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     if (library.supports(NativeKernelCapability.PTQ1_0_Q8_0_BATCHED_MATMUL)) {
       return "rust-ffm-quantized-v14";
     }
-    if (library.supports(NativeKernelCapability.GATED_DELTA_NET_F32)) {
-      return "rust-ffm-quantized-v13";
-    }
     if (library.supports(NativeKernelCapability.INDEPENDENT_BATCHED_MATMUL)) {
       return "rust-ffm-quantized-v12";
     }
@@ -126,111 +123,9 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return PLAN_RECOMMENDATIONS;
   }
 
-  /**
-   * Whether the Qwen 3.5 recurrence runs in the shim. It does not, and that is a decision rather
-   * than a setting.
-   *
-   * <p>This was {@code models.native.gatedDeltaNet}, default off. Removing the veto would have made
-   * the shim recurrence unconditional, and that is an epoch change, not a speed-up:
-   *
-   * <ul>
-   *   <li>Every certified Qwen 3.5 record — {@code qwen3.5-0.8b}, {@code qwen3.5-2b} — was produced
-   *       with {@code native-gated-delta-net = false}, so the published bytes come from the Java
-   *       recurrence.
-   *   <li>The shim's chunked recurrence is validated to a <em>2.0e-4 relative</em> tolerance, not
-   *       bit-identically. Greedy decoding is a discrete argmax, and a perturbation of 1.4e-6 was
-   *       already measured to change 2 of 9 generated answers for grouped attention. 2.0e-4 is a
-   *       hundred times larger.
-   *   <li>Whether it is even faster than the Java recurrence is <em>unmeasured</em>. The one
-   *       committed comparison (2026-09-23) times the shim's sequential against its own chunked
-   *       variant, 3.920 against 3.585 ms, and never against Java.
-   * </ul>
-   *
-   * <p>So: an unmeasured benefit against a known byte-level divergence in published records. It
-   * stays unrouted until someone re-runs every pinned greedy oracle and re-derives the tier bands
-   * on it, which is a deliberate epoch change and not a default to flip. The kernel and its parity
-   * tests are kept because that decision needs them.
-   */
-  @Override
-  public boolean supportsGatedDeltaNet() {
-    return false;
-  }
-
   /** Whether the loaded shim can share one activation quantization across grouped Q5_0 rows. */
   boolean supportsQ5_0Grouped() {
     return library.supports(NativeKernelCapability.Q5_0_F32_GROUPED_BATCHED_MATMUL);
-  }
-
-  @Override
-  public synchronized void gatedDeltaNet(
-      float[] query,
-      float[] key,
-      float[] value,
-      float[] logDecay,
-      float[] beta,
-      float[] state,
-      float[] output,
-      int tokenCount,
-      int keyHeadCount,
-      int valueHeadCount,
-      int keyDimension,
-      int valueDimension) {
-    requireOpen();
-    library.gatedDeltaNetF32(
-        query,
-        key,
-        value,
-        logDecay,
-        beta,
-        state,
-        output,
-        tokenCount,
-        keyHeadCount,
-        valueHeadCount,
-        keyDimension,
-        valueDimension);
-  }
-
-  /**
-   * False for the same reason as {@link #supportsGatedDeltaNet()}: it would change published bytes.
-   */
-  @Override
-  public boolean supportsGroupedGatedDeltaNet() {
-    return false;
-  }
-
-  @Override
-  public synchronized void groupedGatedDeltaNet(
-      float[] query,
-      float[] key,
-      float[] value,
-      float[] logDecay,
-      float[] beta,
-      float[] state,
-      float[] output,
-      int[] rowStateSlot,
-      int rowCount,
-      int stateSlotCount,
-      int keyHeadCount,
-      int valueHeadCount,
-      int keyDimension,
-      int valueDimension) {
-    requireOpen();
-    library.groupedGatedDeltaNetF32(
-        query,
-        key,
-        value,
-        logDecay,
-        beta,
-        state,
-        output,
-        rowStateSlot,
-        rowCount,
-        stateSlotCount,
-        keyHeadCount,
-        valueHeadCount,
-        keyDimension,
-        valueDimension);
   }
 
   int threadCount() {
