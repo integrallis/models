@@ -15,10 +15,9 @@
  */
 package com.integrallis.models.backend.purejava.qwen35;
 
-import com.integrallis.vectors.core.GgufStagePlan;
 import java.util.Objects;
 
-/** Exact row-order recurrence, partitioned across independent heads by the Vectors executor. */
+/** Exact row-order recurrence with register-tiled arithmetic on the calling thread. */
 final class GatedDeltaNetRecurrence {
   private GatedDeltaNetRecurrence() {}
 
@@ -131,27 +130,22 @@ final class GatedDeltaNetRecurrence {
         || output == beta)
       throw new IllegalArgumentException(
           "recurrent state and output must not alias any other buffer");
-    GgufStagePlan.of(
-            GgufStagePlan.stage(
-                valueHeadCount,
-                (firstHead, endHead) ->
-                    GatedDeltaNetKernel.apply(
-                        query,
-                        key,
-                        value,
-                        logDecay,
-                        beta,
-                        state,
-                        output,
-                        stateBase,
-                        tokenCount,
-                        keyHeadCount,
-                        valueHeadCount,
-                        keyDimension,
-                        valueDimension,
-                        firstHead,
-                        endHead)))
-        .execute();
+    GatedDeltaNetKernel.apply(
+        query,
+        key,
+        value,
+        logDecay,
+        beta,
+        state,
+        output,
+        stateBase,
+        tokenCount,
+        keyHeadCount,
+        valueHeadCount,
+        keyDimension,
+        valueDimension,
+        0,
+        valueHeadCount);
   }
 
   private static void requirePositive(int value, String name) {
