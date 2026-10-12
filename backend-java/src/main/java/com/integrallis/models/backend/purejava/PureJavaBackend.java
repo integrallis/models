@@ -628,7 +628,7 @@ public final class PureJavaBackend
             config.numHeads(),
             config.numHeads());
     return new LoadedDecoder(
-        new EncoderDecoderAdapter(BertForwardPass.fromGgufFile(file, config)),
+        new EncoderDecoderAdapter(BertForwardPass.fromGgufFile(file, config, batchedMatrixKernel)),
         metadata,
         contextCapacity,
         executionPlan);

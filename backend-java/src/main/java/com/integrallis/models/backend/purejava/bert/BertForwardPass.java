@@ -17,7 +17,9 @@ package com.integrallis.models.backend.purejava.bert;
 
 import com.integrallis.models.backend.purejava.SequenceEncoder;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
+import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.Arrays;
@@ -28,6 +30,7 @@ public final class BertForwardPass implements SequenceEncoder {
 
   private final BertConfig config;
   private final BertWeights weights;
+  private final GgufBatchedMatrixKernel matrixKernel;
   private final float[] tokenEmbedding;
   private final float[] positionEmbedding;
   private final float[][] tokenTypeEmbeddings;
@@ -55,6 +58,12 @@ public final class BertForwardPass implements SequenceEncoder {
   private int capacity;
 
   BertForwardPass(BertConfig config, BertWeights weights) {
+    this(config, weights, GgufBatchedMatrixKernel.none());
+  }
+
+  private BertForwardPass(
+      BertConfig config, BertWeights weights, GgufBatchedMatrixKernel matrixKernel) {
+    this.matrixKernel = Objects.requireNonNull(matrixKernel, "matrixKernel");
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     this.tokenEmbedding = new float[config.embeddingDim()];
@@ -69,6 +78,12 @@ public final class BertForwardPass implements SequenceEncoder {
   /** Loads a complete bidirectional encoder from an already parsed GGUF. */
   public static BertForwardPass fromGgufFile(GgufFile file, BertConfig config) {
     return new BertForwardPass(config, BertWeights.load(file, config));
+  }
+
+  /** Loads an encoder with an explicitly supplied exact Q5_1 projection provider. */
+  public static BertForwardPass fromGgufFile(
+      GgufFile file, BertConfig config, GgufBatchedMatrixKernel matrixKernel) {
+    return new BertForwardPass(config, BertWeights.load(file, config), matrixKernel);
   }
 
   @Override
@@ -264,7 +279,24 @@ public final class BertForwardPass implements SequenceEncoder {
 
   private void project(
       float[] output, float[] input, int sequenceLength, BertWeights.Matrix matrix) {
-    if (config.usesRotaryPositions()) {
+    // Q5_1's injected kernel preserves the exact F32 arithmetic used by this encoder.
+    // Other native formats quantize activations and have a different numerical contract.
+    if (matrix.type() == GgufTensorType.Q5_1
+        && matrixKernel.isEligible(
+            matrix.type(), sequenceLength, matrix.rows(), matrix.columns())) {
+      matrixKernel.multiply(
+          output,
+          input,
+          matrix.data(),
+          matrix.type(),
+          sequenceLength,
+          matrix.rows(),
+          matrix.columns());
+      return;
+    }
+    if (config.usesRotaryPositions()
+        || matrix.type() == GgufTensorType.Q5_1
+        || matrix.type() == GgufTensorType.Q4_1) {
       TensorOps.ggufExactBatchedMatmul(
           output,
           input,

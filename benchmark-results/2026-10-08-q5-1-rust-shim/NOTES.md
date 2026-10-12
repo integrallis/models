@@ -1,3 +1,10 @@
+> **Correction from the October 12 code audit:** the embedding A/B below did not exercise
+> two execution routes. `EmbeddingEquivalenceCli` called `PureJavaBackend.load(artifact)`,
+> which installs no native provider, and BERT did not dispatch projections to an injected
+> provider. Classpath presence did not establish execution. Retained raw timings and
+> vectors are historical observations of Java runs, not native embedding parity or
+> performance evidence. The direct kernel benchmark remains a separate measurement.
+
 # A Rust shim for Q5_1, and what it is and is not worth
 
 Date: 2026-10-08. Box: i9-14900HX, AVX2, **no AVX-512**, 12 threads reported to the shim.
