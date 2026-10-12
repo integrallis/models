@@ -65,15 +65,15 @@ public final class Q50RouteProof {
       long start = System.nanoTime();
       float[] logits = backend.prefill(session, input, 0);
       prefill = System.nanoTime() - start;
-      initial = logits;
-      snapshots.add(logits);
+      initial = logits.clone();
+      snapshots.add(logits.clone());
       for (int n = 0; n < steps; n++) {
         int token = argmax(logits);
         tokens.add(token);
         start = System.nanoTime();
         logits = backend.forward(session, token, input.length + n);
         decode += System.nanoTime() - start;
-        snapshots.add(logits);
+        snapshots.add(logits.clone());
       }
     }
     long requestNanos = System.nanoTime() - requestStart;
