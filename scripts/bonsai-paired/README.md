@@ -1,7 +1,7 @@
-# Combined BF16 and activation correction: whole-model paired validation
+# All-activation correction without BF16 changes: whole-model paired validation
 
 This protocol is frozen before execution in `protocol.json`. It compares the same actual
-Models commit and native library with released Vectors core against the exact combined BF16 and all-activation
+Models commit and native library with released Vectors core against the exact all-activation-only
 correction. Only the core JAR differs; every file and runtime origin is recorded. This is
 pre-publication evidence, never permission to publish.
 
@@ -32,4 +32,4 @@ GitHub hosted x86 and ARM runners are the supported hosts tested by this workflo
 JDK, native library, artifact hashes, commands, exit status, and elapsed time are retained.
 No compiler flags, warmup-dependent routes, or native-selection properties are added.
 
-The launched candidate is broad revision `6893a587`, whose unchanged Bonsai fixtures passed on both architectures. Bonsai 2 is `qwen35`, verified directly from the SHA-pinned GGUF header; it exercises GDN sigmoid/softplus and causal convolution as well as SwiGLU. Earlier candidate-only SwiGLU and BF16 ablations failed and are not represented as qualified. Any narrower final runtime requires new matching qualification.
+The launched candidate is all-activation-only revision `8495fbf9`, whose unchanged Bonsai fixtures passed on both architectures in run38321333816 (two tests each, no failures/skips, exact zero errors at all three continuation steps). BFloat16Matrix and its executor are unchanged from the released runtime. Bonsai2 is `qwen35`, verified from its exact SHA-pinned GGUF header; it exercises sigmoid/softplus, causal convolution and SwiGLU. This phase is separate from broad6893 run38321278750; observations are never pooled. Qwen's independent BF16 candidate failure, if present, blocks its own timing and remains explicit while Bonsai proceeds.
