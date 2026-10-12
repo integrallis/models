@@ -24,6 +24,8 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -64,6 +66,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private static final int FORMAT_Q5_1 = 6;
   private static final int FORMAT_PTQ1_0 = 7;
   private static final Linker LINKER = Linker.nativeLinker();
+  private static final MethodHandle FLOAT_ARRAY_SEGMENT = floatArraySegment();
   private static final FunctionDescriptor ABI_VERSION_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_INT);
   private static final FunctionDescriptor CAPABILITIES_DESCRIPTOR =
@@ -295,10 +298,18 @@ public final class NativeKernelLibrary implements AutoCloseable {
               "jmodels_quantized_f32_independent_batched_matmul_with_context",
               QUANTIZED_INDEPENDENT_BATCHED_WITH_CONTEXT_DESCRIPTOR);
       MethodHandle gatedDeltaNet =
-          downcallCritical(
-              lookup,
-              "jmodels_gated_delta_net_f32_with_context",
-              GATED_DELTA_NET_WITH_CONTEXT_DESCRIPTOR);
+          withFloatArrays(
+              downcallCritical(
+                  lookup,
+                  "jmodels_gated_delta_net_f32_with_context",
+                  GATED_DELTA_NET_WITH_CONTEXT_DESCRIPTOR),
+              1,
+              3,
+              5,
+              7,
+              9,
+              11,
+              13);
       MethodHandle groupedGatedDeltaNet =
           (capabilityMask & NativeKernelCapability.GROUPED_GATED_DELTA_NET_F32.mask()) != 0
               ? downcallCritical(
@@ -351,6 +362,27 @@ public final class NativeKernelLibrary implements AutoCloseable {
       arena.close();
       throw failure;
     }
+  }
+
+  private static MethodHandle floatArraySegment() {
+    try {
+      return MethodHandles.publicLookup()
+          .findStatic(
+              MemorySegment.class,
+              "ofArray",
+              MethodType.methodType(MemorySegment.class, float[].class));
+    } catch (ReflectiveOperationException failure) {
+      throw new ExceptionInInitializerError(failure);
+    }
+  }
+
+  private static MethodHandle withFloatArrays(MethodHandle downcall, int... positions) {
+    // Keep ephemeral heap-segment conversions beside the critical downcall in its LambdaForm.
+    // Arrays retain their existing ownership and lifetime; no input/state buffer is cached.
+    for (int position : positions) {
+      downcall = MethodHandles.filterArguments(downcall, position, FLOAT_ARRAY_SEGMENT);
+    }
+    return downcall;
   }
 
   /** Returns the ABI version accepted by this Java binding. */
@@ -424,19 +456,19 @@ public final class NativeKernelLibrary implements AutoCloseable {
           (int)
               gatedDeltaNetHandle.invokeExact(
                   context,
-                  MemorySegment.ofArray(query),
+                  query,
                   (long) query.length,
-                  MemorySegment.ofArray(key),
+                  key,
                   (long) key.length,
-                  MemorySegment.ofArray(value),
+                  value,
                   (long) value.length,
-                  MemorySegment.ofArray(logDecay),
+                  logDecay,
                   (long) logDecay.length,
-                  MemorySegment.ofArray(beta),
+                  beta,
                   (long) beta.length,
-                  MemorySegment.ofArray(state),
+                  state,
                   (long) state.length,
-                  MemorySegment.ofArray(output),
+                  output,
                   (long) output.length,
                   tokenCount,
                   keyHeadCount,
