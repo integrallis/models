@@ -1542,7 +1542,7 @@ public final class TensorOps {
     if (type == GgufTensorType.Q5_1
         && rows > 1
         && (long) batchSize * rows * columns
-            >= Math.max(1L, Long.getLong("vectors.gguf.parallelThreshold", 1_048_576L))
+            >= Math.max(1L, Long.getLong("vectors.gguf.parallelThreshold", 131_072L))
         && weights.isAccessibleBy(EXACT_ACCESS_PROBE)) {
       GgufStagePlan.of(
               GgufStagePlan.stage(

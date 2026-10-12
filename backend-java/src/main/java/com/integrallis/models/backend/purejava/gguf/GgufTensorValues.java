@@ -47,7 +47,7 @@ public final class GgufTensorValues {
     return values;
   }
 
-  /** Dequantizes one matrix row into a caller-owned F32 buffer. */
+  /** Dequantizes one matrix row into the prefix of a caller-owned F32 buffer. */
   public static void dequantizeRow(
       MemorySegment segment, GgufTensorType type, int row, int columns, float[] output) {
     Objects.requireNonNull(segment, "segment");
@@ -60,9 +60,9 @@ public final class GgufTensorValues {
       throw new IllegalArgumentException(
           "columns must be a positive multiple of " + type.blockSize() + ": " + columns);
     }
-    if (output.length != columns) {
+    if (output.length < columns) {
       throw new IllegalArgumentException(
-          "output length must match columns: " + output.length + " != " + columns);
+          "output length is smaller than columns: " + output.length + " < " + columns);
     }
     long bytesPerRow = Math.multiplyExact((long) columns / type.blockSize(), type.typeSize());
     long sourceOffset = Math.multiplyExact(row, bytesPerRow);

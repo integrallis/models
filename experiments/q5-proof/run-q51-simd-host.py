@@ -11,7 +11,7 @@ model=pathlib.Path('/work/model.gguf');url='https://huggingface.co/second-state/
 assert hashlib.sha256(model.read_bytes()).hexdigest()=='0de5c3d1343904debb305a2f6c55f57ccdc68786968b5d4726dd404f6c4c4244'
 base=['/opt/jdk/bin/java','--add-modules','jdk.incubator.vector','--enable-native-access=ALL-UNNAMED','-Xmx2g','-Dmodels.native.kernels.threads=16','-Dvectors.gguf.threads=16','-cp','probe.jar:lib/*','experiments.q5.EmbeddingRouteProof']
 arms=['java','native']
-for threads in (1,16):
+for threads in (1,4,16):
  run('kernel-threads-'+str(threads),['/opt/jdk/bin/java','--add-modules','jdk.incubator.vector','--enable-native-access=ALL-UNNAMED','-Xmx2g','-cp','probe.jar:lib/*','experiments.q5.Q5ProjectionProof','rust/target/release/libjmodels_kernels.so','q51',str(threads)],240)
 for arm in arms:run('correctness-'+arm,base+[arm,str(model),'rust/target/release/libjmodels_kernels.so','data/cases.json','correctness','1'],360)
 reference=None
