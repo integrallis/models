@@ -326,8 +326,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   public boolean supportsDual(GgufTensorType firstType, GgufTensorType secondType) {
     return supportsGrouped(firstType)
         && supportsGrouped(secondType)
-        && groupable(firstType)
-        && groupable(secondType)
+        && (groupable(firstType) || firstType == GgufTensorType.Q5_0)
+        && (groupable(secondType) || secondType == GgufTensorType.Q5_0)
         && compatibleGroup(firstType, secondType);
   }
 
@@ -339,7 +339,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int secondRows,
       int batchSize,
       int cols) {
-    return supportsDual(firstType, secondType);
+    return supportsDual(firstType, secondType)
+        && (firstType != GgufTensorType.Q5_0 || batchSize == 1);
   }
 
   @Override
@@ -377,9 +378,9 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return supportsGrouped(firstType)
         && supportsGrouped(secondType)
         && supportsGrouped(thirdType)
-        && groupable(firstType)
-        && groupable(secondType)
-        && groupable(thirdType)
+        && (groupable(firstType) || firstType == GgufTensorType.Q5_0)
+        && (groupable(secondType) || secondType == GgufTensorType.Q5_0)
+        && (groupable(thirdType) || thirdType == GgufTensorType.Q5_0)
         && compatibleGroup(firstType, secondType, thirdType);
   }
 
@@ -393,7 +394,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int thirdRows,
       int batchSize,
       int cols) {
-    return supportsTriple(firstType, secondType, thirdType);
+    return supportsTriple(firstType, secondType, thirdType)
+        && (firstType != GgufTensorType.Q5_0 || batchSize == 1);
   }
 
   @Override
@@ -977,21 +979,10 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
             && library.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL));
   }
 
-  /**
-   * Whether a projection type may share one activation quantization with its group.
-   *
-   * <p>Every type the shim groups may, except Q5_0. On the controlled Qwen2.5-0.5B x86-64 profile
-   * fused grouping recovered worker-barrier overhead and still decoded slower than independent Q5_0
-   * projections — 37.33 against 38.94 tokens/s. This was a setting ({@code
-   * models.native.q5_0.grouped}) that defaulted to off; it is now simply the decision, because a
-   * route measured slower is not a route to offer. The figures are recorded in {@code
-   * backend-native/README.md} but have no committed raw artifact, so they are due a re-run under
-   * protocol before the grouped Q5_0 kernel is either adopted or deleted.
-   */
+  /** Types permitted in many-matrix and independent grouping. */
   private static boolean groupable(GgufTensorType type) {
-    // Q5_1 is excluded for a different reason from Q5_0's measured one: grouping shares a single
-    // quantized activation between matrices, and Q5_1 dots against F32 activations, so there is
-    // nothing to share. The shim refuses such a group rather than reading an empty activation.
+    // Q5_0 currently qualifies only for dual/triple decode, where fewer worker publications
+    // outweigh grouping overhead. Q5_1 uses F32 activations and cannot use this Q8 workspace.
     return type != GgufTensorType.Q5_0 && type != GgufTensorType.Q5_1;
   }
 

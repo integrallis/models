@@ -787,16 +787,20 @@ class NativeKernelLibraryTest {
   }
 
   @Test
-  void q5_0ProjectionsAreNeverGrouped() {
+  void q5_0DualAndTripleGroupingIsLimitedToDecode() {
     try (RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
       assertThat(kernel.supports(GgufTensorType.Q5_0)).isTrue();
-      // The shim can group Q5_0; we do not, because grouping it decoded slower than independent
-      // projections on the controlled profile. One route, chosen by measurement.
+      // Dual/triple decode shares one quantization and one worker publication.
+      // Prefill and independent groups retain their separately measured route.
       assertThat(kernel.supportsQ5_0Grouped()).isTrue();
-      assertThat(kernel.supportsDual(GgufTensorType.Q5_0, GgufTensorType.Q5_0)).isFalse();
+      assertThat(kernel.supportsDual(GgufTensorType.Q5_0, GgufTensorType.Q5_0)).isTrue();
+      assertThat(kernel.isDualEligible(GgufTensorType.Q5_0, 384, GgufTensorType.Q5_0, 384, 1, 384))
+          .isTrue();
+      assertThat(kernel.isDualEligible(GgufTensorType.Q5_0, 384, GgufTensorType.Q5_0, 384, 8, 384))
+          .isFalse();
       assertThat(
               kernel.supportsTriple(GgufTensorType.Q5_0, GgufTensorType.Q5_0, GgufTensorType.Q5_0))
-          .isFalse();
+          .isTrue();
     }
   }
 
@@ -1169,10 +1173,7 @@ class NativeKernelLibraryTest {
             weights[index], input, batchSize, rows, cols, expected[index]);
       }
 
-      // The grouped Q5_0 kernel is correct, which the numerics below check, but the shipping path
-      // does not route to it: grouping Q5_0 decoded slower than independent projections on the
-      // controlled profile. The kernel is a deletion candidate once that measurement is re-run
-      // with a committed artifact.
+      // Prefill remains ineligible: the supported-host sweep found a grouped regression.
       assertThat(
               kernel.isTripleEligible(
                   GgufTensorType.Q5_0,
