@@ -4099,11 +4099,13 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
     let sums_per_batch = cols / Q8_K_SUM_BLOCK;
     let nibble_mask = _mm256_set1_epi8(0x0f);
     batch_scratch!(sums, batch_size, _mm256_setzero_ps(), __m256);
+    batch_scratch!(minimum_sums, batch_size, 0_f32, f32);
     let mut decoded = [_mm256_setzero_si256(); 8];
     let mut group_scales = [0_i32; 8];
     let mut group_mins = [0_i32; 8];
     for row in start_row..end_row {
         sums.fill(_mm256_setzero_ps());
+        minimum_sums.fill(0_f32);
         for block in 0..blocks_per_row {
             record_k_quant_weight_block_decode();
             let weight_offset = (row * blocks_per_row + block) * Q4_K_BLOCK_BYTES;
@@ -4127,16 +4129,6 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
                 group_scales[group] = qk_scale(scales, group);
                 group_mins[group] = qk_min(scales, group);
             }
-            let minimum_values = _mm256_setr_epi32(
-                group_mins[0],
-                group_mins[1],
-                group_mins[2],
-                group_mins[3],
-                group_mins[4],
-                group_mins[5],
-                group_mins[6],
-                group_mins[7],
-            );
 
             for batch in 0..batch_size {
                 let activation_offset = batch * cols + block * QK_K;
@@ -4157,24 +4149,25 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
                     quantized_lanes =
                         _mm256_add_epi32(quantized_lanes, _mm256_madd_epi16(products, scale));
                 }
-                // SAFETY: each Q8_K activation block has sixteen signed group sums.
-                let activation_sum_values =
-                    unsafe { _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast()) };
-                let paired_sums = _mm256_madd_epi16(activation_sum_values, _mm256_set1_epi16(1));
-                let minimum_lanes = _mm256_mullo_epi32(minimum_values, paired_sums);
+                // Match the single-row reduction order: the minimum correction is a
+                // scalar FMA per block, added only after reducing the quantized lanes.
+                // Folding it into SIMD lanes changes rounding when prefill batch size changes.
+                let mut block_minimum_sum = 0_i32;
+                for group in 0..8 {
+                    block_minimum_sum += group_mins[group]
+                        * (activation_sums[sum_offset + group * 2] as i32
+                            + activation_sums[sum_offset + group * 2 + 1] as i32);
+                }
                 let activation_scale = activation_scales[batch * blocks_per_row + block];
                 let d = weight_scale * activation_scale;
                 let d_min = weight_min_scale * activation_scale;
-                let accumulated = _mm256_fmadd_ps(
-                    _mm256_cvtepi32_ps(quantized_lanes),
+                sums[batch] = _mm256_fmadd_ps(
                     _mm256_set1_ps(d),
+                    _mm256_cvtepi32_ps(quantized_lanes),
                     sums[batch],
                 );
-                sums[batch] = _mm256_fmadd_ps(
-                    _mm256_cvtepi32_ps(minimum_lanes),
-                    _mm256_set1_ps(-d_min),
-                    accumulated,
-                );
+                minimum_sums[batch] =
+                    (-d_min).mul_add(block_minimum_sum as f32, minimum_sums[batch]);
             }
         }
         for (batch, &sum) in sums.iter().enumerate() {
@@ -4183,7 +4176,7 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
             unsafe {
                 output
                     .add(batch * rows + row)
-                    .write(horizontal_sum_f32_avx2(sum));
+                    .write(horizontal_sum_f32_avx2(sum) + minimum_sums[batch]);
             }
         }
     }
@@ -6838,6 +6831,60 @@ mod tests {
             unsafe { jmodels_kernels_context_destroy(context) },
             STATUS_OK
         );
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn q4_k_avx2_preserves_single_row_rounding_across_batch_sizes() {
+        if !(std::arch::is_x86_feature_detected!("avx2")
+            && std::arch::is_x86_feature_detected!("fma")
+            && std::arch::is_x86_feature_detected!("f16c"))
+        {
+            return;
+        }
+        const ROWS: usize = 3;
+        const BLOCKS: usize = 4;
+        const COLS: usize = BLOCKS * QK_K;
+        let mut weights = vec![0_u8; ROWS * BLOCKS * Q4_K_BLOCK_BYTES];
+        for block in 0..ROWS * BLOCKS {
+            let offset = block * Q4_K_BLOCK_BYTES;
+            weights[offset..offset + 2]
+                .copy_from_slice(&f32_to_f16(0.0137 * (block + 1) as f32).to_le_bytes());
+            weights[offset + 2..offset + 4]
+                .copy_from_slice(&f32_to_f16(0.0093 * (block + 1) as f32).to_le_bytes());
+            for (index, value) in weights[offset + 4..offset + Q4_K_BLOCK_BYTES]
+                .iter_mut().enumerate()
+            {
+                *value = (index * 19 + block * 7 + 3) as u8;
+            }
+        }
+        // Non-power-of-two scales expose rounding differences hidden by binary-exact fixtures.
+        for batch_size in [1, 3, 8, 32, 33] {
+            let quantized: Vec<i8> = (0..batch_size * COLS)
+                .map(|index| (((index * 17 + 11) % 255) as i32 - 127) as i8)
+                .collect();
+            let scales: Vec<f32> = (0..batch_size * BLOCKS)
+                .map(|index| 0.00371 * (index + 1) as f32).collect();
+            let sums: Vec<i16> = quantized.chunks_exact(Q8_K_SUM_BLOCK)
+                .map(|values| values.iter().map(|&value| value as i16).sum()).collect();
+            let mut actual = vec![f32::NAN; batch_size * ROWS];
+            // SAFETY: CPU features are checked above and all complete fixture buffers are disjoint.
+            unsafe {
+                compute_q4_k_batched_row_range_avx2(
+                    &weights, &quantized, &scales, &sums, actual.as_mut_ptr(),
+                    batch_size, ROWS, COLS, 0, ROWS,
+                );
+                for batch in 0..batch_size {
+                    for row in 0..ROWS {
+                        let expected = dot_q4_k_q8_k_row_avx2(
+                            &weights, &quantized, &scales, &sums, batch, row, COLS,
+                        );
+                        assert_eq!(actual[batch * ROWS + row].to_bits(), expected.to_bits(),
+                            "batch size {batch_size}, batch {batch}, row {row}");
+                    }
+                }
+            }
+        }
     }
 
     #[test]
