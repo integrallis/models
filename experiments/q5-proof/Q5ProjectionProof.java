@@ -23,8 +23,8 @@ public final class Q5ProjectionProof {
     System.setProperty("models.native.kernels.threads", ""+threadCount);
     System.setProperty("vectors.gguf.threads", ""+threadCount);
     try(Arena arena=Arena.ofShared();var nativeKernel=RustGgufBatchedMatrixKernel.open(Path.of(args[0]))) {
-      for(int rows:new int[]{384,1536}) for(int batch:new int[]{1,8,64,256}) {
-        int cols=384;var type=mode.equals("q51")?GgufTensorType.Q5_1:GgufTensorType.Q5_0;
+      for(int[] shape:new int[][]{{384,384},{1536,384},{384,1536},{128,128}}) for(int batch:new int[]{1,4,8,16,64}) {
+        int rows=shape[0],cols=shape[1];var type=mode.equals("q51")?GgufTensorType.Q5_1:GgufTensorType.Q5_0;
         int blockBytes=mode.equals("q51")?24:22;
         var weights=arena.allocate((long)rows*cols/32*blockBytes);
         fill(weights,rows,cols,blockBytes);
@@ -32,11 +32,10 @@ public final class Q5ProjectionProof {
         var random=new SplittableRandom(718329);for(int i=0;i<input.length;i++)input[i]=(float)random.nextDouble(-2,2);
         List<String> names=new ArrayList<>();List<Runnable> arms=new ArrayList<>();
         if(mode.equals("q51")) {
-          Runnable serial=()->TensorOps.ggufExactBatchedMatmul(output,input,weights,type,batch,rows,cols,row);
-          var scratch=ThreadLocal.withInitial(()->new float[cols]);
-          var plan=GgufStagePlan.of(GgufStagePlan.stage(rows,(from,to)->{float[] local=scratch.get();for(int r=from;r<to;r++){GgufTensorValues.dequantizeRow(weights,type,r,cols,local);for(int b=0;b<batch;b++)output[b*rows+r]=PinnedReduction.dot(input,b*cols,local,0,cols);}}));
-          names.addAll(List.of("java_serial","java_parallel","native"));
-          arms.add(serial);arms.add(plan::execute);arms.add(()->nativeKernel.multiply(output,input,weights,type,batch,rows,cols));
+          Runnable serial=()->{for(int r=0;r<rows;r++){GgufTensorValues.dequantizeRow(weights,type,r,cols,row);for(int b=0;b<batch;b++)output[b*rows+r]=PinnedReduction.dot(input,b*cols,row,0,cols);}};
+          Runnable parallel=()->TensorOps.ggufExactBatchedMatmul(output,input,weights,type,batch,rows,cols,row);
+          names.addAll(List.of("java_serial","java_production","native"));
+          arms.add(serial);arms.add(parallel);arms.add(()->nativeKernel.multiply(output,input,weights,type,batch,rows,cols));
           serial.run();System.arraycopy(output,0,reference,0,output.length);
         } else {
           names.addAll(List.of("independent","grouped"));
@@ -44,10 +43,10 @@ public final class Q5ProjectionProof {
           arms.add(()->nativeKernel.multiplyDual(output,weights,type,rows,other,weights,type,rows,input,batch,cols));
           arms.get(0).run();System.arraycopy(output,0,reference,0,output.length);
         }
-        for(int a=0;a<arms.size();a++){arms.get(a).run();if(!Arrays.equals(output,reference))throw new AssertionError(mode+" parity "+names.get(a)+" first="+Arrays.mismatch(output,reference));if(mode.equals("q50")&&!Arrays.equals(other,reference))throw new AssertionError("second grouped output");measure(arms.get(a),250_000_000L);}
-        for(int pair=0;pair<6;pair++)for(int step=0;step<arms.size();step++){
+        for(int a=0;a<arms.size();a++){arms.get(a).run();if(!Arrays.equals(output,reference))throw new AssertionError(mode+" parity "+names.get(a)+" first="+Arrays.mismatch(output,reference));if(mode.equals("q50")&&!Arrays.equals(other,reference))throw new AssertionError("second grouped output");measure(arms.get(a),100_000_000L);}
+        for(int pair=0;pair<4;pair++)for(int step=0;step<arms.size();step++){
           int a=(step+pair)%arms.size();arms.get(a).run();if(!Arrays.equals(output,reference))throw new AssertionError("warm parity "+names.get(a));
-          long ns=measure(arms.get(a),500_000_000L);sink=output[output.length-1];
+          long ns=measure(arms.get(a),150_000_000L);sink=output[output.length-1];
           System.out.printf(Locale.ROOT,"{\"mode\":\"%s\",\"threads\":%d,\"rows\":%d,\"cols\":%d,\"batch\":%d,\"pair\":%d,\"arm\":\"%s\",\"nsPerCall\":%d}%n",mode,threadCount,rows,cols,batch,pair,names.get(a),ns);
         }
       }

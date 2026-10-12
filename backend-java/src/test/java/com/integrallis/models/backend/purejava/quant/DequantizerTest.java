@@ -297,6 +297,46 @@ class DequantizerTest {
     }
 
     @Test
+    void vectorExpansionMatchesScalarFormulaAcrossOffsetsAndFiniteHeaders() {
+      int blocks = 2048;
+      byte[] packed = new byte[7 + blocks * 24];
+      var random = new java.util.SplittableRandom(713891);
+      var bytes = ByteBuffer.wrap(packed).order(ByteOrder.LITTLE_ENDIAN);
+      float[] expected = new float[blocks * 32 + 6];
+      java.util.Arrays.fill(expected, 99.0f);
+      for (int block = 0; block < blocks; block++) {
+        int base = 7 + block * 24;
+        short d = (short) (random.nextInt(0x7c00) | (random.nextBoolean() ? 0x8000 : 0));
+        short m = (short) (random.nextInt(0x7c00) | (random.nextBoolean() ? 0x8000 : 0));
+        bytes.putShort(base, d);
+        bytes.putShort(base + 2, m);
+        int plane = random.nextInt();
+        bytes.putInt(base + 4, plane);
+        float scale = Float16.toFloat(d);
+        float minimum = Float16.toFloat(m);
+        for (int n = 0; n < 16; n++) {
+          int nibble = random.nextInt(256);
+          packed[base + 8 + n] = (byte) nibble;
+          int low = (nibble & 15) | (((plane >>> n) & 1) << 4);
+          int high = (nibble >>> 4) | (((plane >>> (n + 16)) & 1) << 4);
+          expected[3 + block * 32 + n] = low * scale + minimum;
+          expected[3 + block * 32 + 16 + n] = high * scale + minimum;
+        }
+      }
+      try (var arena = Arena.ofConfined()) {
+        var segment = arena.allocateFrom(ValueLayout.JAVA_BYTE, packed);
+        float[] actual = new float[expected.length];
+        java.util.Arrays.fill(actual, 99.0f);
+        new Q5_1Dequantizer().dequantize(segment, 7, actual, 3, blocks * 32);
+        for (int n = 0; n < actual.length; n++) {
+          assertThat(Float.floatToRawIntBits(actual[n]))
+              .as("lane %s", n)
+              .isEqualTo(Float.floatToRawIntBits(expected[n]));
+        }
+      }
+    }
+
+    @Test
     void reachesTheFullFiveBitRange() {
       // d = 1.0, m = 0.0, nibble byte = 0xFF, both fifth bits set -> 15 + 16 = 31, the maximum.
       byte[] block = new byte[24];
