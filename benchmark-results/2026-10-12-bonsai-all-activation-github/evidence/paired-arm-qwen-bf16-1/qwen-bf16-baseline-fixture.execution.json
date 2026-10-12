@@ -1,0 +1,18 @@
+{
+  "command": [
+    "java",
+    "--add-modules",
+    "jdk.incubator.vector",
+    "--enable-native-access=ALL-UNNAMED",
+    "-Xms2g",
+    "-Xmx10g",
+    "-cp",
+    "/home/runner/work/models/models/out/paired-arm-qwen-bf16-1/lib/baseline/*:/home/runner/work/models/models/out/paired-arm-qwen-bf16-1/classes",
+    "com.integrallis.models.backend.purejava.Bf16ModelProof",
+    "fixture",
+    "/home/runner/work/_temp/paired-models/qwen-bf16",
+    "/home/runner/work/models/models/models/backend-native/build/rust-target/release/libjmodels_kernels.so"
+  ],
+  "exitCode": 1,
+  "wallSeconds": 3.5790826229999766
+}
