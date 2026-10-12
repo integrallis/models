@@ -18,10 +18,13 @@ package com.integrallis.models.backend.nativekernel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.plan.PureJavaPlanConfiguration;
+import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -783,6 +786,25 @@ class NativeKernelLibraryTest {
       assertThat(kernel.supportsGatedDeltaNet(128, 128)).isTrue();
       assertThat(kernel.supportsGatedDeltaNet(257, 128)).isFalse();
       assertThat(kernel.supportsGatedDeltaNet(128, 257)).isFalse();
+    }
+  }
+
+  @Test
+  void recurrentEligibilityReusesTheImmutableCapabilitySnapshot() {
+    var capabilities = VectorUtil.runtimeCapabilities();
+    boolean expected =
+        capabilities.fastScalarFma() && (!capabilities.vectorApi() || capabilities.fastVectorFma());
+    try (var vectors = mockStatic(VectorUtil.class)) {
+      vectors.when(VectorUtil::runtimeCapabilities).thenReturn(capabilities);
+      try (var kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+        for (int repetition = 0; repetition < 100; repetition++) {
+          assertThat(kernel.supportsGatedDeltaNet()).isEqualTo(expected);
+          assertThat(kernel.supportsGroupedGatedDeltaNet()).isEqualTo(expected);
+          assertThat(kernel.supportsGatedDeltaNet(128, 128)).isEqualTo(expected);
+          assertThat(kernel.supportsGatedDeltaNet(257, 128)).isFalse();
+        }
+        vectors.verify(VectorUtil::runtimeCapabilities, times(1));
+      }
     }
   }
 

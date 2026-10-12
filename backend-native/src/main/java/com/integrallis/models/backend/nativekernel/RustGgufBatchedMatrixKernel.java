@@ -42,6 +42,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
           "false");
 
   private final NativeKernelLibrary library;
+  private final boolean gatedDeltaNetSupported;
   private Arena scratchArena;
   private MemorySegment nativeInput = MemorySegment.NULL;
   private MemorySegment nativeOutput = MemorySegment.NULL;
@@ -58,6 +59,14 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   private RustGgufBatchedMatrixKernel(NativeKernelLibrary library) {
     this.library = Objects.requireNonNull(library, "library");
+    // Runtime arithmetic capabilities and the loaded native ABI are immutable for this provider.
+    // Resolve once: the diagnostic capability snapshot constructs strings and must not allocate
+    // in every recurrent layer/token eligibility check.
+    var capabilities = VectorUtil.runtimeCapabilities();
+    gatedDeltaNetSupported =
+        library.supports(NativeKernelCapability.GATED_DELTA_NET_F32)
+            && capabilities.fastScalarFma()
+            && (!capabilities.vectorApi() || capabilities.fastVectorFma());
   }
 
   /** Opens a Rust kernel provider from an explicit platform library. */
@@ -129,10 +138,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   /** Whether the loaded recurrence preserves this Java runtime's fused arithmetic contract. */
   @Override
   public boolean supportsGatedDeltaNet() {
-    var capabilities = VectorUtil.runtimeCapabilities();
-    return library.supports(NativeKernelCapability.GATED_DELTA_NET_F32)
-        && capabilities.fastScalarFma()
-        && (!capabilities.vectorApi() || capabilities.fastVectorFma());
+    return gatedDeltaNetSupported;
   }
 
   @Override
