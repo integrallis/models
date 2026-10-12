@@ -61,6 +61,13 @@ jobs:
           tests::grouped_attention_matches_a_naive_reference_across_two_spans_and_workers
           -- --exact
 
+      - name: Check concurrent recurrent state ownership
+        env:
+          MIRIFLAGS: -Zmiri-deterministic-floats
+        run: |
+          cargo +nightly-2026-09-17 miri test --manifest-path backend-native/src/main/rust/model-kernels/Cargo.toml tests::gated_delta_net_matches_pinned_freetoken_recurrence -- --exact
+          cargo +nightly-2026-09-17 miri test --manifest-path backend-native/src/main/rust/model-kernels/Cargo.toml tests::grouped_gated_delta_net_matches_each_row_stepped_alone -- --exact
+
   version:
     name: Resolve private test version
     runs-on: ubuntu-24.04

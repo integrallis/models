@@ -420,11 +420,12 @@ public final class RustFfmBackend
     optimizations.add(
         new OptimizationDecision(
             "rust-gated-delta-net",
-            OptimizationStatus.DISABLED,
-            "the Qwen 3.5 recurrence stays in Java: the shim's chunked recurrence agrees only to"
-                + " 2.0e-4 relative, every certified Qwen 3.5 record was produced with the Java one,"
-                + " and whether the shim is faster here is unmeasured. Adopting it is an epoch"
-                + " change, not a setting",
+            kernel.supportsGatedDeltaNet()
+                ? OptimizationStatus.ENABLED
+                : OptimizationStatus.DISABLED,
+            kernel.supportsGatedDeltaNet()
+                ? "sequential recurrent heads share the projection worker pool; dimensions up to 256"
+                : "the native recurrence is unavailable or incompatible with the Java fused arithmetic contract",
             Map.of(
                 "abi",
                 Integer.toString(NativeKernelLibrary.ABI_VERSION),
@@ -435,9 +436,12 @@ public final class RustFfmBackend
     optimizations.add(
         new OptimizationDecision(
             "rust-grouped-gated-delta-net",
-            OptimizationStatus.DISABLED,
-            "unrouted for the same reason as rust-gated-delta-net: adopting it would change the"
-                + " bytes published Qwen 3.5 records claim",
+            kernel.supportsGroupedGatedDeltaNet()
+                ? OptimizationStatus.ENABLED
+                : OptimizationStatus.DISABLED,
+            kernel.supportsGroupedGatedDeltaNet()
+                ? "independent recurrent state slots share one native worker dispatch"
+                : "the grouped native recurrence is unavailable or incompatible with the Java fused arithmetic contract",
             Map.of(
                 "abi",
                 Integer.toString(NativeKernelLibrary.ABI_VERSION),

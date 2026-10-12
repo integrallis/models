@@ -31,7 +31,7 @@ import java.util.Objects;
 /** Versioned FFM access to Models-owned native inference kernels. */
 @SuppressWarnings("restricted")
 public final class NativeKernelLibrary implements AutoCloseable {
-  public static final int ABI_VERSION = 6;
+  public static final int ABI_VERSION = 7;
   public static final String THREAD_COUNT_PROPERTY = "models.native.kernels.threads";
 
   /**
@@ -389,6 +389,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
     Objects.requireNonNull(beta, "beta");
     Objects.requireNonNull(state, "state");
     Objects.requireNonNull(output, "output");
+    requireDistinctRecurrentWrites(query, key, value, logDecay, beta, state, output);
     requirePositive(tokenCount, "tokenCount");
     requirePositive(keyHeadCount, "keyHeadCount");
     requirePositive(valueHeadCount, "valueHeadCount");
@@ -453,6 +454,30 @@ public final class NativeKernelLibrary implements AutoCloseable {
     }
   }
 
+  private static void requireDistinctRecurrentWrites(
+      float[] query,
+      float[] key,
+      float[] value,
+      float[] logDecay,
+      float[] beta,
+      float[] state,
+      float[] output) {
+    if (state == output
+        || state == query
+        || state == key
+        || state == value
+        || state == logDecay
+        || state == beta
+        || output == query
+        || output == key
+        || output == value
+        || output == logDecay
+        || output == beta) {
+      throw new IllegalArgumentException(
+          "recurrent state and output must not alias any other buffer");
+    }
+  }
+
   /** Returns whether the loaded library can advance a group of sequences in one launch. */
   public boolean supportsGroupedGatedDeltaNet() {
     return groupedGatedDeltaNetHandle != null;
@@ -488,6 +513,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
     Objects.requireNonNull(beta, "beta");
     Objects.requireNonNull(state, "state");
     Objects.requireNonNull(output, "output");
+    requireDistinctRecurrentWrites(query, key, value, logDecay, beta, state, output);
     requirePositive(rowCount, "rowCount");
     requirePositive(stateSlotCount, "stateSlotCount");
     requirePositive(keyHeadCount, "keyHeadCount");

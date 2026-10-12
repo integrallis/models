@@ -187,6 +187,8 @@ class RustFfmBackendTest {
     RustGgufBatchedMatrixKernel kernel = mock(RustGgufBatchedMatrixKernel.class);
     when(kernel.implementation()).thenReturn("rust-test");
     when(kernel.threadCount()).thenReturn(4);
+    when(kernel.supportsGatedDeltaNet()).thenReturn(true);
+    when(kernel.supportsGroupedGatedDeltaNet()).thenReturn(true);
     when(kernel.supports(com.integrallis.models.backend.purejava.gguf.GgufTensorType.PTQ1_0))
         .thenReturn(true);
     BackendDiagnostics javaDiagnostics =
@@ -220,11 +222,11 @@ class RustFfmBackendTest {
         .hasValueSatisfying(
             decision -> assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED));
     assertThat(diagnostics.optimization("rust-gated-delta-net"))
-        .as("the recurrence stays in Java until an epoch change adopts the shim's")
+        .as("diagnostics describe the provider selected by the runtime")
         .hasValueSatisfying(
             decision -> {
-              assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
-              assertThat(decision.reason()).contains("2.0e-4");
+              assertThat(decision.status()).isEqualTo(OptimizationStatus.ENABLED);
+              assertThat(decision.reason()).contains("projection worker pool");
             });
   }
 
@@ -249,7 +251,7 @@ class RustFfmBackendTest {
         .hasValueSatisfying(
             decision -> {
               assertThat(decision.status()).isEqualTo(OptimizationStatus.DISABLED);
-              assertThat(decision.reason()).contains("epoch change");
+              assertThat(decision.reason()).contains("unavailable or incompatible");
             });
     assertThat(diagnostics.optimization("rust-ptq1-0-q8-0-batched-matmul"))
         .hasValueSatisfying(

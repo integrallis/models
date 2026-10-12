@@ -126,34 +126,22 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return PLAN_RECOMMENDATIONS;
   }
 
-  /**
-   * Whether the Qwen 3.5 recurrence runs in the shim. It does not, and that is a decision rather
-   * than a setting.
-   *
-   * <p>This was {@code models.native.gatedDeltaNet}, default off. Removing the veto would have made
-   * the shim recurrence unconditional, and that is an epoch change, not a speed-up:
-   *
-   * <ul>
-   *   <li>Every certified Qwen 3.5 record — {@code qwen3.5-0.8b}, {@code qwen3.5-2b} — was produced
-   *       with {@code native-gated-delta-net = false}, so the published bytes come from the Java
-   *       recurrence.
-   *   <li>The shim's chunked recurrence is validated to a <em>2.0e-4 relative</em> tolerance, not
-   *       bit-identically. Greedy decoding is a discrete argmax, and a perturbation of 1.4e-6 was
-   *       already measured to change 2 of 9 generated answers for grouped attention. 2.0e-4 is a
-   *       hundred times larger.
-   *   <li>Whether it is even faster than the Java recurrence is <em>unmeasured</em>. The one
-   *       committed comparison (2026-09-23) times the shim's sequential against its own chunked
-   *       variant, 3.920 against 3.585 ms, and never against Java.
-   * </ul>
-   *
-   * <p>So: an unmeasured benefit against a known byte-level divergence in published records. It
-   * stays unrouted until someone re-runs every pinned greedy oracle and re-derives the tier bands
-   * on it, which is a deliberate epoch change and not a default to flip. The kernel and its parity
-   * tests are kept because that decision needs them.
-   */
+  /** Whether the loaded recurrence preserves this Java runtime's fused arithmetic contract. */
   @Override
   public boolean supportsGatedDeltaNet() {
-    return false;
+    var capabilities = VectorUtil.runtimeCapabilities();
+    return library.supports(NativeKernelCapability.GATED_DELTA_NET_F32)
+        && capabilities.fastScalarFma()
+        && (!capabilities.vectorApi() || capabilities.fastVectorFma());
+  }
+
+  @Override
+  public boolean supportsGatedDeltaNet(int keyDimension, int valueDimension) {
+    return supportsGatedDeltaNet()
+        && keyDimension > 0
+        && keyDimension <= 256
+        && valueDimension > 0
+        && valueDimension <= 256;
   }
 
   /** Whether the loaded shim can share one activation quantization across grouped Q5_0 rows. */
@@ -191,12 +179,10 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
         valueDimension);
   }
 
-  /**
-   * False for the same reason as {@link #supportsGatedDeltaNet()}: it would change published bytes.
-   */
+  /** Whether independent recurrent state slots can share one native worker dispatch. */
   @Override
   public boolean supportsGroupedGatedDeltaNet() {
-    return false;
+    return supportsGatedDeltaNet() && library.supportsGroupedGatedDeltaNet();
   }
 
   @Override

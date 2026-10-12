@@ -203,6 +203,104 @@ class NativeKernelLibraryTest {
     }
   }
 
+  @Test
+  void recurrentWritesCannotAliasInputsOrEachOther() {
+    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 2)) {
+      for (int alias = 0; alias < 6; alias++) {
+        float[][] buffers = new float[7][8];
+        buffers[6] = buffers[alias];
+        assertThatThrownBy(
+                () ->
+                    kernels.gatedDeltaNetF32(
+                        buffers[0],
+                        buffers[1],
+                        buffers[2],
+                        buffers[3],
+                        buffers[4],
+                        buffers[5],
+                        buffers[6],
+                        1,
+                        1,
+                        1,
+                        2,
+                        2))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("alias");
+        assertThatThrownBy(
+                () ->
+                    kernels.groupedGatedDeltaNetF32(
+                        buffers[0],
+                        buffers[1],
+                        buffers[2],
+                        buffers[3],
+                        buffers[4],
+                        buffers[5],
+                        buffers[6],
+                        null,
+                        1,
+                        1,
+                        1,
+                        1,
+                        2,
+                        2))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("alias");
+      }
+      for (int alias = 0; alias < 5; alias++) {
+        float[][] buffers = new float[7][8];
+        buffers[5] = buffers[alias];
+        assertThatThrownBy(
+                () ->
+                    kernels.gatedDeltaNetF32(
+                        buffers[0],
+                        buffers[1],
+                        buffers[2],
+                        buffers[3],
+                        buffers[4],
+                        buffers[5],
+                        buffers[6],
+                        1,
+                        1,
+                        1,
+                        2,
+                        2))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("alias");
+        assertThatThrownBy(
+                () ->
+                    kernels.groupedGatedDeltaNetF32(
+                        buffers[0],
+                        buffers[1],
+                        buffers[2],
+                        buffers[3],
+                        buffers[4],
+                        buffers[5],
+                        buffers[6],
+                        null,
+                        1,
+                        1,
+                        1,
+                        1,
+                        2,
+                        2))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("alias");
+      }
+    }
+  }
+
+  @Test
+  void groupedRecurrenceRejectsDuplicateSlotsBeforeMutatingState() {
+    float[] state = fixture(77, 8);
+    float[] before = state.clone();
+    try (NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 2)) {
+      assertThatThrownBy(() -> call(kernels, state, new int[] {1, 1}, 2, 2, 1, 1, 2, 2))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("invalid shape");
+    }
+    assertThat(state).containsExactly(before);
+  }
+
   /** A null slot table means row i owns slot i, which must agree with spelling that out. */
   @Test
   void groupedGatedDeltaNetTreatsANullSlotTableAsTheIdentity() {
@@ -679,11 +777,12 @@ class NativeKernelLibraryTest {
     try (RustGgufBatchedMatrixKernel kernel =
         RustGgufBatchedMatrixKernel.open(libraryPath(), settings)) {
       assertThat(kernel.threadCount()).isEqualTo(4);
-      // Capability, not configuration, decides what the shim serves -- with two routes deliberately
-      // not taken: the recurrence, because adopting it would change bytes published records claim,
-      // and grouped Q5_0, because it measured slower. Both are decisions in code, not settings.
-      assertThat(kernel.supportsQ5_0Grouped()).as("the shim has the kernel").isTrue();
-      assertThat(kernel.supportsGatedDeltaNet()).as("but it is not routed to").isFalse();
+      assertThat(kernel.supportsQ5_0Grouped()).isTrue();
+      assertThat(kernel.supportsGatedDeltaNet()).isTrue();
+      assertThat(kernel.supportsGroupedGatedDeltaNet()).isTrue();
+      assertThat(kernel.supportsGatedDeltaNet(128, 128)).isTrue();
+      assertThat(kernel.supportsGatedDeltaNet(257, 128)).isFalse();
+      assertThat(kernel.supportsGatedDeltaNet(128, 257)).isFalse();
     }
   }
 

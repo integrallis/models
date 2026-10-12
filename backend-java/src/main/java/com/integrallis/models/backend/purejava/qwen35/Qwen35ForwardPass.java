@@ -821,7 +821,8 @@ public final class Qwen35ForwardPass {
     int valueHeads = config.gdnValueHeads();
     int headDimension = config.gdnHeadDim();
     float[] groupState = group.recurrentState(layer);
-    if (batchedMatrixKernel.supportsGroupedGatedDeltaNet()) {
+    if (batchedMatrixKernel.supportsGroupedGatedDeltaNet()
+        && batchedMatrixKernel.supportsGatedDeltaNet(headDimension, headDimension)) {
       batchedMatrixKernel.groupedGatedDeltaNet(
           batch.gdnQuery,
           batch.gdnKey,
@@ -1630,7 +1631,7 @@ public final class Qwen35ForwardPass {
       int valueHeadCount,
       int keyDimension,
       int valueDimension) {
-    if (batchedMatrixKernel.supportsGatedDeltaNet()) {
+    if (batchedMatrixKernel.supportsGatedDeltaNet(keyDimension, valueDimension)) {
       batchedMatrixKernel.gatedDeltaNet(
           query,
           key,

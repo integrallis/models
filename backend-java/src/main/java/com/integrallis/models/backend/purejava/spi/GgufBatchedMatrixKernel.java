@@ -37,6 +37,11 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
     return false;
   }
 
+  /** Whether the recurrence can serve these state dimensions. */
+  default boolean supportsGatedDeltaNet(int keyDimension, int valueDimension) {
+    return supportsGatedDeltaNet();
+  }
+
   /** Applies a Gated DeltaNet token prefix while retaining caller-owned recurrent state. */
   default void gatedDeltaNet(
       float[] query,
