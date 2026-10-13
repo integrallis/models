@@ -1,0 +1,108 @@
+name: Reachable attention and PTQ fixed-width diagnosis
+on:
+  push:
+    branches: [fix/attention-ptq-width-proof]
+    paths: ['.github/workflows/attention-ptq-width-diagnostic.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25.0.3'
+      - name: Compile frozen production sources and independent controls
+        run: python3 scripts/attention-ptq-width/run.py prepare "$RUNNER_TEMP/width-risk"
+      - name: Preserve source and class provenance
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: attention-ptq-${{ matrix.runner }}-provenance
+          path: |
+            ${{ runner.temp }}/width-risk/*.json
+            ${{ runner.temp }}/width-risk/compile.*
+      - name: Fixed component pair 0
+        run: |
+          python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" score 0
+          python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" softmax 0
+          python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" ptq 0
+      - name: Preserve pair 0 including failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: attention-ptq-${{ matrix.runner }}-pair-0
+          path: |
+            ${{ runner.temp }}/width-risk/*-0-*.stdout
+            ${{ runner.temp }}/width-risk/*-0-*.stderr
+            ${{ runner.temp }}/width-risk/*-0-*.execution.json
+            ${{ runner.temp }}/width-risk/*-0.complete.json
+      - name: Fixed component pair 1
+        run: |
+          python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" score 1
+          python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" softmax 1
+          python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" ptq 1
+      - name: Preserve pair 1 including failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: attention-ptq-${{ matrix.runner }}-pair-1
+          path: |
+            ${{ runner.temp }}/width-risk/*-1-*.stdout
+            ${{ runner.temp }}/width-risk/*-1-*.stderr
+            ${{ runner.temp }}/width-risk/*-1-*.execution.json
+            ${{ runner.temp }}/width-risk/*-1.complete.json
+      - name: Fixed component pair 2
+        run: |
+          python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" score 2
+          python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" softmax 2
+          python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" ptq 2
+      - name: Preserve pair 2 including failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: attention-ptq-${{ matrix.runner }}-pair-2
+          path: |
+            ${{ runner.temp }}/width-risk/*-2-*.stdout
+            ${{ runner.temp }}/width-risk/*-2-*.stderr
+            ${{ runner.temp }}/width-risk/*-2-*.execution.json
+            ${{ runner.temp }}/width-risk/*-2.complete.json
+      - name: Fixed component pair 3
+        run: |
+          python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" score 3
+          python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" softmax 3
+          python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" ptq 3
+      - name: Preserve pair 3 including failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: attention-ptq-${{ matrix.runner }}-pair-3
+          path: |
+            ${{ runner.temp }}/width-risk/*-3-*.stdout
+            ${{ runner.temp }}/width-risk/*-3-*.stderr
+            ${{ runner.temp }}/width-risk/*-3-*.execution.json
+            ${{ runner.temp }}/width-risk/*-3.complete.json
+      - name: Separately instrument allocation attribution
+        run: |
+          python3 scripts/attention-ptq-width/run.py diagnostic "$RUNNER_TEMP/width-risk" score
+          python3 scripts/attention-ptq-width/run.py diagnostic "$RUNNER_TEMP/width-risk" softmax
+          python3 scripts/attention-ptq-width/run.py diagnostic "$RUNNER_TEMP/width-risk" ptq
+      - name: Preserve diagnostic records separately
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: attention-ptq-${{ matrix.runner }}-diagnostic
+          path: |
+            ${{ runner.temp }}/width-risk/jfr-*
+            ${{ runner.temp }}/width-risk/allocations-*
+            ${{ runner.temp }}/width-risk/*.jfr
