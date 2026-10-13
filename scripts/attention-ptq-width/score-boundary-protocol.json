@@ -1,0 +1,54 @@
+{
+  "scope": "Four-arm score helper-layout diagnosis on predeclared EPYC 9V74 JVM capabilities; no whole-model release qualification",
+  "sourceRevision": "c95e243d0335657958c4f254d45cc9a1ff83f2f5",
+  "pairs": 16,
+  "warmCalls": 2000,
+  "blocks": 5,
+  "jdk": "25.0.3",
+  "kernels": [
+    "score"
+  ],
+  "score": {
+    "groups": 5,
+    "rows": 64,
+    "columns": 64
+  },
+  "softmaxElements": 515,
+  "ptqElements": 4096,
+  "controls": "Independent primitive implementation with pinned eight-lane floating fold and exact integer PTQ groups; same classes and JVM per pair",
+  "dependencies": [
+    {
+      "name": "vectors-core-0.1.29.jar",
+      "url": "https://repo.maven.apache.org/maven2/com/integrallis/vectors-core/0.1.29/vectors-core-0.1.29.jar",
+      "sha256": "21eeae4fcaa56fa26ed45d99610142f794cdec0e1d852894e637263f5bd0b40c"
+    },
+    {
+      "name": "slf4j-api-2.0.17.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar",
+      "sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+    }
+  ],
+  "minimumMeasuredBlockNanos": 250000000,
+  "timerBatchCalls": {
+    "score": 992,
+    "softmax": 992,
+    "ptq": 1020,
+    "ptqFloat": 992
+  },
+  "timerPolicy": "Each of five blocks runs full batches until 250 ms; counts and elapsed duration retained. Batch sizes contain complete 31-input or 255-input mutation cycles. No block discarded.",
+  "candidateRevision": "7ad622a404511e178201eae1ad7f9fc97287d08e",
+  "arms": {
+    "baseline": "c95e243d0335657958c4f254d45cc9a1ff83f2f5",
+    "corrected": "7ad622a404511e178201eae1ad7f9fc97287d08e",
+    "bodyHelper": "7633a70cc24e02f1c381e956e59d3e7d97b47b44",
+    "validatedHelper": "61a47f548d1f83e44bb97094aca1605129985e8b"
+  },
+  "admission": {
+    "cpuModel": "AMD EPYC 9V74 80-Core Processor",
+    "UseAVX": "3",
+    "MaxVectorSize": "64",
+    "UseFMA": "true",
+    "UseSSE": "4"
+  },
+  "order": "Rotating four-arm Latin order, reversed on odd blocks of four; every admitted host retains all 16 cycles. No outcome-based stopping. Four host attempts bounded before launch."
+}
