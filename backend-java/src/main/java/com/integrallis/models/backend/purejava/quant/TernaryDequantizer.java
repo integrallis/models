@@ -181,6 +181,9 @@ public final class TernaryDequantizer {
       throw new IllegalArgumentException("PTQ/Q8 input must use aligned nonnegative dimensions");
     java.util.Objects.checkFromIndexSize(inputOffset, count, input.length);
     java.util.Objects.checkFromIndexSize(inputOffset / 32, count / 32, scales.length);
+    if (IntVector.SPECIES_PREFERRED.vectorBitSize() < 256) {
+      return dotProductPtq1_0Q8_0Native128(source, sourceOffset, input, scales, inputOffset, count);
+    }
     float total = 0;
     for (int block = 0; block < count / 128; block++) {
       long base = sourceOffset + (long) block * 28;
@@ -214,6 +217,68 @@ public final class TernaryDequantizer {
                     ByteVector.fromArray(ByteVector.SPECIES_64, input, at + index)
                         .convertShape(VectorOperators.B2I, IntVector.SPECIES_256, 0);
             vectorSum = vectorSum.add(trits.mul(activations));
+          }
+        }
+        int integerSum = vectorSum.reduceLanes(VectorOperators.ADD) + scalarTail;
+        blockSum = Math.fma(integerSum, scales[at / 32 + group], blockSum);
+      }
+      total = Math.fma(blockSum, halfToFloat(source.get(LE_SHORT, base + 26)), total);
+    }
+    return total;
+  }
+
+  /**
+   * Integer sums are exact; only the physical vector width changes. Scale FMAs retain their order.
+   */
+  private static float dotProductPtq1_0Q8_0Native128(
+      MemorySegment source,
+      long sourceOffset,
+      byte[] input,
+      float[] scales,
+      int inputOffset,
+      int count) {
+    float total = 0;
+    for (int block = 0; block < count / 128; block++) {
+      long base = sourceOffset + (long) block * 28;
+      int at = inputOffset + block * 128;
+      float blockSum = 0;
+      for (int group = 0; group < 4; group++) {
+        IntVector vectorSum = IntVector.zero(IntVector.SPECIES_128);
+        int scalarTail = 0;
+        for (int lane = 0; lane < 4; lane++) {
+          int index = group * 32 + lane * 8;
+          if (index == 120) {
+            for (int j = 0; j < 8; j++) {
+              int packed =
+                  (Byte.toUnsignedInt(source.get(ValueLayout.JAVA_BYTE, base + 24 + j % 2))
+                          * POW3[j / 2])
+                      & 255;
+              scalarTail += ((packed * 3 >>> 8) - 1) * input[at + index + j];
+            }
+          } else {
+            int packedIndex = index < 80 ? index % 16 : 16;
+            int power = index < 80 ? index / 16 : (index - 80) / 8;
+            for (int half = 0; half < 2; half++) {
+              IntVector trits =
+                  ((IntVector)
+                          ByteVector.fromMemorySegment(
+                                  ByteVector.SPECIES_64,
+                                  source,
+                                  base + packedIndex,
+                                  ByteOrder.LITTLE_ENDIAN)
+                              .convertShape(VectorOperators.B2I, IntVector.SPECIES_128, half))
+                      .and(255)
+                      .mul(POW3[power])
+                      .and(255)
+                      .mul(3)
+                      .lanewise(VectorOperators.LSHR, 8)
+                      .sub(1);
+              IntVector activations =
+                  (IntVector)
+                      ByteVector.fromArray(ByteVector.SPECIES_64, input, at + index)
+                          .convertShape(VectorOperators.B2I, IntVector.SPECIES_128, half);
+              vectorSum = vectorSum.add(trits.mul(activations));
+            }
           }
         }
         int integerSum = vectorSum.reduceLanes(VectorOperators.ADD) + scalarTail;

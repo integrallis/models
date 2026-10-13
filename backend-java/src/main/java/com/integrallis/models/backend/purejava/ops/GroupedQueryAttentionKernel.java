@@ -47,14 +47,21 @@ public final class GroupedQueryAttentionKernel {
    * and nothing declared that. This was found while making a CUDA kernel bit-exact: the kernel
    * could not match "the CPU" because there was no single CPU answer to match.
    *
-   * <p>Pinning costs nothing on a 256-bit host, which is the default ceiling ({@code
-   * PanamaConstants.DEFAULT_MAX_BITS}) and the common case. On a 128-bit host the 8-lane species is
-   * emulated, and on a host with {@code maxBits} raised to 512 this no longer widens — both are
-   * deliberate: a reproducible number is worth more here than the last few percent, because this
-   * feeds token selection, where a last-bit difference changes the output text.
+   * <p>The eight logical lanes are retained on every host. A 128-bit host uses two native-width
+   * vectors, preserving the same FMA chains and fold without emulating unsupported 256-bit
+   * operations. Wider hosts use one 256-bit vector.
    */
   static final VectorSpecies<Float> REDUCTION_SPECIES =
       VectorSpecies.of(float.class, VectorShape.S_256_BIT);
+
+  private static final boolean SPLIT_REDUCTION =
+      FloatVector.SPECIES_PREFERRED.vectorBitSize() < 256;
+  private static final VectorSpecies<Float> HALF_REDUCTION_SPECIES = FloatVector.SPECIES_128;
+
+  private static float reduceAddPinnedHalves(FloatVector low, FloatVector high) {
+    FloatVector pair = low.add(high);
+    return (pair.lane(0) + pair.lane(2)) + (pair.lane(1) + pair.lane(3));
+  }
 
   private static final VectorShuffle<Float> REDUCE_ROTATE_4 = reductionRotation(4);
   private static final VectorShuffle<Float> REDUCE_ROTATE_2 = reductionRotation(2);
@@ -134,6 +141,23 @@ public final class GroupedQueryAttentionKernel {
       Objects.checkFromIndexSize(
           scoresOffset, (groupSize - 1) * scoresHeadStride + rows, scores.length);
     }
+    if (SPLIT_REDUCTION) {
+      scoreGroup128(
+          query,
+          queryOffset,
+          queryHeadStride,
+          groupSize,
+          keys,
+          keyOffset,
+          keyRowStride,
+          rows,
+          columns,
+          scale,
+          scores,
+          scoresOffset,
+          scoresHeadStride);
+      return;
+    }
     int lanes = REDUCTION_SPECIES.length();
     int vectorLimit = REDUCTION_SPECIES.loopBound(columns);
     int blockedRows = rows & ~3;
@@ -198,6 +222,113 @@ public final class GroupedQueryAttentionKernel {
     }
   }
 
+  private static void scoreGroup128(
+      float[] query,
+      int queryOffset,
+      int queryHeadStride,
+      int groupSize,
+      float[] keys,
+      int keyOffset,
+      int keyRowStride,
+      int rows,
+      int columns,
+      float scale,
+      float[] scores,
+      int scoresOffset,
+      int scoresHeadStride) {
+    int lanes = 8;
+    int vectorLimit = columns & ~7;
+    int blockedRows = rows & ~3;
+    // Four rows per head at a time: four independent FMA chains hide the FMA latency that a single
+    // dependent chain over 64 columns exposes, and each query vector load serves four rows.
+    for (int row = 0; row < blockedRows; row += 4) {
+      int key0 = keyOffset + row * keyRowStride;
+      int key1 = key0 + keyRowStride;
+      int key2 = key1 + keyRowStride;
+      int key3 = key2 + keyRowStride;
+      for (int head = 0; head < groupSize; head++) {
+        int queryBase = queryOffset + head * queryHeadStride;
+        FloatVector acc0Low = FloatVector.zero(HALF_REDUCTION_SPECIES);
+        FloatVector acc0High = FloatVector.zero(HALF_REDUCTION_SPECIES);
+        FloatVector acc1Low = FloatVector.zero(HALF_REDUCTION_SPECIES);
+        FloatVector acc1High = FloatVector.zero(HALF_REDUCTION_SPECIES);
+        FloatVector acc2Low = FloatVector.zero(HALF_REDUCTION_SPECIES);
+        FloatVector acc2High = FloatVector.zero(HALF_REDUCTION_SPECIES);
+        FloatVector acc3Low = FloatVector.zero(HALF_REDUCTION_SPECIES);
+        FloatVector acc3High = FloatVector.zero(HALF_REDUCTION_SPECIES);
+        int column = 0;
+        for (; column < vectorLimit; column += lanes) {
+          FloatVector qLow =
+              FloatVector.fromArray(HALF_REDUCTION_SPECIES, query, queryBase + column);
+          FloatVector qHigh =
+              FloatVector.fromArray(HALF_REDUCTION_SPECIES, query, queryBase + column + 4);
+          acc0Low =
+              qLow.fma(FloatVector.fromArray(HALF_REDUCTION_SPECIES, keys, key0 + column), acc0Low);
+          acc0High =
+              qHigh.fma(
+                  FloatVector.fromArray(HALF_REDUCTION_SPECIES, keys, key0 + column + 4), acc0High);
+          acc1Low =
+              qLow.fma(FloatVector.fromArray(HALF_REDUCTION_SPECIES, keys, key1 + column), acc1Low);
+          acc1High =
+              qHigh.fma(
+                  FloatVector.fromArray(HALF_REDUCTION_SPECIES, keys, key1 + column + 4), acc1High);
+          acc2Low =
+              qLow.fma(FloatVector.fromArray(HALF_REDUCTION_SPECIES, keys, key2 + column), acc2Low);
+          acc2High =
+              qHigh.fma(
+                  FloatVector.fromArray(HALF_REDUCTION_SPECIES, keys, key2 + column + 4), acc2High);
+          acc3Low =
+              qLow.fma(FloatVector.fromArray(HALF_REDUCTION_SPECIES, keys, key3 + column), acc3Low);
+          acc3High =
+              qHigh.fma(
+                  FloatVector.fromArray(HALF_REDUCTION_SPECIES, keys, key3 + column + 4), acc3High);
+        }
+        float sum0 = reduceAddPinnedHalves(acc0Low, acc0High);
+        float sum1 = reduceAddPinnedHalves(acc1Low, acc1High);
+        float sum2 = reduceAddPinnedHalves(acc2Low, acc2High);
+        float sum3 = reduceAddPinnedHalves(acc3Low, acc3High);
+        for (; column < columns; column++) {
+          float q = query[queryBase + column];
+          sum0 = Math.fma(q, keys[key0 + column], sum0);
+          sum1 = Math.fma(q, keys[key1 + column], sum1);
+          sum2 = Math.fma(q, keys[key2 + column], sum2);
+          sum3 = Math.fma(q, keys[key3 + column], sum3);
+        }
+        int scoreBase = scoresOffset + head * scoresHeadStride + row;
+        scores[scoreBase] = sum0 * scale;
+        scores[scoreBase + 1] = sum1 * scale;
+        scores[scoreBase + 2] = sum2 * scale;
+        scores[scoreBase + 3] = sum3 * scale;
+      }
+    }
+    for (int row = blockedRows; row < rows; row++) {
+      int keyBase = keyOffset + row * keyRowStride;
+      for (int head = 0; head < groupSize; head++) {
+        int queryBase = queryOffset + head * queryHeadStride;
+        FloatVector accLow = FloatVector.zero(HALF_REDUCTION_SPECIES);
+        FloatVector accHigh = FloatVector.zero(HALF_REDUCTION_SPECIES);
+        int column = 0;
+        for (; column < vectorLimit; column += lanes) {
+          accLow =
+              FloatVector.fromArray(HALF_REDUCTION_SPECIES, query, queryBase + column)
+                  .fma(
+                      FloatVector.fromArray(HALF_REDUCTION_SPECIES, keys, keyBase + column),
+                      accLow);
+          accHigh =
+              FloatVector.fromArray(HALF_REDUCTION_SPECIES, query, queryBase + column + 4)
+                  .fma(
+                      FloatVector.fromArray(HALF_REDUCTION_SPECIES, keys, keyBase + column + 4),
+                      accHigh);
+        }
+        float sum = reduceAddPinnedHalves(accLow, accHigh);
+        for (; column < columns; column++) {
+          sum = Math.fma(query[queryBase + column], keys[keyBase + column], sum);
+        }
+        scores[scoresOffset + head * scoresHeadStride + row] = sum * scale;
+      }
+    }
+  }
+
   /**
    * In-place stable softmax over {@code x[offset, offset + size)}; the same contract as {@code
    * TensorOps.softmax} (rejects NaN and +infinity, requires one finite input) with a vector maximum
@@ -245,15 +376,36 @@ public final class GroupedQueryAttentionKernel {
     // elementwise, so only this reduction changes.
     int pinnedLanes = REDUCTION_SPECIES.length();
     int pinnedLimit = REDUCTION_SPECIES.loopBound(size);
-    FloatVector maxBroadcast = FloatVector.broadcast(REDUCTION_SPECIES, max);
-    FloatVector sumVector = FloatVector.zero(REDUCTION_SPECIES);
+    float sum;
     index = 0;
-    for (; index < pinnedLimit; index += pinnedLanes) {
-      FloatVector value = expVector(reductionLoad(x, offset + index).sub(maxBroadcast));
-      value.intoArray(x, offset + index);
-      sumVector = sumVector.add(value);
+    if (SPLIT_REDUCTION) {
+      FloatVector maximum = FloatVector.broadcast(HALF_REDUCTION_SPECIES, max);
+      FloatVector lowSum = FloatVector.zero(HALF_REDUCTION_SPECIES);
+      FloatVector highSum = FloatVector.zero(HALF_REDUCTION_SPECIES);
+      for (; index < pinnedLimit; index += 8) {
+        FloatVector low =
+            expVector(
+                FloatVector.fromArray(HALF_REDUCTION_SPECIES, x, offset + index).sub(maximum));
+        FloatVector high =
+            expVector(
+                FloatVector.fromArray(HALF_REDUCTION_SPECIES, x, offset + index + 4).sub(maximum));
+        low.intoArray(x, offset + index);
+        high.intoArray(x, offset + index + 4);
+        lowSum = lowSum.add(low);
+        highSum = highSum.add(high);
+      }
+      sum = reduceAddPinnedHalves(lowSum, highSum);
+    } else {
+      FloatVector maxBroadcast = FloatVector.broadcast(REDUCTION_SPECIES, max);
+      FloatVector sumVector = FloatVector.zero(REDUCTION_SPECIES);
+      index = 0;
+      for (; index < pinnedLimit; index += pinnedLanes) {
+        FloatVector value = expVector(reductionLoad(x, offset + index).sub(maxBroadcast));
+        value.intoArray(x, offset + index);
+        sumVector = sumVector.add(value);
+      }
+      sum = reduceAddPinnedTree(sumVector);
     }
-    float sum = reduceAddPinnedTree(sumVector);
     for (; index < size; index++) {
       float value = expScalar(x[offset + index] - max);
       x[offset + index] = value;
