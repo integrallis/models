@@ -287,7 +287,8 @@ public final class TernaryDequantizer {
   }
 
   /**
-   * Integer sums are exact; only the physical vector width changes. Scale FMAs retain their order.
+   * Integer sums remain exact; primitive accumulation avoids unsupported-vector emulation. Scale
+   * FMAs retain their order.
    */
   private static float dotProductPtq1_0Q8_0NarrowHost(
       MemorySegment source,
