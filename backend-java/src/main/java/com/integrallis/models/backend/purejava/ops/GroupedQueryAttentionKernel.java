@@ -128,21 +128,8 @@ public final class GroupedQueryAttentionKernel {
       float[] scores,
       int scoresOffset,
       int scoresHeadStride) {
-    Objects.requireNonNull(query, "query");
-    Objects.requireNonNull(keys, "keys");
-    Objects.requireNonNull(scores, "scores");
-    if (groupSize < 1 || rows < 0 || columns < 1) {
-      throw new IllegalArgumentException("groupSize and columns must be positive, rows >= 0");
-    }
-    Objects.checkFromIndexSize(
-        queryOffset, (groupSize - 1) * queryHeadStride + columns, query.length);
-    if (rows > 0) {
-      Objects.checkFromIndexSize(keyOffset, (rows - 1) * keyRowStride + columns, keys.length);
-      Objects.checkFromIndexSize(
-          scoresOffset, (groupSize - 1) * scoresHeadStride + rows, scores.length);
-    }
     if (SPLIT_REDUCTION) {
-      scoreGroup128(
+      scoreGroup128Validated(
           query,
           queryOffset,
           queryHeadStride,
@@ -156,22 +143,22 @@ public final class GroupedQueryAttentionKernel {
           scores,
           scoresOffset,
           scoresHeadStride);
-      return;
+    } else {
+      scoreGroup256(
+          query,
+          queryOffset,
+          queryHeadStride,
+          groupSize,
+          keys,
+          keyOffset,
+          keyRowStride,
+          rows,
+          columns,
+          scale,
+          scores,
+          scoresOffset,
+          scoresHeadStride);
     }
-    scoreGroup256(
-        query,
-        queryOffset,
-        queryHeadStride,
-        groupSize,
-        keys,
-        keyOffset,
-        keyRowStride,
-        rows,
-        columns,
-        scale,
-        scores,
-        scoresOffset,
-        scoresHeadStride);
   }
 
   private static void scoreGroup256(
@@ -188,6 +175,19 @@ public final class GroupedQueryAttentionKernel {
       float[] scores,
       int scoresOffset,
       int scoresHeadStride) {
+    Objects.requireNonNull(query, "query");
+    Objects.requireNonNull(keys, "keys");
+    Objects.requireNonNull(scores, "scores");
+    if (groupSize < 1 || rows < 0 || columns < 1) {
+      throw new IllegalArgumentException("groupSize and columns must be positive, rows >= 0");
+    }
+    Objects.checkFromIndexSize(
+        queryOffset, (groupSize - 1) * queryHeadStride + columns, query.length);
+    if (rows > 0) {
+      Objects.checkFromIndexSize(keyOffset, (rows - 1) * keyRowStride + columns, keys.length);
+      Objects.checkFromIndexSize(
+          scoresOffset, (groupSize - 1) * scoresHeadStride + rows, scores.length);
+    }
     int lanes = REDUCTION_SPECIES.length();
     int vectorLimit = REDUCTION_SPECIES.loopBound(columns);
     int blockedRows = rows & ~3;
@@ -250,6 +250,49 @@ public final class GroupedQueryAttentionKernel {
         scores[scoresOffset + head * scoresHeadStride + row] = sum * scale;
       }
     }
+  }
+
+  private static void scoreGroup128Validated(
+      float[] query,
+      int queryOffset,
+      int queryHeadStride,
+      int groupSize,
+      float[] keys,
+      int keyOffset,
+      int keyRowStride,
+      int rows,
+      int columns,
+      float scale,
+      float[] scores,
+      int scoresOffset,
+      int scoresHeadStride) {
+    Objects.requireNonNull(query, "query");
+    Objects.requireNonNull(keys, "keys");
+    Objects.requireNonNull(scores, "scores");
+    if (groupSize < 1 || rows < 0 || columns < 1) {
+      throw new IllegalArgumentException("groupSize and columns must be positive, rows >= 0");
+    }
+    Objects.checkFromIndexSize(
+        queryOffset, (groupSize - 1) * queryHeadStride + columns, query.length);
+    if (rows > 0) {
+      Objects.checkFromIndexSize(keyOffset, (rows - 1) * keyRowStride + columns, keys.length);
+      Objects.checkFromIndexSize(
+          scoresOffset, (groupSize - 1) * scoresHeadStride + rows, scores.length);
+    }
+    scoreGroup128(
+        query,
+        queryOffset,
+        queryHeadStride,
+        groupSize,
+        keys,
+        keyOffset,
+        keyRowStride,
+        rows,
+        columns,
+        scale,
+        scores,
+        scoresOffset,
+        scoresHeadStride);
   }
 
   private static void scoreGroup128(
