@@ -21,7 +21,7 @@ public final class WidthRiskProbe {
   private final float[] query=new float[GROUPS*COLUMNS], keys=new float[ROWS*COLUMNS];
   private final float[] scores=new float[GROUPS*ROWS], logits=new float[SOFTMAX], probabilities=new float[SOFTMAX];
   private final byte[] quants=new byte[PTQ];
-  private final float[] scales=new float[PTQ/32];
+  private final float[] scales=new float[PTQ/32], floatInput=new float[PTQ], floatSums=new float[8];
   private final Arena arena=Arena.ofConfined();
   private final MemorySegment weights=arena.allocate((PTQ/128)*28L);
   private float result;
@@ -36,6 +36,7 @@ public final class WidthRiskProbe {
     for(int i=0;i<scales.length;i++)scales[i]=(float)Math.scalb(1.0,random.nextInt(-8,-2));
     for(long i=0;i<weights.byteSize();i++)weights.set(ValueLayout.JAVA_BYTE,i,(byte)random.nextInt(243));
     for(int block=0;block<PTQ/128;block++)weights.set(LE_SHORT,block*28L+26,Float.floatToFloat16(.125f));
+    for(int i=0;i<floatInput.length;i++)floatInput[i]=(float)random.nextDouble(-1,1);
   }
   private void invoke(int iteration) {
     switch(kernel) {
@@ -54,6 +55,10 @@ public final class WidthRiskProbe {
       case "ptq" -> {
         quants[0]=(byte)(iteration%255-127);
         result=reference?ptqReference():TernaryDequantizer.dotProductPtq1_0Q8_0(weights,0,quants,scales,0,PTQ);
+      }
+      case "ptqFloat" -> {
+        floatInput[0]=(iteration%31-15)*.03125f;
+        result=reference?ptqFloatReference():TernaryDequantizer.dotProductPtq1_0(weights,0,floatInput,0,PTQ);
       }
       default -> throw new IllegalArgumentException(kernel);
     }
@@ -106,6 +111,26 @@ public final class WidthRiskProbe {
         blockSum=Math.fma(sum,scales[block*4+group],blockSum);
       }
       total=Math.fma(blockSum,Float.float16ToFloat(weights.get(LE_SHORT,base+26)),total);
+    }
+    return total;
+  }
+  private int trit(long base,int packed,int power) {
+    int value=(Byte.toUnsignedInt(weights.get(ValueLayout.JAVA_BYTE,base+packed))*POW3[power])&255;
+    return ((value*3)>>>8)-1;
+  }
+  private float ptqFloatReference() {
+    float total=0;
+    for(int block=0;block<PTQ/128;block++) {
+      long base=block*28L;int at=block*128;
+      java.util.Arrays.fill(floatSums,0f);
+      for(int n=0;n<5;n++)for(int lane=0;lane<8;lane++) {
+        floatSums[lane]=Math.fma(trit(base,lane,n),floatInput[at+n*16+lane],floatSums[lane]);
+        floatSums[lane]=Math.fma(trit(base,8+lane,n),floatInput[at+n*16+8+lane],floatSums[lane]);
+        floatSums[lane]=Math.fma(trit(base,16+lane,n),floatInput[at+80+n*8+lane],floatSums[lane]);
+      }
+      float sum=((floatSums[4]+floatSums[0])+(floatSums[6]+floatSums[2]))+((floatSums[5]+floatSums[1])+(floatSums[7]+floatSums[3]));
+      for(int n=0;n<4;n++)for(int h=0;h<2;h++)sum=Math.fma(trit(base,24+h,n),floatInput[at+120+n*2+h],sum);
+      total=Math.fma(sum,Float.float16ToFloat(weights.get(LE_SHORT,base+26)),total);
     }
     return total;
   }

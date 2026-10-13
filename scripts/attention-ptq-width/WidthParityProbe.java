@@ -47,6 +47,9 @@ public final class WidthParityProbe {
       Class<?>[] ptqTypes={MemorySegment.class,long.class,byte[].class,float[].class,int.class,int.class};
       Method oldPtq=baseline.loadClass("com.integrallis.models.backend.purejava.quant.TernaryDequantizer").getMethod("dotProductPtq1_0Q8_0",ptqTypes);
       Method newPtq=candidate.loadClass("com.integrallis.models.backend.purejava.quant.TernaryDequantizer").getMethod("dotProductPtq1_0Q8_0",ptqTypes);
+      Class<?>[] floatTypes={MemorySegment.class,long.class,float[].class,int.class,int.class};
+      Method oldFloat=baseline.loadClass("com.integrallis.models.backend.purejava.quant.TernaryDequantizer").getMethod("dotProductPtq1_0",floatTypes);
+      Method newFloat=candidate.loadClass("com.integrallis.models.backend.purejava.quant.TernaryDequantizer").getMethod("dotProductPtq1_0",floatTypes);
       // Repeat the complete case set to compare both first-use and compiled production paths.
       for (int repeat=0;repeat<4;repeat++) {
         for(int columns:new int[]{1,3,4,7,8,9,15,16,17,63,64,65,128})
@@ -75,6 +78,10 @@ public final class WidthParityProbe {
           for(int block=0;block<blocks;block++)source.set(ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN),sourceOffset+block*28L+26,(short)new int[]{0,1,0x3000,0xbc00,0x1400}[block%5]);
           float a=(float)oldPtq.invoke(null,source,(long)sourceOffset,input,scales,offset,blocks*128);
           float b=(float)newPtq.invoke(null,source,(long)sourceOffset,input,scales,offset,blocks*128);
+          exact(new float[]{a},new float[]{b});
+          float[] floatInput=random(offset+3+blocks*128);
+          a=(float)oldFloat.invoke(null,source,(long)sourceOffset,floatInput,offset+3,blocks*128);
+          b=(float)newFloat.invoke(null,source,(long)sourceOffset,floatInput,offset+3,blocks*128);
           exact(new float[]{a},new float[]{b});
         }
       }

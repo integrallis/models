@@ -379,22 +379,8 @@ public final class GroupedQueryAttentionKernel {
     float sum;
     index = 0;
     if (SPLIT_REDUCTION) {
-      FloatVector maximum = FloatVector.broadcast(HALF_REDUCTION_SPECIES, max);
-      FloatVector lowSum = FloatVector.zero(HALF_REDUCTION_SPECIES);
-      FloatVector highSum = FloatVector.zero(HALF_REDUCTION_SPECIES);
-      for (; index < pinnedLimit; index += 8) {
-        FloatVector low =
-            expVector(
-                FloatVector.fromArray(HALF_REDUCTION_SPECIES, x, offset + index).sub(maximum));
-        FloatVector high =
-            expVector(
-                FloatVector.fromArray(HALF_REDUCTION_SPECIES, x, offset + index + 4).sub(maximum));
-        low.intoArray(x, offset + index);
-        high.intoArray(x, offset + index + 4);
-        lowSum = lowSum.add(low);
-        highSum = highSum.add(high);
-      }
-      sum = reduceAddPinnedHalves(lowSum, highSum);
+      sum = expAndSumPinned128(x, offset, pinnedLimit, max);
+      index = pinnedLimit;
     } else {
       FloatVector maxBroadcast = FloatVector.broadcast(REDUCTION_SPECIES, max);
       FloatVector sumVector = FloatVector.zero(REDUCTION_SPECIES);
@@ -420,6 +406,27 @@ public final class GroupedQueryAttentionKernel {
     for (; index < size; index++) {
       x[offset + index] *= inverseSum;
     }
+  }
+
+  private static void expShift128(float[] values, int offset, int size, float maximum) {
+    FloatVector max = FloatVector.broadcast(HALF_REDUCTION_SPECIES, maximum);
+    for (int index = 0; index < size; index += 4) {
+      expVector(FloatVector.fromArray(HALF_REDUCTION_SPECIES, values, offset + index).sub(max))
+          .intoArray(values, offset + index);
+    }
+  }
+
+  private static float expAndSumPinned128(float[] values, int offset, int size, float maximum) {
+    // Keep vector values inside each array-only phase. Returning a vector from an outlined
+    // exponential helper can otherwise force the live sum vectors to escape on 128-bit JVMs.
+    expShift128(values, offset, size, maximum);
+    FloatVector low = FloatVector.zero(HALF_REDUCTION_SPECIES);
+    FloatVector high = FloatVector.zero(HALF_REDUCTION_SPECIES);
+    for (int index = 0; index < size; index += 8) {
+      low = low.add(FloatVector.fromArray(HALF_REDUCTION_SPECIES, values, offset + index));
+      high = high.add(FloatVector.fromArray(HALF_REDUCTION_SPECIES, values, offset + index + 4));
+    }
+    return reduceAddPinnedHalves(low, high);
   }
 
   /**
