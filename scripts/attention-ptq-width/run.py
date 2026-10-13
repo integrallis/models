@@ -29,7 +29,7 @@ def prepare(out):
   for relative in paths:
    target=src/Path(relative).name
    target.write_bytes(subprocess.check_output(['git','show',revision+':backend-java/src/main/java/com/integrallis/models/backend/purejava/'+relative],cwd=ROOT));files.append(target);arm_files.append(target)
-  run(['javac','--release','25','-g','--add-modules','jdk.incubator.vector','-cp',str(libs/'*'),'-d',str(dest),*[str(f) for f in arm_files],str(HERE/'WidthRiskProbe.java'),str(HERE/'WidthParityProbe.java')],out/f'compile-{label}')
+  run(['javac','--release','25','-g','--add-modules','jdk.incubator.vector','-cp',str(libs/'*'),'-d',str(dest),*[str(f) for f in arm_files],str(HERE/'WidthRiskProbe.java'),str(HERE/'WidthParityProbe.java'),str(HERE/'WidthCompilerProbe.java')],out/f'compile-{label}')
  for width,flags in [('default',[]),('128',['-XX:MaxVectorSize=16'])]:
   run(['java',*flags,'--add-modules','jdk.incubator.vector','--enable-native-access=ALL-UNNAMED','-cp',str(classes/'candidate'),'com.integrallis.models.backend.purejava.ops.WidthParityProbe',str(classes/'current'),str(classes/'candidate'),str(libs)],out/f'parity-{width}')
 
@@ -60,7 +60,8 @@ def diagnostic(out,kernel):
 def compiler(out):
  for arm in ['current','candidate']:
   cmd=command(out,'score',arm)
-  cmd[1:1]=['-XX:+UnlockDiagnosticVMOptions','-XX:+PrintCompilation','-XX:+PrintInlining','-XX:CompileCommand=print,com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel::scoreGroup']
+  cmd[cmd.index('com.integrallis.models.backend.purejava.ops.WidthRiskProbe')]='com.integrallis.models.backend.purejava.ops.WidthCompilerProbe'
+  cmd[1:1]=['-XX:+UnlockDiagnosticVMOptions','-XX:+LogCompilation',f'-XX:LogFile={out}/compiler-{arm}.xml','-XX:CompileCommand=print,com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel::scoreGroup']
   run(cmd,out/f'compiler-{arm}')
 
 out=Path(sys.argv[2]).resolve();out.mkdir(parents=True,exist_ok=True)
