@@ -158,6 +158,36 @@ public final class GroupedQueryAttentionKernel {
           scoresHeadStride);
       return;
     }
+    scoreGroup256(
+        query,
+        queryOffset,
+        queryHeadStride,
+        groupSize,
+        keys,
+        keyOffset,
+        keyRowStride,
+        rows,
+        columns,
+        scale,
+        scores,
+        scoresOffset,
+        scoresHeadStride);
+  }
+
+  private static void scoreGroup256(
+      float[] query,
+      int queryOffset,
+      int queryHeadStride,
+      int groupSize,
+      float[] keys,
+      int keyOffset,
+      int keyRowStride,
+      int rows,
+      int columns,
+      float scale,
+      float[] scores,
+      int scoresOffset,
+      int scoresHeadStride) {
     int lanes = REDUCTION_SPECIES.length();
     int vectorLimit = REDUCTION_SPECIES.loopBound(columns);
     int blockedRows = rows & ~3;
