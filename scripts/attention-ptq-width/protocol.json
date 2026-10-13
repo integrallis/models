@@ -1,14 +1,15 @@
 {
-  "scope": "Exact native-width attention/PTQ correction against frozen baseline and primitive reference; component diagnosis, not model release qualification",
+  "scope": "Native-width attention and primitive narrow-host PTQ correction: exact output/resource/latency diagnostic, not whole-model release qualification",
   "sourceRevision": "c95e243d0335657958c4f254d45cc9a1ff83f2f5",
-  "pairs": 4,
+  "pairs": 16,
   "warmCalls": 2000,
   "blocks": 5,
   "jdk": "25.0.3",
   "kernels": [
     "score",
     "softmax",
-    "ptq"
+    "ptq",
+    "ptqFloat"
   ],
   "score": {
     "groups": 5,
@@ -34,10 +35,11 @@
   "timerBatchCalls": {
     "score": 992,
     "softmax": 992,
-    "ptq": 1020
+    "ptq": 1020,
+    "ptqFloat": 992
   },
   "timerPolicy": "Each of five blocks runs full batches until 250 ms; counts and elapsed duration retained. Batch sizes contain complete 31-input or 255-input mutation cycles. No block discarded.",
-  "candidateRevision": "66bdca040ee55a565bc84d05ac1e70756f4a0bd7",
+  "candidateRevision": "7ad622a404511e178201eae1ad7f9fc97287d08e",
   "arms": [
     "current",
     "candidate",
