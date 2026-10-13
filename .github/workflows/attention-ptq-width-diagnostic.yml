@@ -1,4 +1,4 @@
-name: Reachable attention and PTQ fixed-width diagnosis
+name: Reachable attention and PTQ native-width correction
 on:
   push:
     branches: [fix/attention-ptq-width-proof]
@@ -31,7 +31,8 @@ jobs:
           name: attention-ptq-${{ matrix.runner }}-provenance
           path: |
             ${{ runner.temp }}/width-risk/*.json
-            ${{ runner.temp }}/width-risk/compile.*
+            ${{ runner.temp }}/width-risk/compile-*
+            ${{ runner.temp }}/width-risk/parity-*
       - name: Fixed component pair 0
         run: |
           python3 scripts/attention-ptq-width/run.py pair "$RUNNER_TEMP/width-risk" score 0

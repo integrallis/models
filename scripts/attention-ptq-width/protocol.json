@@ -1,5 +1,5 @@
 {
-  "scope": "Reachable attention and PTQ width risk diagnosis, not model or release qualification",
+  "scope": "Exact native-width attention/PTQ correction against frozen baseline and primitive reference; component diagnosis, not model release qualification",
   "sourceRevision": "c95e243d0335657958c4f254d45cc9a1ff83f2f5",
   "pairs": 4,
   "warmCalls": 2000,
@@ -36,5 +36,11 @@
     "softmax": 992,
     "ptq": 1020
   },
-  "timerPolicy": "Each of five blocks runs full batches until 250 ms; counts and elapsed duration retained. Batch sizes contain complete 31-input or 255-input mutation cycles. No block discarded."
+  "timerPolicy": "Each of five blocks runs full batches until 250 ms; counts and elapsed duration retained. Batch sizes contain complete 31-input or 255-input mutation cycles. No block discarded.",
+  "candidateRevision": "66bdca040ee55a565bc84d05ac1e70756f4a0bd7",
+  "arms": [
+    "current",
+    "candidate",
+    "reference"
+  ]
 }
