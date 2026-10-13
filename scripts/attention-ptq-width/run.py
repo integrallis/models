@@ -57,7 +57,14 @@ def diagnostic(out,kernel):
  run(cmd,out/f'jfr-{kernel}')
  run(['jfr','print','--events','jdk.ObjectAllocationSample','--json',str(out/f'{kernel}.jfr')],out/f'allocations-{kernel}')
 
+def compiler(out):
+ for arm in ['current','candidate']:
+  cmd=command(out,'score',arm)
+  cmd[1:1]=['-XX:+UnlockDiagnosticVMOptions','-XX:+PrintCompilation','-XX:+PrintInlining','-XX:CompileCommand=print,com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel::scoreGroup']
+  run(cmd,out/f'compiler-{arm}')
+
 out=Path(sys.argv[2]).resolve();out.mkdir(parents=True,exist_ok=True)
 if sys.argv[1]=='prepare':prepare(out)
 elif sys.argv[1]=='pair':pair(out,sys.argv[3],int(sys.argv[4]))
+elif sys.argv[1]=='compiler':compiler(out)
 else:diagnostic(out,sys.argv[3])
