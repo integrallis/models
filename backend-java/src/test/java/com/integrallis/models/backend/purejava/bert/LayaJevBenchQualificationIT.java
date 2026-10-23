@@ -22,9 +22,12 @@ import com.integrallis.models.backend.purejava.bert.DecisionCalibrationQualifica
 import com.integrallis.models.backend.purejava.bert.DecisionCalibrationQualification.Report;
 import com.integrallis.models.backend.purejava.bert.ModernBertConfig.QuestionType;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -183,12 +186,60 @@ class LayaJevBenchQualificationIT {
     assertThat(report.tier().publishable()).as("tier %s", report.tier()).isTrue();
   }
 
-  private static String json(Report report, List<String> perCase, double seconds) {
+  private static String sha256(Path path) throws IOException {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      try (InputStream in = Files.newInputStream(path)) {
+        byte[] buffer = new byte[1 << 16];
+        for (int read = in.read(buffer); read > 0; read = in.read(buffer)) {
+          digest.update(buffer, 0, read);
+        }
+      }
+      StringBuilder hex = new StringBuilder(64);
+      for (byte b : digest.digest()) {
+        hex.append(String.format(Locale.ROOT, "%02x", b));
+      }
+      return hex.toString();
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 is required by every JVM", e);
+    }
+  }
+
+  private static long sizeOf(Path path) throws IOException {
+    return Files.size(path);
+  }
+
+  /** Machine specs, because a result without them is not reproducible. */
+  private static String environment() {
+    return "  \"environment\": {\n"
+        + "    \"osName\": \""
+        + System.getProperty("os.name")
+        + "\",\n"
+        + "    \"osArch\": \""
+        + System.getProperty("os.arch")
+        + "\",\n"
+        + "    \"javaVersion\": \""
+        + System.getProperty("java.version")
+        + "\",\n"
+        + "    \"availableProcessors\": "
+        + Runtime.getRuntime().availableProcessors()
+        + "\n"
+        + "  },\n";
+  }
+
+  private static String json(Report report, List<String> perCase, double seconds)
+      throws IOException {
     StringBuilder out = new StringBuilder();
     out.append("{\n");
     out.append("  \"policy\": \"").append(report.policyId()).append("\",\n");
     out.append("  \"cohort\": \"JevBench v1.1, MIT, 120 cases\",\n");
     out.append("  \"artifact\": \"").append(ARTIFACT.getFileName()).append("\",\n");
+    // The digest and size, not just the file name. A report that names its artifact by file name
+    // binds to nothing: the catalog entry downstream would have to copy the digest from itself
+    // rather than check it against what was actually measured.
+    out.append("  \"artifactSha256\": \"").append(sha256(ARTIFACT)).append("\",\n");
+    out.append("  \"artifactSizeBytes\": ").append(sizeOf(ARTIFACT)).append(",\n");
+    out.append("  \"cohortSha256\": \"").append(sha256(COHORT)).append("\",\n");
     out.append("  \"cases\": ").append(report.cases()).append(",\n");
     out.append(
         String.format(Locale.ROOT, "  \"chanceAccuracy\": %.6f,%n", report.chanceAccuracy()));
@@ -200,6 +251,7 @@ class LayaJevBenchQualificationIT {
         .append(report.uncalibratedBucketsExercised())
         .append(",\n");
     out.append(String.format(Locale.ROOT, "  \"wallClockSeconds\": %.2f,%n", seconds));
+    out.append(environment());
     out.append("  \"byType\": {\n");
     List<String> types = new ArrayList<>(report.accuracyByType().keySet());
     for (int index = 0; index < types.size(); index++) {

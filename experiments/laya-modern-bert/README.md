@@ -180,13 +180,15 @@ of the model, and `correctAnswerRate` describes a grounded-RAG pipeline that is 
 - **the raw and clamped temperature**, because one bucket in this artifact differs between them
 - **two arms on one host**: Laya against our own decision arm on identical items
 
-We already hold a labelled set that fits and a second arm to run against it: the SNIPS and TREC
-samples in `articles/models-deep-dive/experiments/routing-accuracy` (100 items each, 7-way and
-6-way intent labels — `choice:6-10` territory) and Harriet, measured on exactly those items, with
-the calibration method already written and reproduced in
-`articles/models-deep-dive/experiments/decision-threshold` (reliability bins, ECE, Brier, Platt
-scaling fitted out-of-fold). That makes the quality gate a reuse rather than a new build — but it
-is still a gate that has to be written, and no number from it exists yet.
+A labelled set that fits and a second arm to run against it both exist, but **not in this
+repository**: the SNIPS and TREC samples (100 items each, 7-way and 6-way intent labels —
+`choice:6-10` territory) and the Harriet measurements over exactly those items, together with a
+calibration method already written and reproduced (reliability bins, ECE, Brier, Platt scaling
+fitted out-of-fold), live in the `models-deep-dive` article working tree, which is not a git
+repository and is committed nowhere. So the quality gate is a reuse in the sense that the method
+and the items have been built once — not in the sense that anything here can cite them. Making it
+a gate means moving those items and that method into this repo under a digest, and no number from
+it exists yet.
 
 ## What is upstream's claim and not ours
 
