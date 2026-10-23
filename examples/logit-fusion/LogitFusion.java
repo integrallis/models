@@ -1,7 +1,7 @@
 ///usr/bin/env jbang "$0" "$@" ; exit $?
 //JAVA 25+
-//DEPS com.integrallis:models:0.3.42
-//DEPS com.integrallis:backend-java:0.3.42
+//DEPS com.integrallis:models:0.5.4
+//DEPS com.integrallis:backend-java:0.5.4
 //RUNTIME_OPTIONS --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED
 
 import com.integrallis.models.backend.purejava.PureJavaBackend;

@@ -1390,9 +1390,15 @@ tasks.register("verifyDocumentation") {
     val ciWorkflowFile = file(".github/workflows/ci.yml")
     val docsWorkflowFile = file(".github/workflows/docs.yml")
     val releaseWorkflowFile = file(".github/workflows/release.yml")
+    val versionedDocFiles =
+        fileTree(projectDir) {
+            include("README.md", "*/README.md", "examples/**", "notebooks/**/*.md")
+            exclude("**/build/**", "**/node_modules/**", "**/.gradle/**")
+        }
     inputs.files(
         readmeFile,
         docsFiles,
+        versionedDocFiles,
         docsPackageFile,
         docsLockFile,
         docsBuildFile,
@@ -1471,6 +1477,135 @@ tasks.register("verifyDocumentation") {
         }
         require("notebooks/README.md" in readme) {
             "README must link to the executable notebooks"
+        }
+
+        // Every other place that names a coordinate, not just the root README.
+        //
+        // The checks above read `readmeFile` alone, so module READMEs, docs/, examples/ and the
+        // landing page drifted unnoticed. AUDITED 2026-10-23: the starter README advertised
+        // models-spring-boot-starter 0.3.28 against a published 0.5.4 and
+        // vectors-spring-boot-starter 0.1.9 against 0.1.30; the JBang example pinned 0.3.42;
+        // antora.yml named ModelJars 0.1.62; and the landing page's install snippet said ModelJars
+        // 0.1.29, thirty-six releases stale. Each one is an instruction a reader would copy.
+        //
+        // A literal is permitted only where interpolation is impossible -- a JBang //DEPS line, an
+        // Antora attribute, an HTML snippet -- and then it must equal the current version. Prose
+        // and Gradle snippets in Markdown use the version property instead, which is what the root
+        // README does.
+        val authoritativeVersions =
+            mapOf(
+                "models" to version.toString(),
+                "vectors" to
+                    providers.gradleProperty("vectorsVersion").get(),
+                "modeljars" to
+                    providers.gradleProperty("modeljarsVersion").get(),
+            )
+        // A family whose authoritative version cannot be resolved would make every check below
+        // pass by skipping, which is how this check first shipped doing nothing: modeljarsVersion
+        // was undefined here, so the landing page's ModelJars 0.1.29 and antora.yml's 0.1.62 were
+        // both waved through. An empty value is a defect in this build, not a clean document.
+        authoritativeVersions.forEach { (family, declared) ->
+            require(declared.matches(Regex("""\d+\.\d+\.\d+"""))) {
+                "verifyDocumentation needs a concrete $family version to check documents against, " +
+                    "got '$declared'"
+            }
+        }
+        val coordinateUse =
+            Regex(
+                """(com\.integrallis:(?:models|backend|vectors)[A-Za-z0-9.-]*|""" +
+                    """org\.modeljars:[A-Za-z0-9.-]+):(\d+\.\d+\.\d+)"""
+            )
+        val versionedDocs =
+            fileTree(projectDir) {
+                include("README.md", "*/README.md", "docs/**", "examples/**", "notebooks/**")
+                exclude(
+                    "**/build/**",
+                    "**/node_modules/**",
+                    "**/.gradle/**",
+                    "docs/ui/**",
+                    "**/*.zip",
+                    "**/*.png",
+                    "**/*.svg",
+                    "**/*.ipynb",
+                )
+            }
+        val staleCoordinates = mutableListOf<String>()
+        versionedDocs.files.filter { it.isFile }.forEach { file ->
+            coordinateUse.findAll(file.readText()).forEach { match ->
+                val coordinate = match.groupValues[1]
+                val cited = match.groupValues[2]
+                val family =
+                    when {
+                        coordinate.startsWith("org.modeljars:") -> "modeljars"
+                        coordinate.startsWith("com.integrallis:vectors") -> "vectors"
+                        else -> "models"
+                    }
+                val expected = authoritativeVersions.getValue(family)
+                if (cited != expected) {
+                    staleCoordinates +=
+                        "${file.relativeTo(projectDir)}: $coordinate:$cited (current $expected)"
+                }
+            }
+        }
+        // Maven XML and SBT name the artifact and its version apart, so neither matches the
+        // coordinate regex. The landing page's copy-to-clipboard snippets carry all four build
+        // systems, and its Gradle forms were caught while its Maven and SBT forms were not --
+        // AUDITED 2026-10-23, eight snippets on ModelJars 0.1.11, fifty-four releases stale.
+        val mavenXmlUse =
+            Regex(
+                // The separator may be a real newline or, inside a JavaScript string literal, the
+                // two characters backslash-n. `\s*` bridges only the first, which is why the
+                // landing page's Maven snippet survived the first version of this check.
+                """<artifactId>(modeljars|models|vectors)</artifactId>[\s\\n]*""" +
+                    """<version>(\d+\.\d+\.\d+)</version>"""
+            )
+        val sbtUse =
+            Regex(
+                """"(org\.modeljars|com\.integrallis)"\s*%+\s*"(modeljars|models|vectors)"""" +
+                    """\s*%\s*"(\d+\.\d+\.\d+)""""
+            )
+        versionedDocs.files.filter { it.isFile }.forEach { file ->
+            val text = file.readText()
+            mavenXmlUse.findAll(text).forEach { match ->
+                val family = if (match.groupValues[1] == "modeljars") "modeljars" else match.groupValues[1]
+                val expected = authoritativeVersions.getValue(family)
+                if (match.groupValues[2] != expected) {
+                    staleCoordinates +=
+                        "${file.relativeTo(projectDir)}: <${match.groupValues[1]}> " +
+                            "${match.groupValues[2]} (current $expected)"
+                }
+            }
+            sbtUse.findAll(text).forEach { match ->
+                val family = match.groupValues[2]
+                val expected = authoritativeVersions.getValue(family)
+                if (match.groupValues[3] != expected) {
+                    staleCoordinates +=
+                        "${file.relativeTo(projectDir)}: sbt ${match.groupValues[2]} " +
+                            "${match.groupValues[3]} (current $expected)"
+                }
+            }
+        }
+
+        // Antora attributes name a version without a coordinate, so the coordinate regex above
+        // cannot see them. antora.yml declared ModelJars 0.1.62 against a published 0.1.65 and no
+        // check noticed; the site renders these attributes into every install snippet it shows.
+        val attributeUse =
+            Regex("""(models|vectors|modeljars)-version:\s*'(\d+\.\d+\.\d+)'""")
+        versionedDocs.files.filter { it.isFile && it.name.endsWith(".yml") }.forEach { file ->
+            attributeUse.findAll(file.readText()).forEach { match ->
+                val family = match.groupValues[1]
+                val cited = match.groupValues[2]
+                val expected = authoritativeVersions.getValue(family)
+                if (cited != expected) {
+                    staleCoordinates +=
+                        "${file.relativeTo(projectDir)}: $family-version $cited (current $expected)"
+                }
+            }
+        }
+        require(staleCoordinates.isEmpty()) {
+            "Documentation cites versions that are not the current ones. Use the version property " +
+                "where the file can interpolate, or the current version where it cannot:\n  " +
+                staleCoordinates.sorted().joinToString("\n  ")
         }
 
         val docsIndex = file("docs/content/modules/ROOT/pages/index.adoc").readText()

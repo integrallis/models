@@ -3,8 +3,10 @@
 Auto-configures a Models runtime as a Spring AI `ChatModel`.
 
 ```kotlin
+val modelsVersion = providers.gradleProperty("modelsVersion").get()
+
 dependencies {
-    implementation("com.integrallis:models-spring-boot-starter:0.3.28")
+    implementation("com.integrallis:models-spring-boot-starter:$modelsVersion")
 }
 ```
 
@@ -68,7 +70,7 @@ It is **prototype-scoped**, so each injection point gets its own builder and one
 cannot leak into another's. A `ChatClient.Builder` the application or another auto-configuration
 supplies is left alone, and nothing is registered when there is no local chat model.
 
-For local RAG, add `com.integrallis:vectors-spring-boot-starter:0.1.9` and provide a Spring AI
+For local RAG, add `com.integrallis:vectors-spring-boot-starter:0.1.30` and provide a Spring AI
 `EmbeddingModel`. Vectors contributes `JavaVectorsVectorStore` while this starter contributes the
 local chat model. Both starters are verified together on Spring AI 1.1 and 2.0.
 
