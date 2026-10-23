@@ -43,8 +43,12 @@ finish() {
   fi
   # HOLD_ON_FAIL keeps a broken box alive long enough to be inspected instead of erasing
   # the evidence. Success always terminates.
-  if [ "$STATUS" != "SHARD_COMPLETE" ] && [ "1" = "1" ]; then
-    say "holding 45m for inspection (HOLD_ON_FAIL=1)"
+  # The condition here was `[ "1" = "1" ]`, so HOLD_ON_FAIL was named in the comment and in the
+  # message and read nowhere: every failed shard held 45 minutes of billed time, and setting
+  # HOLD_ON_FAIL=0 did nothing. A toggle that silently does nothing is worse than no toggle,
+  # and this one spent money. Default is 0 -- a failed box terminates unless a hold was asked for.
+  if [ "$STATUS" != "SHARD_COMPLETE" ] && [ "${HOLD_ON_FAIL:-0}" = "1" ]; then
+    say "holding 45m for inspection (HOLD_ON_FAIL=${HOLD_ON_FAIL:-0})"
     sleep 2700
   fi
   say "shutting down"
@@ -94,7 +98,7 @@ export JAVA_HOME=/opt/jdk; export PATH=$JAVA_HOME/bin:$PATH
 [ -x /opt/jdk/bin/java ] || { STATUS=NO_JDK; exit 1; }
 say "jdk $(/opt/jdk/bin/java -version 2>&1 | head -1)"
 
-cd /work
+cd /work || { STATUS=NO_WORKDIR; exit 1; }
 # The payload and the version string that will be stamped on every report are REQUIRED inputs with
 # no defaults, and they are checked against each other below. Both used to be hard-coded here, and
 # both went stale: this file said models-rag-bench-0.3.50-v23.tar and
@@ -221,7 +225,7 @@ if [ -n "$PUBLISHER_REFERENCE" ]; then
     yum install -y -q git gcc gcc-c++ make cmake libcurl-devel 2>/dev/null \
       || apt-get -qq update && apt-get -qq install -y git build-essential cmake libcurl4-openssl-dev
     git clone --no-checkout "$PUBLISHER_REPO" /work/llama.cpp
-    cd /work/llama.cpp
+    cd /work/llama.cpp || { STATUS=NO_PUBLISHER_CLONE; exit 1; }
     # Checked out by exact revision, never a branch: the policy admits this commit and no other.
     git fetch --depth 1 origin "$PUBLISHER_REVISION"
     git checkout "$PUBLISHER_REVISION"
