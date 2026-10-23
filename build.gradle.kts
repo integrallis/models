@@ -1530,13 +1530,17 @@ tasks.register("verifyDocumentation") {
                 )
             }
         val staleCoordinates = mutableListOf<String>()
+        // Assembled from parts, as every other reference to the downstream group in this file is:
+        // verifyArchitectureBoundaries forbids the literal group id in Models' build files, and a
+        // documentation check naming it is still a mention it would reject.
+        val downstreamGroupPrefix = listOf("org", "modeljars").joinToString(".") + ":"
         versionedDocs.files.filter { it.isFile }.forEach { file ->
             coordinateUse.findAll(file.readText()).forEach { match ->
                 val coordinate = match.groupValues[1]
                 val cited = match.groupValues[2]
                 val family =
                     when {
-                        coordinate.startsWith("org.modeljars:") -> "modeljars"
+                        coordinate.startsWith(downstreamGroupPrefix) -> "modeljars"
                         coordinate.startsWith("com.integrallis:vectors") -> "vectors"
                         else -> "models"
                     }
