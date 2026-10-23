@@ -192,10 +192,67 @@ export PATH="/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin:$PATH"
 # is why the previous shard produced candidate-only reports. The AMI also runs no systemd, so the
 # unit the installer registers is inert and `ollama serve` has to be supervised here directly.
 export HOME=/root
+# A shard may name a reviewed publisher reference instead of Ollama. PUBLISHER_REFERENCE is the
+# policy's opt-in id; PUBLISHER_REPO and PUBLISHER_REVISION are its pinned source, both required
+# inputs rather than strings derived here, for the same reason BACKEND_VERSION is: this box has no
+# repository and nothing to resolve them against.
+#
+# This exists because RagProductionQualificationPolicy's ordinary comparators are Ollama and
+# Transformers, and neither executes Prism's PTQ1_0 packing with its declared Hadamard transform.
+# A shard that ran the candidate against Ollama for such an artifact produced a candidate-only
+# report -- the exact outcome the two-arm rule was written to stop -- so the comparator is chosen
+# by the artifact's format, not by what happens to be installed.
+PUBLISHER_REFERENCE=${PUBLISHER_REFERENCE:-}
+PUBLISHER_REPO=${PUBLISHER_REPO:-}
+PUBLISHER_REVISION=${PUBLISHER_REVISION:-}
+PUBLISHER_PORT=${PUBLISHER_PORT:-8080}
+PUBLISHER_READY=0
+if [ -n "$PUBLISHER_REFERENCE" ]; then
+  [ -n "$PUBLISHER_REPO" ] && [ -n "$PUBLISHER_REVISION" ] || {
+    say "FATAL: PUBLISHER_REFERENCE set without PUBLISHER_REPO and PUBLISHER_REVISION"
+    STATUS=PUBLISHER_INPUT_MISSING
+    exit 2
+  }
+  say "publisher reference $PUBLISHER_REFERENCE from $PUBLISHER_REPO@$PUBLISHER_REVISION"
+  # Build before any weights download. A comparator that cannot build is the one failure that makes
+  # the shard worthless, and a 5.95GB artifact fetched first only delays finding out.
+  (
+    set -x
+    yum install -y -q git gcc gcc-c++ make cmake libcurl-devel 2>/dev/null \
+      || apt-get -qq update && apt-get -qq install -y git build-essential cmake libcurl4-openssl-dev
+    git clone --no-checkout "$PUBLISHER_REPO" /work/llama.cpp
+    cd /work/llama.cpp
+    # Checked out by exact revision, never a branch: the policy admits this commit and no other.
+    git fetch --depth 1 origin "$PUBLISHER_REVISION"
+    git checkout "$PUBLISHER_REVISION"
+    git rev-parse HEAD
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=ON -DLLAMA_CURL=OFF
+    cmake --build build --config Release -j "$(nproc)" --target llama-server
+  ) > /work/out/publisher-build.log 2>&1
+  built_rev=$(git -C /work/llama.cpp rev-parse HEAD 2>/dev/null || echo none)
+  say "publisher build exit=$? revision=$built_rev"
+  # Uploaded now, not at shutdown, for the same reason the ollama logs are.
+  aws s3 cp /work/out/publisher-build.log "s3://$BUCKET/results/shard-$SHARD/" --only-show-errors 2>/dev/null
+  if [ "$built_rev" != "$PUBLISHER_REVISION" ]; then
+    say "FATAL: publisher reference is at $built_rev, not the pinned $PUBLISHER_REVISION"
+    STATUS=PUBLISHER_REVISION_MISMATCH
+    exit 2
+  fi
+  [ -x /work/llama.cpp/build/bin/llama-server ] || {
+    say "FATAL: llama-server did not build; see publisher-build.log"
+    STATUS=PUBLISHER_BUILD_FAILED
+    exit 2
+  }
+  PUBLISHER_READY=1
+  say "publisher reference ready on port $PUBLISHER_PORT"
+fi
 # Models go on the 120GB data volume, not the root filesystem: the comparator imports a copy of every
 # candidate GGUF and the shard is 20GB of them.
 export OLLAMA_MODELS=/work/ollama
 mkdir -p "$OLLAMA_MODELS"
+if [ "$PUBLISHER_READY" = "1" ]; then
+  say "skipping ollama: this shard qualifies against its publisher reference"
+else
 curl -fsSL https://ollama.com/install.sh | sh > /work/out/ollama-install.log 2>&1
 say "ollama install exit=$? path=$(command -v ollama || echo none) home=$HOME"
 (OLLAMA_HOST=127.0.0.1:11434 OLLAMA_MAX_LOADED_MODELS=1 nohup ollama serve >> /work/out/ollama-serve.log 2>&1 &)
@@ -215,6 +272,15 @@ else
   # of them would repeat the previous campaign exactly: reports, no qualifications.
   STATUS=NO_COMPARATOR
   say "ollama NOT ready; refusing to run candidate-only arms"
+  exit 1
+fi
+fi
+
+# One comparator or the other, never neither: the two-arm rule does not care which reviewed
+# reference answered, only that a same-host arm did.
+if [ "$OLLAMA_READY" != "1" ] && [ "$PUBLISHER_READY" != "1" ]; then
+  STATUS=NO_COMPARATOR
+  say "no comparator arm is ready; refusing to run candidate-only arms"
   exit 1
 fi
 
@@ -366,7 +432,51 @@ while IFS= read -r job; do
       --output "/work/out/$id.json" > "/work/out/$id.log" 2>&1
     rc=$?
 
-    if [ "$rc" = "0" ] && [ "$OLLAMA_READY" = "1" ]; then
+    if [ "$rc" = "0" ] && [ "$PUBLISHER_READY" = "1" ]; then
+      # The publisher's own implementation, serving the identical file the candidate arm just read,
+      # so artifactSha256 matches and the comparison is not excluded. One server per job: a 27B
+      # artifact is not worth keeping resident across jobs it does not belong to.
+      ( nohup /work/llama.cpp/build/bin/llama-server \
+          --model "$gguf" --host 127.0.0.1 --port "$PUBLISHER_PORT" \
+          --ctx-size 2048 --threads "$THREADS" \
+          >> "/work/out/$id.publisher.log" 2>&1 & )
+      for attempt in $(seq 1 180); do
+        curl -s -o /dev/null "http://127.0.0.1:$PUBLISHER_PORT/health" && break
+        sleep 2
+      done
+      if curl -s -o /dev/null "http://127.0.0.1:$PUBLISHER_PORT/health"; then
+        java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED \
+          -cp "$CP" \
+          com.integrallis.models.rag.RagBenchmarkCli \
+          --framework plain-java --backend llama.cpp \
+          --backend-version "llama.cpp@$PUBLISHER_REVISION" \
+          --endpoint "http://127.0.0.1:$PUBLISHER_PORT" \
+          --model "$id" --artifact "$gguf" --model-id "$id" $ARMS \
+          --output "/work/out/$id.comparator.json" >> "/work/out/$id.publisher.log" 2>&1
+        crc=$?
+        if [ "$crc" = "0" ]; then
+          # --publisher-reference is what admits this comparator at all. Without it the policy
+          # refuses a llama.cpp baseline, which is correct: the reference is reviewed per artifact,
+          # not granted to the backend in general.
+          java -cp "$CP" com.integrallis.models.rag.RagQualificationCli \
+            --candidate "/work/out/$id.json" \
+            --comparator "/work/out/$id.comparator.json" \
+            --publisher-reference "$PUBLISHER_REFERENCE" \
+            --output "/work/out/$id.verdict.json" >> "/work/out/$id.publisher.log" 2>&1
+          verdict=$(python3 -c "import json;print(json.load(open('/work/out/$id.verdict.json'))['qualification']['verdict'])" 2>/dev/null || echo NO_VERDICT)
+          say "verdict $id: $verdict (publisher reference)"
+          printf '%s\tverdict\t%s\n' "$id" "$verdict" >> /work/out/progress.tsv
+          aws s3 cp "/work/out/$id.comparator.json" "s3://$BUCKET/results/shard-$SHARD/" --only-show-errors 2>/dev/null
+          aws s3 cp "/work/out/$id.verdict.json"    "s3://$BUCKET/results/shard-$SHARD/" --only-show-errors 2>/dev/null
+        else
+          say "publisher comparator arm failed for $id (rc=$crc)"
+        fi
+      else
+        say "publisher reference did not become ready for $id"
+      fi
+      pkill -f "llama-server .*--port $PUBLISHER_PORT" 2>/dev/null || true
+      aws s3 cp "/work/out/$id.publisher.log" "s3://$BUCKET/results/shard-$SHARD/" --only-show-errors 2>/dev/null
+    elif [ "$rc" = "0" ] && [ "$OLLAMA_READY" = "1" ]; then
       # The comparator runs the identical artifact, not a registry copy of the same name: `ollama create`
       # from this exact file, so artifactSha256 matches and the comparison is not excluded.
       printf 'FROM %s\n' "$gguf" > /work/Modelfile
