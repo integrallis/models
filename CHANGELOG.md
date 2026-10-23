@@ -4,6 +4,59 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-10-23
+
+### Added
+
+- **A typed-decision decoder for `modern-bert` artifacts.** `ModernBertDecisionModel.open(Path)`
+  reads a ModernBERT GGUF that declares a decision head and answers one typed question about one
+  state in a single non-autoregressive pass: `decide(QuestionType, String instructions,
+  List<Option> options, String state)` returns the chosen option, the probabilities over options,
+  and whether those probabilities are calibrated at all.
+
+  It is deliberately **not** a `TextGenerationModel` and not an `InferenceBackend`. There is no
+  continuation to stream, so there is nothing for a generative interface to expose, and
+  `PureJavaBackend` does not dispatch `modern-bert` — this is reached by its own facade from an
+  artifact path, not through the generative runtime. An artifact with no decision head is refused
+  at `open` rather than silently answering from an untrained head.
+
+- **`ModernBertDecisionAnswer.uncalibrated()`, which is the part to read before the probability.**
+  Turning option logits into a probability needs the temperature for that question's
+  `type:option-count` bucket, and that is where a decision model is most easily misreported. The
+  `ggml-org/Laya-GGUF` artifact declares `choice:11+ = 0.100583`, a temperature that sharpens the
+  logits roughly tenfold; the model's own reference implementation refuses it, clamps to 0.5 and
+  warns. A twelve-option question here therefore yields a *ranked* answer whose probability nobody
+  fitted, and this record says so instead of publishing the number as though it were calibrated.
+
+- **`DecisionUseCaseTier` and `DecisionCalibrationQualification`**, a decision-shaped
+  qualification. `CALIBRATED_DECISION` exports a confidence quality a caller may threshold;
+  `RANKED_DECISION` publishes its accuracy and exports none; `UNQUALIFIED` does not publish. The
+  accuracy gates are measured against the cohort's own chance floor, because a cohort mixing
+  2-option and 12-option questions has chance floors that differ by more than any fixed pass mark
+  would mean.
+
+### Measured
+
+- **Laya-Q8_0 qualifies at `RANKED_DECISION`**: accuracy **0.7833** against a chance floor of
+  **0.3004** over the 120-case JevBench v1.1 cohort — 0.7917 on `choice` (n=72, chance 0.2090),
+  0.7778 on `noul` (n=36, chance 0.5000), 0.7500 on `score` (n=12, chance 0.2500). Expected
+  calibration error **0.1638**, which fails the 0.10 gate, so no confidence quality is exported and
+  the limitation travels with the record. Report:
+  `experiments/laya-modern-bert/evidence/jevbench-120-decision-calibration-v2.json`, which binds
+  its own artifact digest, cohort digest and machine specs.
+
+- **A null worth recording: refitting the temperatures does not rescue the calibration.** One
+  scalar per bucket, fitted out-of-fold, moved held-out ECE from 0.1802 to 0.1300 — a 28%
+  improvement that still fails. It helped `choice:3-5` (−0.259 → −0.026, 30 fit cases) and made
+  `noul:2` *worse* (−0.081 → −0.144, 18 fit cases), which shows the pre-registered ≥10-case floor
+  for fitting a bucket was too permissive. It was not retuned after seeing that.
+
+- **Three defects in the forward pass, each corrected against the reference implementation rather
+  than guessed**: the decision MLP needs a ReLU, the decision blocks take no rotary embedding, and
+  they are isolation-free; the sliding window is computed on position ids, not token indices. Two
+  of them partially cancelled, so the earlier claim that eleven refuted hypotheses had validated
+  the graph was wrong — they were masking each other.
+
 ## [0.5.3] - 2026-10-22
 
 ### Added
