@@ -1,0 +1,23 @@
+Oct 24, 2026 12:46:37 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 24, 2026 12:46:37 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=12 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+route        = rust-batched-matmul
+  sliding-window-attention = ENABLED {pattern-source=declared-per-layer, local-layers=18/24, declared-window=512}
+  expert-swiglu-clamp = ENABLED {clamped-layers=24/24}
+promptTokens = 355
+window       = 512  exceeded=false
+prefill      = 335.50 s
+  step 0 token=1234 Item
+  step 1 token=220  
+  step 2 token=16 1
+  step 3 token=24 9
+  step 4 token=320  (
+  step 5 token=1234 Item
+  step 6 token=220  
+  step 7 token=16 1
+  step 8 token=24 9
+  step 9 token=320  (
+  step 10 token=1234 Item
+  step 11 token=220  
+continuation = Item 19 (Item 19 (Item 
