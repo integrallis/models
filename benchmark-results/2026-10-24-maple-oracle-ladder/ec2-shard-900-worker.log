@@ -1,0 +1,274 @@
++ STATUS=STARTED
+++ cat /sys/devices/virtual/dmi/id/product_uuid
+++ head -c 8
++ say 'boot shard=900 instance=ec240a5e'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:01:21 'boot shard=900 instance=ec240a5e'
+[qual 23:01:21] boot shard=900 instance=ec240a5e
++ trap finish EXIT
++ mkdir -p /work/models /work/out /opt/jdk
+++ curl -s -o /dev/null -w '%{http_code}' --max-time 25 https://s3.amazonaws.com
++ EGRESS_CODE=307
++ '[' 307 = 000 ']'
++ '[' -z 307 ']'
++ say 'egress ok (s3 root http=307)'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:01:21 'egress ok (s3 root http=307)'
+[qual 23:01:21] egress ok (s3 root http=307)
++ export DEBIAN_FRONTEND=noninteractive
++ DEBIAN_FRONTEND=noninteractive
++ apt-get update -qq
++ apt-get install -y -qq unzip python3
+
+Running kernel seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
++ command -v aws
++ say 'installing aws cli from the bundled installer'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:01:33 'installing aws cli from the bundled installer'
+[qual 23:01:33] installing aws cli from the bundled installer
++ curl -sfL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscli.zip
++ cd /tmp
++ unzip -qo awscli.zip
++ ./aws/install --update
++ hash -r
++ command -v aws
+++ aws --version
+++ head -c 40
++ say 'aws aws-cli/2.38.5 Python/3.14.8 Linux/7.0.0'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:01:36 'aws aws-cli/2.38.5 Python/3.14.8 Linux/7.0.0'
+[qual 23:01:36] aws aws-cli/2.38.5 Python/3.14.8 Linux/7.0.0
++ command -v python3
++ curl -sfL https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jdk/hotspot/normal/eclipse -o /tmp/jdk.tgz
++ tar xzf /tmp/jdk.tgz -C /opt/jdk --strip-components=1
++ export JAVA_HOME=/opt/jdk
++ JAVA_HOME=/opt/jdk
++ export PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
++ PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
++ '[' -x /opt/jdk/bin/java ']'
+++ /opt/jdk/bin/java -version
+++ head -1
++ say 'jdk openjdk version "25.0.5" 2026-10-20 LTS'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:01:38 'jdk openjdk version "25.0.5" 2026-10-20 LTS'
+[qual 23:01:38] jdk openjdk version "25.0.5" 2026-10-20 LTS
++ cd /work
++ '[' -z models-rag-bench-0.5.4-maple1.tar ']'
++ '[' -z models@0.5.4+maple1-416ccc3d ']'
++ '[' -z models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar ']'
++ PAYLOAD=models-rag-bench-0.5.4-maple1.tar
++ KERNELS=models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar
++ BACKEND_VERSION=models@0.5.4+maple1-416ccc3d
++ payload_matches_label models-rag-bench-0.5.4-maple1.tar models@0.5.4+maple1-416ccc3d
++ local payload=models-rag-bench-0.5.4-maple1.tar label=models@0.5.4+maple1-416ccc3d version
+++ payload_label_version models@0.5.4+maple1-416ccc3d
+++ printf %s models@0.5.4+maple1-416ccc3d
+++ sed -n 's/^models@\([0-9][0-9.]*[^+]*\).*/\1/p'
++ version=0.5.4
++ '[' -n 0.5.4 ']'
++ case "$payload" in
++ return 0
++ payload_matches_label models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar models@0.5.4+maple1-416ccc3d
++ local payload=models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar label=models@0.5.4+maple1-416ccc3d version
+++ payload_label_version models@0.5.4+maple1-416ccc3d
+++ printf %s models@0.5.4+maple1-416ccc3d
+++ sed -n 's/^models@\([0-9][0-9.]*[^+]*\).*/\1/p'
++ version=0.5.4
++ '[' -n 0.5.4 ']'
++ case "$payload" in
++ return 0
++ say 'payload models-rag-bench-0.5.4-maple1.tar kernels models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar labelled models@0.5.4+maple1-416ccc3d'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:01:38 'payload models-rag-bench-0.5.4-maple1.tar kernels models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar labelled models@0.5.4+maple1-416ccc3d'
+[qual 23:01:38] payload models-rag-bench-0.5.4-maple1.tar kernels models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar labelled models@0.5.4+maple1-416ccc3d
++ aws s3 cp s3://models-qual-077051030817/payload/models-rag-bench-0.5.4-maple1.tar . --only-show-errors
++ aws s3 cp s3://models-qual-077051030817/payload/models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar . --only-show-errors
++ aws s3 cp s3://models-qual-077051030817/payload/fleet-shard-900.json /work/shard.json --only-show-errors
++ '[' -s models-rag-bench-0.5.4-maple1.tar ']'
++ '[' -s /work/models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar ']'
++ '[' -s /work/shard.json ']'
++ tar xf models-rag-bench-0.5.4-maple1.tar
+++ ls -d /work/models-rag-bench-0.5.4/
+++ head -1
++ DIST=/work/models-rag-bench-0.5.4/
++ CP='/work/models-rag-bench-0.5.4//lib/*:/work/models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar'
+++ unzip -p /work/models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar META-INF/models/native/linux-x86_64/native.properties
+++ sed -n 's/^sha256=//p'
++ KERNEL_SHA=c747df1e099197ce5b2b03e2af4245868372f511d850122b6d2a5c33686ae69f
++ say 'kernel models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar sha256=c747df1e099197ce5b2b03e2af4245868372f511d850122b6d2a5c33686ae69f'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:01:40 'kernel models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar sha256=c747df1e099197ce5b2b03e2af4245868372f511d850122b6d2a5c33686ae69f'
+[qual 23:01:40] kernel models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar sha256=c747df1e099197ce5b2b03e2af4245868372f511d850122b6d2a5c33686ae69f
+++ python3 -c 'import json;print(len(json.load(open('\''/work/shard.json'\''))))'
++ JOBS=1
++ say 'payload ok, 1 jobs'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:01:40 'payload ok, 1 jobs'
+[qual 23:01:40] payload ok, 1 jobs
+++ nproc
++ THREADS=16
++ DECODE_THREAD_DEFAULT=
++ STATUS=RUNNING
++ export PATH=/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin:/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
++ PATH=/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin:/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin
++ export HOME=/root
++ HOME=/root
++ PUBLISHER_REFERENCE=
++ PUBLISHER_REPO=
++ PUBLISHER_REVISION=
++ PUBLISHER_PORT=8080
++ PUBLISHER_READY=0
++ '[' -n '' ']'
++ export OLLAMA_MODELS=/work/ollama
++ OLLAMA_MODELS=/work/ollama
++ mkdir -p /work/ollama
++ '[' 0 = 1 ']'
++ curl -fsSL https://ollama.com/install.sh
++ sh
+++ command -v ollama
++ say 'ollama install exit=0 path=/usr/local/bin/ollama home=/root'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:01:50 'ollama install exit=0 path=/usr/local/bin/ollama home=/root'
+[qual 23:01:50] ollama install exit=0 path=/usr/local/bin/ollama home=/root
++ OLLAMA_HOST=127.0.0.1:11434
++ OLLAMA_MAX_LOADED_MODELS=1
++ nohup ollama serve
+++ seq 1 90
++ for attempt in $(seq 1 90)
++ curl -s -o /dev/null http://127.0.0.1:11434/api/tags
++ sleep 2
++ for attempt in $(seq 1 90)
++ curl -s -o /dev/null http://127.0.0.1:11434/api/tags
++ break
++ aws s3 cp /work/out/ollama-install.log s3://models-qual-077051030817/results/shard-900/ --only-show-errors
++ aws s3 cp /work/out/ollama-serve.log s3://models-qual-077051030817/results/shard-900/ --only-show-errors
++ curl -s -o /dev/null http://127.0.0.1:11434/api/tags
+++ ollama --version
+++ head -1
++ say 'ollama ready (ollama version is 0.40.11)'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:01:54 'ollama ready (ollama version is 0.40.11)'
+[qual 23:01:54] ollama ready (ollama version is 0.40.11)
++ OLLAMA_READY=1
++ '[' 1 '!=' 1 ']'
++ SUPPORTED_ARCH='llama gemma gemma2 gemma4 phi3 mistral3 hunyuan-dense lfm2 qwen2 qwen3 qwen3moe granite smollm3 gemma3 gemma-embedding qwen35 qwen35moe qwen3next gemma3n deepseek2 gpt-oss mobilemoe needle2 maple'
++ MAX_ARTIFACT_BYTES=22000000000
++ done_n=0
++ python3 -c '
+import json
+for j in json.load(open('\''/work/shard.json'\'')): print(json.dumps(j))
+'
++ sleep 18000
++ IFS=
++ read -r job
++ '[' -f /work/out/STOP ']'
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''id'\''])' '{"id": "maple_preview_tq1_0", "uri": "https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/f5466f918e0c50cdb9d4d47a6f35813509a42a30/maple-preview-TQ1_0-head-Q4_K.gguf", "tpl": "chatml-no-think", "gb": 4.98, "arch": "maple", "wl": "general", "mt": 256, "dt": 8}'
++ id=maple_preview_tq1_0
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''uri'\''])' '{"id": "maple_preview_tq1_0", "uri": "https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/f5466f918e0c50cdb9d4d47a6f35813509a42a30/maple-preview-TQ1_0-head-Q4_K.gguf", "tpl": "chatml-no-think", "gb": 4.98, "arch": "maple", "wl": "general", "mt": 256, "dt": 8}'
++ uri=https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/f5466f918e0c50cdb9d4d47a6f35813509a42a30/maple-preview-TQ1_0-head-Q4_K.gguf
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1])['\''tpl'\''])' '{"id": "maple_preview_tq1_0", "uri": "https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/f5466f918e0c50cdb9d4d47a6f35813509a42a30/maple-preview-TQ1_0-head-Q4_K.gguf", "tpl": "chatml-no-think", "gb": 4.98, "arch": "maple", "wl": "general", "mt": 256, "dt": 8}'
++ tpl=chatml-no-think
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''arch'\'','\'''\''))' '{"id": "maple_preview_tq1_0", "uri": "https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/f5466f918e0c50cdb9d4d47a6f35813509a42a30/maple-preview-TQ1_0-head-Q4_K.gguf", "tpl": "chatml-no-think", "gb": 4.98, "arch": "maple", "wl": "general", "mt": 256, "dt": 8}'
++ arch=maple
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''dt'\'') or '\'''\'')' '{"id": "maple_preview_tq1_0", "uri": "https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/f5466f918e0c50cdb9d4d47a6f35813509a42a30/maple-preview-TQ1_0-head-Q4_K.gguf", "tpl": "chatml-no-think", "gb": 4.98, "arch": "maple", "wl": "general", "mt": 256, "dt": 8}'
++ dt=8
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''wl'\'') or '\''general'\'')' '{"id": "maple_preview_tq1_0", "uri": "https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/f5466f918e0c50cdb9d4d47a6f35813509a42a30/maple-preview-TQ1_0-head-Q4_K.gguf", "tpl": "chatml-no-think", "gb": 4.98, "arch": "maple", "wl": "general", "mt": 256, "dt": 8}'
++ wl=general
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''mt'\'') or 256)' '{"id": "maple_preview_tq1_0", "uri": "https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/f5466f918e0c50cdb9d4d47a6f35813509a42a30/maple-preview-TQ1_0-head-Q4_K.gguf", "tpl": "chatml-no-think", "gb": 4.98, "arch": "maple", "wl": "general", "mt": 256, "dt": 8}'
++ mt=256
++ '[' -z 8 ']'
++ DECODE_THREAD_OPT=
++ '[' -n 8 ']'
++ DECODE_THREAD_OPT=-Dmodels.native.kernels.decodeThreads=8
++ gguf=/work/models/maple_preview_tq1_0.gguf
+++ date +%s
++ T0=1792882914
++ case " $SUPPORTED_ARCH " in
+++ python3 -c 'import json,sys;print('\'' '\''.join(json.loads(sys.argv[1]).get('\''files'\'') or []))' '{"id": "maple_preview_tq1_0", "uri": "https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/f5466f918e0c50cdb9d4d47a6f35813509a42a30/maple-preview-TQ1_0-head-Q4_K.gguf", "tpl": "chatml-no-think", "gb": 4.98, "arch": "maple", "wl": "general", "mt": 256, "dt": 8}'
++ files=
+++ python3 -c 'import json,sys;print(json.loads(sys.argv[1]).get('\''bytes'\'',0))' '{"id": "maple_preview_tq1_0", "uri": "https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/f5466f918e0c50cdb9d4d47a6f35813509a42a30/maple-preview-TQ1_0-head-Q4_K.gguf", "tpl": "chatml-no-think", "gb": 4.98, "arch": "maple", "wl": "general", "mt": 256, "dt": 8}'
++ bytes=0
++ '[' 0 = 0 ']'
++ '[' -z '' ']'
+++ curl -sIL https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/f5466f918e0c50cdb9d4d47a6f35813509a42a30/maple-preview-TQ1_0-head-Q4_K.gguf
+++ awk 'BEGIN{IGNORECASE=1} /^content-length:/ {v=$2} END{gsub(/\r/,"",v); print v+0}'
++ bytes=4984016416
++ say 'maple_preview_tq1_0: HEAD reports 4984016416 bytes'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:01:54 'maple_preview_tq1_0: HEAD reports 4984016416 bytes'
+[qual 23:01:54] maple_preview_tq1_0: HEAD reports 4984016416 bytes
++ '[' 4984016416 -gt 22000000000 ']'
++ '[' -n '' ']'
++ say 'start maple_preview_tq1_0 (arch=maple workload=general decodeThreads=8)'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:01:54 'start maple_preview_tq1_0 (arch=maple workload=general decodeThreads=8)'
+[qual 23:01:54] start maple_preview_tq1_0 (arch=maple workload=general decodeThreads=8)
++ curl -sfL https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/f5466f918e0c50cdb9d4d47a6f35813509a42a30/maple-preview-TQ1_0-head-Q4_K.gguf -o /work/models/maple_preview_tq1_0.gguf
++ ARMS='--workload general --prompt-template chatml-no-think --context 2048 --threads 16'
++ ARMS='--workload general --prompt-template chatml-no-think --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3'
++ java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Dmodels.native.kernels.decodeThreads=8 -cp '/work/models-rag-bench-0.5.4//lib/*:/work/models-kernels-linux-x86_64-0.5.4-ci.674.1.416ccc3dc013.jar' com.integrallis.models.rag.RagBenchmarkCli --framework plain-java --backend rust-ffm --backend-version models@0.5.4+maple1-416ccc3d --model /work/models/maple_preview_tq1_0.gguf --model-id maple_preview_tq1_0 --workload general --prompt-template chatml-no-think --context 2048 --threads 16 --max-tokens 256 --warmups 1 --iterations 3 --output /work/out/maple_preview_tq1_0.json
++ rc=0
++ '[' 0 = 0 ']'
++ '[' 0 = 1 ']'
++ '[' 0 = 0 ']'
++ '[' 1 = 1 ']'
++ printf 'FROM %s\n' /work/models/maple_preview_tq1_0.gguf
++ ollama create qual-maple_preview_tq1_0 -f /work/Modelfile
++ say 'ollama could not load maple_preview_tq1_0; no comparator for it'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:06:46 'ollama could not load maple_preview_tq1_0; no comparator for it'
+[qual 23:06:46] ollama could not load maple_preview_tq1_0; no comparator for it
++ aws s3 cp /work/out/maple_preview_tq1_0.ollama.log s3://models-qual-077051030817/results/shard-900/ --only-show-errors
+++ date +%s
++ printf '%s\trc%s\t%s\n' maple_preview_tq1_0 0 293
+++ date +%s
++ say 'done maple_preview_tq1_0 rc=0 in 293s'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:06:47 'done maple_preview_tq1_0 rc=0 in 293s'
+[qual 23:06:47] done maple_preview_tq1_0 rc=0 in 293s
++ aws s3 cp /work/out/maple_preview_tq1_0.json s3://models-qual-077051030817/results/shard-900/ --only-show-errors
++ aws s3 cp /work/out/maple_preview_tq1_0.log s3://models-qual-077051030817/results/shard-900/ --only-show-errors
++ rm -f /work/models/maple_preview_tq1_0.gguf
++ done_n=1
++ IFS=
++ read -r job
++ aws s3 cp /work/out/progress.tsv s3://models-qual-077051030817/results/shard-900/ --only-show-errors
++ STATUS=SHARD_COMPLETE
++ say 'shard complete: 1 jobs'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:06:49 'shard complete: 1 jobs'
+[qual 23:06:49] shard complete: 1 jobs
++ finish
++ rc=0
++ say 'FINAL_STATUS=SHARD_COMPLETE exit=0'
++ tee -a /var/log/qual-worker.log
+++ date -u +%H:%M:%S
++ printf '[qual %s] %s\n' 23:06:49 'FINAL_STATUS=SHARD_COMPLETE exit=0'
+[qual 23:06:49] FINAL_STATUS=SHARD_COMPLETE exit=0
++ command -v aws
++ echo SHARD_COMPLETE
++ aws s3 cp /work/out/STATUS s3://models-qual-077051030817/results/shard-900/ --only-show-errors
++ aws s3 cp /var/log/qual-worker.log s3://models-qual-077051030817/results/shard-900/qual-worker-900.log --only-show-errors
