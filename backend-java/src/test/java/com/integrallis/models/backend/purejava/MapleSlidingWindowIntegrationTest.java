@@ -53,6 +53,10 @@ class MapleSlidingWindowIntegrationTest {
   private static final int DECLARED_WINDOW = 512;
 
   private static final int LAYERS = 24;
+
+  /** Enough greedy steps for a collapse to be unambiguous rather than a coincidence. */
+  private static final int GENERATED_TOKENS = 10;
+
   private static final int EXPECTED_LOCAL_LAYERS = 18;
 
   @Test
@@ -106,20 +110,58 @@ class MapleSlidingWindowIntegrationTest {
       // A flat distribution is the shape of a mask that admitted nothing or everything. Asserting
       // a POSITIVE top logit would be wrong -- nothing guarantees the sign -- so this asserts
       // non-degeneracy instead: a real spread, and a top that stands above the mean.
-      int best = 0;
+      int best = argmax(logits);
       double total = 0.0;
-      for (int index = 0; index < logits.length; index++) {
-        total += logits[index];
-        if (logits[index] > logits[best]) {
-          best = index;
-        }
+      for (float logit : logits) {
+        total += logit;
       }
-      float mean = (float) (total / logits.length);
       assertThat(logits[best])
           .as("the next-token distribution must not be flat past the window")
-          .isGreaterThan(mean);
-      assertThat(logits[best]).isNotEqualTo(logits[(best + 1) % logits.length]);
+          .isGreaterThan((float) (total / logits.length));
+
+      // The assertions above are NOT enough, and that is a measured statement rather than a
+      // precaution. With the window and the clamp both fixed and both reported ENABLED, maple
+      // still generated </think>2222222 past the window -- a confident argmax every step, so a
+      // spread-and-above-the-mean check passed it. The defect was a third one: we were roping all
+      // 24 layers where maple ropes only its local ones.
+      //
+      // So the greedy continuation is checked for the shape that got through: one token, over and
+      // over. This does not hardcode the right answer, only the absence of a collapse.
+      int[] generated = new int[GENERATED_TOKENS];
+      int position = tokens.length;
+      float[] step = logits;
+      for (int index = 0; index < GENERATED_TOKENS; index++) {
+        generated[index] = argmax(step);
+        step = backend.forward(generated[index], position++);
+      }
+
+      int longestRun = 1;
+      int run = 1;
+      for (int index = 1; index < generated.length; index++) {
+        run = generated[index] == generated[index - 1] ? run + 1 : 1;
+        longestRun = Math.max(longestRun, run);
+      }
+      assertThat(longestRun)
+          .as(
+              "greedy decoding collapsed into one repeated token: %s",
+              java.util.Arrays.toString(generated))
+          .isLessThan(GENERATED_TOKENS);
+      assertThat(java.util.Arrays.stream(generated).distinct().count())
+          .as(
+              "greedy decoding produced almost no distinct tokens: %s",
+              java.util.Arrays.toString(generated))
+          .isGreaterThan(2L);
     }
+  }
+
+  private static int argmax(float[] values) {
+    int best = 0;
+    for (int index = 1; index < values.length; index++) {
+      if (values[index] > values[best]) {
+        best = index;
+      }
+    }
+    return best;
   }
 
   /**
