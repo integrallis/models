@@ -564,6 +564,19 @@ public final class TensorOps {
               x, qWeight, rows, cols, out, quantizedActivation, quantizedActivationScales);
       case MXFP4 -> mxfp4Matmul(out, x, qWeight, rows, cols);
       case PTQ1_0 -> ptqMatmul(out, x, qWeight, rows, cols);
+      // TQ1_0 is ggml's standard ternary packing, distinct from Prism's PTQ1_0 above: 256-element
+      // blocks in 54 bytes against PTQ's 128 in 28, and no activation quantization defined for it.
+      // MEASURED 2026-10-24: maple is 168 TQ1_0 tensors and died here with "GGUF matmul not
+      // supported", because the type is readable -- GgufTensorValues.dequantizeRow has handled it
+      // all along -- and was never multipliable. Readable and multipliable were conflated when the
+      // port was estimated.
+      //
+      // Dequantize-then-dot, which is what the exact batched path already does generically. That
+      // is the correct shape for the correctness gate the port needs: F32 activations and a fixed
+      // accumulation order, so a logit comparison against the reference spends its tolerance on
+      // quantization rather than on arithmetic. A packed kernel on ptqMatmul's model is the
+      // performance answer and is deliberately not this change.
+      case TQ1_0 -> ggufExactBatchedMatmul(out, x, qWeight, type, 1, rows, cols, new float[cols]);
       // Exact, like the batched Q5_1 path: the reference's integer kernel pairs Q5_1 with Q8_1
       // activations because it needs their block sums for the minimum term, and nothing on this
       // side carries a Q8_1 block sum. Dequantizing the row costs the same read either way and
@@ -1500,6 +1513,7 @@ public final class TensorOps {
   public static boolean supportsBatchedMatmul(GgufTensorType type) {
     return type == GgufTensorType.F16
         || type == GgufTensorType.PTQ1_0
+        || type == GgufTensorType.TQ1_0
         || type == GgufTensorType.Q4_0
         || type == GgufTensorType.Q4_1
         || type == GgufTensorType.BF16
@@ -1721,7 +1735,7 @@ public final class TensorOps {
       // Reuses Q5_1 row scratch after its first allocation, and makes mixed-quantization embedding
       // artifacts loadable at all -- all-MiniLM-L6-v2 and granite-embedding-107m carry Q5_1
       // attention tensors at Q4_K_S, Q5_K_S and Q5_K_M.
-      case Q4_1, Q5_1 ->
+      case Q4_1, Q5_1, TQ1_0 ->
           ggufExactBatchedMatmul(
               out, x, qWeight, type, batchSize, rows, cols, exactCallerScratch(type, cols));
       default -> throw new AssertionError("unhandled batched matmul type: " + type);

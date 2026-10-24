@@ -96,6 +96,9 @@ val modelFixtures =
         // every CI runner. A published, catalogued model's evidence was re-derivable only by
         // someone who already knew to download it.
         modelFixture("downloadLayaQ80Model", "laya_q8_0"),
+        // Pinned to revision f5466f91, not resolve/main: the intake record's URI used main, which
+        // moves, so a fixture built from it would not be the artifact the evidence names.
+        modelFixture("downloadMaplePreviewTq10Model", "maple_preview_tq1_0"),
         modelFixture("downloadLayaBf16Model", "laya_bf16"),
         modelFixture("downloadEmbeddingGemma2Q80Model", "embeddinggemma2_q8_0"),
         modelFixture(
