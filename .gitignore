@@ -54,3 +54,8 @@ docs/content/modules/ROOT/attachments/javadoc/
 # Agent worktrees and session scratch. These are embedded git repositories; git add -A
 # swept one into a release commit once.
 .claude/
+
+# Host timing written beside a decision-evidence report. Deliberately not committed: it is
+# wall clock, it changes on every run, and the whole point of moving it out of the evidence file
+# was to stop a re-run dirtying the tree. The evidence file beside it is byte-reproducible.
+experiments/**/evidence/*.timing.json
