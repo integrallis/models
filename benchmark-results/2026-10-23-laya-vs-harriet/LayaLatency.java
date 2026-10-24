@@ -34,7 +34,7 @@ public final class LayaLatency {
     boolean useNative = args.length > 3 && "native".equals(args[3]);
     var kernel =
         useNative
-            ? com.integrallis.models.backend.nativekernel.RustGgufBatchedMatrixKernel.openBundled(
+            ? com.integrallis.models.backend.nativekernel.RustGgufBatchedMatrixKernel.openBundledExactActivations(
                 Math.max(1, Math.min(8, Runtime.getRuntime().availableProcessors())))
             : com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel.none();
     System.out.printf("  \"kernel\": \"%s\",%n", kernel.implementation());

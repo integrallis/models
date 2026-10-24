@@ -65,6 +65,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private static final int FORMAT_Q5_K = 4;
   private static final int FORMAT_Q5_0 = 5;
   private static final int FORMAT_Q5_1 = 6;
+  private static final int FORMAT_Q8_0_F32_ACTIVATION = 8;
   private static final int FORMAT_PTQ1_0 = 7;
   private static final Linker LINKER = Linker.nativeLinker();
   private static final MethodHandle FLOAT_ARRAY_SEGMENT = floatArraySegment();
@@ -1242,6 +1243,40 @@ public final class NativeKernelLibrary implements AutoCloseable {
         "Q8_0",
         FORMAT_Q8_0,
         NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL,
+        weights,
+        weightBytes,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        rows,
+        cols);
+  }
+
+  /**
+   * Computes a Q8_0 projection whose activations are not quantized.
+   *
+   * <p>Same weights, same 34-byte blocks and same entry point shape as {@code q8_0F32BatchedMatmul}
+   * above; only the format code differs, which selects the row kernel that reads F32 activations
+   * directly instead of the one that quantizes them to eight bits first. Measured 2026-10-23: the
+   * quantizing route costs three of 120 items on a typed-decision cohort, so a caller whose output
+   * is an argmax takes this one.
+   */
+  void q8_0F32ActivationBatchedMatmul(
+      MemorySegment weights,
+      long weightBytes,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int batchSize,
+      int rows,
+      int cols) {
+    invokeBatched(
+        "Q8_0-F32-activation",
+        FORMAT_Q8_0_F32_ACTIVATION,
+        NativeKernelCapability.Q8_0_F32_ACTIVATION_BATCHED_MATMUL,
         weights,
         weightBytes,
         nativeInput,

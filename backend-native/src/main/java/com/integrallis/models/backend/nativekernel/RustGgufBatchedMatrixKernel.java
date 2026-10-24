@@ -42,6 +42,17 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
           "false");
 
   private final NativeKernelLibrary library;
+
+  /**
+   * Whether a Q8_0 projection keeps its activations in F32.
+   *
+   * <p>False by default, so every existing caller gets exactly the route it got before: Q8_0
+   * weights against Q8_0 activations, llama.cpp's convention. A caller whose output is an argmax
+   * opens the kernel with {@link #openBundledExactActivations(int)} instead, because the cheaper
+   * route was measured on 2026-10-23 to move three of 120 answers on a typed-decision cohort.
+   */
+  private final boolean exactActivations;
+
   private final boolean gatedDeltaNetSupported;
   private final int bfloat16Lanes;
   private final boolean bfloat16Fused;
@@ -59,7 +70,20 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private int outputCapacity;
   private boolean closed;
 
+  /** Opens the bundled kernel in the mode that keeps Q8_0 activations in F32. */
+  public static RustGgufBatchedMatrixKernel openBundledExactActivations(int recommendedThreads) {
+    NativeKernelLibrary library =
+        NativeKernelLibrary.open(BundledNativeKernelLibrary.resolve(), recommendedThreads);
+    parkJavaExecutor();
+    return new RustGgufBatchedMatrixKernel(library, true);
+  }
+
   private RustGgufBatchedMatrixKernel(NativeKernelLibrary library) {
+    this(library, false);
+  }
+
+  private RustGgufBatchedMatrixKernel(NativeKernelLibrary library, boolean exactActivations) {
+    this.exactActivations = exactActivations;
     this.library = Objects.requireNonNull(library, "library");
     // Runtime arithmetic capabilities and the loaded native ABI are immutable for this provider.
     // Resolve once: the diagnostic capability snapshot constructs strings and must not allocate
@@ -474,7 +498,10 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       case Q5_0 -> library.supports(NativeKernelCapability.Q5_0_F32_BATCHED_MATMUL);
       case Q5_1 -> library.supports(NativeKernelCapability.Q5_1_F32_BATCHED_MATMUL);
       case PTQ1_0 -> library.supports(NativeKernelCapability.PTQ1_0_Q8_0_BATCHED_MATMUL);
-      case Q8_0 -> library.supports(NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL);
+      case Q8_0 ->
+          exactActivations
+              ? library.supports(NativeKernelCapability.Q8_0_F32_ACTIVATION_BATCHED_MATMUL)
+              : library.supports(NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL);
       case Q4_K -> library.supports(NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL);
       case Q5_K -> library.supports(NativeKernelCapability.Q5_K_F32_BATCHED_MATMUL);
       case Q6_K -> library.supports(NativeKernelCapability.Q6_K_F32_BATCHED_MATMUL);
@@ -895,7 +922,19 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
               batchSize,
               rows,
               cols);
-      case Q8_0 ->
+      case Q8_0 -> {
+        if (exactActivations) {
+          library.q8_0F32ActivationBatchedMatmul(
+              weights,
+              weightBytes,
+              nativeInput,
+              inputElements,
+              nativeOutput,
+              outputElements,
+              batchSize,
+              rows,
+              cols);
+        } else {
           library.q8_0F32BatchedMatmul(
               weights,
               weightBytes,
@@ -906,6 +945,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
               batchSize,
               rows,
               cols);
+        }
+      }
       case Q4_K ->
           library.q4_KF32BatchedMatmul(
               weights,

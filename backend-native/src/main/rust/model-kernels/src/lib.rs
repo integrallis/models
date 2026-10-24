@@ -105,6 +105,13 @@ const CAPABILITY_GROUPED_GATED_DELTA_NET_F32: u64 = 1 << 22;
 /// format, this reproduces what Java does: dequantize the row and dot in F32 along
 /// `PinnedReduction`'s pinned fold order. The parity test asserts equality, not closeness.
 const CAPABILITY_Q5_1_F32_BATCHED_MATMUL: u64 = 1 << 23;
+/// Q8_0 rows against **F32** activations, for callers that cannot spend activation precision.
+///
+/// Distinct from CAPABILITY_Q8_0_F32_BATCHED_MATMUL, whose `F32` names the output: that route
+/// quantizes activations to Q8_0 the way llama.cpp does, which is free accuracy for a generative
+/// model and, measured 2026-10-23, three of 120 items for a typed-decision model whose output is
+/// an argmax. This route keeps activations in F32 and folds as Java's `PinnedReduction.dot` folds.
+const CAPABILITY_Q8_0_F32_ACTIVATION_BATCHED_MATMUL: u64 = 1 << 28;
 
 const CAPABILITY_BF16_F32_BATCHED_MATMUL: u64 = 1 << 25;
 const CAPABILITY_SWIGLU_F32: u64 = 1 << 26;
@@ -228,6 +235,8 @@ enum DotKernel {
     #[cfg(target_arch = "aarch64")]
     PtqNeon,
     Q8,
+    /// Q8_0 weights against F32 activations, folded as Java folds.
+    Q8F32Activation,
     #[cfg(target_arch = "x86_64")]
     Q8Avx2,
     #[cfg(target_arch = "aarch64")]
@@ -254,6 +263,9 @@ enum WeightFormat {
     Q5_0,
     Q5_1,
     Q8_0,
+    /// Q8_0 weights, F32 activations. A separate format rather than a flag on Q8_0, so the
+    /// existing Q8_0 route and every generative model on it are untouched.
+    Q8_0F32Activation,
     Q4K,
     Q5K,
     Q6K,
@@ -278,6 +290,7 @@ impl WeightFormat {
             5 => Some(Self::Q5_0),
             6 => Some(Self::Q5_1),
             7 => Some(Self::Ptq),
+            8 => Some(Self::Q8_0F32Activation),
             _ => None,
         }
     }
@@ -287,6 +300,7 @@ impl WeightFormat {
             Self::Q4_0 => Q4_0_BLOCK_BYTES,
             Self::Q5_0 => Q5_0_BLOCK_BYTES,
             Self::Q5_1 => Q5_1_BLOCK_BYTES,
+            Self::Q8_0F32Activation => Q8_0_BLOCK_BYTES,
             Self::Ptq => PTQ1_0_BLOCK_BYTES,
             Self::Q8_0 => Q8_0_BLOCK_BYTES,
             Self::Q4K => Q4_K_BLOCK_BYTES,
@@ -298,7 +312,7 @@ impl WeightFormat {
     fn block_elements(self) -> usize {
         match self {
             Self::Ptq => 128,
-            Self::Q4_0 | Self::Q5_0 | Self::Q5_1 | Self::Q8_0 => QK_0,
+            Self::Q4_0 | Self::Q5_0 | Self::Q5_1 | Self::Q8_0 | Self::Q8_0F32Activation => QK_0,
             Self::Q4K | Self::Q5K | Self::Q6K => QK_K,
         }
     }
@@ -306,7 +320,7 @@ impl WeightFormat {
     fn activation_format(self) -> ActivationFormat {
         match self {
             Self::Q4_0 | Self::Q5_0 | Self::Q8_0 | Self::Ptq => ActivationFormat::Q8_0,
-            Self::Q5_1 => ActivationFormat::F32,
+            Self::Q5_1 | Self::Q8_0F32Activation => ActivationFormat::F32,
             Self::Q4K | Self::Q5K | Self::Q6K => ActivationFormat::Q8K,
         }
     }
@@ -316,6 +330,7 @@ impl WeightFormat {
             Self::Q4_0 => selected_q4_kernel(),
             Self::Q5_0 => selected_q5_kernel(),
             Self::Q5_1 => selected_q5_1_kernel(),
+            Self::Q8_0F32Activation => DotKernel::Q8F32Activation,
             Self::Ptq => {
                 #[cfg(target_arch = "x86_64")]
                 if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
@@ -1495,6 +1510,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL
         | CAPABILITY_Q5_0_F32_BATCHED_MATMUL
         | q5_1_simd_capability()
+        | CAPABILITY_Q8_0_F32_ACTIVATION_BATCHED_MATMUL
         | CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL
         | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
         | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
@@ -3052,6 +3068,21 @@ unsafe fn compute_batched_row_range(
                 }
             }
         }
+        DotKernel::Q8F32Activation => {
+            // SAFETY: the caller assigns this worker an exclusive matrix-row range.
+            unsafe {
+                compute_q8_0_f32_activation_batched_row_range_scalar(
+                    weights,
+                    activations,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
         DotKernel::Q5_1 => {
             // SAFETY: the caller assigns this worker an exclusive matrix-row range.
             unsafe {
@@ -4478,6 +4509,9 @@ fn compute_output_range(
                 // SAFETY: dispatch requires AVX2 and FMA; input shapes were validated.
                 unsafe { ptq::dot_avx2(weights, quantized, activation_scales, batch, row, cols) }
             }
+            DotKernel::Q8F32Activation => {
+                dot_q8_0_f32_activation_row_scalar(weights, activations, batch, row, cols)
+            }
             DotKernel::Q5_1 => dot_q5_1_f32_row_scalar(weights, activations, batch, row, cols),
             #[cfg(target_arch = "x86_64")]
             DotKernel::Q5_1Avx2 => {
@@ -4956,6 +4990,81 @@ unsafe fn unpack_q5_0_avx2(high_bits: *const u8, packed_weights: *const u8) -> _
     let signed_high_nibble =
         _mm256_andnot_si256(clear_high_nibble, _mm256_set1_epi8(0xf0_u8 as i8));
     _mm256_or_si256(nibbles, signed_high_nibble)
+}
+
+/// Q8_0 against F32 activations, folded exactly as Java's `PinnedReduction.dot` folds.
+///
+/// Parity with the Java exact path is the whole point of this kernel, so every step is taken from
+/// that path rather than from what would be fastest. `TensorOps::ggufExactBatchedMatmul`
+/// dequantizes a weight row with `Q8_0Dequantizer` and then calls `PinnedReduction.dot`, so:
+///
+/// * The dequantization is `quant as f32 * scale`, one multiply. Java writes `quant * scale` with
+///   no addend, so unlike the Q5_1 kernel there is no separate add to keep unfused here.
+/// * A Q8_0 block is thirty-two elements, which is exactly what `PinnedReduction` steps per
+///   iteration with its four eight-lane accumulators, so one block maps to one iteration and the
+///   fold order falls out without buffering the row.
+/// * The lane fold is `((l4+l0) + (l6+l2)) + ((l5+l1) + (l7+l3))`, transcribed from
+///   `reduceLanesPinned`, with the species pinned to 256 bits on the Java side.
+///
+/// The existing Q8_0 route quantizes activations to Q8_0 instead, as llama.cpp does. That is free
+/// accuracy on a generative model and measured three of 120 items on a typed-decision model, which
+/// is why this exists rather than a change to that route.
+fn dot_q8_0_f32_activation_row_scalar(
+    weights: &[u8],
+    activations: &[f32],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
+    let blocks_per_row = cols / QK_0;
+    let mut accumulators = [0_f32; QK_0];
+    for block in 0..blocks_per_row {
+        let weight_offset = (row * blocks_per_row + block) * Q8_0_BLOCK_BYTES;
+        let scale = f16_to_f32(u16::from_le_bytes([
+            weights[weight_offset],
+            weights[weight_offset + 1],
+        ]));
+        let quant_offset = weight_offset + 2;
+        let input_offset = batch * cols + block * QK_0;
+        for index in 0..QK_0 {
+            let quant = weights[quant_offset + index] as i8;
+            let dequantized = quant as f32 * scale;
+            accumulators[index] =
+                activations[input_offset + index].mul_add(dequantized, accumulators[index]);
+        }
+    }
+    let mut folded = [0_f32; 8];
+    for lane in 0..8 {
+        folded[lane] = (accumulators[lane] + accumulators[8 + lane])
+            + (accumulators[16 + lane] + accumulators[24 + lane]);
+    }
+    let even = (folded[4] + folded[0]) + (folded[6] + folded[2]);
+    let odd = (folded[5] + folded[1]) + (folded[7] + folded[3]);
+    even + odd
+}
+
+/// Computes an exclusive row range for [`dot_q8_0_f32_activation_row_scalar`].
+///
+/// # Safety
+/// The caller must assign this worker an exclusive `start_row..end_row` of `output`, and the
+/// shapes must already be validated.
+unsafe fn compute_q8_0_f32_activation_batched_row_range_scalar(
+    weights: &[u8],
+    activations: &[f32],
+    output: *mut f32,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
+    for row in start_row..end_row {
+        for batch in 0..batch_size {
+            let value = dot_q8_0_f32_activation_row_scalar(weights, activations, batch, row, cols);
+            // SAFETY: this worker exclusively owns this output row.
+            unsafe { *output.add(batch * rows + row) = value };
+        }
+    }
 }
 
 /// Q5_1 against F32 activations, folded exactly as Java's `PinnedReduction.dot` folds.
@@ -6165,6 +6274,7 @@ mod tests {
                 | CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_Q5_0_F32_BATCHED_MATMUL
                 | q5_1_simd_capability()
+                | CAPABILITY_Q8_0_F32_ACTIVATION_BATCHED_MATMUL
                 | CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL
                 | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
                 | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION

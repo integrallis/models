@@ -158,3 +158,44 @@ Acceptance criterion: reproduce accuracy 0.783333 and the published per-type cel
 through the kernel, then re-qualify.
 
 Raw native arm: `laya-native-jev120.tsv`.
+
+## The Q8_0 x F32-activation kernel: bit-exact, and 6.4x too slow
+
+Built the route the section above specified: `WeightFormat::Q8_0F32Activation` (format code 8) with
+`dot_q8_0_f32_activation_row_scalar`, transcribed from the Java path rather than approximated —
+`quant as f32 * scale` as one multiply, because `Q8_0Dequantizer` writes `quant * scale` with no
+addend; FMA into thirty-two per-lane accumulators, one Q8_0 block per iteration; and the
+`((l4+l0)+(l6+l2)) + ((l5+l1)+(l7+l3))` fold from `reduceLanesPinned`. A new variant rather than a
+change to `Q8_0`'s mapping, so every generative Q8_0 model keeps the quantizing route untouched.
+
+**Parity is exact**, 10 cases, 50 options, against the Java exact path on this host:
+
+| | |
+| --- | --- |
+| max absolute probability delta | **0.000e+00** |
+| argmax agreement | 10/10 |
+
+Not "within tolerance" — identical. The fold transcription is right, which is the half of this that
+was uncertain.
+
+**Speed is the problem.** Same 10 cases, same host:
+
+| path | mean per decision |
+| --- | ---: |
+| Java exact (Panama, 256-bit) | **4.2 s** |
+| this kernel (Rust, scalar) | 27.0 s |
+| Rust quantizing Q8_0 route | 1.5 s (and three items wrong) |
+
+6.4x slower than the Java path it reproduces, because that path is vectorized and this kernel is
+not. A full 120-case run was abandoned at thirty minutes for the same reason.
+
+**So it is not the default, and the reason has changed.** The accuracy objection is gone — this
+route cannot move an answer, because it does not move a bit. What remains is purely that the scalar
+kernel is slower than Java's vectorized one, which is a SIMD gap and nothing to do with precision.
+
+The kernel is kept rather than reverted because it is now the parity oracle for that SIMD work: an
+AVX2 implementation has something to be bit-compared against, which is exactly the role Q5_1's
+scalar entry point serves ("the scalar entry point remains usable by direct ABI correctness
+tests"). The remaining task is a `Q8F32ActivationAvx2` variant mirroring `Q5_1Avx2`.
+
+Raw arms: `laya-exact-activation-kernel-10.tsv`, `laya-java-exact-10.tsv`.

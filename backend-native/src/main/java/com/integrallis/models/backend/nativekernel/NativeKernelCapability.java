@@ -52,6 +52,15 @@ public enum NativeKernelCapability {
    * between matrices, and this format has none to share.
    */
   Q5_1_F32_BATCHED_MATMUL(1L << 23),
+  /**
+   * Q8_0 rows against F32 activations.
+   *
+   * <p>Distinct from {@link #Q8_0_F32_BATCHED_MATMUL}, whose {@code F32} names the output: that
+   * route quantizes activations to Q8_0 as llama.cpp does, which is free accuracy on a generative
+   * model and, measured 2026-10-23, three of 120 items on a typed-decision model whose output is an
+   * argmax. This one keeps activations in F32 and folds as {@code PinnedReduction.dot} folds.
+   */
+  Q8_0_F32_ACTIVATION_BATCHED_MATMUL(1L << 28),
   /** PTQ1_0 packed ternary rows with Q8_0 activation quantization. */
   PTQ1_0_Q8_0_BATCHED_MATMUL(1L << 24),
   /** Fixed-tree BF16 projections for the supported shape and vector configuration. */
