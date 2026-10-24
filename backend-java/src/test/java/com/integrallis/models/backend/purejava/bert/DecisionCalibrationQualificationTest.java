@@ -180,17 +180,17 @@ class DecisionCalibrationQualificationTest {
   /**
    * THE EVIDENCE MUST SERIALISE THE SAME WAY TWICE.
    *
-   * MEASURED 2026-10-23: re-running Laya's JevBench qualification on released 0.5.4 reproduced
+   * <p>MEASURED 2026-10-23: re-running Laya's JevBench qualification on released 0.5.4 reproduced
    * every metric exactly -- accuracy, chance floor, calibration error, every per-type cell -- and
    * still produced a different reportSha256, because the canonical constructor used Map.copyOf.
    * Java's immutable maps randomise iteration order per JVM with a salted hash, so `byType` came
    * out score/noul/choice on one run and noul/choice/score on the next.
    *
-   * ModelJars pins reportSha256 and matches evidence by SHA-256 rather than by filename, so an
+   * <p>ModelJars pins reportSha256 and matches evidence by SHA-256 rather than by filename, so an
    * unchanged measurement failed its own digest check -- which pushes toward not re-running, the
    * exact opposite of the rule that our own earlier results are re-derived when the library moves.
    *
-   * Asserting the key ORDER rather than just the content is the point: equal maps with different
+   * <p>Asserting the key ORDER rather than just the content is the point: equal maps with different
    * iteration order are what broke it, and a contents-only assertion passes while the bug is live.
    */
   @Test
