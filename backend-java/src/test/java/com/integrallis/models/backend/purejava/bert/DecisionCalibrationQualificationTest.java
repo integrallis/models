@@ -177,6 +177,51 @@ class DecisionCalibrationQualificationTest {
         .hasMessageContaining("empty cohort");
   }
 
+  /**
+   * THE EVIDENCE MUST SERIALISE THE SAME WAY TWICE.
+   *
+   * MEASURED 2026-10-23: re-running Laya's JevBench qualification on released 0.5.4 reproduced
+   * every metric exactly -- accuracy, chance floor, calibration error, every per-type cell -- and
+   * still produced a different reportSha256, because the canonical constructor used Map.copyOf.
+   * Java's immutable maps randomise iteration order per JVM with a salted hash, so `byType` came
+   * out score/noul/choice on one run and noul/choice/score on the next.
+   *
+   * ModelJars pins reportSha256 and matches evidence by SHA-256 rather than by filename, so an
+   * unchanged measurement failed its own digest check -- which pushes toward not re-running, the
+   * exact opposite of the rule that our own earlier results are re-derived when the library moves.
+   *
+   * Asserting the key ORDER rather than just the content is the point: equal maps with different
+   * iteration order are what broke it, and a contents-only assertion passes while the bug is live.
+   */
+  @Test
+  void reportsTheSameTypeOrderOnEveryConstruction() {
+    List<Outcome> cohort = new ArrayList<>();
+    // Three types, so the map has something to reorder. Added score-first deliberately: the
+    // committed evidence serialised score/noul/choice, so insertion order and sorted order differ
+    // and a test that happened to agree with both would prove nothing.
+    cohort.addAll(repeat("score", QuestionType.SCORE, 5, 4, true, 0.9));
+    cohort.addAll(noul(4, true, 0.9));
+    cohort.addAll(choice(4, true, 0.9));
+
+    Report report = DecisionCalibrationQualification.assess(cohort);
+
+    // Pin the ORDER to the order the cohort was assessed in, not merely "stable within this JVM".
+    //
+    // Repeating assess() in one JVM and comparing runs does NOT catch this, and the first version
+    // of this test made exactly that mistake and passed against the bug. Map.copyOf salts its
+    // hash once per JVM, so every call in a single process agrees with itself; the divergence only
+    // appears between processes, which is why the committed evidence and a re-run differed while a
+    // loop inside one test could not tell. Asserting the concrete expected order is what
+    // distinguishes an insertion-ordered map from a hash-ordered one inside a single JVM.
+    assertThat(new ArrayList<>(report.accuracyByType().keySet()))
+        .as("byType must serialise in cohort order, or reportSha256 varies between JVMs")
+        .containsExactly("score", "noul", "choice");
+    assertThat(new ArrayList<>(report.casesByType().keySet()))
+        .containsExactly("score", "noul", "choice");
+    assertThat(new ArrayList<>(report.chanceByType().keySet()))
+        .containsExactly("score", "noul", "choice");
+  }
+
   private static List<Outcome> choice(int count, boolean correct, double confidence) {
     return repeat("choice", QuestionType.CHOICE, 4, count, correct, confidence);
   }

@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava.bert;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -115,9 +116,17 @@ public final class DecisionCalibrationQualification {
       List<String> limitations) {
 
     public Report {
-      accuracyByType = Map.copyOf(accuracyByType);
-      casesByType = Map.copyOf(casesByType);
-      chanceByType = Map.copyOf(chanceByType);
+      // Order-preserving defensive copies, NOT Map.copyOf. Map.copyOf returns one of the
+      // immutable map implementations, whose iteration order is deliberately randomised per JVM
+      // by a salted hash -- so the same measurement serialised in a different key order on every
+      // run. MEASURED 2026-10-23: re-running this qualification on released 0.5.4 reproduced
+      // every metric exactly and still produced a different reportSha256, because `byType` came
+      // out as score/noul/choice one run and noul/choice/score the next. ModelJars pins that
+      // digest and matches evidence by SHA-256, so an unchanged result failed its own digest
+      // check. These still satisfy EI_EXPOSE_REP: the caller's map cannot reach the record.
+      accuracyByType = Collections.unmodifiableMap(new LinkedHashMap<>(accuracyByType));
+      casesByType = Collections.unmodifiableMap(new LinkedHashMap<>(casesByType));
+      chanceByType = Collections.unmodifiableMap(new LinkedHashMap<>(chanceByType));
       failures = List.copyOf(failures);
       limitations = List.copyOf(limitations);
     }
