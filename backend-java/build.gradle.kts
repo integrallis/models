@@ -90,6 +90,13 @@ fun modelFixture(taskName: String, id: String): ModelFixture {
 val modelFixtures =
     listOf(
         modelFixture("downloadBonsai2Ptq10Model", "bonsai2_27b_ptq1_0"),
+        // Laya's gates read these two paths and skip when they are absent, so before this entry
+        // existed the oracle-parity gate, the JevBench qualification and the BF16 quantization
+        // control all skipped on any machine that had not fetched the weights by hand -- including
+        // every CI runner. A published, catalogued model's evidence was re-derivable only by
+        // someone who already knew to download it.
+        modelFixture("downloadLayaQ80Model", "laya_q8_0"),
+        modelFixture("downloadLayaBf16Model", "laya_bf16"),
         modelFixture("downloadEmbeddingGemma2Q80Model", "embeddinggemma2_q8_0"),
         modelFixture(
             "downloadQwen306BQ40Model",
@@ -817,6 +824,10 @@ tasks.register<JavaExec>("mxbaiDebertaRerankerPerformanceExperiment") {
 
 tasks.register<Test>("layaDecisionIntegrationTest") {
     description = "Gate the modern-bert decision forward pass against the laya reference logits"
+    // Both artifacts, because this task owns three gates and one of them compares them: the BF16
+    // arm is the control that shows the residual against the reference is quantization error and
+    // not ours. Without the download it skipped everywhere, so the control never ran at all.
+    dependsOn(tasks.named("downloadLayaQ80Model"), tasks.named("downloadLayaBf16Model"))
     group = "verification"
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath

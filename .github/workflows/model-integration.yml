@@ -112,8 +112,20 @@ jobs:
           :backend-java:downloadQwen3Embedding06BQ80Model
           :backend-java:downloadAllMiniLmL6V2Q4KMModel
           :backend-java:downloadNeedle2Cact
+          :backend-java:downloadLayaQ80Model
+          :backend-java:downloadLayaBf16Model
           --no-daemon
           --stacktrace
+
+      # Laya is published, catalogued and qualified, and until this step no CI job ran any of its
+      # gates: its tests read ~/.jvllm/models directly and skip when the weights are absent, which
+      # on a clean runner is always. The oracle-parity gate, the JevBench qualification and the
+      # BF16 quantization control were re-derivable only by someone who already knew to fetch the
+      # weights by hand. Both artifacts are downloaded above because the BF16 arm is the control
+      # that attributes the residual to quantization rather than to us.
+      - name: Run Laya typed-decision gates and the BF16 quantization control
+        working-directory: models
+        run: ./gradlew :backend-java:layaDecisionIntegrationTest --no-daemon --stacktrace
 
       - name: Run EmbeddingGemma 2 text integration and oracle equivalence
         working-directory: models
