@@ -27,7 +27,8 @@
     "PTQ1_0_Q8_0_BATCHED_MATMUL": 16777216,
     "BF16_F32_BATCHED_MATMUL": 33554432,
     "SWIGLU_F32": 67108864,
-    "SLEEF_ACTIVATIONS_F32": 134217728
+    "SLEEF_ACTIVATIONS_F32": 134217728,
+    "Q8_0_F32_ACTIVATION_BATCHED_MATMUL": 268435456
   },
   "exports": {
     "cpu": [
@@ -55,24 +56,25 @@
     ]
   },
   "migrationChecklist": [
+    "arm-sleef-activations",
+    "bf16-projection",
+    "cpu-attention",
+    "gated-delta-net",
+    "gqa-decode-attention",
+    "projection-grouping",
+    "ptq1-projection",
     "q4_0-projection",
-    "q5_0-projection",
-    "q8_0-projection",
     "q4_k-projection",
+    "q4k-decode-projection",
+    "q5_0-projection",
+    "q5_1-projection",
     "q5_k-projection",
     "q6_k-projection",
-    "q5_1-projection",
-    "ptq1-projection",
-    "projection-grouping",
-    "worker-context",
-    "gated-delta-net",
-    "cpu-attention",
-    "gqa-decode-attention",
-    "q4k-decode-projection",
     "q6k-decode-projection",
-    "bf16-projection",
+    "q8_0-f32-activation-projection",
+    "q8_0-projection",
     "swiglu-activation",
-    "arm-sleef-activations"
+    "worker-context"
   ],
   "operations": [
     {
@@ -759,6 +761,40 @@
         "Actual-provider full-domain and graph correctness with owned full-model snapshots.",
         "Unchanged task-quality, load, first-request, steady latency, allocation, RSS and confidence gates versus published and corrected Java on every retained platform.",
         "Retire the optional native operation if the best supported Java implementation passes the same complete gates."
+      ],
+      "sourceScope": "cpu"
+    },
+    {
+      "id": "q8_0-f32-activation-projection",
+      "status": "UNPROVEN",
+      "summary": "Q8_0 projections whose activations are NOT quantized, for callers whose output is an argmax. The existing Q8_0 route quantizes activations to eight bits as llama.cpp does, which is free accuracy on a generative model and measured three of 120 items on a typed-decision cohort (0.7833 to 0.7583, different winner on four). This route is bit-identical to the exact Java path -- max absolute probability delta 0.000e+00 over 10 cases and 50 options -- and 6.4x SLOWER than it, because the Java path is Panama-vectorized and this kernel is scalar. It is therefore not selected anywhere by default and exists as the parity oracle an AVX2 implementation can be bit-compared against, the role Q5_1's scalar entry point already serves. Unproven, not proven-required: no JVM limitation is claimed, and the evidence so far is one cohort on one host.",
+      "capabilities": [
+        "Q8_0_F32_ACTIVATION_BATCHED_MATMUL"
+      ],
+      "exports": {
+        "cpu": [
+          "jmodels_quantized_f32_batched_matmul_with_context"
+        ]
+      },
+      "dispatch": [
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGgufBatchedMatrixKernel.java",
+          "anchor": "library.q8_0F32ActivationBatchedMatmul("
+        }
+      ],
+      "requiredProfiles": [
+        "linux-x86_64",
+        "linux-aarch64",
+        "macos-x86_64",
+        "macos-aarch64",
+        "windows-x86_64",
+        "windows-aarch64"
+      ],
+      "evidence": [],
+      "remaining": [
+        "Implement a Q8F32ActivationAvx2 row kernel mirroring Q5_1Avx2 and bit-compare it against the scalar route, which is what makes this kernel worth keeping rather than reverting.",
+        "Beat the Java exact path's 3.3 s per decision on the published cohort; at 27 s scalar it is 6.4x slower and no caller can justify selecting it.",
+        "Qualify on a second independent dataset and on every retained profile, then adopt as the decision default or remove the capability."
       ],
       "sourceScope": "cpu"
     }
