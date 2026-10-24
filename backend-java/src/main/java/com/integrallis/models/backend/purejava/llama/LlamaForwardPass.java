@@ -2351,7 +2351,15 @@ public final class LlamaForwardPass {
         TensorOps.swiGluClamped(moeActivated, 0, moeGate, 0, moeUp, 0, hidden, clampLimit);
       } else {
         activateFfn(
-            moeActivated, 0, moeGate, 0, moeUp, 0, hidden, moeActivatedView, moeGateView,
+            moeActivated,
+            0,
+            moeGate,
+            0,
+            moeUp,
+            0,
+            hidden,
+            moeActivatedView,
+            moeGateView,
             moeUpView);
       }
       matmulDispatch(moeExpertOut, moeActivated, moe.down()[expert], moe.downType(), dim, hidden);

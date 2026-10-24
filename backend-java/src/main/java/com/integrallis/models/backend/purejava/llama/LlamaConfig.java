@@ -436,6 +436,23 @@ public record LlamaConfig(
     return isGemmaFamily() && !isGemma1();
   }
 
+  /**
+   * The declared per-layer sliding-window pattern, or null where the checkpoint declares none.
+   *
+   * <p>Cloned on the way out as well as on the way in. The compact constructor alone leaves the
+   * record handing every caller a reference to the live array, which a test caught doing exactly
+   * that; the forward pass reads the field through {@link #usesSlidingWindow(int)} and never
+   * through here, so the copy costs nothing that runs per token.
+   */
+  public boolean[] slidingWindowLayers() {
+    return slidingWindowLayers == null ? null : slidingWindowLayers.clone();
+  }
+
+  /** The declared per-layer expert SwiGLU clamps, or null where none are declared. */
+  public float[] swigluClampExp() {
+    return swigluClampExp == null ? null : swigluClampExp.clone();
+  }
+
   /** Whether this layer uses bounded sliding-window attention. */
   public boolean usesSlidingWindow(int layer) {
     requireLayer(layer);
@@ -453,6 +470,15 @@ public record LlamaConfig(
     //
     // Gemma keeps the stride: its configs read the pattern array themselves, so the models that
     // ship today reach this method with slidingWindowLayers unset and must not change behaviour.
+    //
+    // NOT A GENERAL RULE, and the next port must not read it as one. Upstream decides this per
+    // architecture, and there is a third case neither branch below covers: mellum declares a
+    // window and NO pattern, and makes every layer local on that basis
+    // (src/models/mellum.cpp:13-14 at 3f03b1772, swa_type = STANDARD whenever n_swa > 0). Falling
+    // through to the Gemma stride would answer false for all of its layers -- the same silent
+    // full-attention defect this method just stopped doing to maple. mellum and laguna are #281
+    // and are not in DecoderArchitecture yet, so the case is named here rather than written as
+    // code for an architecture that cannot reach it.
     if (slidingWindowLayers != null) {
       return slidingWindowLayers[layer];
     }
@@ -623,8 +649,19 @@ public record LlamaConfig(
     float ropeTheta = getArchFloatKey(metadata, arch, "rope.freq_base").orElse(10000.0f);
     float ropeFrequencyScale = ropeFrequencyScale(metadata, arch);
     RopeScaling ropeScaling = ropeScaling(metadata, arch, contextLength, ropeFrequencyScale);
+    // Where a checkpoint declares no rope.freq_base_swa, the fallback is architecture-specific
+    // upstream, and the two groups disagree. gemma2, maple, mellum, laguna and cohere2 seed it
+    // from the model's own rope.freq_base; gemma3, gemma3n and gemma-embedding leave it at
+    // llama-hparams.h's 10000 even when the model's own base is 1e6. Collapsing that into one
+    // default would be wrong for one group or the other, so the split is reproduced here --
+    // ggml-org/llama.cpp 3f03b1772, src/models/*.cpp against src/llama-hparams.h:164.
+    //
+    // Both groups agree for every artifact measured so far, because their bases are already
+    // 10000, so this changes no number we have on disk. It is still the rule rather than the
+    // coincidence, and maple is the first arch to reach it from outside the Gemma family.
     float slidingWindowRopeTheta =
-        getArchFloatKey(metadata, arch, "rope.freq_base_swa").orElse(10_000.0f);
+        getArchFloatKey(metadata, arch, "rope.freq_base_swa")
+            .orElse(architecture.seedsSlidingWindowRopeFromBase() ? ropeTheta : 10_000.0f);
     float rmsNormEps =
         getArchFloatKey(metadata, arch, "attention.layer_norm_rms_epsilon").orElse(1e-5f);
     int slidingWindow = getArchKey(metadata, arch, "attention.sliding_window").orElse(0);

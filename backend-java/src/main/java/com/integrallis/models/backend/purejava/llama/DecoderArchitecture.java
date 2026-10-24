@@ -62,6 +62,22 @@ public enum DecoderArchitecture {
     return metadataId;
   }
 
+  /**
+   * Whether an undeclared SWA RoPE base falls back to this checkpoint's own {@code rope.freq_base}
+   * rather than to the 10000 in llama-hparams.h.
+   *
+   * <p>Upstream splits on this per architecture and the groups disagree, so it cannot be one
+   * default. {@code gemma2} and {@code maple} seed from the model's base; {@code gemma3} and {@code
+   * gemma-embedding} do not, and keep 10000 even where their own base is 1e6. Checked against
+   * ggml-org/llama.cpp 3f03b1772: {@code src/models/gemma2.cpp}, {@code maple.cpp} reset it before
+   * the optional read, {@code gemma3.cpp} and {@code gemma-embedding.cpp} do not.
+   *
+   * <p>Every architecture that declares no sliding window answers false and never reads it.
+   */
+  boolean seedsSlidingWindowRopeFromBase() {
+    return this == GEMMA2 || this == MAPLE;
+  }
+
   /** Resolves only architectures whose complete semantics are implemented. */
   public static DecoderArchitecture parse(String value) {
     String normalized = value == null ? LLAMA.metadataId : value.trim().toLowerCase(Locale.ROOT);

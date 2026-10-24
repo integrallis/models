@@ -38,6 +38,142 @@ class LlamaConfigTest {
         .isInstanceOf(NoSuchMethodException.class);
   }
 
+  /**
+   * maple's declared sliding window, its per-layer pattern, and its expert SwiGLU clamp.
+   *
+   * <p>The metadata below is the real header of maple-preview-TQ1_0-head-Q4_K.gguf (deepgrove,
+   * revision f5466f918e0c50cdb9d4d47a6f35813509a42a30), read off the artifact on 2026-10-24 --
+   * sliding_window 512, sliding_window_pattern as arr[bool,24] at [true,true,true,false] repeated
+   * six times, swiglu_clamp_exp as arr[f32,24] at 7.0. Not a plausible-looking shape: a fixture
+   * that invented the key names would have tested nothing.
+   */
+  @Nested
+  class MapleSlidingWindowAndClamp {
+
+    private static final int LAYERS = 24;
+
+    private GgufMetadata mapleMetadata(boolean withPattern, boolean withClamp) {
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("general.architecture", new GgufMetadataValue.StringValue("maple"));
+      entries.put("maple.embedding_length", new GgufMetadataValue.Uint32Value(2048));
+      entries.put("maple.block_count", new GgufMetadataValue.Uint32Value(LAYERS));
+      entries.put("maple.attention.head_count", new GgufMetadataValue.Uint32Value(16));
+      entries.put("maple.attention.head_count_kv", new GgufMetadataValue.Uint32Value(4));
+      entries.put("maple.attention.key_length", new GgufMetadataValue.Uint32Value(128));
+      entries.put("maple.attention.value_length", new GgufMetadataValue.Uint32Value(128));
+      entries.put("maple.vocab_size", new GgufMetadataValue.Uint32Value(128));
+      entries.put("maple.context_length", new GgufMetadataValue.Uint32Value(4096));
+      entries.put("maple.feed_forward_length", new GgufMetadataValue.Uint32Value(4096));
+      entries.put("maple.rope.freq_base", new GgufMetadataValue.Float32Value(10000.0f));
+      entries.put("maple.rope.dimension_count", new GgufMetadataValue.Uint32Value(64));
+      entries.put(
+          "maple.attention.layer_norm_rms_epsilon", new GgufMetadataValue.Float32Value(1.0e-6f));
+      entries.put("maple.attention.sliding_window", new GgufMetadataValue.Uint32Value(512));
+      entries.put("maple.expert_count", new GgufMetadataValue.Uint32Value(256));
+      entries.put("maple.expert_used_count", new GgufMetadataValue.Uint32Value(8));
+      entries.put("maple.expert_feed_forward_length", new GgufMetadataValue.Uint32Value(512));
+      entries.put("maple.expert_gating_func", new GgufMetadataValue.Uint32Value(1));
+      if (withPattern) {
+        List<GgufMetadataValue> pattern = new java.util.ArrayList<>();
+        for (int layer = 0; layer < LAYERS; layer++) {
+          pattern.add(new GgufMetadataValue.BoolValue(layer % 4 != 3));
+        }
+        entries.put(
+            "maple.attention.sliding_window_pattern",
+            new GgufMetadataValue.ArrayValue(GgufValueType.BOOL, pattern));
+      }
+      if (withClamp) {
+        List<GgufMetadataValue> clamps = new java.util.ArrayList<>();
+        for (int layer = 0; layer < LAYERS; layer++) {
+          clamps.add(new GgufMetadataValue.Float32Value(7.0f));
+        }
+        entries.put(
+            "maple.swiglu_clamp_exp",
+            new GgufMetadataValue.ArrayValue(GgufValueType.FLOAT32, clamps));
+      }
+      return new GgufMetadata(entries);
+    }
+
+    @Test
+    void readsTheWindowAndFollowsTheDeclaredPattern() {
+      LlamaConfig config = LlamaConfig.fromMetadata(mapleMetadata(true, true));
+
+      assertThat(config.slidingWindow()).isEqualTo(512);
+      // Three local layers then one global, six times over. Before 2026-10-24 this method
+      // consulted isGemmaFamily() and nothing else, so all 24 answered false and maple ran full
+      // attention end to end -- no error, no warning, just the wrong attention span.
+      for (int layer = 0; layer < LAYERS; layer++) {
+        assertThat(config.usesSlidingWindow(layer))
+            .describedAs("layer %d", layer)
+            .isEqualTo(layer % 4 != 3);
+      }
+    }
+
+    @Test
+    void readsTheClampForEveryLayer() {
+      LlamaConfig config = LlamaConfig.fromMetadata(mapleMetadata(true, true));
+
+      for (int layer = 0; layer < LAYERS; layer++) {
+        assertThat(config.swigluClampExp(layer)).describedAs("layer %d", layer).isEqualTo(7.0f);
+      }
+    }
+
+    @Test
+    void reportsNoClampWhereTheKeyIsAbsent() {
+      // Zero is how the expert path decides to take the unclamped kernel, and every artifact
+      // shipped before maple declares no such key.
+      LlamaConfig config = LlamaConfig.fromMetadata(mapleMetadata(true, false));
+
+      for (int layer = 0; layer < LAYERS; layer++) {
+        assertThat(config.swigluClampExp(layer)).isZero();
+      }
+    }
+
+    @Test
+    void doesNotFallBackToTheGemmaStrideWhenThePatternIsAbsent() {
+      // Without the array there is nothing to honour, and the Gemma stride is not maple's. The
+      // generic stride default is 6, which would make five layers in six local.
+      //
+      // This pins maple, not a general rule: maple always declares the pattern, so this is the
+      // shape of a truncated or absent key. An architecture that declares a window and no pattern
+      // may well mean every layer -- mellum does -- and will need its own case rather than this
+      // expectation.
+      LlamaConfig config = LlamaConfig.fromMetadata(mapleMetadata(false, true));
+
+      for (int layer = 0; layer < LAYERS; layer++) {
+        assertThat(config.usesSlidingWindow(layer)).describedAs("layer %d", layer).isFalse();
+      }
+    }
+
+    @Test
+    void seedsTheSlidingWindowRopeBaseFromTheModelsOwnBase() {
+      // maple declares no rope.freq_base_swa, and upstream seeds it from rope.freq_base rather
+      // than from llama-hparams.h's 10000 (src/models/maple.cpp:12 at 3f03b1772). Both are 10000
+      // for this artifact; the assertion pins the rule, not the coincidence.
+      Map<String, GgufMetadataValue> entries =
+          new LinkedHashMap<>(mapleMetadata(true, true).entries());
+      entries.put("maple.rope.freq_base", new GgufMetadataValue.Float32Value(1_000_000.0f));
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(config.ropeTheta(0)).isEqualTo(1_000_000.0f);
+      assertThat(config.ropeTheta(3)).isEqualTo(1_000_000.0f);
+    }
+
+    @Test
+    void doesNotShareTheCallersArrays() {
+      Map<String, GgufMetadataValue> entries = mapleMetadata(true, true).entries();
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      boolean[] windows = config.slidingWindowLayers();
+      float[] clamps = config.swigluClampExp();
+      windows[0] = !windows[0];
+      clamps[0] = 999.0f;
+
+      assertThat(config.usesSlidingWindow(0)).isTrue();
+      assertThat(config.swigluClampExp(0)).isEqualTo(7.0f);
+    }
+  }
+
   @Nested
   class LongRope {
 
