@@ -1785,6 +1785,9 @@ public final class PureJavaBackend
       return new BackendDiagnostics(
           diagnostics.backend(), diagnostics.planVersion(), environment, optimizations);
     }
+    if (decoder instanceof LlamaDecoder llama) {
+      return llamaAttentionDiagnostics(diagnostics, llama.config());
+    }
     if (!(decoder instanceof Gemma4DecoderAdapter gemma4)) {
       return diagnostics;
     }
@@ -1802,6 +1805,72 @@ public final class PureJavaBackend
             Map.of("batch-size", Integer.toString(batchSize))));
     return new BackendDiagnostics(
         diagnostics.backend(), diagnostics.planVersion(), environment, optimizations);
+  }
+
+  /**
+   * Records whether bounded attention and the expert SwiGLU clamp actually engaged, and on how many
+   * layers.
+   *
+   * <p>Both are switches that fail silently when they fail. maple declares {@code
+   * attention.sliding_window=512} with a per-layer pattern and {@code swiglu_clamp_exp} at 7.0, and
+   * until 2026-10-24 this graph honoured neither: the window was gated on {@code isGemmaFamily()},
+   * so all 24 layers ran full attention, and the clamp was not implemented at all. Nothing threw,
+   * no logit went non-finite, and a short probe could not distinguish it -- below the window,
+   * bounded and full attention are the same computation. The model simply answered slightly worse,
+   * which is indistinguishable from the model being slightly worse.
+   *
+   * <p>So the decision is reported rather than inferred, the same reason {@code
+   * tokenizer.pre.implemented} is reported above. A {@code sliding-window-attention: DISABLED} on
+   * an architecture whose header declares a window is now visible in the record instead of waiting
+   * to be found by an ablation.
+   */
+  // Package-private so the two states that matter can be asserted directly: a declared window
+  // honoured, and a declared window ignored. The second is the pre-2026-10-24 maple behaviour.
+  static BackendDiagnostics llamaAttentionDiagnostics(
+      BackendDiagnostics diagnostics, LlamaConfig config) {
+    int localLayers = 0;
+    int clampedLayers = 0;
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      if (config.usesSlidingWindow(layer)) {
+        localLayers++;
+      }
+      if (config.swigluClampExp(layer) > 1.0e-6f) {
+        clampedLayers++;
+      }
+    }
+
+    List<OptimizationDecision> optimizations = new ArrayList<>(diagnostics.optimizations());
+    boolean windowDeclared = config.slidingWindow() > 0;
+    optimizations.add(
+        new OptimizationDecision(
+            "sliding-window-attention",
+            localLayers > 0
+                ? OptimizationStatus.ENABLED
+                : windowDeclared ? OptimizationStatus.UNSUPPORTED : OptimizationStatus.DISABLED,
+            localLayers > 0
+                ? "attention is bounded to the declared window on the layers the checkpoint marks local"
+                : windowDeclared
+                    ? "the checkpoint declares a sliding window that this graph does not apply to any layer"
+                    : "the checkpoint declares no sliding window, so every layer attends to the full context",
+            Map.of(
+                "declared-window",
+                Integer.toString(config.slidingWindow()),
+                "local-layers",
+                localLayers + "/" + config.numLayers(),
+                "pattern-source",
+                config.slidingWindowLayers() != null
+                    ? "declared-per-layer"
+                    : windowDeclared ? "architecture-stride" : "none")));
+    optimizations.add(
+        new OptimizationDecision(
+            "expert-swiglu-clamp",
+            clampedLayers > 0 ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
+            clampedLayers > 0
+                ? "routed-expert activations are clamped per layer, one-sided on the gate and two-sided on the up projection"
+                : "the checkpoint declares no expert SwiGLU clamp",
+            Map.of("clamped-layers", clampedLayers + "/" + config.numLayers())));
+    return new BackendDiagnostics(
+        diagnostics.backend(), diagnostics.planVersion(), diagnostics.environment(), optimizations);
   }
 
   private static GgufTensorType tensorType(GgufFile file, String name) {

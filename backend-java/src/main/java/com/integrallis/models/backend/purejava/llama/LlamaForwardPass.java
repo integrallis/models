@@ -700,6 +700,14 @@ public final class LlamaForwardPass {
     return new StepOutput(stepLogits, xNorm);
   }
 
+  /**
+   * The resolved configuration this graph runs, so a caller can report what it actually decided
+   * rather than what the metadata appears to say.
+   */
+  public LlamaConfig config() {
+    return config;
+  }
+
   /** Processes prompt tokens while computing the vocabulary projection only for the final token. */
   public float[] prefill(int[] tokens, int startPosition) {
     Objects.requireNonNull(tokens, "tokens");

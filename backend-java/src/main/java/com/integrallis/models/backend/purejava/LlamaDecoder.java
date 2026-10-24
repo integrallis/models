@@ -69,6 +69,11 @@ final class LlamaDecoder implements PureJavaDecoder {
     this.forwardPass = Objects.requireNonNull(forwardPass, "forwardPass");
   }
 
+  /** The graph's resolved configuration, for architecture diagnostics. */
+  com.integrallis.models.backend.purejava.llama.LlamaConfig config() {
+    return forwardPass.config();
+  }
+
   @Override
   public int maxBatchSize() {
     return forwardPass.maxSessionBatchSize();

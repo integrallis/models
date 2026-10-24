@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.llama;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.backend.purejava.fixture.MapleTestHeaders;
 import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
 import com.integrallis.models.backend.purejava.gguf.GgufMetadataValue;
 import com.integrallis.models.backend.purejava.gguf.GgufValueType;
@@ -50,48 +51,10 @@ class LlamaConfigTest {
   @Nested
   class MapleSlidingWindowAndClamp {
 
-    private static final int LAYERS = 24;
+    private static final int LAYERS = MapleTestHeaders.LAYERS;
 
     private GgufMetadata mapleMetadata(boolean withPattern, boolean withClamp) {
-      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
-      entries.put("general.architecture", new GgufMetadataValue.StringValue("maple"));
-      entries.put("maple.embedding_length", new GgufMetadataValue.Uint32Value(2048));
-      entries.put("maple.block_count", new GgufMetadataValue.Uint32Value(LAYERS));
-      entries.put("maple.attention.head_count", new GgufMetadataValue.Uint32Value(16));
-      entries.put("maple.attention.head_count_kv", new GgufMetadataValue.Uint32Value(4));
-      entries.put("maple.attention.key_length", new GgufMetadataValue.Uint32Value(128));
-      entries.put("maple.attention.value_length", new GgufMetadataValue.Uint32Value(128));
-      entries.put("maple.vocab_size", new GgufMetadataValue.Uint32Value(128));
-      entries.put("maple.context_length", new GgufMetadataValue.Uint32Value(4096));
-      entries.put("maple.feed_forward_length", new GgufMetadataValue.Uint32Value(4096));
-      entries.put("maple.rope.freq_base", new GgufMetadataValue.Float32Value(10000.0f));
-      entries.put("maple.rope.dimension_count", new GgufMetadataValue.Uint32Value(64));
-      entries.put(
-          "maple.attention.layer_norm_rms_epsilon", new GgufMetadataValue.Float32Value(1.0e-6f));
-      entries.put("maple.attention.sliding_window", new GgufMetadataValue.Uint32Value(512));
-      entries.put("maple.expert_count", new GgufMetadataValue.Uint32Value(256));
-      entries.put("maple.expert_used_count", new GgufMetadataValue.Uint32Value(8));
-      entries.put("maple.expert_feed_forward_length", new GgufMetadataValue.Uint32Value(512));
-      entries.put("maple.expert_gating_func", new GgufMetadataValue.Uint32Value(1));
-      if (withPattern) {
-        List<GgufMetadataValue> pattern = new java.util.ArrayList<>();
-        for (int layer = 0; layer < LAYERS; layer++) {
-          pattern.add(new GgufMetadataValue.BoolValue(layer % 4 != 3));
-        }
-        entries.put(
-            "maple.attention.sliding_window_pattern",
-            new GgufMetadataValue.ArrayValue(GgufValueType.BOOL, pattern));
-      }
-      if (withClamp) {
-        List<GgufMetadataValue> clamps = new java.util.ArrayList<>();
-        for (int layer = 0; layer < LAYERS; layer++) {
-          clamps.add(new GgufMetadataValue.Float32Value(7.0f));
-        }
-        entries.put(
-            "maple.swiglu_clamp_exp",
-            new GgufMetadataValue.ArrayValue(GgufValueType.FLOAT32, clamps));
-      }
-      return new GgufMetadata(entries);
+      return MapleTestHeaders.metadata(withPattern, withClamp);
     }
 
     @Test
@@ -105,7 +68,7 @@ class LlamaConfigTest {
       for (int layer = 0; layer < LAYERS; layer++) {
         assertThat(config.usesSlidingWindow(layer))
             .describedAs("layer %d", layer)
-            .isEqualTo(layer % 4 != 3);
+            .isEqualTo(MapleTestHeaders.isLocal(layer));
       }
     }
 
