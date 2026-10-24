@@ -1291,7 +1291,7 @@ public final class LlamaForwardPass {
         }
         if (lw.moe() != null) {
           for (int batch = 0; batch < batchSize; batch++) {
-            routedFfn(batchFfnProjected, batch * dim, batchXNorm, batch * dim, lw.moe());
+            routedFfn(batchFfnProjected, batch * dim, batchXNorm, batch * dim, lw.moe(), layer);
           }
         } else if (stagedQuantizedFfn
             && stagedQuantizedPlan != null
@@ -1543,7 +1543,7 @@ public final class LlamaForwardPass {
     if (lw.moe() != null) {
       for (int batch = 0; batch < batchSize; batch++) {
         refuseFfnAdapter(layer, sessions[batch].adapterActive);
-        routedFfn(batchFfnProjected, batch * dim, batchXNorm, batch * dim, lw.moe());
+        routedFfn(batchFfnProjected, batch * dim, batchXNorm, batch * dim, lw.moe(), layer);
       }
     } else if (batchSize > 1
         && !hasActivatedAdapter(sessions, batchSize)
@@ -1939,7 +1939,7 @@ public final class LlamaForwardPass {
       // FFN: routed for a mixture-of-experts layer, dense SwiGLU otherwise
       if (lw.moe() != null) {
         refuseFfnAdapter(layer, adapterActive);
-        routedFfn(ffnProjected, 0, xNorm, 0, lw.moe());
+        routedFfn(ffnProjected, 0, xNorm, 0, lw.moe(), layer);
       } else {
         if (groupedProjections) {
           dualMatmulDispatch(
@@ -2258,7 +2258,10 @@ public final class LlamaForwardPass {
       LlamaWeights.LayerWeights layer, int stateOffset, int dim, int hiddenDim) {
     TensorOps.rmsNorm(xNorm, 0, batchX, stateOffset, layer.ffnNorm(), dim, config.rmsNormEps());
     if (layer.moe() != null) {
-      routedFfn(ffnProjected, 0, xNorm, 0, layer.moe());
+      // finishFinalLayerFfnRow is, by name and contract, the last layer, so its index is not
+      // ambiguous -- but it is passed explicitly rather than defaulted, because a clamp read from
+      // the wrong layer is exactly the silent-wrong-answer class this change exists to close.
+      routedFfn(ffnProjected, 0, xNorm, 0, layer.moe(), config.numLayers() - 1);
     } else {
       if (groupedProjections) {
         dualMatmulDispatch(
@@ -2316,7 +2319,8 @@ public final class LlamaForwardPass {
       int destinationOffset,
       float[] normalized,
       int normalizedOffset,
-      LlamaWeights.MoeWeights moe) {
+      LlamaWeights.MoeWeights moe,
+      int layer) {
     int dim = config.embeddingDim();
     int hidden = config.expertHiddenDim();
     int used = config.numExpertsUsed();
@@ -2337,8 +2341,19 @@ public final class LlamaForwardPass {
       matmulDispatch(moeUp, moeInput, moe.up()[expert], moe.upType(), hidden, dim);
       // The same activation policy as the dense path, so a routed model honours usesGeluFfn and the
       // Granite sigmoid rather than hardcoding SwiGLU here.
-      activateFfn(
-          moeActivated, 0, moeGate, 0, moeUp, 0, hidden, moeActivatedView, moeGateView, moeUpView);
+      // swiglu_clamp_exp applies to the EXPERT FFN only -- the reference keeps a separate
+      // swiglu_clamp_shexp for shared experts -- so the clamp is applied here and not in the dense
+      // path. Above the reference's 1e-6 epsilon it takes the scalar clamped route, because the
+      // vectorized SwiGLU kernels do not clamp and silently returning their unclamped result is
+      // the failure this fixes.
+      float clampLimit = config.swigluClampExp(layer);
+      if (clampLimit > 1.0e-6f) {
+        TensorOps.swiGluClamped(moeActivated, 0, moeGate, 0, moeUp, 0, hidden, clampLimit);
+      } else {
+        activateFfn(
+            moeActivated, 0, moeGate, 0, moeUp, 0, hidden, moeActivatedView, moeGateView,
+            moeUpView);
+      }
       matmulDispatch(moeExpertOut, moeActivated, moe.down()[expert], moe.downType(), dim, hidden);
       for (int index = 0; index < dim; index++) {
         destination[destinationOffset + index] += weight * moeExpertOut[index];

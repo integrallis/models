@@ -1975,6 +1975,39 @@ public final class TensorOps {
     swiGlu(out, 0, gate, 0, up, 0, size);
   }
 
+  /**
+   * SwiGLU with the reference's asymmetric clamp, for expert FFNs that declare one.
+   *
+   * <p>Transcribed from {@code ggml_compute_forward_swiglu_clamp_f32}
+   * (ggml-org/llama.cpp 3f03b17724ad8b69040825f45c43c59b092a0244, ggml-cpu/ops.cpp) rather than
+   * guessed, because the two halves are clamped DIFFERENTLY and that is not what the name suggests:
+   *
+   * <pre>
+   *   gate = min(gate, limit)              one-sided, no lower bound
+   *   up   = clamp(up, -limit, limit)      two-sided
+   *   out  = gate / (1 + exp(-gate)) * up
+   * </pre>
+   *
+   * <p>maple declares {@code swiglu_clamp_exp} at 7.0 per layer and ran unclamped until
+   * 2026-10-24. The reference applies the clamp only above a 1e-6 epsilon, which is why the caller
+   * checks the limit rather than this method treating zero as "no clamp".
+   */
+  public static void swiGluClamped(
+      float[] out,
+      int outOffset,
+      float[] gate,
+      int gateOffset,
+      float[] up,
+      int upOffset,
+      int size,
+      float limit) {
+    for (int i = 0; i < size; i++) {
+      float g = Math.min(gate[gateOffset + i], limit);
+      float u = Math.max(-limit, Math.min(up[upOffset + i], limit));
+      out[outOffset + i] = g / (1.0f + (float) Math.exp(-g)) * u;
+    }
+  }
+
   /** Offset-aware SwiGLU activation over flat batch buffers. */
   public static void swiGlu(
       float[] out,

@@ -45,9 +45,17 @@ public record LlamaConfig(
     int numExpertsUsed,
     int expertHiddenDim,
     RopeScaling ropeScaling,
-    GraniteScalars graniteScalars) {
+    GraniteScalars graniteScalars,
+    // Per-layer, and null where the artifact declares nothing -- which keeps "absent" distinct
+    // from "declared as all-false" or "declared as zero".
+    boolean[] slidingWindowLayers,
+    float[] swigluClampExp) {
 
   public LlamaConfig {
+    // Arrays on a record: copy on the way in. Order is irrelevant for both, so clone() is right
+    // and the Map.copyOf hazard that cost a digest earlier does not apply.
+    slidingWindowLayers = slidingWindowLayers == null ? null : slidingWindowLayers.clone();
+    swigluClampExp = swigluClampExp == null ? null : swigluClampExp.clone();
     if (architecture == null) throw new IllegalArgumentException("architecture must not be null");
     if (embeddingDim <= 0) throw new IllegalArgumentException("embeddingDim must be > 0");
     if (numLayers <= 0) throw new IllegalArgumentException("numLayers must be > 0");
@@ -147,7 +155,9 @@ public record LlamaConfig(
         0,
         0,
         RopeScaling.linear(ropeFrequencyScale),
-        GraniteScalars.none());
+        GraniteScalars.none(),
+        null,
+        null);
   }
 
   /** GGUF rotary-scaling algorithms implemented by the pure-Java graph. */
@@ -429,9 +439,36 @@ public record LlamaConfig(
   /** Whether this layer uses bounded sliding-window attention. */
   public boolean usesSlidingWindow(int layer) {
     requireLayer(layer);
-    return slidingWindow > 0
-        && isGemmaFamily()
-        && layer % slidingWindowPattern < slidingWindowPattern - 1;
+    if (slidingWindow <= 0) {
+      return false;
+    }
+    // A declared per-layer pattern decides it, whatever the architecture.
+    //
+    // MEASURED 2026-10-24: maple declares attention.sliding_window=512 and
+    // attention.sliding_window_pattern as arr[bool,24] -- [true,true,true,false,...] -- and this
+    // method returned false for all 24 layers, because the only thing it consulted besides the
+    // window was isGemmaFamily(). maple ran full attention on every layer. The defect is invisible
+    // at short prompts: a 512-token window and full attention are the same thing at four tokens,
+    // which is why a load probe reported finite logits and proved nothing.
+    //
+    // Gemma keeps the stride: its configs read the pattern array themselves, so the models that
+    // ship today reach this method with slidingWindowLayers unset and must not change behaviour.
+    if (slidingWindowLayers != null) {
+      return slidingWindowLayers[layer];
+    }
+    return isGemmaFamily() && layer % slidingWindowPattern < slidingWindowPattern - 1;
+  }
+
+  /**
+   * The SwiGLU clamp for this layer's expert FFN, or zero where none is declared.
+   *
+   * <p>maple declares swiglu_clamp_exp as arr[f32,24] at 7.0. Unimplemented until 2026-10-24, so
+   * every expert output ran unclamped. The reference applies it only above a 1e-6 epsilon, and
+   * clamps the two halves differently -- see {@code TensorOps.swiGluClamped}.
+   */
+  public float swigluClampExp(int layer) {
+    requireLayer(layer);
+    return swigluClampExp == null ? 0.0f : swigluClampExp[layer];
   }
 
   /** RoPE base for the selected layer. */
@@ -658,6 +695,38 @@ public record LlamaConfig(
               + ropeDimensions);
     }
 
+    // A per-layer sliding-window pattern, where the artifact declares one. maple does, as
+    // arr[bool,24]; mellum and laguna declare a window and should be re-checked for a pattern.
+    boolean[] slidingWindowLayers =
+        metadata
+            .getBoolArray(arch + ".attention.sliding_window_pattern")
+            .filter(pattern -> pattern.size() == numLayers)
+            .map(
+                pattern -> {
+                  boolean[] layers = new boolean[numLayers];
+                  for (int layer = 0; layer < numLayers; layer++) {
+                    layers[layer] = pattern.get(layer);
+                  }
+                  return layers;
+                })
+            .orElse(null);
+
+    // Per-layer SwiGLU clamp for the expert FFN. Absent for every artifact that shipped before
+    // maple, which is why it stays null rather than defaulting to zero-means-none.
+    float[] swigluClampExp =
+        metadata
+            .getFloat32Array(arch + ".swiglu_clamp_exp")
+            .filter(clamps -> clamps.size() == numLayers)
+            .map(
+                clamps -> {
+                  float[] limits = new float[numLayers];
+                  for (int layer = 0; layer < numLayers; layer++) {
+                    limits[layer] = clamps.get(layer);
+                  }
+                  return limits;
+                })
+            .orElse(null);
+
     GraniteScalars graniteScalars =
         architecture == DecoderArchitecture.GRANITE
             ? new GraniteScalars(
@@ -692,7 +761,9 @@ public record LlamaConfig(
         numExpertsUsed,
         expertHiddenDim,
         ropeScaling,
-        graniteScalars);
+        graniteScalars,
+        slidingWindowLayers,
+        swigluClampExp);
   }
 
   private static float requiredGraniteScale(GgufMetadata metadata, String arch, String suffix) {
