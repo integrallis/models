@@ -239,6 +239,8 @@ enum DotKernel {
     Ptq,
     Tq1_0,
     #[cfg(target_arch = "x86_64")]
+    Tq1_0Avx2,
+    #[cfg(target_arch = "x86_64")]
     PtqAvx2,
     #[cfg(target_arch = "aarch64")]
     PtqNeon,
@@ -353,7 +355,13 @@ impl WeightFormat {
                 }
                 DotKernel::Ptq
             }
-            Self::Tq1_0 => DotKernel::Tq1_0,
+            Self::Tq1_0 => {
+                #[cfg(target_arch = "x86_64")]
+                if is_x86_feature_detected!("avx2") {
+                    return DotKernel::Tq1_0Avx2;
+                }
+                DotKernel::Tq1_0
+            }
             Self::Q8_0 => selected_q8_kernel(),
             Self::Q4K => selected_q4_k_kernel(),
             Self::Q5K => selected_q5_k_kernel(),
@@ -3085,6 +3093,26 @@ unsafe fn compute_batched_row_range(
             }
         }
         #[cfg(target_arch = "x86_64")]
+        DotKernel::Tq1_0Avx2 => {
+            for row in start_row..end_row {
+                for batch in 0..batch_size {
+                    // SAFETY: this variant is selected only after runtime AVX2 detection, and the
+                    // worker exclusively owns the assigned output rows.
+                    let value = unsafe {
+                        dot_tq1_0_q8_k_row_avx2(
+                            weights,
+                            quantized,
+                            activation_scales,
+                            batch,
+                            row,
+                            cols,
+                        )
+                    };
+                    unsafe { *output.add(batch * rows + row) = value };
+                }
+            }
+        }
+        #[cfg(target_arch = "x86_64")]
         DotKernel::PtqAvx2 => {
             for row in start_row..end_row {
                 for batch in 0..batch_size {
@@ -4613,6 +4641,20 @@ fn compute_output_range(
                 dot_tq1_0_q8_k_row_scalar(weights, quantized, activation_scales, batch, row, cols)
             }
             #[cfg(target_arch = "x86_64")]
+            DotKernel::Tq1_0Avx2 => {
+                // SAFETY: this variant is selected only after runtime AVX2 detection.
+                unsafe {
+                    dot_tq1_0_q8_k_row_avx2(
+                        weights,
+                        quantized,
+                        activation_scales,
+                        batch,
+                        row,
+                        cols,
+                    )
+                }
+            }
+            #[cfg(target_arch = "x86_64")]
             DotKernel::Q6KAvx2 => {
                 // SAFETY: this variant is selected only after runtime AVX2 and FMA detection.
                 unsafe {
@@ -5621,6 +5663,106 @@ fn dot_tq1_0_q8_k_row_scalar(
     sum
 }
 
+/// AVX2 TQ1_0 x Q8_K, bit-exact with [`dot_tq1_0_q8_k_row_scalar`].
+///
+/// Exactness is free here and that is the reason this shape was chosen. The whole product is
+/// integer: trits in -1..1 against i8 activations, 256 per block, which cannot overflow i32. So
+/// the vector lanes accumulate an i32 total, the horizontal sum is exact whatever order it runs
+/// in, and there is exactly one float multiply per block -- identical to the scalar kernel and to
+/// `ggml_vec_dot_tq1_0_q8_K`. A float accumulator would have made the two paths disagree in the
+/// last bits and turned a parity kernel into an approximation.
+///
+/// The trit extraction is the scalar one widened to 16-bit lanes: the reference's wrapping u8
+/// multiply becomes a 16-bit multiply masked to `0x00FF`, which reproduces the wrap exactly
+/// because only the low byte is ever read. `(q * 3) >> 8` then stays in range.
+///
+/// `qh` is left scalar: 4 bytes over 4 planes is 16 of 256 values, and a vector path for it would
+/// be edge cases without measurable benefit.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn dot_tq1_0_q8_k_row_avx2(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
+    const POW3: [i16; 5] = [1, 3, 9, 27, 81];
+    const QS_BYTES: usize = 48;
+    const QH_BYTES: usize = 4;
+    const LANES: usize = 16;
+
+    let blocks_per_row = cols / QK_K;
+    let byte_mask = _mm256_set1_epi16(0x00ff);
+    let threes = _mm256_set1_epi16(3);
+    let ones = _mm256_set1_epi16(1);
+    let mut sum = 0_f32;
+
+    for block in 0..blocks_per_row {
+        let weight_offset = (row * blocks_per_row + block) * TQ1_0_BLOCK_BYTES;
+        let activation_offset = batch * cols + block * QK_K;
+        let d = f16_to_f32(u16::from_le_bytes([
+            weights[weight_offset + QS_BYTES + QH_BYTES],
+            weights[weight_offset + QS_BYTES + QH_BYTES + 1],
+        ])) * activation_scales[batch * blocks_per_row + block];
+
+        // SAFETY: the caller validated that every block of this row lies inside both slices.
+        let qs = unsafe { weights.as_ptr().add(weight_offset) };
+        let activations = unsafe { quantized.as_ptr().add(activation_offset) };
+        let mut lane_sums = _mm256_setzero_si256();
+
+        let mut byte = 0_usize;
+        for chunk in [32_usize, 16] {
+            while byte + chunk <= QS_BYTES {
+                for (plane, pow) in POW3.iter().enumerate() {
+                    let broadcast = _mm256_set1_epi16(*pow);
+                    let activation_base = byte * 5 + plane * chunk;
+                    let mut lane = 0_usize;
+                    while lane < chunk {
+                        // SAFETY: byte + lane < 48 and the block is in bounds.
+                        let packed = unsafe { _mm_loadu_si128(qs.add(byte + lane).cast()) };
+                        let widened = _mm256_cvtepu8_epi16(packed);
+                        // The reference truncates `qs[j + m] * pow3[l]` to 8 bits and the base-3
+                        // selection depends on that wrap, so the mask is load-bearing.
+                        let wrapped =
+                            _mm256_and_si256(_mm256_mullo_epi16(widened, broadcast), byte_mask);
+                        let selected =
+                            _mm256_srli_epi16::<8>(_mm256_mullo_epi16(wrapped, threes));
+                        let trits = _mm256_sub_epi16(selected, ones);
+
+                        // SAFETY: the reference's own index, bounded by 256 per block.
+                        let activation = unsafe {
+                            _mm_loadu_si128(activations.add(activation_base + lane).cast())
+                        };
+                        let activation = _mm256_cvtepi8_epi16(activation);
+
+                        lane_sums =
+                            _mm256_add_epi32(lane_sums, _mm256_madd_epi16(trits, activation));
+                        lane += LANES;
+                    }
+                }
+                byte += chunk;
+            }
+        }
+
+        let mut total = horizontal_sum_i32_avx2(lane_sums);
+        for (plane, pow) in POW3.iter().take(4).enumerate() {
+            let activation_base = QS_BYTES * 5 + plane * QH_BYTES;
+            for lane in 0..QH_BYTES {
+                // SAFETY: lane < 4, inside the block's qh bytes.
+                let packed = u32::from(unsafe { *qs.add(QS_BYTES + lane) });
+                let wrapped = (packed * u32::from(*pow as u16)) & 0xFF;
+                let selected = ((wrapped * 3) >> 8) as i32;
+                total += (selected - 1)
+                    * i32::from(unsafe { *activations.add(activation_base + lane) });
+            }
+        }
+        sum = d.mul_add(total as f32, sum);
+    }
+    sum
+}
+
 fn dot_q6_k_q8_k_row_scalar(
     weights: &[u8],
     quantized: &[i8],
@@ -6309,6 +6451,61 @@ mod tests {
             }
         }
         sum as f32 * (weight_scale * activation_scale)
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn tq1_0_q8_k_avx2_is_bit_identical_to_the_scalar_kernel() {
+        if !is_x86_feature_detected!("avx2") {
+            return;
+        }
+        // Several blocks and several rows, so the per-block float accumulation order is exercised
+        // rather than just one block where any order agrees.
+        let cols = 256 * 3;
+        let rows = 5;
+        let mut state = 0x1234_5678_9abc_def1_u64;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        let mut weights = vec![0_u8; rows * cols / QK_K * TQ1_0_BLOCK_BYTES];
+        for block in 0..weights.len() / TQ1_0_BLOCK_BYTES {
+            let base = block * TQ1_0_BLOCK_BYTES;
+            for byte in 0..48 {
+                weights[base + byte] = (next() % 243) as u8;
+            }
+            for byte in 48..52 {
+                weights[base + byte] = (next() % 81) as u8;
+            }
+            // Mixed scales including zero and a negative, since d multiplies the block total.
+            let scale = match block % 4 {
+                0 => f32_to_f16(0.015_625),
+                1 => f32_to_f16(-0.5),
+                2 => 0,
+                _ => f32_to_f16(1.0),
+            };
+            weights[base + 52] = scale as u8;
+            weights[base + 53] = (scale >> 8) as u8;
+        }
+        let mut quantized = vec![0_i8; cols];
+        for value in quantized.iter_mut() {
+            *value = ((next() % 255) as i64 - 127) as i8;
+        }
+        let scales: Vec<f32> = (0..cols / QK_K).map(|i| 0.01 * (i as f32 + 1.0)).collect();
+
+        for row in 0..rows {
+            let scalar = dot_tq1_0_q8_k_row_scalar(&weights, &quantized, &scales, 0, row, cols);
+            // SAFETY: AVX2 was detected above.
+            let vector =
+                unsafe { dot_tq1_0_q8_k_row_avx2(&weights, &quantized, &scales, 0, row, cols) };
+            assert_eq!(
+                scalar.to_bits(),
+                vector.to_bits(),
+                "row {row}: AVX2 must be bit-identical to scalar, got {vector} against {scalar}"
+            );
+        }
     }
 
     #[test]
