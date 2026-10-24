@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.bert;
 import com.integrallis.models.backend.purejava.bert.ModernBertConfig.QuestionType;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.util.Objects;
 
 /**
@@ -81,9 +82,16 @@ final class ModernBertDecisionForwardPass {
   private final ModernBertConfig config;
   private final ModernBertWeights weights;
   private final float[] exactWeightRow;
+  private final GgufBatchedMatrixKernel matrixKernel;
   private float[] zeroBias;
 
   ModernBertDecisionForwardPass(ModernBertConfig config, ModernBertWeights weights) {
+    this(config, weights, GgufBatchedMatrixKernel.none());
+  }
+
+  ModernBertDecisionForwardPass(
+      ModernBertConfig config, ModernBertWeights weights, GgufBatchedMatrixKernel matrixKernel) {
+    this.matrixKernel = Objects.requireNonNull(matrixKernel, "matrixKernel");
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     int widest = config.embeddingDim();
@@ -465,13 +473,44 @@ final class ModernBertDecisionForwardPass {
   }
 
   /**
-   * The exact GGUF matmul, not the fast one.
+   * The projection, through an injected kernel when one is eligible and the exact Java matmul
+   * otherwise.
    *
-   * <p>This path exists to be compared against a reference to a fixed tolerance, and a reordered
-   * accumulation would spend that tolerance on arithmetic rather than on correctness.
+   * <p>The exact path keeps F32 activations and a fixed accumulation order, which is what lets the
+   * reference comparison attribute its residual to quantization rather than to arithmetic. It is
+   * also, measured on 2026-10-23, about 3.3 s per decision on twelve cores -- and it was the only
+   * path, because this class took no kernel at all. A decision model is the one place where that
+   * matters most: every call pays the whole cost, since there is no prefix to amortise.
+   *
+   * <p>The injected kernel is asked rather than assumed: {@code isEligible} lets an implementation
+   * refuse a shape whose boundary cost exceeds the win.
+   *
+   * <p>MEASURED 2026-10-23, and the reason the default is still {@code none()}: the Rust shim's
+   * Q8_0 route is 2.2x faster per decision and costs three of 120 items on the published cohort
+   * (accuracy 0.7833 to 0.7583), picking a different winner on four. The cause is not accumulation
+   * order. {@code GgufTensorType::activation_format} in the kernel maps Q8_0 weights to {@code
+   * ActivationFormat::Q8_0}, so it quantizes the activations to eight bits; the exact path keeps
+   * them in F32. The capability is named Q8_0_F32_BATCHED_MATMUL, where the F32 describes the
+   * output rather than the activations -- a name this comment previously misread.
+   *
+   * <p>So a kernel is safe for this model only if it keeps F32 activations. Q5_1 already has such a
+   * route, "folded exactly as Java's PinnedReduction.dot folds", which is the shape a Q8_0 one
+   * needs. Until that exists, an injected kernel changes published answers and the exact path stays
+   * the default.
    */
   private void project(
       float[] output, float[] input, int sequenceLength, ModernBertWeights.Matrix matrix) {
+    if (matrixKernel.isEligible(matrix.type(), sequenceLength, matrix.rows(), matrix.columns())) {
+      matrixKernel.multiply(
+          output,
+          input,
+          matrix.data(),
+          matrix.type(),
+          sequenceLength,
+          matrix.rows(),
+          matrix.columns());
+      return;
+    }
     TensorOps.ggufExactBatchedMatmul(
         output,
         input,

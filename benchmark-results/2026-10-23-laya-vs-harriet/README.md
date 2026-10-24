@@ -99,3 +99,62 @@ Laya's per-decision latency also reproduced across two runs: p50 3264.85 ms and 
 - **No TTFT or TPOT for Laya.** It answers in one non-autoregressive pass; there is no first token
   and no inter-token interval. Reporting a zero or a win on those axes would be fabrication. The
   comparable quantity is time to decision, which is what the table gives.
+
+## Addendum, 2026-10-23: the fast projection kernel is 2.2x and is rejected
+
+Laya had no fast projection path at all — `ModernBertDecisionForwardPass` took no kernel, so every
+decision ran `TensorOps.ggufExactBatchedMatmul`, the exact F32 route. For a decision model that is
+the whole cost of every call: there is no prefix to amortise.
+
+A kernel seam was added (`ModernBertDecisionModel.open(Path, GgufBatchedMatrixKernel)`) and the Rust
+shim's `Q8_0_F32_BATCHED_MATMUL` route measured on this host, same cohort, same scorer as above.
+
+| | exact, shipped | `rust-ffm-quantized-v14` |
+| --- | ---: | ---: |
+| accuracy | **0.7833** (94/120) | 0.7583 (91/120) |
+| Intelligence | **76.4** | 74.1 |
+| Calibration (ECE) | 67.2 (0.1638) | **72.2 (0.1391)** |
+| Speed | 61.8 | **68.5** |
+| p50 / p95 per decision | 3.318 / 4.800 s | **1.492 / 2.188 s** |
+
+**2.2x faster and three items worse. Rejected as the default.**
+
+The reason is not the tolerance I happened to pick. A parity check written before the run — chosen
+option equal, probabilities within a fixed 1e-3 — failed at 0.0063 on a `choice` case, and that
+alone would be arguable, because Laya is `RANKED_DECISION` and the catalog already says its
+probability is not a fitted one. What settles it is the cohort: **the two paths pick different
+winners on 4 of 120 items**, so the kernel changes answers rather than last bits. Per family:
+`tool_selection` 1.0000 to 0.9167, `extraction` 0.8750 to 0.8333, `intent` 0.7917 to 0.7500.
+
+Shipping it would leave the catalog's published 0.783333 describing a path that no longer runs,
+which is the one thing evidence discipline here exists to prevent. The tolerance was not widened
+to make the check pass, and the seam's default stays `GgufBatchedMatrixKernel.none()`.
+
+The seam is kept because it is what made this measurable at all, and because the win is real enough
+to be worth earning: 2.2x on every decision, on a model whose latency is its weakest axis against
+Harriet. ### Why the numbers differ, which is not what this file first said
+
+Not accumulation order. `GgufTensorType::activation_format` in the kernel
+(`model-kernels/src/lib.rs:306-312`) maps Q8_0 weights to `ActivationFormat::Q8_0`, so the shim
+**quantizes the activations to eight bits** before the dot product; the exact Java path keeps them
+in F32. That is a precision reduction on the input to every projection, which is the right trade
+for a generative model — it is llama.cpp's own convention — and the wrong one for a model whose
+output is an argmax, where a flipped winner is simply a wrong answer.
+
+The capability is called `Q8_0_F32_BATCHED_MATMUL`, and the `F32` there describes the **output**.
+An earlier version of this addendum, and a comment in the forward pass, read it as a promise about
+the activations. Both are corrected; it was inferred from a name rather than read from the kernel.
+
+### The fix has a precedent in the same file
+
+`Q5_1` already maps to `ActivationFormat::F32`, and its row kernel is written to fold "exactly as
+Java's `PinnedReduction.dot` folds" (`lib.rs:4961`) — native speed with the Java path's
+accumulation. A Q8_0 weights x F32 activations route of the same shape is what this model needs,
+added as its own capability and entry point rather than by changing the global mapping, because
+flipping Q8_0 to F32 activations everywhere would slow every generative Q8_0 model for a precision
+none of them need.
+
+Acceptance criterion: reproduce accuracy 0.783333 and the published per-type cells on this cohort
+through the kernel, then re-qualify.
+
+Raw native arm: `laya-native-jev120.tsv`.

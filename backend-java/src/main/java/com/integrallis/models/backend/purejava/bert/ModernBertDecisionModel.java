@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.bert;
 import com.integrallis.models.backend.purejava.bert.ModernBertConfig.QuestionType;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
 import java.lang.foreign.Arena;
 import java.nio.file.Path;
@@ -73,7 +74,28 @@ public final class ModernBertDecisionModel implements AutoCloseable {
    * @throws java.io.UncheckedIOException when the file cannot be read
    */
   public static ModernBertDecisionModel open(Path artifact) {
+    return open(artifact, GgufBatchedMatrixKernel.none());
+  }
+
+  /**
+   * Opens the model with an injected projection kernel.
+   *
+   * <p>The no-argument overload stays pure Java deliberately: this module does not depend on
+   * backend-native, so it cannot reach the Rust shim without inverting that layering. A caller that
+   * has the native kernel on its classpath passes it here, which is the same seam {@code
+   * SopranoTextToSpeechModel.loadNative} uses.
+   *
+   * <p>The kernel is asked whether it wants each shape rather than told to take it, so an
+   * implementation that would be slower on a projection can decline and leave the exact Java path
+   * in place for that one call.
+   *
+   * @param artifact the GGUF file
+   * @param matrixKernel the projection kernel, or {@link GgufBatchedMatrixKernel#none()}
+   * @return the model, which the caller closes
+   */
+  public static ModernBertDecisionModel open(Path artifact, GgufBatchedMatrixKernel matrixKernel) {
     Objects.requireNonNull(artifact, "artifact");
+    Objects.requireNonNull(matrixKernel, "matrixKernel");
     Arena arena = Arena.ofShared();
     try {
       GgufFile file = GgufParser.parse(artifact, arena);
@@ -88,7 +110,7 @@ public final class ModernBertDecisionModel implements AutoCloseable {
           arena,
           config,
           new ModernBertDecisionPrompt(tokenizer, config),
-          new ModernBertDecisionForwardPass(config, weights));
+          new ModernBertDecisionForwardPass(config, weights, matrixKernel));
     } catch (java.io.IOException failure) {
       arena.close();
       throw new java.io.UncheckedIOException("cannot read " + artifact, failure);

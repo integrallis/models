@@ -30,8 +30,16 @@ public final class LayaLatency {
     Path cohort = Path.of(args[1]);
     List<String> lines = Files.readAllLines(cohort);
 
+    // args[3] = "native" opts into the Rust shim, so one probe measures both paths on one host.
+    boolean useNative = args.length > 3 && "native".equals(args[3]);
+    var kernel =
+        useNative
+            ? com.integrallis.models.backend.nativekernel.RustGgufBatchedMatrixKernel.openBundled(
+                Math.max(1, Math.min(8, Runtime.getRuntime().availableProcessors())))
+            : com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel.none();
+    System.out.printf("  \"kernel\": \"%s\",%n", kernel.implementation());
     long loadStart = System.nanoTime();
-    try (var model = ModernBertDecisionModel.open(artifact)) {
+    try (var model = ModernBertDecisionModel.open(artifact, kernel)) {
       double loadSeconds = (System.nanoTime() - loadStart) / 1e9;
 
       List<Case> cases = new ArrayList<>();
