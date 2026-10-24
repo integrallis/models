@@ -383,10 +383,36 @@ public record LlamaConfig(
         || isGemmaFamily();
   }
 
-  /** Whether the zero-based transformer layer applies rotary position embeddings. */
+  /**
+   * Whether the zero-based transformer layer applies rotary position embeddings.
+   *
+   * <p>maple ties this to the window: it ropes a layer exactly when that layer is local, so its six
+   * global layers carry no positional encoding at all. From {@code src/models/maple.cpp} at
+   * ggml-org/llama.cpp 3f03b1772, where the whole rope block is inside {@code if
+   * (hparams.is_swa(il))}:
+   *
+   * <pre>
+   *   if (hparams.is_swa(il)) {
+   *       Qcur = ggml_rope_ext(ctx0, Qcur, inp_pos, nullptr, n_rot_l, ...);
+   *       Kcur = ggml_rope_ext(ctx0, Kcur, inp_pos, nullptr, n_rot_l, ...);
+   *   }
+   * </pre>
+   *
+   * <p>MEASURED 2026-10-24: we roped all 24 layers, and on a 1222-token prompt maple answered
+   * {@code </think>2222222} where the oracle continued the prompt's own pattern. Fixing the window
+   * and the clamp was not enough on its own -- both engaged, provably, and the output was still
+   * degenerate, because six layers were receiving positions the architecture does not give them.
+   *
+   * <p>The layer indices coincide with SmolLM3's NoPE stride for this checkpoint, and that is a
+   * coincidence of maple's 3-local-1-global pattern rather than a shared rule. maple's answer comes
+   * from the declared pattern, so a checkpoint that declares a different one gets a different set.
+   */
   public boolean usesRope(int layer) {
     if (layer < 0 || layer >= numLayers) {
       throw new IllegalArgumentException("layer out of range: " + layer);
+    }
+    if (architecture == DecoderArchitecture.MAPLE) {
+      return usesSlidingWindow(layer);
     }
     return architecture != DecoderArchitecture.SMOLLM3 || (layer + 1) % 4 != 0;
   }

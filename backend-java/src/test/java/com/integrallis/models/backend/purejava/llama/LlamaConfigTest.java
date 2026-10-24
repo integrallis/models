@@ -73,6 +73,23 @@ class LlamaConfigTest {
     }
 
     @Test
+    void ropesExactlyTheLocalLayersAndLeavesTheGlobalOnesWithoutPositions() {
+      // maple's whole rope block sits inside if (hparams.is_swa(il)), so its six global layers get
+      // no positional encoding at all. Roping all 24 produced </think>2222222 on a 1222-token
+      // prompt while the window and the clamp were both provably engaged -- fixing those two was
+      // necessary and not sufficient.
+      LlamaConfig config = LlamaConfig.fromMetadata(mapleMetadata(true, true));
+
+      for (int layer = 0; layer < LAYERS; layer++) {
+        assertThat(config.usesRope(layer))
+            .describedAs("layer %d", layer)
+            .isEqualTo(config.usesSlidingWindow(layer));
+      }
+      assertThat(config.usesRope(0)).isTrue();
+      assertThat(config.usesRope(3)).isFalse();
+    }
+
+    @Test
     void readsTheClampForEveryLayer() {
       LlamaConfig config = LlamaConfig.fromMetadata(mapleMetadata(true, true));
 
