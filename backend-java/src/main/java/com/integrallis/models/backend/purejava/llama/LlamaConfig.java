@@ -353,6 +353,12 @@ public record LlamaConfig(
    * and K rows were written -- so the table is the only place the answer exists, and a wrong choice
    * yields fluent but degraded text, never an error.
    *
+   * <p>MAPLE was added from that same table rather than from its resemblance to Qwen3: at
+   * ggml-org/llama.cpp 3f03b17724ad8b69040825f45c43c59b092a0244, {@code LLM_ARCH_MAPLE} falls
+   * through to {@code LLAMA_ROPE_TYPE_NEOX} alongside QWEN3MOE, MELLUM and LAGUNA in {@code
+   * llama_model_rope_type}. Reading the table is the whole point: the QWEN3MOE omission recorded
+   * above is what this costs when it is skipped.
+   *
    * <p>The algorithm was read and translated, not depended on: this stack is Java plus Rust shims,
    * and llama.cpp and Ollama serve as benchmark arms that our generated tokens are compared
    * against.
@@ -361,6 +367,7 @@ public record LlamaConfig(
     return architecture == DecoderArchitecture.QWEN2
         || architecture == DecoderArchitecture.QWEN3
         || architecture == DecoderArchitecture.QWEN3MOE
+        || architecture == DecoderArchitecture.MAPLE
         || architecture == DecoderArchitecture.PHI3
         || architecture == DecoderArchitecture.HUNYUAN_DENSE
         || isGemmaFamily();
@@ -605,6 +612,28 @@ public record LlamaConfig(
     int numExperts = getArchKey(metadata, arch, "expert_count").orElse(0);
     int numExpertsUsed = getArchKey(metadata, arch, "expert_used_count").orElse(0);
     int expertHiddenDim = getArchKey(metadata, arch, "expert_feed_forward_length").orElse(0);
+
+    // The router's gating function, asserted rather than assumed.
+    //
+    // ExpertRouting implements softmax gating only. llama.cpp numbers the choices NONE 0,
+    // SOFTMAX 1, SIGMOID 2, SOFTMAX_WEIGHT 3, SQRT_SOFTPLUS 4 (llama-hparams.h at
+    // 3f03b17724ad8b69040825f45c43c59b092a0244), and a model declaring any of the others would
+    // route differently while loading cleanly and producing plausible text -- the same failure
+    // mode as a wrong rotary layout, and invisible for the same reason.
+    //
+    // Checked only when the key is present: artifacts that predate it declare nothing and are
+    // served by the softmax path they were qualified on, so enforcing a value there would reject
+    // models that ship today. maple declares 1, which is why it needs no new routing primitive;
+    // laguna and lfm2moe declare 2 and are blocked on sigmoid gating for exactly this reason.
+    int gatingFunction = getArchKey(metadata, arch, "expert_gating_func").orElse(0);
+    if (numExperts > 0 && gatingFunction != 0 && gatingFunction != 1) {
+      throw new IllegalArgumentException(
+          "this build routes experts with softmax gating only, but "
+              + arch
+              + " declares expert_gating_func="
+              + gatingFunction
+              + " (1 is softmax; 2 is sigmoid, 3 softmax-over-weights, 4 sqrt-softplus)");
+    }
 
     // Partial rotary: rope.dimension_count below the head dimension means only the leading dims are
     // rotated. RotaryTable rotates the whole head and takes no dimension count, so a model needing

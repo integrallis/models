@@ -40,6 +40,12 @@ public enum DecoderArchitecture {
   QWEN2("qwen2"),
   QWEN3("qwen3"),
   QWEN3MOE("qwen3moe"),
+  // Structurally a routed Qwen3: the real header declares the identical tensor set --
+  // attn_{q,k,v,output,norm}, attn_{q,k}_norm, ffn_gate_inp and fused ffn_{gate,up,down}_exps --
+  // with 256 experts of 8 used, QK-norm, sliding window 512 and partial rotary over 64 of 128
+  // head dimensions. Read from the artifact in benchmark-results/2026-10-22-qxotic-header-intake,
+  // not inferred from the family name.
+  MAPLE("maple"),
   GRANITE("granite"),
   SMOLLM3("smollm3"),
   GEMMA3("gemma3"),

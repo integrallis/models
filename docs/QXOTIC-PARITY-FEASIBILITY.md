@@ -207,10 +207,20 @@ reachable on our own terms, and the reason is the published artifacts, not the r
 - **`bailingmoe3` is unassessed, not assessed as hard.** Its artifact was not found in their
   manifest; locating a Ling 3 GGUF is the first step, and the MLA-plus-Q-LoRA reading in
   `QXOTIC-PARITY.md` §4 came from their codec, not from a header, so it stays unconfirmed.
-- **Oracle availability is unchecked.** Every tier's gate assumes an external reference to compare
-  against. For `maple`, `mellum`, `laguna` and `nemotron_h_moe` that is presumably llama.cpp; it has
-  not been verified that each architecture is actually implemented there at a usable revision. That
-  check belongs before Tier A starts.
+- **Oracle availability: RESOLVED 2026-10-24, and read from upstream rather than from the clone.**
+  All nine architectures exist in `ggml-org/llama.cpp` at `3f03b17724ad8b69040825f45c43c59b092a0244`
+  as real `LLM_ARCH_*` registrations in `src/llama-arch.cpp` — including `maple` (line 70),
+  `bailingmoe3` (119), `laguna` (124) and `mellum` (165).
+
+  **The local clone would have said otherwise.** It was pinned at `a58222229` (2026-07-15), **1839
+  commits behind**, and at that revision `maple`, `mellum`, `laguna` and `bailingmoe3` are all
+  absent — `mellum` appears only as a pretokenizer in `llama-vocab.cpp`. Checking the checkout on
+  disk would have recorded four false negatives and plausibly cancelled four ports.
+
+  So the default for any cross-implementation claim is: bring the oracle current, then record the
+  revision beside the result. `scripts/oracle-revision.sh` reports it and **fails on a stale or
+  dirty clone**; `--update` fast-forwards first. An oracle with local edits is not the revision its
+  sha names, which is why the script refuses that too.
 - **The 110M parakeet sibling was sized but not probed.** Only `tdt-0.6b-v3-q8_0.gguf` had its
   header read; `tdt_ctc-110m-q4_k.gguf` is assumed to share the architecture on the strength of its
   filename, which is exactly the kind of assumption this document exists to avoid. Probe it before
