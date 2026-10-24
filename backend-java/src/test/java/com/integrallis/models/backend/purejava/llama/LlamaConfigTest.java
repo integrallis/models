@@ -292,6 +292,80 @@ class LlamaConfigTest {
     }
 
     @Test
+    void readsMapleFromItsRealHeaderKeys() {
+      // Every value below is the one the published artifact declares
+      // (benchmark-results/2026-10-22-qxotic-header-intake), including the two that make this a
+      // port rather than a rename: partial rotary over 64 of 128 head dimensions, and a 512-token
+      // sliding window.
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("general.architecture", new GgufMetadataValue.StringValue("maple"));
+      entries.put("maple.embedding_length", new GgufMetadataValue.Uint32Value(2048));
+      entries.put("maple.block_count", new GgufMetadataValue.Uint32Value(24));
+      entries.put("maple.feed_forward_length", new GgufMetadataValue.Uint32Value(4096));
+      entries.put("maple.attention.head_count", new GgufMetadataValue.Uint32Value(16));
+      entries.put("maple.attention.head_count_kv", new GgufMetadataValue.Uint32Value(4));
+      entries.put("maple.attention.key_length", new GgufMetadataValue.Uint32Value(128));
+      entries.put("maple.attention.value_length", new GgufMetadataValue.Uint32Value(128));
+      entries.put("maple.rope.dimension_count", new GgufMetadataValue.Uint32Value(64));
+      entries.put("maple.attention.sliding_window", new GgufMetadataValue.Uint32Value(512));
+      entries.put("maple.expert_count", new GgufMetadataValue.Uint32Value(256));
+      entries.put("maple.expert_used_count", new GgufMetadataValue.Uint32Value(8));
+      entries.put("maple.expert_feed_forward_length", new GgufMetadataValue.Uint32Value(512));
+      entries.put("maple.expert_gating_func", new GgufMetadataValue.Uint32Value(1));
+
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(config.architecture()).isEqualTo(DecoderArchitecture.MAPLE);
+      assertThat(config.numExperts()).isEqualTo(256);
+      assertThat(config.numExpertsUsed()).isEqualTo(8);
+      assertThat(config.keyLength()).isEqualTo(128);
+      // NEOX, from llama.cpp's llama_model_rope_type table rather than from the Qwen3
+      // resemblance. The table is the only place this answer exists, and the wrong choice yields
+      // degraded text instead of an error.
+      assertThat(config.usesNeoxRope()).isTrue();
+    }
+
+    @Test
+    void refusesAnExpertGatingFunctionThisBuildCannotRoute() {
+      // laguna and lfm2moe declare 2, sigmoid. ExpertRouting implements softmax only, so routing
+      // them on this build would silently select different experts -- load clean, read plausible.
+      // This is the assertion that makes that a failure instead of a quiet wrong answer.
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("general.architecture", new GgufMetadataValue.StringValue("maple"));
+      entries.put("maple.embedding_length", new GgufMetadataValue.Uint32Value(2048));
+      entries.put("maple.block_count", new GgufMetadataValue.Uint32Value(24));
+      entries.put("maple.attention.head_count", new GgufMetadataValue.Uint32Value(16));
+      entries.put("maple.attention.head_count_kv", new GgufMetadataValue.Uint32Value(4));
+      entries.put("maple.attention.key_length", new GgufMetadataValue.Uint32Value(128));
+      entries.put("maple.attention.value_length", new GgufMetadataValue.Uint32Value(128));
+      entries.put("maple.expert_count", new GgufMetadataValue.Uint32Value(256));
+      entries.put("maple.expert_used_count", new GgufMetadataValue.Uint32Value(8));
+      entries.put("maple.expert_gating_func", new GgufMetadataValue.Uint32Value(2));
+
+      assertThatThrownBy(() -> LlamaConfig.fromMetadata(new GgufMetadata(entries)))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("expert_gating_func=2");
+    }
+
+    @Test
+    void acceptsADenseModelThatDeclaresNoGatingFunction() {
+      // The guard must not reject artifacts that predate the key. They declare no experts and no
+      // gating function, and are served by the path they were qualified on.
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("general.architecture", new GgufMetadataValue.StringValue("qwen3"));
+      entries.put("qwen3.embedding_length", new GgufMetadataValue.Uint32Value(1024));
+      entries.put("qwen3.block_count", new GgufMetadataValue.Uint32Value(28));
+      entries.put("qwen3.attention.head_count", new GgufMetadataValue.Uint32Value(16));
+      entries.put("qwen3.attention.head_count_kv", new GgufMetadataValue.Uint32Value(8));
+      entries.put("qwen3.attention.key_length", new GgufMetadataValue.Uint32Value(128));
+      entries.put("qwen3.attention.value_length", new GgufMetadataValue.Uint32Value(128));
+
+      LlamaConfig config = LlamaConfig.fromMetadata(new GgufMetadata(entries));
+
+      assertThat(config.numExperts()).isZero();
+    }
+
+    @Test
     void selectsSmolLm3LayersThatSkipRope() {
       Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
       entries.put("general.architecture", new GgufMetadataValue.StringValue("smollm3"));
