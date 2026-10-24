@@ -146,7 +146,14 @@ const Q4_0_BLOCK_BYTES: usize = 18;
 const Q5_0_BLOCK_BYTES: usize = 22;
 const Q5_1_BLOCK_BYTES: usize = 24;
 const PTQ1_0_BLOCK_BYTES: usize = 28;
+/// ggml's standard ternary block: 48 base-3 `qs` bytes, 4 `qh` bytes, an f16 scale.
+///
+/// Not PTQ1_0. That is PrismML's ternary at group 128 in 28 bytes, and the two must never be
+/// pointed at each other's weights -- same idea, different geometry, different activation format.
+const TQ1_0_BLOCK_BYTES: usize = 54;
 const CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL: u64 = 1 << 24;
+/// TQ1_0 weights against Q8_K activations, which is what ggml actually computes for this type.
+const CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL: u64 = 1 << 29;
 mod ptq;
 const Q8_0_BLOCK_BYTES: usize = 34;
 const Q4_K_BLOCK_BYTES: usize = 144;
@@ -230,6 +237,7 @@ enum DotKernel {
     #[cfg(target_arch = "x86_64")]
     Q5_1Avx2,
     Ptq,
+    Tq1_0,
     #[cfg(target_arch = "x86_64")]
     PtqAvx2,
     #[cfg(target_arch = "aarch64")]
@@ -269,6 +277,7 @@ enum WeightFormat {
     Q4K,
     Q5K,
     Q6K,
+    Tq1_0,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -291,6 +300,7 @@ impl WeightFormat {
             6 => Some(Self::Q5_1),
             7 => Some(Self::Ptq),
             8 => Some(Self::Q8_0F32Activation),
+            9 => Some(Self::Tq1_0),
             _ => None,
         }
     }
@@ -302,6 +312,7 @@ impl WeightFormat {
             Self::Q5_1 => Q5_1_BLOCK_BYTES,
             Self::Q8_0F32Activation => Q8_0_BLOCK_BYTES,
             Self::Ptq => PTQ1_0_BLOCK_BYTES,
+            Self::Tq1_0 => TQ1_0_BLOCK_BYTES,
             Self::Q8_0 => Q8_0_BLOCK_BYTES,
             Self::Q4K => Q4_K_BLOCK_BYTES,
             Self::Q5K => Q5_K_BLOCK_BYTES,
@@ -313,7 +324,7 @@ impl WeightFormat {
         match self {
             Self::Ptq => 128,
             Self::Q4_0 | Self::Q5_0 | Self::Q5_1 | Self::Q8_0 | Self::Q8_0F32Activation => QK_0,
-            Self::Q4K | Self::Q5K | Self::Q6K => QK_K,
+            Self::Q4K | Self::Q5K | Self::Q6K | Self::Tq1_0 => QK_K,
         }
     }
 
@@ -321,7 +332,7 @@ impl WeightFormat {
         match self {
             Self::Q4_0 | Self::Q5_0 | Self::Q8_0 | Self::Ptq => ActivationFormat::Q8_0,
             Self::Q5_1 | Self::Q8_0F32Activation => ActivationFormat::F32,
-            Self::Q4K | Self::Q5K | Self::Q6K => ActivationFormat::Q8K,
+            Self::Q4K | Self::Q5K | Self::Q6K | Self::Tq1_0 => ActivationFormat::Q8K,
         }
     }
 
@@ -342,6 +353,7 @@ impl WeightFormat {
                 }
                 DotKernel::Ptq
             }
+            Self::Tq1_0 => DotKernel::Tq1_0,
             Self::Q8_0 => selected_q8_kernel(),
             Self::Q4K => selected_q4_k_kernel(),
             Self::Q5K => selected_q5_k_kernel(),
@@ -1512,6 +1524,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | q5_1_simd_capability()
         | CAPABILITY_Q8_0_F32_ACTIVATION_BATCHED_MATMUL
         | CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL
+        | CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL
         | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
         | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
         | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL
@@ -3055,6 +3068,22 @@ unsafe fn compute_batched_row_range(
                 }
             }
         }
+        DotKernel::Tq1_0 => {
+            for row in start_row..end_row {
+                for batch in 0..batch_size {
+                    let value = dot_tq1_0_q8_k_row_scalar(
+                        weights,
+                        quantized,
+                        activation_scales,
+                        batch,
+                        row,
+                        cols,
+                    );
+                    // SAFETY: this worker exclusively owns the assigned output rows.
+                    unsafe { *output.add(batch * rows + row) = value };
+                }
+            }
+        }
         #[cfg(target_arch = "x86_64")]
         DotKernel::PtqAvx2 => {
             for row in start_row..end_row {
@@ -4580,6 +4609,9 @@ fn compute_output_range(
             DotKernel::Q6K => {
                 dot_q6_k_q8_k_row_scalar(weights, quantized, activation_scales, batch, row, cols)
             }
+            DotKernel::Tq1_0 => {
+                dot_tq1_0_q8_k_row_scalar(weights, quantized, activation_scales, batch, row, cols)
+            }
             #[cfg(target_arch = "x86_64")]
             DotKernel::Q6KAvx2 => {
                 // SAFETY: this variant is selected only after runtime AVX2 and FMA detection.
@@ -5511,6 +5543,84 @@ fn dot_q5_k_q8_k_row_scalar(
     sum
 }
 
+/// One TQ1_0 weight row against one Q8_K activation row.
+///
+/// Transcribed from `ggml_vec_dot_tq1_0_q8_K` (ggml/src/ggml-cpu/quants.c) at ggml-org/llama.cpp
+/// 3f03b1772. Three things here are not guessable from the block layout, and getting any of them
+/// wrong yields numbers that look reasonable and are wrong:
+///
+/// * The weight trit comes out of a **wrapping** u8 multiply: `q = qs[j + m] * pow3[l]` truncates
+///   to 8 bits, and the base-3 selection depends on that wrap. `xi = ((q as u16) * 3) >> 8` then
+///   lands in 0..2 and the weight is `xi - 1`.
+/// * The activation index is **not** sequential. Within the 32-wide stage the reference reads
+///   `y.qs[j * 5 + l * 32 + m]`, so the base-3 plane `l` strides the activations by the chunk
+///   width. Reading activations in order would silently transpose one operand.
+/// * The 48 `qs` bytes are walked as 32 then 16 -- `sizeof(qs) - sizeof(qs) % 32` is 32 -- and the
+///   16-wide stage strides by 16, not 32. The `qh` tail then starts at activation index
+///   `48 * 5 = 240` and runs four planes of four.
+///
+/// Unlike Q4_K and Q5_K this needs no `bsums`: ternary weights are symmetric around zero and the
+/// block carries no min, so the only scalars are the weight's f16 `d` and the activation's f32 `d`.
+///
+/// The integer accumulator is one exact i32 for the whole block, as in the reference, rather than
+/// the eight-lane split the K-quant kernels use to pin a reduction order. An i32 sum of products
+/// of values in -1..1 and i8 activations cannot overflow at 256 elements and is exact, so there is
+/// one float multiply per block and this is **bit-exact with ggml** -- which is the point, since
+/// the whole reason for this kernel is that our exact-F32 path was not.
+fn dot_tq1_0_q8_k_row_scalar(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
+    const POW3: [u32; 5] = [1, 3, 9, 27, 81];
+    const QS_BYTES: usize = 48;
+    const QH_BYTES: usize = 4;
+
+    let blocks_per_row = cols / QK_K;
+    let mut sum = 0_f32;
+    for block in 0..blocks_per_row {
+        let weight_offset = (row * blocks_per_row + block) * TQ1_0_BLOCK_BYTES;
+        let activation_offset = batch * cols + block * QK_K;
+        let d = f16_to_f32(u16::from_le_bytes([
+            weights[weight_offset + QS_BYTES + QH_BYTES],
+            weights[weight_offset + QS_BYTES + QH_BYTES + 1],
+        ])) * activation_scales[batch * blocks_per_row + block];
+
+        let qs = &weights[weight_offset..weight_offset + QS_BYTES];
+        let qh = &weights[weight_offset + QS_BYTES..weight_offset + QS_BYTES + QH_BYTES];
+        let mut total = 0_i32;
+
+        // Stage widths 32 then 16, exactly as the reference derives them from sizeof(qs).
+        let mut byte = 0_usize;
+        for chunk in [32_usize, 16] {
+            while byte + chunk <= QS_BYTES {
+                for (plane, pow) in POW3.iter().enumerate() {
+                    let activation_base = activation_offset + byte * 5 + plane * chunk;
+                    for lane in 0..chunk {
+                        let q = (u32::from(qs[byte + lane]) * pow) & 0xFF;
+                        let xi = ((q * 3) >> 8) as i32;
+                        total += (xi - 1) * i32::from(quantized[activation_base + lane]);
+                    }
+                }
+                byte += chunk;
+            }
+        }
+        for (plane, pow) in POW3.iter().take(4).enumerate() {
+            let activation_base = activation_offset + QS_BYTES * 5 + plane * QH_BYTES;
+            for lane in 0..QH_BYTES {
+                let q = (u32::from(qh[lane]) * pow) & 0xFF;
+                let xi = ((q * 3) >> 8) as i32;
+                total += (xi - 1) * i32::from(quantized[activation_base + lane]);
+            }
+        }
+        sum = d.mul_add(total as f32, sum);
+    }
+    sum
+}
+
 fn dot_q6_k_q8_k_row_scalar(
     weights: &[u8],
     quantized: &[i8],
@@ -6155,6 +6265,153 @@ fn f32_to_f16(value: f32) -> u16 {
 
 #[cfg(test)]
 mod tests {
+    /// `ggml_vec_dot_tq1_0_q8_K` written out literally, as an independent expectation.
+    ///
+    /// Deliberately NOT factored against the kernel: this keeps the reference's own index
+    /// arithmetic (`j * 5 + l * 32 + m`, byte offsets derived from `sizeof`) so that a
+    /// transcription error in the kernel cannot be mirrored here and cancel out.
+    fn reference_tq1_0_q8_k(
+        qs: &[u8; 48],
+        qh: &[u8; 4],
+        weight_scale: f32,
+        activations: &[i8; 256],
+        activation_scale: f32,
+    ) -> f32 {
+        let pow3: [u16; 6] = [1, 3, 9, 27, 81, 243];
+        let mut sum = 0_i32;
+        let mut j = 0_usize;
+        while j < 48 - 48 % 32 {
+            for l in 0..5_usize {
+                for m in 0..32_usize {
+                    let q = (qs[j + m] as u16 * pow3[l]) as u8;
+                    let xi = ((q as u16) * 3) >> 8;
+                    sum += (xi as i32 - 1) * activations[j * 5 + l * 32 + m] as i32;
+                }
+            }
+            j += 32;
+        }
+        let mut j = 48 - 48 % 32;
+        while j < 48 {
+            for l in 0..5_usize {
+                for m in 0..16_usize {
+                    let q = (qs[j + m] as u16 * pow3[l]) as u8;
+                    let xi = ((q as u16) * 3) >> 8;
+                    sum += (xi as i32 - 1) * activations[j * 5 + l * 16 + m] as i32;
+                }
+            }
+            j += 16;
+        }
+        for l in 0..4_usize {
+            for jj in 0..4_usize {
+                let q = (qh[jj] as u16 * pow3[l]) as u8;
+                let xi = ((q as u16) * 3) >> 8;
+                sum += (xi as i32 - 1) * activations[48 * 5 + l * 4 + jj] as i32;
+            }
+        }
+        sum as f32 * (weight_scale * activation_scale)
+    }
+
+    #[test]
+    fn tq1_0_q8_k_row_matches_the_reference_bit_for_bit() {
+        // A spread of byte values rather than a uniform fill: a block of equal bytes cannot fail
+        // on the index arithmetic, which is the thing most likely to be wrong here.
+        let mut qs = [0_u8; 48];
+        let mut qh = [0_u8; 4];
+        let mut activations = [0_i8; 256];
+        let mut state = 0x2545_F491_4F6C_DD1D_u64;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        for byte in qs.iter_mut() {
+            *byte = (next() % 243) as u8;
+        }
+        for byte in qh.iter_mut() {
+            *byte = (next() % 81) as u8;
+        }
+        for value in activations.iter_mut() {
+            *value = ((next() % 255) as i64 - 127) as i8;
+        }
+
+        let weight_scale_bits = f32_to_f16(0.015_625);
+        let activation_scale = 0.012_345_f32;
+        let mut weights = Vec::new();
+        weights.extend_from_slice(&qs);
+        weights.extend_from_slice(&qh);
+        weights.extend_from_slice(&weight_scale_bits.to_le_bytes());
+        assert_eq!(weights.len(), TQ1_0_BLOCK_BYTES);
+
+        let actual = dot_tq1_0_q8_k_row_scalar(
+            &weights,
+            &activations,
+            &[activation_scale],
+            0,
+            0,
+            256,
+        );
+        let expected = reference_tq1_0_q8_k(
+            &qs,
+            &qh,
+            f16_to_f32(weight_scale_bits),
+            &activations,
+            activation_scale,
+        );
+
+        assert_eq!(
+            actual.to_bits(),
+            expected.to_bits(),
+            "TQ1_0 x Q8_K must be bit-exact with ggml: {actual} vs {expected}"
+        );
+    }
+
+    #[test]
+    fn tq1_0_q8_k_row_is_sensitive_to_activation_order() {
+        // The activation index strides by the base-3 plane, so reading activations sequentially
+        // would transpose one operand. Reversing them must change the answer -- if it does not,
+        // this kernel is not reading the layout it claims to.
+        let qs = [7_u8; 48];
+        let qh = [5_u8; 4];
+        let mut activations = [0_i8; 256];
+        for (index, value) in activations.iter_mut().enumerate() {
+            *value = (index as i32 - 128) as i8;
+        }
+        let scale_bits = f32_to_f16(0.5);
+        let mut weights = Vec::new();
+        weights.extend_from_slice(&qs);
+        weights.extend_from_slice(&qh);
+        weights.extend_from_slice(&scale_bits.to_le_bytes());
+
+        let forward = dot_tq1_0_q8_k_row_scalar(&weights, &activations, &[1.0], 0, 0, 256);
+        let mut reversed = activations;
+        reversed.reverse();
+        let backward = dot_tq1_0_q8_k_row_scalar(&weights, &reversed, &[1.0], 0, 0, 256);
+
+        assert_ne!(forward, backward);
+    }
+
+    #[test]
+    fn tq1_0_declares_q8_k_activations_and_its_own_block_geometry() {
+        // PTQ1_0 and TQ1_0 are different formats and the kernel must not confuse them: group 256
+        // in 54 bytes against Q8_K activations, not group 128 in 28 against Q8_0.
+        let format = WeightFormat::from_code(9).expect("TQ1_0 weight format code");
+        assert_eq!(format.block_bytes(), 54);
+        assert_eq!(format.block_elements(), 256);
+        assert!(format.activation_format() == ActivationFormat::Q8K);
+        assert_eq!(WeightFormat::Ptq.block_bytes(), 28);
+        assert_eq!(WeightFormat::Ptq.block_elements(), 128);
+        assert!(WeightFormat::Ptq.activation_format() == ActivationFormat::Q8_0);
+    }
+
+    #[test]
+    fn tq1_0_q8_k_capability_is_advertised() {
+        assert_ne!(
+            jmodels_kernels_capabilities() & CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL,
+            0
+        );
+    }
+
     use super::*;
 
     fn matrix_job_of(weight_bytes: usize) -> MatrixJob {
@@ -6277,6 +6534,7 @@ mod tests {
                 | q5_1_simd_capability()
                 | CAPABILITY_Q8_0_F32_ACTIVATION_BATCHED_MATMUL
                 | CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL
+                | CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL
                 | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
                 | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
                 | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL

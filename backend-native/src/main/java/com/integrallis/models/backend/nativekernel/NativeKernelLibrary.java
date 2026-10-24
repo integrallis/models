@@ -67,6 +67,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private static final int FORMAT_Q5_1 = 6;
   private static final int FORMAT_Q8_0_F32_ACTIVATION = 8;
   private static final int FORMAT_PTQ1_0 = 7;
+  private static final int FORMAT_TQ1_0 = 9;
   private static final Linker LINKER = Linker.nativeLinker();
   private static final MethodHandle FLOAT_ARRAY_SEGMENT = floatArraySegment();
   private static final FunctionDescriptor BF16_BATCHED_DESCRIPTOR =
@@ -1153,6 +1154,28 @@ public final class NativeKernelLibrary implements AutoCloseable {
         output);
   }
 
+  /**
+   * Computes a batch-major {@code input[batch, cols] * weights[rows, cols]} TQ1_0 projection.
+   *
+   * <p>Quantizes the activations to Q8_K, as ggml does for this weight type, so the result is
+   * bit-exact with {@code ggml_vec_dot_tq1_0_q8_K} rather than merely close to it.
+   */
+  public void tq1_0F32BatchedMatmul(
+      MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
+    f32BatchedMatmul(
+        "TQ1_0",
+        FORMAT_TQ1_0,
+        256,
+        54L,
+        NativeKernelCapability.TQ1_0_Q8_K_BATCHED_MATMUL,
+        weights,
+        input,
+        batchSize,
+        rows,
+        cols,
+        output);
+  }
+
   /** Computes a batch-major {@code input[batch, cols] * weights[rows, cols]} Q4_K projection. */
   public void q4_KF32BatchedMatmul(
       MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
@@ -1352,6 +1375,31 @@ public final class NativeKernelLibrary implements AutoCloseable {
         "PTQ1_0",
         FORMAT_PTQ1_0,
         NativeKernelCapability.PTQ1_0_Q8_0_BATCHED_MATMUL,
+        weights,
+        weightBytes,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        rows,
+        cols);
+  }
+
+  void tq1_0F32BatchedMatmul(
+      MemorySegment weights,
+      long weightBytes,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int batchSize,
+      int rows,
+      int cols) {
+    invokeBatched(
+        "TQ1_0",
+        FORMAT_TQ1_0,
+        NativeKernelCapability.TQ1_0_Q8_K_BATCHED_MATMUL,
         weights,
         weightBytes,
         nativeInput,

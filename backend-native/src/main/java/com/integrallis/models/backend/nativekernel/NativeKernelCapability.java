@@ -63,6 +63,14 @@ public enum NativeKernelCapability {
   Q8_0_F32_ACTIVATION_BATCHED_MATMUL(1L << 28),
   /** PTQ1_0 packed ternary rows with Q8_0 activation quantization. */
   PTQ1_0_Q8_0_BATCHED_MATMUL(1L << 24),
+
+  /**
+   * TQ1_0 weights against Q8_K activations, which is what ggml computes for this type.
+   *
+   * <p>Not interchangeable with {@link #PTQ1_0_Q8_0_BATCHED_MATMUL}: ggml's TQ1_0 is group 256 in
+   * 54 bytes against Q8_K, PrismML's PTQ1_0 is group 128 in 28 bytes against Q8_0.
+   */
+  TQ1_0_Q8_K_BATCHED_MATMUL(1L << 29),
   /** Fixed-tree BF16 projections for the supported shape and vector configuration. */
   BF16_F32_BATCHED_MATMUL(1L << 25),
   /** Deterministic float SwiGLU with checked finite gates. */

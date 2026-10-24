@@ -28,7 +28,8 @@
     "BF16_F32_BATCHED_MATMUL": 33554432,
     "SWIGLU_F32": 67108864,
     "SLEEF_ACTIVATIONS_F32": 134217728,
-    "Q8_0_F32_ACTIVATION_BATCHED_MATMUL": 268435456
+    "Q8_0_F32_ACTIVATION_BATCHED_MATMUL": 268435456,
+    "TQ1_0_Q8_K_BATCHED_MATMUL": 536870912
   },
   "exports": {
     "cpu": [
@@ -74,7 +75,8 @@
     "q8_0-f32-activation-projection",
     "q8_0-projection",
     "swiglu-activation",
-    "worker-context"
+    "worker-context",
+    "tq1_0-projection"
   ],
   "operations": [
     {
@@ -795,6 +797,48 @@
         "Implement a Q8F32ActivationAvx2 row kernel mirroring Q5_1Avx2 and bit-compare it against the scalar route, which is what makes this kernel worth keeping rather than reverting.",
         "Beat the Java exact path's 3.3 s per decision on the published cohort; at 27 s scalar it is 6.4x slower and no caller can justify selecting it.",
         "Qualify on a second independent dataset and on every retained profile, then adopt as the decision default or remove the capability."
+      ],
+      "sourceScope": "cpu"
+    },
+    {
+      "id": "tq1_0-projection",
+      "status": "UNPROVEN",
+      "summary": "ggml TQ1_0 weights against Q8_K activations. Exists because our exact-F32 path is not the reference arithmetic, not because the JVM cannot do it: bit-exactness with ggml_vec_dot_tq1_0_q8_K is the requirement, and speed is a second, unproven motive.",
+      "capabilities": [
+        "TQ1_0_Q8_K_BATCHED_MATMUL"
+      ],
+      "exports": {
+        "cpu": [
+          "jmodels_quantized_f32_batched_matmul_with_context",
+          "jmodels_quantized_f32_grouped_batched_matmul_with_context",
+          "jmodels_quantized_f32_independent_batched_matmul_with_context"
+        ]
+      },
+      "dispatch": [
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGgufBatchedMatrixKernel.java",
+          "anchor": "case TQ1_0 ->"
+        }
+      ],
+      "requiredProfiles": [
+        "linux-x86_64",
+        "linux-aarch64",
+        "macos-x86_64",
+        "macos-aarch64",
+        "windows-x86_64",
+        "windows-aarch64"
+      ],
+      "evidence": [
+        {
+          "path": "benchmark-results/2026-10-24-maple-oracle-ladder/README.md",
+          "kind": "measured",
+          "sha256": "c4f7f48c42f36a41eb691fa926ac1d540c810d8c6fd8be3ba11300615e6b4c27"
+        }
+      ],
+      "remaining": [
+        "Replace TensorOps.ggufExactBatchedMatmul for TQ1_0 on the Java side; the exact F32 path stays only as a parity oracle.",
+        "Re-run the maple ladder against llama-eval-callback and the 355- and 1222-token continuations; maple is not qualified until those match (#299).",
+        "No AVX2 variant yet: the scalar kernel accumulates one exact i32 per block, which is bit-exact and unvectorized."
       ],
       "sourceScope": "cpu"
     }
