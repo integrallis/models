@@ -5048,6 +5048,7 @@ fn dot_q8_0_f32_activation_row_scalar(
 /// # Safety
 /// The caller must assign this worker an exclusive `start_row..end_row` of `output`, and the
 /// shapes must already be validated.
+#[allow(clippy::too_many_arguments)]
 unsafe fn compute_q8_0_f32_activation_batched_row_range_scalar(
     weights: &[u8],
     activations: &[f32],
