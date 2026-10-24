@@ -71,12 +71,29 @@ Laya's per-decision latency also reproduced across two runs: p50 3264.85 ms and 
   `../2026-09-24-decision-latency/REPRODUCE.md` requires. The *ratio* is same-host and back to
   back, so it is meaningful; the absolute seconds are not comparable to any published figure and
   must not be quoted as a product latency.
-- **Harriet ran with no prefix sharing — 0 of 120, by its own report line.** That is not a setup
-  failure: `Qwen35DecoderAdapter` has never implemented `supportsSharedPrefixes`, so the mechanism
-  does not exist for Harriet's own base architecture. Its amortised profile
-  (`prefill 5.89 s` once, then `~0.42 s` per question) could not be reproduced here at all, and
-  this cohort could not show it anyway — every JevBench item carries its own state, so there is
-  nothing to share. **This table is Harriet's unshared mode, which is its worst case.**
+- **Harriet ran with no prefix reuse — 0 of 120, by its own report line.** That is not a setup
+  failure and not a missing capability: **every JevBench item carries its own state, so there is no
+  common prefix to reuse.** `../2026-09-24-decision-latency/REPRODUCE.md` says so directly — the
+  per-question latency the release is about is not measurable on this cohort. **This table is
+  therefore Harriet's unshared mode, which is its worst case**, and its amortised profile
+  (`prefill 5.89 s` once, then `~0.42 s` per question) is a different and legitimate measurement
+  recorded in `../../models-decisions/benchmark-results/2026-09-21-jev-sidebyside/`.
+
+  **Correction, 2026-10-23.** An earlier version of this file claimed that amortised profile was
+  unreproducible because "the mechanism does not exist for Harriet's own base architecture." That
+  was wrong, and it was wrong in an instructive way: it read one capability flag and inferred the
+  absence of a different mechanism. There are two, and they are not interchangeable:
+
+  | capability | qwen35 | what it does |
+  | --- | --- | --- |
+  | `supportsSharedPrefixes` | false | freeze one prefix and `fork()` it into parallel branches — batch candidate scoring |
+  | `supportsResumption` | **true** (`Qwen35DecoderAdapter:153`) | return to a position already read without re-reading it |
+
+  Harriet's briefing asks its questions **sequentially** against one document, which needs
+  resumption, not forking — and `Qwen35ForwardPass:358` captures the Gated DeltaNet state required
+  to resume a retained prefix. The reuse in those records is real, and the numbers in the same file
+  prove it independently: a 5.89 s prefill paid once against ten marginals near 0.42 s is not what
+  re-reading the document per question would cost.
 - **Harriet's accuracy here is 0.8833 against 0.8917 and 0.9000 in the two older records** — one
   to two items, at a cohort whose stated noise floor is one item. Consistent, not identical.
 - **No TTFT or TPOT for Laya.** It answers in one non-autoregressive pass; there is no first token

@@ -118,7 +118,12 @@ public final class HarrietBriefing {
 
       StringBuilder json = new StringBuilder();
       json.append("{\"system\":\"integrallis-harriet\",\"kernel\":\"").append(kernel).append('"');
-      json.append(",\"model\":\"qwen3.5-4b-q4_k_m\",\"readout\":\"letter-logits\",\"head\":null");
+      // Read from the descriptor, not written as a literal. A hardcoded model name survives being
+      // pointed at a different artifact, and a reader cannot tell. This record is the only
+      // surviving account of a host that no longer exists.
+      json.append(",\"model\":\"").append(runtime.descriptor().alias()).append('"');
+      json.append(",\"marker_coordinate\":\"").append(runtime.descriptor().markerCoordinate()).append('"');
+      json.append(",\"readout\":\"letter-logits\",\"head\":null");
       json.append(",\"questions\":").append(questions.size());
       json.append(",\"prefill_s\":").append(round(prefillSeconds));
       json.append(",\"marginal_s\":[");
@@ -130,7 +135,21 @@ public final class HarrietBriefing {
         json.append(index == 0 ? "" : ",").append(round(probabilities.get(index)));
       }
       json.append("],\"total_s\":").append(round(total));
-      json.append(",\"prefix_shared\":true");
+      // DERIVED from the measurements above, not asserted. This was `true` as a literal, which no
+      // run could falsify -- and it is ambiguous besides: this demo reuses the document's state by
+      // RESUMPTION (one session, questions asked in sequence), not by freezing a prefix and
+      // forking it, which is a separate capability the qwen35 decoder does not have. Reading the
+      // literal as the latter is a real misreading that happened on 2026-10-23.
+      //
+      // The check is the evidence: if the document had been re-read for every question, each
+      // marginal would cost about what the prefill cost. A median marginal far below the prefill
+      // is what "shared" means here, and it is computable from the numbers in this same file.
+      List<Double> sortedMarginal = new ArrayList<>(marginal);
+      java.util.Collections.sort(sortedMarginal);
+      double medianMarginal = sortedMarginal.get(sortedMarginal.size() / 2);
+      json.append(",\"prefix_mechanism\":\"resumption\"");
+      json.append(",\"prefix_reuse_observed\":").append(medianMarginal * 2 < prefillSeconds);
+      json.append(",\"median_marginal_s\":").append(round(medianMarginal));
       json.append(",\"native_kernel_abi\":\"").append(abi).append('"');
       json.append(",\"worker_threads\":").append(threads);
       json.append(",\"host\":\"").append(System.getProperty("harriet.demo.host", "unstated")).append("\"}");
