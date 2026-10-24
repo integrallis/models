@@ -859,6 +859,80 @@ class NativeKernelLibraryTest {
   }
 
   @Test
+  void theExactActivationQ8_0RouteIsCloserToAnF32ReferenceThanTheQuantizingRoute() {
+    // Both routes read the same Q8_0 weights. The difference is the activations: the default route
+    // quantizes them to eight bits as llama.cpp does, and this one does not. Measured against the
+    // real model on 2026-10-23 that cost three of 120 items on a typed-decision cohort, so the
+    // claim under test is that this route is nearer the unquantized answer.
+    //
+    // The assertion is an ORDERING, not a tolerance, so it carries no constant anybody could tune
+    // to make it pass. The second half is a negative control: if the two routes were in fact the
+    // same code, the quantizing route would be equally close and this would fail.
+    int batchSize = 3;
+    int rows = 5;
+    int cols = 64;
+    float[] input = inputs(batchSize, cols);
+    float[] reference = new float[batchSize * rows];
+    float[] exactActivations = new float[batchSize * rows];
+    float[] quantizedActivations = new float[batchSize * rows];
+
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment weights = arena.allocate(rows * cols / 32L * 34L);
+      fillQ8_0Weights(weights, rows, cols);
+      referenceQ8_0F32ActivationBatchedMatmul(weights, input, batchSize, rows, cols, reference);
+
+      try (RustGgufBatchedMatrixKernel kernel =
+          RustGgufBatchedMatrixKernel.openExactActivations(libraryPath(), 1)) {
+        assertThat(kernel.supports(GgufTensorType.Q8_0)).isTrue();
+        kernel.multiply(
+            exactActivations, input, weights, GgufTensorType.Q8_0, batchSize, rows, cols);
+      }
+      try (RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+        kernel.multiply(
+            quantizedActivations, input, weights, GgufTensorType.Q8_0, batchSize, rows, cols);
+      }
+    }
+
+    double exactWorst = worstAbsoluteDelta(exactActivations, reference);
+    double quantizedWorst = worstAbsoluteDelta(quantizedActivations, reference);
+
+    assertThat(exactWorst)
+        .as(
+            "the F32-activation route must be nearer the unquantized reference than the"
+                + " quantizing one (exact %s, quantizing %s)",
+            exactWorst, quantizedWorst)
+        .isLessThan(quantizedWorst);
+  }
+
+  /** Dequantizes Q8_0 weights and reduces in F32, which is what the activations are spared. */
+  private static void referenceQ8_0F32ActivationBatchedMatmul(
+      MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
+    int blocksPerRow = cols / 32;
+    for (int batch = 0; batch < batchSize; batch++) {
+      for (int row = 0; row < rows; row++) {
+        double sum = 0;
+        for (int block = 0; block < blocksPerRow; block++) {
+          long weightOffset = ((long) row * blocksPerRow + block) * 34;
+          float weightScale = Float.float16ToFloat(weights.get(LE_SHORT, weightOffset));
+          for (int lane = 0; lane < 32; lane++) {
+            byte quant = weights.get(ValueLayout.JAVA_BYTE, weightOffset + 2 + lane);
+            sum += (double) input[batch * cols + block * 32 + lane] * (quant * weightScale);
+          }
+        }
+        output[batch * rows + row] = (float) sum;
+      }
+    }
+  }
+
+  private static double worstAbsoluteDelta(float[] actual, float[] expected) {
+    double worst = 0;
+    for (int index = 0; index < expected.length; index++) {
+      worst = Math.max(worst, Math.abs(actual[index] - expected[index]));
+    }
+    return worst;
+  }
+
+  @Test
   void reusableGgufKernelComputesQ5_0BatchedMatrixMultiplicationWithinReductionTolerance() {
     int batchSize = 3;
     int rows = 5;

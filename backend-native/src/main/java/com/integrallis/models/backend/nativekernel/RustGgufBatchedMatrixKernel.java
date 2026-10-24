@@ -102,6 +102,20 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return open(libraryPath, NativeKernelSettings.fromSystemProperties(Map.of()));
   }
 
+  /**
+   * Opens an explicit platform library in the mode that keeps Q8_0 activations in F32.
+   *
+   * <p>The bundled counterpart is {@link #openBundledExactActivations(int)}. Both exist for the
+   * same reason {@code SopranoTextToSpeechModel} offers a bundled and an explicit-path opener: a
+   * caller holding the library itself should not have to go through resource resolution.
+   */
+  public static RustGgufBatchedMatrixKernel openExactActivations(
+      Path libraryPath, int recommendedThreads) {
+    NativeKernelLibrary library = NativeKernelLibrary.open(libraryPath, recommendedThreads);
+    parkJavaExecutor();
+    return new RustGgufBatchedMatrixKernel(library, true);
+  }
+
   /** Opens an explicit platform library with a model-specific worker recommendation. */
   public static RustGgufBatchedMatrixKernel open(Path libraryPath, int recommendedThreads) {
     return open(
