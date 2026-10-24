@@ -114,6 +114,13 @@ jobs:
           python3 scripts/test-dependency-policy.py
           python3 scripts/test-published-consumers.py
 
+      # Refuses a constant where a measurement belongs. Three fields read as evidence on
+      # 2026-10-23 and were literals: HOLD_ON_FAIL behind `[ "1" = "1" ]`, so every failed shard
+      # held 45 minutes of billed time; and `prefix_shared` hardcoded in two evidence writers,
+      # one of which was then misread as proof of a capability the flag did not describe.
+      - name: Evidence fields must be measured, not asserted
+        run: bash scripts/check-evidence-literals.sh
+
       - name: Retain dependency and consumer evidence
         if: always()
         uses: actions/upload-artifact@v7

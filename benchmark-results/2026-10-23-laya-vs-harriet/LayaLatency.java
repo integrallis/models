@@ -19,6 +19,10 @@ import java.util.regex.Pattern;
  * Laya has no shared prefill to amortise -- it answers in one non-autoregressive pass -- so its
  * one-off cost is the model load and its marginal cost is the whole decision. That asymmetry is
  * the finding, not a gap in the measurement.
+ *
+ * <p>Deliberately emits no `prefix_shared` field. There is no prefix to reuse here, so any value
+ * would be a constant no run could falsify, and a constant in an evidence file is what made the
+ * Harriet records misreadable in the first place. The absence of the field is the honest report.
  */
 public final class LayaLatency {
   public static void main(String[] args) throws Exception {
@@ -67,7 +71,6 @@ public final class LayaLatency {
       System.out.printf("{%n");
       System.out.printf("  \"model\": \"laya-q8_0\",%n");
       System.out.printf("  \"readout\": \"typed-decision single pass\",%n");
-      System.out.printf("  \"prefix_shared\": false,%n");
       System.out.printf("  \"decisions\": %d,%n", millis.length);
       System.out.printf("  \"load_s\": %.4f,%n", loadSeconds);
       System.out.printf("  \"marginal_ms_mean\": %.2f,%n", sum / millis.length);
