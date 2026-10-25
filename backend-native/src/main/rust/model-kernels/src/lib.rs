@@ -12,7 +12,7 @@ mod swiglu;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::slice;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 use std::thread::{self, JoinHandle};
 
 #[cfg(test)]
@@ -70,7 +70,7 @@ fn record_q6_k_single_horizontal_reduction() {
     Q6_K_SINGLE_HORIZONTAL_REDUCTIONS.with(|count| count.set(count.get() + 1));
 }
 
-const ABI_VERSION: u32 = 7;
+const ABI_VERSION: u32 = 8;
 const CAPABILITY_Q4_0_F32_BATCHED_MATMUL: u64 = 1;
 const CAPABILITY_Q4_0_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 1;
 const CAPABILITY_PERSISTENT_WORKER_CONTEXT: u64 = 1 << 2;
@@ -375,8 +375,79 @@ impl WeightFormat {
 }
 
 pub struct KernelContext {
-    workers: WorkerPool,
+    workers: ContextPool,
     scratch: Mutex<ActivationScratch>,
+    /// Row-taking workers this context wants on its next job, 1..=pool size, or 0 for the whole
+    /// pool. Held per context rather than on the pool: several models in one process share the
+    /// pool's threads, and each still tunes decode against prefill for itself.
+    active_threads: AtomicUsize,
+}
+
+/// The worker threads a context runs on: the process-wide pool, or its own.
+///
+/// One pool per process is the default because a pool is sized for every logical CPU, so a second
+/// resident model otherwise doubles the threads competing for the same cores. `Owned` exists for
+/// the measurement seam and for tests that need a pool of a known size.
+enum ContextPool {
+    Shared(&'static WorkerPool),
+    Owned(WorkerPool),
+}
+
+impl std::ops::Deref for ContextPool {
+    type Target = WorkerPool;
+
+    fn deref(&self) -> &WorkerPool {
+        match self {
+            ContextPool::Shared(pool) => pool,
+            ContextPool::Owned(pool) => pool,
+        }
+    }
+}
+
+/// The process-wide pool, sized for this machine on first use.
+///
+/// Sized by the host rather than by whichever model opened first, so one model asking for a
+/// narrow partition cannot cap every later model in the process.
+static SHARED_POOL: OnceLock<Option<WorkerPool>> = OnceLock::new();
+
+fn shared_pool() -> Option<&'static WorkerPool> {
+    SHARED_POOL
+        .get_or_init(|| {
+            WorkerPool::new(
+                thread::available_parallelism()
+                    .map_or(1, usize::from)
+                    .min(256),
+            )
+            .ok()
+        })
+        .as_ref()
+}
+
+impl KernelContext {
+    /// Partitions for this context's next job: its own preference, or the whole pool.
+    fn desired_partitions(&self) -> usize {
+        let desired = self.active_threads.load(Ordering::Acquire);
+        if desired == 0 {
+            self.workers.total_threads
+        } else {
+            desired
+        }
+    }
+
+    fn execute_matrix(&self, job: ParallelJob) -> bool {
+        self.workers
+            .execute_matrix_with(job, self.desired_partitions())
+    }
+
+    fn execute_gated_delta_net(&self, job: GatedDeltaNetJob) -> bool {
+        self.workers
+            .execute_gated_delta_net_with(job, self.desired_partitions())
+    }
+
+    fn execute_attention(&self, job: AttentionJob) -> bool {
+        self.workers
+            .execute_attention_with(job, self.desired_partitions())
+    }
 }
 
 #[derive(Default)]
@@ -554,9 +625,20 @@ impl WorkerPool {
         Ok(pool)
     }
 
+    /// Test seam: the sticky form. Production carries the count per job via the `*_with` calls.
+    #[cfg(test)]
     fn set_active_threads(&self, requested: usize) -> usize {
         let active = requested.clamp(1, self.total_threads);
         let _execution = lock(&self.execution);
+        self.ensure_active(active);
+        active
+    }
+
+    /// Moves the activation gate to `active`, waking any worker it brings back in.
+    ///
+    /// The caller must hold `execution`, so a context that gates and then publishes a job does
+    /// both without another context's gate landing in between.
+    fn ensure_active(&self, active: usize) {
         let previous = self.active_threads.swap(active, Ordering::AcqRel);
         let state = lock(&self.shared.state);
         if active > previous {
@@ -570,14 +652,15 @@ impl WorkerPool {
             self.shared.activation.notify_all();
         }
         drop(state);
-        active
     }
 
-    fn execute_matrix(&self, mut job: ParallelJob) -> bool {
-        let partitions = self
-            .active_threads
-            .load(Ordering::Acquire)
-            .clamp(1, self.total_threads);
+    #[cfg(test)]
+    fn execute_matrix(&self, job: ParallelJob) -> bool {
+        self.execute_matrix_with(job, self.active_threads.load(Ordering::Acquire))
+    }
+
+    fn execute_matrix_with(&self, mut job: ParallelJob, desired: usize) -> bool {
+        let partitions = desired.clamp(1, self.total_threads);
         job.partitions = partitions;
         if self.workers.is_empty()
             || partitions == 1
@@ -591,6 +674,7 @@ impl WorkerPool {
         }
 
         let _execution = lock(&self.execution);
+        self.ensure_active(partitions);
         {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::Matrix(job));
@@ -623,7 +707,7 @@ impl WorkerPool {
         self.await_workers(caller_succeeded)
     }
 
-    fn execute_gated_delta_net(&self, job: GatedDeltaNetJob) -> bool {
+    fn execute_gated_delta_net_with(&self, job: GatedDeltaNetJob, desired: usize) -> bool {
         // Heads and branches own disjoint state. Prefix and decode work use the existing
         // projection pool; a single unit needs no worker dispatch.
         let units = job.branch_count * job.value_head_count;
@@ -635,10 +719,7 @@ impl WorkerPool {
             .is_ok();
         }
 
-        let partitions = self
-            .active_threads
-            .load(Ordering::Acquire)
-            .clamp(1, self.total_threads);
+        let partitions = desired.clamp(1, self.total_threads);
         if partitions == 1 {
             return catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: the caller owns all recurrence buffers for this synchronous execution.
@@ -647,14 +728,11 @@ impl WorkerPool {
             .is_ok();
         }
         let _execution = lock(&self.execution);
+        self.ensure_active(partitions);
         {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::GatedDeltaNet(job));
             state.failed = false;
-            self.shared
-                .partitions
-                .0
-                .store(partitions, Ordering::Release);
             self.shared
                 .remaining
                 .0
@@ -676,7 +754,7 @@ impl WorkerPool {
         self.await_workers(caller_succeeded)
     }
 
-    fn execute_attention(&self, job: AttentionJob) -> bool {
+    fn execute_attention_with(&self, job: AttentionJob, desired: usize) -> bool {
         if self.workers.is_empty() || job.num_kv_heads == 1 {
             return catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: the caller owns all recurrence buffers for this synchronous execution.
@@ -686,10 +764,7 @@ impl WorkerPool {
             .is_ok();
         }
 
-        let partitions = self
-            .active_threads
-            .load(Ordering::Acquire)
-            .clamp(1, self.total_threads);
+        let partitions = desired.clamp(1, self.total_threads);
         if partitions == 1 {
             return catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: the caller owns all recurrence buffers for this synchronous execution.
@@ -698,14 +773,11 @@ impl WorkerPool {
             .is_ok();
         }
         let _execution = lock(&self.execution);
+        self.ensure_active(partitions);
         {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::Attention(job));
             state.failed = false;
-            self.shared
-                .partitions
-                .0
-                .store(partitions, Ordering::Release);
             self.shared
                 .remaining
                 .0
@@ -1816,21 +1888,61 @@ pub unsafe extern "C" fn jmodels_causal_depthwise_conv_silu_f32(
     STATUS_OK
 }
 
+fn requested_threads(thread_count: u32) -> usize {
+    let requested = if thread_count == 0 {
+        thread::available_parallelism().map_or(1, usize::from)
+    } else {
+        thread_count as usize
+    };
+    requested.min(256)
+}
+
+fn new_context(workers: ContextPool) -> *mut KernelContext {
+    Box::into_raw(Box::new(KernelContext {
+        workers,
+        scratch: Mutex::new(ActivationScratch::default()),
+        active_threads: AtomicUsize::new(0),
+    }))
+}
+
 #[unsafe(no_mangle)]
+/// Opens a context on the process-wide worker pool, creating that pool on the first call.
+///
+/// `thread_count` sizes the pool only when this is the first context in the process; later
+/// contexts join the pool that exists and report its size back through
+/// `jmodels_kernels_context_set_active_threads`. Sharing is the default because a pool takes one
+/// thread per logical CPU, so a second resident model would otherwise double the threads
+/// contending for the same cores. Each context keeps its own active-thread preference and its own
+/// activation scratch.
 pub extern "C" fn jmodels_kernels_context_create(thread_count: u32) -> *mut KernelContext {
+    match catch_unwind(AssertUnwindSafe(|| match shared_pool() {
+        Some(pool) => {
+            let context = new_context(ContextPool::Shared(pool));
+            if thread_count != 0 && !context.is_null() {
+                // SAFETY: new_context just returned this unique, non-null pointer.
+                let reference = unsafe { &*context };
+                let width = (thread_count as usize).clamp(1, pool.total_threads);
+                reference.active_threads.store(width, Ordering::Release);
+            }
+            context
+        }
+        None => std::ptr::null_mut(),
+    })) {
+        Ok(context) => context,
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[unsafe(no_mangle)]
+/// Opens a context on its own worker pool of exactly `thread_count` threads.
+///
+/// This is the measurement seam and the route for tests that need a pool of a known size. A
+/// process that opens several of these pays one pool per context; production opens
+/// `jmodels_kernels_context_create` instead.
+pub extern "C" fn jmodels_kernels_context_create_private(thread_count: u32) -> *mut KernelContext {
     match catch_unwind(AssertUnwindSafe(|| {
-        let requested_threads = if thread_count == 0 {
-            thread::available_parallelism().map_or(1, usize::from)
-        } else {
-            thread_count as usize
-        };
-        WorkerPool::new(requested_threads.min(256))
-            .map(|workers| {
-                Box::into_raw(Box::new(KernelContext {
-                    workers,
-                    scratch: Mutex::new(ActivationScratch::default()),
-                }))
-            })
+        WorkerPool::new(requested_threads(thread_count))
+            .map(|pool| new_context(ContextPool::Owned(pool)))
             .unwrap_or(std::ptr::null_mut())
     })) {
         Ok(context) => context,
@@ -1954,7 +2066,7 @@ pub unsafe extern "C" fn jmodels_grouped_attention_f32_with_context(
     match catch_unwind(AssertUnwindSafe(|| {
         // SAFETY: Java owns the context and every buffer for this synchronous call.
         let context = unsafe { &*context };
-        context.workers.execute_attention(job)
+        context.execute_attention(job)
     })) {
         Ok(true) => STATUS_OK,
         Ok(false) => STATUS_PANIC,
@@ -1978,12 +2090,32 @@ pub unsafe extern "C" fn jmodels_kernels_context_set_active_threads(
     }
     // SAFETY: Java owns the context for the duration of this synchronous call.
     let context = unsafe { &*context };
-    let requested = if thread_count == 0 {
-        context.workers.total_threads
+    let total = context.workers.total_threads;
+    let active = if thread_count == 0 {
+        total
     } else {
-        thread_count as usize
+        (thread_count as usize).clamp(1, total)
     };
-    context.workers.set_active_threads(requested) as i32
+    context.active_threads.store(active, Ordering::Release);
+    active as i32
+}
+
+#[unsafe(no_mangle)]
+/// The number of threads in the pool this context runs on. Read-only: it does not change this
+/// context's partition width.
+///
+/// # Safety
+///
+/// `context` must be a live pointer returned by one of the context creators.
+pub unsafe extern "C" fn jmodels_kernels_context_thread_count(
+    context: *const KernelContext,
+) -> u32 {
+    if context.is_null() {
+        return 0;
+    }
+    // SAFETY: Java owns the context for the duration of this synchronous call.
+    let context = unsafe { &*context };
+    context.workers.total_threads as u32
 }
 
 #[unsafe(no_mangle)]
@@ -2123,7 +2255,7 @@ pub unsafe extern "C" fn jmodels_gated_delta_net_f32_with_context(
     match catch_unwind(AssertUnwindSafe(|| {
         // SAFETY: Java pins every validated array for the duration of this synchronous call.
         let context = unsafe { &*context };
-        context.workers.execute_gated_delta_net(GatedDeltaNetJob {
+        context.execute_gated_delta_net(GatedDeltaNetJob {
             query: query as usize,
             key: key as usize,
             value: value as usize,
@@ -2240,7 +2372,7 @@ pub unsafe extern "C" fn jmodels_gated_delta_net_group_f32_with_context(
     match catch_unwind(AssertUnwindSafe(|| {
         // SAFETY: Java pins every validated array for the duration of this synchronous call.
         let context = unsafe { &*context };
-        context.workers.execute_gated_delta_net(GatedDeltaNetJob {
+        context.execute_gated_delta_net(GatedDeltaNetJob {
             query: query as usize,
             key: key as usize,
             value: value as usize,
@@ -2860,7 +2992,7 @@ fn compute_independent_with_scratch(
         sum_offset += sum_elements;
         output_offset += matrix_output_elements;
     }
-    context.workers.execute_matrix(ParallelJob {
+    context.execute_matrix(ParallelJob {
         matrices,
         matrix_count: formats.len(),
         output_elements: output.len(),
@@ -2920,7 +3052,7 @@ fn compute_grouped_with_scratch(
             });
             output_offset += matrix_output_elements;
         }
-        return context.workers.execute_matrix(ParallelJob {
+        return context.execute_matrix(ParallelJob {
             matrices,
             matrix_count: formats.len(),
             output_elements: output.len(),
@@ -2991,7 +3123,7 @@ fn compute_outputs(
             batch_size,
             cols,
         });
-        return context.workers.execute_matrix(ParallelJob {
+        return context.execute_matrix(ParallelJob {
             matrices,
             matrix_count: 1,
             output_elements: output.len(),
@@ -4669,14 +4801,7 @@ fn compute_output_range(
             DotKernel::Tq1_0Avx2 => {
                 // SAFETY: this variant is selected only after runtime AVX2 detection.
                 unsafe {
-                    dot_tq1_0_q8_k_row_avx2(
-                        weights,
-                        quantized,
-                        activation_scales,
-                        batch,
-                        row,
-                        cols,
-                    )
+                    dot_tq1_0_q8_k_row_avx2(weights, quantized, activation_scales, batch, row, cols)
                 }
             }
             #[cfg(target_arch = "x86_64")]
@@ -5864,8 +5989,7 @@ unsafe fn dot_tq1_0_q8_k_row_avx2(
                         // selection depends on that wrap, so the mask is load-bearing.
                         let wrapped =
                             _mm256_and_si256(_mm256_mullo_epi16(widened, broadcast), byte_mask);
-                        let selected =
-                            _mm256_srli_epi16::<8>(_mm256_mullo_epi16(wrapped, threes));
+                        let selected = _mm256_srli_epi16::<8>(_mm256_mullo_epi16(wrapped, threes));
                         let trits = _mm256_sub_epi16(selected, ones);
 
                         // SAFETY: the reference's own index, bounded by 256 per block.
@@ -5891,8 +6015,8 @@ unsafe fn dot_tq1_0_q8_k_row_avx2(
                 let packed = u32::from(unsafe { *qs.add(QS_BYTES + lane) });
                 let wrapped = (packed * u32::from(*pow as u16)) & 0xFF;
                 let selected = ((wrapped * 3) >> 8) as i32;
-                total += (selected - 1)
-                    * i32::from(unsafe { *activations.add(activation_base + lane) });
+                total +=
+                    (selected - 1) * i32::from(unsafe { *activations.add(activation_base + lane) });
             }
         }
         sum = d.mul_add(total as f32, sum);
@@ -6843,7 +6967,7 @@ mod tests {
 
     #[test]
     fn exports_stable_abi_and_capabilities() {
-        assert_eq!(jmodels_kernels_abi_version(), 7);
+        assert_eq!(jmodels_kernels_abi_version(), 8);
         assert_eq!(
             jmodels_kernels_capabilities(),
             CAPABILITY_Q4_0_F32_BATCHED_MATMUL
@@ -6893,7 +7017,7 @@ mod tests {
     #[test]
     fn gated_delta_net_matches_pinned_freetoken_recurrence() {
         GATED_DELTA_NET_PARALLEL_PARTITIONS.store(0, Ordering::Relaxed);
-        let context = jmodels_kernels_context_create(2);
+        let context = jmodels_kernels_context_create_private(2);
         assert!(!context.is_null());
         let query = [
             0.5, -1.0, 1.5, 0.25, -0.75, 0.5, 0.1, -0.4, 1.25, 0.75, -0.3, 0.9,
@@ -6981,7 +7105,7 @@ mod tests {
 
     #[test]
     fn creates_and_joins_persistent_worker_context() {
-        let context = jmodels_kernels_context_create(4);
+        let context = jmodels_kernels_context_create_private(4);
         assert!(!context.is_null());
         // SAFETY: the test consumes the unique context pointer exactly once.
         assert_eq!(
@@ -7061,7 +7185,7 @@ mod tests {
                 }
             }
         }
-        let context = jmodels_kernels_context_create(4);
+        let context = jmodels_kernels_context_create_private(4);
         assert!(!context.is_null());
         let mut output = vec![0.0_f32; num_heads * value_length + 2];
         let mut scores = vec![0.0_f32; num_heads * total];
@@ -7107,7 +7231,7 @@ mod tests {
             );
         }
         // Empty second span and a 1-worker context must agree with the 4-worker result.
-        let single = jmodels_kernels_context_create(1);
+        let single = jmodels_kernels_context_create_private(1);
         let mut output_single = vec![0.0_f32; num_heads * value_length + 2];
         let status = unsafe {
             jmodels_grouped_attention_f32_with_context(
@@ -7294,7 +7418,7 @@ mod tests {
 
     #[test]
     fn persistent_context_reuses_activation_workspace() {
-        let context = jmodels_kernels_context_create(2);
+        let context = jmodels_kernels_context_create_private(2);
         assert!(!context.is_null());
         let weights = [0_u8; Q4_K_BLOCK_BYTES];
         let input = [0.25_f32; QK_K];
@@ -7354,7 +7478,7 @@ mod tests {
 
     #[test]
     fn grouped_projection_uses_one_worker_generation() {
-        let context = jmodels_kernels_context_create(2);
+        let context = jmodels_kernels_context_create_private(2);
         assert!(!context.is_null());
         let weights: [Vec<u8>; 3] = std::array::from_fn(|_| vec![0_u8; 64 * Q4_0_BLOCK_BYTES]);
         let weight_pointers = [
@@ -7441,7 +7565,7 @@ mod tests {
 
     #[test]
     fn independent_projections_use_one_worker_generation() {
-        let context = jmodels_kernels_context_create(2);
+        let context = jmodels_kernels_context_create_private(2);
         assert!(!context.is_null());
         let weights: [Vec<u8>; 3] = std::array::from_fn(|_| vec![0_u8; 64 * Q4_K_BLOCK_BYTES]);
         let weight_pointers = [
@@ -7510,7 +7634,7 @@ mod tests {
     fn persistent_workers_complete_repeated_generations() {
         const GENERATIONS: u64 = 256;
 
-        let context = jmodels_kernels_context_create(4);
+        let context = jmodels_kernels_context_create_private(4);
         assert!(!context.is_null());
         let weights = vec![0_u8; 64 * Q5_0_BLOCK_BYTES];
         let input = [0.25_f32; QK_0];
@@ -8442,7 +8566,7 @@ mod tests {
         let weights = [0_u8; Q4_0_BLOCK_BYTES];
         let input = [0_f32; QK_0];
         let mut output = [0_f32; 1];
-        let context = jmodels_kernels_context_create(1);
+        let context = jmodels_kernels_context_create_private(1);
         assert!(!context.is_null());
         // SAFETY: the context and test arrays remain live for the synchronous call.
         let status = unsafe {
@@ -8539,7 +8663,7 @@ mod tests {
         let initial = gated_delta_net_fixture(16, SLOTS * STATE_PER_SLOT);
 
         GROUPED_GATED_DELTA_NET_PARALLEL_PARTITIONS.store(0, Ordering::Relaxed);
-        let context = jmodels_kernels_context_create(4);
+        let context = jmodels_kernels_context_create_private(4);
         assert!(!context.is_null());
 
         let mut grouped_state = initial.clone();
@@ -8647,7 +8771,7 @@ mod tests {
         let gates = gated_delta_net_fixture(23, 2);
         let mut state = vec![0.0_f32; 2 * 2 * 2];
         let mut output = vec![0.0_f32; 4];
-        let context = jmodels_kernels_context_create(2);
+        let context = jmodels_kernels_context_create_private(2);
         // SAFETY: every fixture outlives the call; the call is expected to reject before reading.
         assert_eq!(
             unsafe {
@@ -8681,7 +8805,7 @@ mod tests {
 
     #[test]
     fn gated_delta_net_prefix_matches_token_steps_exactly() {
-        let context = jmodels_kernels_context_create(3);
+        let context = jmodels_kernels_context_create_private(3);
         assert!(!context.is_null());
         let tokens = 40;
         let key_heads = 2;
@@ -8793,7 +8917,7 @@ mod tests {
             .ok()
             .and_then(|value| value.parse().ok())
             .unwrap_or(20);
-        let context = jmodels_kernels_context_create(threads as u32);
+        let context = jmodels_kernels_context_create_private(threads as u32);
         assert!(!context.is_null());
 
         let tokens = 64;
@@ -9052,7 +9176,7 @@ mod tests {
     }
     #[test]
     fn q5_1_reuse_matches_scalar_through_real_worker_dispatch() {
-        let context = jmodels_kernels_context_create(4);
+        let context = jmodels_kernels_context_create_private(4);
         assert!(!context.is_null());
         // SAFETY: this test owns the context until the single final destroy.
         let c = unsafe { &*context };
@@ -9112,6 +9236,101 @@ mod tests {
         // SAFETY: consumes the unique live context once.
         assert_eq!(
             unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
+        );
+    }
+
+    /// The defect this pool sharing fixes: a second resident model used to open a second pool of
+    /// one thread per logical CPU, so N models contended with N times the cores' worth of workers.
+    #[test]
+    fn every_context_shares_one_process_pool() {
+        let first = jmodels_kernels_context_create(2);
+        assert!(!first.is_null());
+        let second = jmodels_kernels_context_create(7);
+        assert!(!second.is_null());
+
+        // SAFETY: both pointers come from context_create above and stay live until destroyed.
+        let (first_ref, second_ref) = unsafe { (&*first, &*second) };
+        let first_pool: &WorkerPool = &first_ref.workers;
+        let second_pool: &WorkerPool = &second_ref.workers;
+
+        assert!(
+            std::ptr::eq(first_pool, second_pool),
+            "a second context must join the pool that exists"
+        );
+        assert_eq!(
+            first_pool.total_threads, second_pool.total_threads,
+            "a later context must not resize the pool"
+        );
+        assert_eq!(
+            first_ref.desired_partitions(),
+            2,
+            "the requested count stays this context's partition width"
+        );
+        assert_eq!(
+            second_ref.desired_partitions(),
+            7.min(first_pool.total_threads)
+        );
+
+        // SAFETY: each pointer is destroyed once; destroying one must not take the shared pool
+        // with it, which the second destroy and the still-live thread count below prove.
+        assert_eq!(unsafe { jmodels_kernels_context_destroy(first) }, STATUS_OK);
+        assert!(second_pool.total_threads >= 1);
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(second) },
+            STATUS_OK
+        );
+    }
+
+    /// Sharing the threads must not share the decode/prefill tuning: that is per model.
+    #[test]
+    fn each_context_keeps_its_own_active_thread_preference() {
+        let a = jmodels_kernels_context_create(4);
+        let b = jmodels_kernels_context_create(4);
+        assert!(!a.is_null() && !b.is_null());
+        // SAFETY: both pointers are live for the body of this test.
+        let (a_ref, b_ref) = unsafe { (&*a, &*b) };
+        let total = a_ref.workers.total_threads;
+
+        // SAFETY: both contexts are live; the call only stores a per-context count.
+        let a_active = unsafe { jmodels_kernels_context_set_active_threads(a, 1) };
+        // 0 asks for the whole pool.
+        let b_active = unsafe { jmodels_kernels_context_set_active_threads(b, 0) };
+
+        assert_eq!(a_active, 1);
+        assert_eq!(b_active, total as i32);
+        assert_eq!(a_ref.desired_partitions(), 1);
+        assert_eq!(b_ref.desired_partitions(), total);
+
+        // SAFETY: each pointer is destroyed exactly once.
+        assert_eq!(unsafe { jmodels_kernels_context_destroy(a) }, STATUS_OK);
+        assert_eq!(unsafe { jmodels_kernels_context_destroy(b) }, STATUS_OK);
+    }
+
+    /// The measurement seam: a private context must not be on the shared pool.
+    #[test]
+    fn a_private_context_owns_its_pool() {
+        let shared = jmodels_kernels_context_create(2);
+        let private = jmodels_kernels_context_create_private(3);
+        assert!(!shared.is_null() && !private.is_null());
+        // SAFETY: both pointers are live for the body of this test.
+        let (shared_ref, private_ref) = unsafe { (&*shared, &*private) };
+        let shared_pool: &WorkerPool = &shared_ref.workers;
+        let private_pool: &WorkerPool = &private_ref.workers;
+
+        assert!(!std::ptr::eq(shared_pool, private_pool));
+        assert_eq!(
+            private_pool.total_threads, 3,
+            "a private pool is sized as asked"
+        );
+
+        // SAFETY: each pointer is destroyed exactly once.
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(shared) },
+            STATUS_OK
+        );
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(private) },
             STATUS_OK
         );
     }

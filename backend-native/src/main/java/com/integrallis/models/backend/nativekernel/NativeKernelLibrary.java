@@ -33,8 +33,20 @@ import java.util.Objects;
 /** Versioned FFM access to Models-owned native inference kernels. */
 @SuppressWarnings("restricted")
 public final class NativeKernelLibrary implements AutoCloseable {
-  public static final int ABI_VERSION = 7;
+  public static final int ABI_VERSION = 8;
   public static final String THREAD_COUNT_PROPERTY = "models.native.kernels.threads";
+
+  /**
+   * Whether this process shares one native worker pool across every model it loads; true by
+   * default.
+   *
+   * <p>A pool takes one thread per logical CPU, so a second resident model on its own pool doubles
+   * the threads competing for the same cores and a fourth quadruples them. Sharing sizes the pool
+   * once per process and lets each model keep its own decode/prefill preference. Setting this to
+   * {@code false} restores a pool per model, which exists so the two can be measured against each
+   * other rather than argued about.
+   */
+  public static final String SHARED_POOL_PROPERTY = "models.native.kernels.sharedPool";
 
   /**
    * Workers that take rows on single-token (decode) projections; defaults to the pool size. Batched
@@ -88,6 +100,9 @@ public final class NativeKernelLibrary implements AutoCloseable {
       FunctionDescriptor.of(ValueLayout.JAVA_INT);
   private static final FunctionDescriptor CAPABILITIES_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_LONG);
+  private static final FunctionDescriptor CONTEXT_THREAD_COUNT_DESCRIPTOR =
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS);
+
   private static final FunctionDescriptor CONTEXT_CREATE_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
   private static final FunctionDescriptor SWIGLU_DESCRIPTOR =
@@ -355,9 +370,16 @@ public final class NativeKernelLibrary implements AutoCloseable {
             "native kernel library does not provide a persistent worker context");
       }
       MethodHandle contextCreate =
-          downcall(lookup, "jmodels_kernels_context_create", CONTEXT_CREATE_DESCRIPTOR);
+          downcall(
+              lookup,
+              sharedPoolRequested()
+                  ? "jmodels_kernels_context_create"
+                  : "jmodels_kernels_context_create_private",
+              CONTEXT_CREATE_DESCRIPTOR);
       MethodHandle contextDestroy =
           downcall(lookup, "jmodels_kernels_context_destroy", CONTEXT_DESTROY_DESCRIPTOR);
+      MethodHandle poolThreadCount =
+          downcall(lookup, "jmodels_kernels_context_thread_count", CONTEXT_THREAD_COUNT_DESCRIPTOR);
       MethodHandle quantizedBatched =
           downcall(
               lookup,
@@ -439,12 +461,16 @@ public final class NativeKernelLibrary implements AutoCloseable {
               ? downcall(
                   lookup, "jmodels_kernels_context_set_poll_nanos", SET_POLL_NANOS_DESCRIPTOR)
               : null;
-      int decodeThreadCount = configuredDecodeThreadCount(threadCount);
       long pollMillis = configuredPollMillis();
       MemorySegment context = invokeAddress(contextCreate, threadCount, "create worker context");
       if (context.address() == 0) {
         throw new IllegalStateException("native kernel worker context creation failed");
       }
+      // The pool is shared and sized for the host; this model's worker count stays the count it
+      // asked for, clamped to the pool, and the native context was opened partitioned to it.
+      int poolSize = joinedPoolThreadCount(poolThreadCount, context, threadCount);
+      int workerCount = Math.min(threadCount, poolSize);
+      int decodeThreadCount = configuredDecodeThreadCount(workerCount);
       applyPollBudget(setPollNanos, context, pollMillis);
       return new NativeKernelLibrary(
           arena,
@@ -462,7 +488,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
           swiGlu,
           sigmoidSoftplus,
           convolutionSilu,
-          threadCount,
+          workerCount,
           decodeThreadCount,
           pollMillis);
     } catch (RuntimeException | LinkageError failure) {
@@ -2038,6 +2064,28 @@ public final class NativeKernelLibrary implements AutoCloseable {
     } catch (NumberFormatException failure) {
       throw new IllegalArgumentException(
           DECODE_THREAD_COUNT_PROPERTY + " must be an integer: " + configured, failure);
+    }
+  }
+
+  private static boolean sharedPoolRequested() {
+    String configured = System.getProperty(SHARED_POOL_PROPERTY);
+    return configured == null || configured.isBlank() || Boolean.parseBoolean(configured);
+  }
+
+  /**
+   * The size of the pool this context runs on, which is the whole host on a shared pool and the
+   * requested count on a private one. Read-only, so it leaves this model's partition width alone.
+   */
+  private static int joinedPoolThreadCount(
+      MethodHandle poolThreadCount, MemorySegment context, int requested) {
+    if (poolThreadCount == null) {
+      return requested;
+    }
+    try {
+      int total = (int) poolThreadCount.invokeExact(context);
+      return total > 0 ? total : requested;
+    } catch (Throwable failure) {
+      throw bridgeFailure("read worker pool size", failure);
     }
   }
 
