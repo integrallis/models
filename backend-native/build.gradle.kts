@@ -12,7 +12,7 @@ import org.gradle.jvm.tasks.Jar
 
 apply(plugin = "maven-publish")
 
-val nativeAbi = 7
+val nativeAbi = 8
 
 dependencies {
     api(project(":models-api"))
