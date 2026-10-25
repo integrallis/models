@@ -1,4 +1,6 @@
 mod q51_reuse;
+#[cfg(target_arch = "x86_64")]
+mod q8f32_reuse;
 // Copyright 2025-2026 Integrallis Software, LLC
 // SPDX-License-Identifier: Apache-2.0
 
@@ -248,6 +250,8 @@ enum DotKernel {
     /// Q8_0 weights against F32 activations, folded as Java folds.
     Q8F32Activation,
     #[cfg(target_arch = "x86_64")]
+    Q8F32ActivationAvx2,
+    #[cfg(target_arch = "x86_64")]
     Q8Avx2,
     #[cfg(target_arch = "aarch64")]
     Q8Neon,
@@ -343,7 +347,7 @@ impl WeightFormat {
             Self::Q4_0 => selected_q4_kernel(),
             Self::Q5_0 => selected_q5_kernel(),
             Self::Q5_1 => selected_q5_1_kernel(),
-            Self::Q8_0F32Activation => DotKernel::Q8F32Activation,
+            Self::Q8_0F32Activation => selected_q8f32_kernel(),
             Self::Ptq => {
                 #[cfg(target_arch = "x86_64")]
                 if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
@@ -3140,6 +3144,22 @@ unsafe fn compute_batched_row_range(
                 );
             }
         }
+        #[cfg(target_arch = "x86_64")]
+        DotKernel::Q8F32ActivationAvx2 => {
+            // SAFETY: runtime dispatch selected this variant only with AVX2 and FMA.
+            unsafe {
+                compute_q8_0_f32_activation_batched_row_range_avx2(
+                    weights,
+                    activations,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
         DotKernel::Q5_1 => {
             // SAFETY: the caller assigns this worker an exclusive matrix-row range.
             unsafe {
@@ -4569,6 +4589,11 @@ fn compute_output_range(
             DotKernel::Q8F32Activation => {
                 dot_q8_0_f32_activation_row_scalar(weights, activations, batch, row, cols)
             }
+            #[cfg(target_arch = "x86_64")]
+            DotKernel::Q8F32ActivationAvx2 => {
+                // SAFETY: this variant is selected only after runtime AVX2 and FMA detection.
+                unsafe { dot_q8_0_f32_activation_row_avx2(weights, activations, batch, row, cols) }
+            }
             DotKernel::Q5_1 => dot_q5_1_f32_row_scalar(weights, activations, batch, row, cols),
             #[cfg(target_arch = "x86_64")]
             DotKernel::Q5_1Avx2 => {
@@ -4771,6 +4796,16 @@ fn selected_q5_1_kernel() -> DotKernel {
         return DotKernel::Q5_1Avx2;
     }
     DotKernel::Q5_1
+}
+
+// Same runtime gate as the Q5_1 selector minus F16C: this kernel converts the half-precision
+// scales in software, so nothing here needs the hardware conversion.
+fn selected_q8f32_kernel() -> DotKernel {
+    #[cfg(target_arch = "x86_64")]
+    if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma") {
+        return DotKernel::Q8F32ActivationAvx2;
+    }
+    DotKernel::Q8F32Activation
 }
 
 fn selected_q5_kernel() -> DotKernel {
@@ -5137,6 +5172,108 @@ unsafe fn compute_q8_0_f32_activation_batched_row_range_scalar(
         for batch in 0..batch_size {
             let value = dot_q8_0_f32_activation_row_scalar(weights, activations, batch, row, cols);
             // SAFETY: this worker exclusively owns this output row.
+            unsafe { *output.add(batch * rows + row) = value };
+        }
+    }
+}
+
+/// The AVX2 form of [`dot_q8_0_f32_activation_row_scalar`], and bit-identical to it by construction.
+///
+/// Every operation has the same kind and the same order as the scalar version: a widening
+/// signed-byte-to-float conversion, a multiply by the scale (Q8_0 has no addend), four fused
+/// multiply-adds into four accumulators per block, the pairwise accumulator fold and then the
+/// pinned lane fold. A test asserts the two agree exactly on random blocks rather than trusting
+/// that reading.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn dot_q8_0_f32_activation_row_avx2(
+    weights: &[u8],
+    activations: &[f32],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
+    let blocks_per_row = cols / QK_0;
+    let mut accumulators = [_mm256_setzero_ps(); 4];
+    for block in 0..blocks_per_row {
+        let weight_offset = (row * blocks_per_row + block) * Q8_0_BLOCK_BYTES;
+        let scale = _mm256_set1_ps(f16_to_f32(u16::from_le_bytes([
+            weights[weight_offset],
+            weights[weight_offset + 1],
+        ])));
+        // SAFETY: the block's thirty-two quant bytes are inside the validated row.
+        let quants = unsafe {
+            [
+                _mm_loadu_si128(weights.as_ptr().add(weight_offset + 2).cast()),
+                _mm_loadu_si128(weights.as_ptr().add(weight_offset + 18).cast()),
+            ]
+        };
+        let groups = [
+            _mm256_cvtepi8_epi32(quants[0]),
+            _mm256_cvtepi8_epi32(_mm_srli_si128(quants[0], 8)),
+            _mm256_cvtepi8_epi32(quants[1]),
+            _mm256_cvtepi8_epi32(_mm_srli_si128(quants[1], 8)),
+        ];
+        let input_offset = batch * cols + block * QK_0;
+        for group in 0..4 {
+            let weight = _mm256_mul_ps(_mm256_cvtepi32_ps(groups[group]), scale);
+            // SAFETY: input_offset + 32 is within the activation row checked by the caller.
+            let activation =
+                unsafe { _mm256_loadu_ps(activations.as_ptr().add(input_offset + group * 8)) };
+            accumulators[group] = _mm256_fmadd_ps(activation, weight, accumulators[group]);
+        }
+    }
+    let folded = _mm256_add_ps(
+        _mm256_add_ps(accumulators[0], accumulators[1]),
+        _mm256_add_ps(accumulators[2], accumulators[3]),
+    );
+    let mut lanes = [0_f32; 8];
+    // SAFETY: the destination is eight floats, which is the register's width.
+    unsafe { _mm256_storeu_ps(lanes.as_mut_ptr(), folded) };
+    let even = (lanes[4] + lanes[0]) + (lanes[6] + lanes[2]);
+    let odd = (lanes[5] + lanes[1]) + (lanes[7] + lanes[3]);
+    even + odd
+}
+
+/// One worker's band of Q8F32 output rows, AVX2.
+///
+/// Split from the scalar form rather than selected by a flag inside it, which is both the house
+/// shape for every other format here and the reason this compiles on aarch64 at all: a runtime
+/// bool still names the x86 symbol on every target.
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments)]
+unsafe fn compute_q8_0_f32_activation_batched_row_range_avx2(
+    weights: &[u8],
+    activations: &[f32],
+    output: *mut f32,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
+    if batch_size > 1 {
+        // SAFETY: AVX2/FMA detected, caller owns each row and validates shapes.
+        unsafe {
+            q8f32_reuse::compute_avx2(
+                weights,
+                activations,
+                output,
+                batch_size,
+                rows,
+                cols,
+                start_row,
+                end_row,
+            );
+        }
+        return;
+    }
+    for row in start_row..end_row {
+        for batch in 0..batch_size {
+            // SAFETY: the caller selected this only after AVX2 and FMA detection.
+            let value =
+                unsafe { dot_q8_0_f32_activation_row_avx2(weights, activations, batch, row, cols) };
+            // SAFETY: the caller assigns this worker an exclusive row range of the output.
             unsafe { *output.add(batch * rows + row) = value };
         }
     }
@@ -6540,14 +6677,8 @@ mod tests {
         weights.extend_from_slice(&weight_scale_bits.to_le_bytes());
         assert_eq!(weights.len(), TQ1_0_BLOCK_BYTES);
 
-        let actual = dot_tq1_0_q8_k_row_scalar(
-            &weights,
-            &activations,
-            &[activation_scale],
-            0,
-            0,
-            256,
-        );
+        let actual =
+            dot_tq1_0_q8_k_row_scalar(&weights, &activations, &[activation_scale], 0, 0, 256);
         let expected = reference_tq1_0_q8_k(
             &qs,
             &qh,
@@ -8093,6 +8224,182 @@ mod tests {
             assert_eq!(value.to_bits(), scalar.to_bits());
         }
         Q8_0_HORIZONTAL_REDUCTIONS.with(|count| assert_eq!(count.get(), 0));
+    }
+
+    /// A pseudo-random Q8_0 weight block set, varied on every axis the kernel reads.
+    ///
+    /// Scale bits are `0x3000 |` ten mantissa bits, so every scale is a normal number in
+    /// [0.125, 0.25) and never subnormal, which keeps the comparison about the arithmetic and
+    /// not about flushing a subnormal; the quants use the full byte range, which is what makes
+    /// the products mixed-sign.
+    fn q8_0_rows(rows: usize, blocks_per_row: usize, seed: u32) -> Vec<u8> {
+        let mut state = seed | 1;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        let mut bytes = vec![0_u8; rows * blocks_per_row * Q8_0_BLOCK_BYTES];
+        for block in 0..rows * blocks_per_row {
+            let base = block * Q8_0_BLOCK_BYTES;
+            let scale = 0x3000 | (next() & 0x03FF) as u16;
+            bytes[base..base + 2].copy_from_slice(&scale.to_le_bytes());
+            for index in 2..Q8_0_BLOCK_BYTES {
+                bytes[base + index] = next() as u8;
+            }
+        }
+        bytes
+    }
+
+    fn q8_0_f32_activations(elements: usize, seed: u32) -> Vec<f32> {
+        let mut state = seed | 1;
+        (0..elements)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 17;
+                state ^= state << 5;
+                (state % 2_003) as f32 / 1_000.0 - 1.0
+            })
+            .collect()
+    }
+
+    #[test]
+    fn q8f32_avx2_row_matches_the_scalar_parity_oracle_exactly() {
+        // Exactly, not closely. The shim and the Java kernel are only interchangeable if every
+        // dot of the same weights and activations returns the same bits, so a tolerance here
+        // would hide the one failure this test exists to catch.
+        let rows = 3;
+        let blocks_per_row = 5;
+        let cols = blocks_per_row * QK_0;
+        let batch_size = 2;
+        let weights = q8_0_rows(rows, blocks_per_row, 0x1234_5678);
+        let activations = q8_0_f32_activations(batch_size * cols, 0x8765_4321);
+
+        // The scalar kernel is the parity oracle and is the only Q8F32 kernel on a non-x86-64
+        // host, so it is exercised on every target rather than only where there is something to
+        // compare it against: every output finite, not all equal, and the same on a second call.
+        let mut scalars = Vec::new();
+        for batch in 0..batch_size {
+            for row in 0..rows {
+                let value =
+                    dot_q8_0_f32_activation_row_scalar(&weights, &activations, batch, row, cols);
+                assert!(value.is_finite(), "batch {batch} row {row} is not finite");
+                assert_eq!(
+                    value.to_bits(),
+                    dot_q8_0_f32_activation_row_scalar(&weights, &activations, batch, row, cols)
+                        .to_bits(),
+                    "batch {batch} row {row} is not deterministic"
+                );
+                scalars.push(value);
+            }
+        }
+        assert!(
+            scalars.windows(2).any(|pair| pair[0] != pair[1]),
+            "a fixture whose rows all produce the same dot proves nothing"
+        );
+
+        #[cfg(target_arch = "x86_64")]
+        if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma")
+        {
+            let mut index = 0;
+            for batch in 0..batch_size {
+                for row in 0..rows {
+                    // SAFETY: the features above were just detected.
+                    let vector = unsafe {
+                        dot_q8_0_f32_activation_row_avx2(&weights, &activations, batch, row, cols)
+                    };
+                    assert_eq!(
+                        scalars[index].to_bits(),
+                        vector.to_bits(),
+                        "batch {batch} row {row}: {} != {vector}",
+                        scalars[index]
+                    );
+                    index += 1;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn q8f32_reuse_matches_scalar_through_real_worker_dispatch() {
+        // Through the real entry point, not the row kernels: batch>1 jobs are what the reuse
+        // module serves and batch=1 jobs its row arm, and the row parity test cannot see either
+        // the reuse fold or the selection decision that puts this kernel on the dispatched path.
+        let context = jmodels_kernels_context_create(4);
+        assert!(!context.is_null());
+        // SAFETY: this test owns the context until the single final destroy.
+        let c = unsafe { &*context };
+        let before = job_generation(c.workers.shared.generation.0.load(Ordering::Acquire));
+        #[cfg(target_arch = "x86_64")]
+        if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma")
+        {
+            // Output equality alone cannot see which variant ran, so the selection decision is
+            // pinned directly: on an avx2+fma host the dispatched jobs below must be the AVX2
+            // kernel's work.
+            assert!(matches!(
+                WeightFormat::Q8_0F32Activation.selected_kernel(),
+                DotKernel::Q8F32ActivationAvx2
+            ));
+        }
+        for cols in [32_usize, 96, 896, 4864] {
+            let rows = 17;
+            let weights = q8_0_rows(rows, cols / 32, 0x81c6_1437 ^ cols as u32);
+            for batch in [1_usize, 2, 3, 8, 32, 1] {
+                let input = q8_0_f32_activations(batch * cols, 0x9876_5431 ^ batch as u32);
+                let mut expected = Vec::new();
+                for b in 0..batch {
+                    for row in 0..rows {
+                        expected.push(
+                            dot_q8_0_f32_activation_row_scalar(&weights, &input, b, row, cols)
+                                .to_bits(),
+                        );
+                    }
+                }
+                let mut output = vec![f32::NAN; batch * rows + 2];
+                output[0] = 19.0;
+                output[batch * rows + 1] = 23.0;
+                // SAFETY: all buffers are live, disjoint, and correctly sized; output has sentinels.
+                let status = unsafe {
+                    jmodels_quantized_f32_batched_matmul_with_context(
+                        context,
+                        8,
+                        weights.as_ptr(),
+                        weights.len() as u64,
+                        input.as_ptr(),
+                        input.len() as u64,
+                        output.as_mut_ptr().add(1),
+                        (batch * rows) as u64,
+                        batch as u32,
+                        rows as u32,
+                        cols as u32,
+                    )
+                };
+                assert_eq!(status, STATUS_OK);
+                assert_eq!(output[0], 19.0);
+                assert_eq!(output[batch * rows + 1], 23.0);
+                assert_eq!(
+                    output[1..batch * rows + 1]
+                        .iter()
+                        .map(|v| v.to_bits())
+                        .collect::<Vec<_>>(),
+                    expected,
+                    "cols {cols} batch {batch}"
+                );
+                assert_eq!(
+                    c.workers.shared.partitions.0.load(Ordering::Acquire),
+                    4,
+                    "immutable activation gate"
+                );
+            }
+        }
+        let after = job_generation(c.workers.shared.generation.0.load(Ordering::Acquire));
+        assert!(after > before, "test must actually publish worker jobs");
+        // SAFETY: this test owns the context until the single final destroy.
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
+        );
     }
 
     #[cfg(target_arch = "x86_64")]
