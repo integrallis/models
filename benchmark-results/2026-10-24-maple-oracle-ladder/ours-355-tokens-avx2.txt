@@ -1,0 +1,19 @@
+route        = rust-batched-matmul
+  sliding-window-attention = ENABLED {local-layers=18/24, pattern-source=declared-per-layer, declared-window=512}
+  expert-swiglu-clamp = ENABLED {clamped-layers=24/24}
+promptTokens = 355
+window       = 512  exceeded=false
+prefill      = 83.88 s
+  step 0 token=151668 </think>
+  step 1 token=271 \n\n
+  step 2 token=334 **
+  step 3 token=16141 Answer
+  step 4 token=25 :
+  step 5 token=220  
+  step 6 token=23 8
+  step 7 token=334 **
+  step 8 token=18611   \n\n
+  step 9 token=334 **
+  step 10 token=69769 Explanation
+  step 11 token=66963 :**
+continuation = </think>\n\n**Answer: 8**  \n\n**Explanation:**
