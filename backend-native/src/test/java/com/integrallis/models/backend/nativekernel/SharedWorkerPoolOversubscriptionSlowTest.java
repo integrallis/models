@@ -34,16 +34,16 @@ import org.junit.jupiter.api.Test;
  * <p>Each {@code RustFfmBackend.load} used to build its own {@link NativeKernelLibrary}, and each
  * of those created a worker pool holding one thread per logical CPU, so three resident models ran
  * three pools' worth of workers against one machine's cores. {@link
- * NativeKernelLibrary#SHARED_POOL_PROPERTY} selects between that and one pool per process, so the
- * two are measured against each other here rather than argued about.
+ * NativeKernelLibrary#SHARED_LIBRARY_PROPERTY} selects between that and one shared library per
+ * configuration, so the two are measured against each other here rather than argued about.
  *
  * <p>Run one JVM per arm, because the shared pool is created once per process:
  *
  * <pre>
  *   ./gradlew :backend-native:test --tests '*SharedWorkerPoolOversubscriptionSlowTest' \
- *     -Dmodels.native.kernels.sharedPool=true  -PincludeTags=oversubscription
+ *     -Dmodels.native.kernels.sharedLibrary=true  -PincludeTags=oversubscription
  *   ./gradlew :backend-native:test --tests '*SharedWorkerPoolOversubscriptionSlowTest' \
- *     -Dmodels.native.kernels.sharedPool=false -PincludeTags=oversubscription
+ *     -Dmodels.native.kernels.sharedLibrary=false -PincludeTags=oversubscription
  * </pre>
  */
 @Tag("slow")
@@ -112,7 +112,7 @@ class SharedWorkerPoolOversubscriptionSlowTest {
   @Test
   void aResidentFleetCostsTheFirstModelLessWhenItSharesThePool() throws Exception {
     boolean shared =
-        !"false".equals(System.getProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY, "true"));
+        !"false".equals(System.getProperty(NativeKernelLibrary.SHARED_LIBRARY_PROPERTY, "true"));
     int processors = Runtime.getRuntime().availableProcessors();
 
     try (var timed = RustFfmBackend.load(artifact(TIMED), shortContext())) {
@@ -137,7 +137,7 @@ class SharedWorkerPoolOversubscriptionSlowTest {
             "%narm=%s processors=%d loadavg=%s%n"
                 + "threads: %d with 1 model, %d with %d, +%d for the first extra model%n"
                 + "timed model: %d ms alone, %d ms with %d resident, ratio %.2fx%n",
-            shared ? "shared-pool" : "pool-per-model",
+            shared ? "shared-library" : "library-per-model",
             processors,
             loadAverage(),
             threadsOneModel,

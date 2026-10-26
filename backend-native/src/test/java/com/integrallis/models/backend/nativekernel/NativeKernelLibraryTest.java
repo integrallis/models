@@ -37,13 +37,69 @@ import org.junit.jupiter.api.Test;
 
 class NativeKernelLibraryTest {
 
-  /**
-   * The pool-sharing default is process-wide, so a test that turns it off must not leave it off for
-   * the next one.
-   */
   @AfterEach
-  void restoreThePoolSharingDefault() {
-    System.clearProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY);
+  void restoreTheLibrarySharingDefault() {
+    System.clearProperty(NativeKernelLibrary.SHARED_LIBRARY_PROPERTY);
+  }
+
+  /**
+   * The defect: a second resident model opened a second library, and each library's worker pool
+   * holds one thread per logical CPU, so N models ran N pools against one machine's cores.
+   */
+  @Test
+  void modelsConfiguredAlikeShareOneLibraryAndOnePool() {
+    NativeKernelLibrary first = NativeKernelLibrary.open(libraryPath(), 2);
+    try {
+      NativeKernelLibrary second = NativeKernelLibrary.open(libraryPath(), 2);
+      assertThat(second)
+          .as("the same path and settings must hand back one library")
+          .isSameAs(first);
+
+      // Releasing one holder must leave the other's pool running and its code mapped.
+      second.close();
+      assertThat(first.threadCount()).isEqualTo(2);
+      assertThat(first.supports(NativeKernelCapability.PERSISTENT_WORKER_CONTEXT)).isTrue();
+    } finally {
+      first.close();
+    }
+  }
+
+  /** Different worker counts cannot share: the pool they want is not the same pool. */
+  @Test
+  void modelsWantingDifferentWorkerCountsDoNotShare() {
+    try (NativeKernelLibrary two = NativeKernelLibrary.open(libraryPath(), 2);
+        NativeKernelLibrary three = NativeKernelLibrary.open(libraryPath(), 3)) {
+      assertThat(three).isNotSameAs(two);
+      assertThat(two.threadCount()).isEqualTo(2);
+      assertThat(three.threadCount()).isEqualTo(3);
+    }
+  }
+
+  /** The measurement seam, and the behaviour every release before this one had. */
+  @Test
+  void sharingCanBeTurnedOffForMeasurement() {
+    System.setProperty(NativeKernelLibrary.SHARED_LIBRARY_PROPERTY, "false");
+    try (NativeKernelLibrary first = NativeKernelLibrary.open(libraryPath(), 2);
+        NativeKernelLibrary second = NativeKernelLibrary.open(libraryPath(), 2)) {
+      assertThat(second).isNotSameAs(first);
+    }
+  }
+
+  /** Closing twice must stay safe, and must not drop another holder's reference. */
+  @Test
+  void closingASharedLibraryTwiceReleasesItOnce() {
+    NativeKernelLibrary first = NativeKernelLibrary.open(libraryPath(), 2);
+    NativeKernelLibrary second = NativeKernelLibrary.open(libraryPath(), 2);
+    assertThat(second).isSameAs(first);
+    second.close();
+    second.close();
+    assertThat(first.threadCount()).isEqualTo(2);
+    first.close();
+    // Every holder has gone, so a later open builds a fresh library rather than a closed one.
+    try (NativeKernelLibrary reopened = NativeKernelLibrary.open(libraryPath(), 2)) {
+      assertThat(reopened.threadCount()).isEqualTo(2);
+      assertThat(reopened.supports(NativeKernelCapability.PERSISTENT_WORKER_CONTEXT)).isTrue();
+    }
   }
 
   private static final float BLOCK_QUANT_REDUCTION_TOLERANCE = 2e-5f;
@@ -494,9 +550,6 @@ class NativeKernelLibraryTest {
     float[] actualPair = new float[2 * rows];
     float[] actualSingleAgain = new float[rows];
     System.setProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY, "1");
-    // A pool of exactly four, because this asserts a decode count against a known pool size.
-    // The shared process pool is the host's, so a host with fewer cores would clamp the four.
-    System.setProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY, "false");
     try (Arena arena = Arena.ofConfined();
         NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 4)) {
       assertThat(kernels.threadCount()).isEqualTo(4);
@@ -516,7 +569,6 @@ class NativeKernelLibraryTest {
       assertThat(actualSingleAgain).containsExactly(expectedSingle);
     } finally {
       System.clearProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY);
-      System.clearProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY);
     }
   }
 
@@ -713,14 +765,12 @@ class NativeKernelLibraryTest {
   @Test
   void decodeThreadCountMustFitThePool() {
     System.setProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY, "9");
-    System.setProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY, "false");
     try {
       assertThatThrownBy(() -> NativeKernelLibrary.open(libraryPath(), 4).close())
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("between 1 and the pool size 4");
     } finally {
       System.clearProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY);
-      System.clearProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY);
     }
   }
 
@@ -804,8 +854,6 @@ class NativeKernelLibraryTest {
 
   @Test
   void profiledSettingsConfigureTheWorkerCount() {
-    // Four workers of its own, so this holds on a host with fewer than four cores.
-    System.setProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY, "false");
     NativeKernelSettings settings = new NativeKernelSettings(4);
     var capabilities = VectorUtil.runtimeCapabilities();
     boolean recurrenceEligible =
