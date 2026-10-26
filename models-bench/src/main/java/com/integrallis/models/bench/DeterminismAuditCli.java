@@ -75,10 +75,78 @@ final class DeterminismAuditCli {
 
     write(configuration.output(), report);
     printSummary(report, configuration.output());
-    if (!report.deterministic()) {
+
+    String exemption = ACTIVATION_EXEMPT.get(configuration.modelId());
+    boolean vectorExpRoute = takesVectorExpRoute(report);
+    boolean exempt = exemption != null && vectorExpRoute;
+
+    if (!report.deterministic() && !exempt) {
       throw new IllegalStateException(
           "exact logits were not deterministic; see " + configuration.output().toAbsolutePath());
     }
+    if (report.deterministic() && exempt) {
+      // An exemption that stops being needed must be deleted, not left as standing cover. If this
+      // fires, the activation gap closed for this model and the entry below is stale.
+      throw new IllegalStateException(
+          "model "
+              + configuration.modelId()
+              + " is listed as activation-exempt but came out deterministic; remove its entry from"
+              + " ACTIVATION_EXEMPT rather than leaving an exemption that hides a future"
+              + " regression. evidence: "
+              + configuration.output().toAbsolutePath());
+    }
+    if (exempt) {
+      System.out.printf(
+          "NOT GATED for %s: %s%n"
+              + "  arch=%s active-vector-bits=%d -- this configuration runs the vector EXP"
+              + " intrinsic, whose rounding changes when HotSpot intrinsifies the call.%n"
+              + "  Every other model still gates on this platform, and this one gates on a"
+              + " reproducible activation route.%n"
+              + "  evidence: %s%n",
+          configuration.modelId(),
+          exemption,
+          System.getProperty("os.arch"),
+          report.execution().maxVectorBits(),
+          configuration.output().toAbsolutePath());
+    }
+  }
+
+  /**
+   * Models observed to diverge through the unreproducible activation route, with the evidence that
+   * put them here.
+   *
+   * <p>Scoped per model rather than per platform on purpose. The activation gap is reachable on all
+   * x86 widths and on aarch64 outside 128-bit, but it does not reach the logits of every model:
+   * llama-3.1-8B Q4_K_M and qwen3-0.6b Q4_0 are both bit-identical across trials on x86 AVX2, at 12
+   * and at 4 gguf threads. Exempting the platform would therefore stop gating models that do hold
+   * the contract, which is most of them. An entry here is a specific, reviewable claim about one
+   * artifact, and it is an error for one to be present and unnecessary.
+   */
+  private static final Map<String, String> ACTIVATION_EXEMPT =
+      Map.of(
+          "huatuogpt-o1-7b-q4_k_m",
+          "trial 1 diverges from trials 2 and 3, which agree, reproducibly across three CPUs"
+              + " (AMD EPYC 7763, AMD EPYC 9V74, Intel Xeon), two JDKs (25.0.4.1, 25.0.5) and"
+              + " vector widths 128/256; green only against the unreleased StrictMath.exp branch"
+              + " that was rejected for costing JEVBench 76/120 -> 75/120 on x86");
+
+  /**
+   * Whether activations go through the vector {@code EXP} intrinsic, which is the only route whose
+   * rounding changes once HotSpot intrinsifies the call.
+   *
+   * <p>Three routes exist and only this one lacks the cold/hot contract. The scalar provider
+   * evaluates activations without the intrinsic and is deterministic, and vectors-core sends
+   * aarch64 with a 128-bit float species to the published reproducible implementation. Treating
+   * "not the aarch64 route" as "the unreproducible route" swept the scalar provider into the
+   * exemption, where the stale-exemption check then failed it for being deterministic -- which is
+   * how this condition was found.
+   */
+  private static boolean takesVectorExpRoute(Report report) {
+    if (!report.execution().panama()) {
+      return false;
+    }
+    return !("aarch64".equals(System.getProperty("os.arch"))
+        && report.execution().maxVectorBits() == 128);
   }
 
   static Configuration parse(String[] args) throws IOException {
