@@ -12,7 +12,7 @@ import org.gradle.jvm.tasks.Jar
 
 apply(plugin = "maven-publish")
 
-val nativeAbi = 8
+val nativeAbi = 7
 
 dependencies {
     api(project(":models-api"))
@@ -318,7 +318,7 @@ tasks.register<Test>("nativeAttentionParityTest") {
 // pool per model. One JVM per arm: the shared pool is created once per process.
 tasks.register<Test>("sharedWorkerPoolOversubscriptionTest") {
     group = "verification"
-    description = "Measure resident-model contention with a shared worker pool and with one per model"
+    description = "Measure resident-model contention with a shared kernel library and with one per model"
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
     useJUnitPlatform {
@@ -335,8 +335,8 @@ tasks.register<Test>("sharedWorkerPoolOversubscriptionTest") {
     testLogging {
         showStandardStreams = true
     }
-    providers.systemProperty("models.native.kernels.sharedPool").orNull?.let {
-        systemProperty("models.native.kernels.sharedPool", it)
+    providers.systemProperty("models.native.kernels.sharedLibrary").orNull?.let {
+        systemProperty("models.native.kernels.sharedLibrary", it)
     }
 }
 

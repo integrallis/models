@@ -8,38 +8,27 @@ All notable changes to models are documented here.
 
 ### Fixed
 
-- **One native worker pool per process, not one per model.** Every `RustFfmBackend.load` opened its
-  own `NativeKernelLibrary`, and each of those created a `KernelContext` whose worker pool holds one
-  thread per logical CPU. Two resident native models on a twelve-core host therefore ran 24 workers
-  against 12 cores and three ran 36. Measured on this 12-core host by
-  `:backend-native:sharedWorkerPoolOversubscriptionTest`, one extra resident model costs 21 process
-  threads with a pool per model and 10 with one shared: a difference of 11, which is the spawned
-  worker count of a 12-thread pool. 65 of the 68 catalog models resolve to this backend, so any
-  process holding two of them — a chat model and a decision model, a chat model and `models-audio`'s
-  text-to-speech, a router over several — paid this. No answer was ever wrong because of it; the
-  cost is threads, and latency only while more than one model is actively computing. What it is
-  worth in latency is **not** claimed here: this host could not hold a quiet enough baseline to
-  measure it, and that belongs to a gated harness rather than to a release note.
+- **Models in one process share one open kernel library, and so one worker pool.** Every
+  `RustFfmBackend.load` opened its own `NativeKernelLibrary`, and each library's worker pool holds
+  one thread per logical CPU. Two resident native models on a twelve-core host therefore ran 24
+  workers against 12 cores and three ran 36. 65 of the catalog's 68 qualifications resolve to this
+  backend, so any process holding two of them — a chat model and a decision model, a chat model and
+  `models-audio`'s text-to-speech, a router over several — paid it. No answer was ever wrong because
+  of it; the cost is threads, and latency only while more than one model is actively computing.
 
-  The pool is now a process-wide singleton sized for the host on first use. A model's requested
-  thread count keeps its meaning as that model's partition width, held per context and carried into
-  each job, so decode and prefill still tune per model over shared threads.
-  `-Dmodels.native.kernels.sharedPool=false` restores a pool per model, which is how the two arms
-  above were measured against each other.
+  Libraries opened with the same path and the same worker, decode and poll settings now return one
+  reference-counted instance. The native context is destroyed and the library unloaded when the
+  last holder closes it, never before: a worker thread must not outlive the mapping it runs in, and
+  that ordering is why the sharing lives here rather than inside the kernel. Models asking for
+  different settings still get their own library and their own pool, because the pool they want is
+  not the same pool.
 
-- **A pool that outlived its contexts, which crashed the JVM on Windows.** The first version of
-  the sharing above held the pool in a `OnceLock`, so it was never dropped. A caller unloads the
-  native library once it has destroyed its contexts, and `Drop for WorkerPool` is what joins the
-  workers, so workers were left running in code that had just been unmapped: an access violation
-  (`0xC0000005`) on both Windows platforms, survived on Linux and macOS only because unloading
-  there is lenient. The pool is now held by its contexts and dropped, joining every worker, when
-  the last one is released; a later context builds a fresh one.
-
-- **A latent stranding in the gated-delta-net and attention dispatchers.** Both stored the pool's
-  activation gate directly and never notified it, so a job that *grew* the partition count would
-  have waited on workers that were parked and never woken. It was unreachable while every job used
-  the whole pool, which is why it had never fired; per-model partition widths make it reachable, so
-  all three dispatchers now move the gate through one guarded path under the execution lock.
+  Measured on this 12-core host by `:backend-native:sharedWorkerPoolOversubscriptionTest`, one extra
+  resident model costs 20 process threads with a library each and 10 with one shared: a difference
+  of 10, which is a twelve-thread pool's spawned workers. What it is worth in latency is **not**
+  claimed here — this host could not hold a quiet enough baseline to measure it, and that belongs to
+  a gated harness rather than to a release note. `-Dmodels.native.kernels.sharedLibrary=false`
+  restores a library per model, which is how the two arms above were measured against each other.
 
 - **Reproducible decision qualification evidence.** JevBench reports sort per-type keys and keep
   wall-clock timing in a sibling `.json.timing.json` report outside the evidence digest, so identical
