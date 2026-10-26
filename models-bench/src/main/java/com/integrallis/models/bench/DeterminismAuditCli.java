@@ -77,14 +77,14 @@ final class DeterminismAuditCli {
     printSummary(report, configuration.output());
 
     String exemption = ACTIVATION_EXEMPT.get(configuration.modelId());
-    boolean routeIsReproducible = reproducibleActivationRoute(report);
-    boolean exempt = exemption != null && !routeIsReproducible;
+    boolean vectorExpRoute = takesVectorExpRoute(report);
+    boolean exempt = exemption != null && vectorExpRoute;
 
     if (!report.deterministic() && !exempt) {
       throw new IllegalStateException(
           "exact logits were not deterministic; see " + configuration.output().toAbsolutePath());
     }
-    if (report.deterministic() && exemption != null && !routeIsReproducible) {
+    if (report.deterministic() && exempt) {
       // An exemption that stops being needed must be deleted, not left as standing cover. If this
       // fires, the activation gap closed for this model and the entry below is stale.
       throw new IllegalStateException(
@@ -131,12 +131,22 @@ final class DeterminismAuditCli {
               + " that was rejected for costing JEVBench 76/120 -> 75/120 on x86");
 
   /**
-   * Whether activations take the reproducible route, which vectors-core's
-   * {@code USE_PUBLISHED_ARM_ACTIVATIONS} limits to aarch64 with a 128-bit float species.
+   * Whether activations go through the vector {@code EXP} intrinsic, which is the only route whose
+   * rounding changes once HotSpot intrinsifies the call.
+   *
+   * <p>Three routes exist and only this one lacks the cold/hot contract. The scalar provider
+   * evaluates activations without the intrinsic and is deterministic, and vectors-core sends
+   * aarch64 with a 128-bit float species to the published reproducible implementation. Treating
+   * "not the aarch64 route" as "the unreproducible route" swept the scalar provider into the
+   * exemption, where the stale-exemption check then failed it for being deterministic -- which is
+   * how this condition was found.
    */
-  private static boolean reproducibleActivationRoute(Report report) {
-    return "aarch64".equals(System.getProperty("os.arch"))
-        && report.execution().maxVectorBits() == 128;
+  private static boolean takesVectorExpRoute(Report report) {
+    if (!report.execution().panama()) {
+      return false;
+    }
+    return !("aarch64".equals(System.getProperty("os.arch"))
+        && report.execution().maxVectorBits() == 128);
   }
 
   static Configuration parse(String[] args) throws IOException {
