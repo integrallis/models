@@ -42,6 +42,7 @@ FILES=(
   backend-native/src/main/rust/model-kernels/Cargo.lock
   models-backend-apple/README.md
   models-rag/README.md
+  examples/logit-fusion/LogitFusion.java
 )
 
 escaped_from=${FROM//./\\.}

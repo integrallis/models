@@ -32,9 +32,20 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.util.Arrays;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class NativeKernelLibraryTest {
+
+  /**
+   * The pool-sharing default is process-wide, so a test that turns it off must not leave it off for
+   * the next one.
+   */
+  @AfterEach
+  void restoreThePoolSharingDefault() {
+    System.clearProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY);
+  }
+
   private static final float BLOCK_QUANT_REDUCTION_TOLERANCE = 2e-5f;
   private static final float K_QUANT_REDUCTION_TOLERANCE = 2e-3f;
   private static final ValueLayout.OfInt LE_INT =
@@ -483,6 +494,9 @@ class NativeKernelLibraryTest {
     float[] actualPair = new float[2 * rows];
     float[] actualSingleAgain = new float[rows];
     System.setProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY, "1");
+    // A pool of exactly four, because this asserts a decode count against a known pool size.
+    // The shared process pool is the host's, so a host with fewer cores would clamp the four.
+    System.setProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY, "false");
     try (Arena arena = Arena.ofConfined();
         NativeKernelLibrary kernels = NativeKernelLibrary.open(libraryPath(), 4)) {
       assertThat(kernels.threadCount()).isEqualTo(4);
@@ -502,6 +516,7 @@ class NativeKernelLibraryTest {
       assertThat(actualSingleAgain).containsExactly(expectedSingle);
     } finally {
       System.clearProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY);
+      System.clearProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY);
     }
   }
 
@@ -698,12 +713,14 @@ class NativeKernelLibraryTest {
   @Test
   void decodeThreadCountMustFitThePool() {
     System.setProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY, "9");
+    System.setProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY, "false");
     try {
       assertThatThrownBy(() -> NativeKernelLibrary.open(libraryPath(), 4).close())
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("between 1 and the pool size 4");
     } finally {
       System.clearProperty(NativeKernelLibrary.DECODE_THREAD_COUNT_PROPERTY);
+      System.clearProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY);
     }
   }
 
@@ -787,6 +804,8 @@ class NativeKernelLibraryTest {
 
   @Test
   void profiledSettingsConfigureTheWorkerCount() {
+    // Four workers of its own, so this holds on a host with fewer than four cores.
+    System.setProperty(NativeKernelLibrary.SHARED_POOL_PROPERTY, "false");
     NativeKernelSettings settings = new NativeKernelSettings(4);
     var capabilities = VectorUtil.runtimeCapabilities();
     boolean recurrenceEligible =
