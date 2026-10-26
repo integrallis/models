@@ -314,6 +314,32 @@ tasks.register<Test>("nativeAttentionParityTest") {
     }
 }
 
+// What a second and third resident native model cost the first, with one shared pool and with a
+// pool per model. One JVM per arm: the shared pool is created once per process.
+tasks.register<Test>("sharedWorkerPoolOversubscriptionTest") {
+    group = "verification"
+    description = "Measure resident-model contention with a shared worker pool and with one per model"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("slow")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.nativekernel.SharedWorkerPoolOversubscriptionSlowTest",
+        )
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "12g"
+    testLogging {
+        showStandardStreams = true
+    }
+    providers.systemProperty("models.native.kernels.sharedPool").orNull?.let {
+        systemProperty("models.native.kernels.sharedPool", it)
+    }
+}
+
 tasks.register<Test>("gemma426BA4BNativeSlowTest") {
     group = "verification"
     description = "Run the pinned Gemma 4 26B-A4B Q4_K_M Rust/FFM qualification test"

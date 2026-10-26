@@ -674,7 +674,9 @@ impl WorkerPool {
         }
 
         let _execution = lock(&self.execution);
-        self.ensure_active(partitions);
+        if self.shared.partitions.0.load(Ordering::Acquire) != partitions {
+            self.ensure_active(partitions);
+        }
         {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::Matrix(job));
@@ -728,7 +730,9 @@ impl WorkerPool {
             .is_ok();
         }
         let _execution = lock(&self.execution);
-        self.ensure_active(partitions);
+        if self.shared.partitions.0.load(Ordering::Acquire) != partitions {
+            self.ensure_active(partitions);
+        }
         {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::GatedDeltaNet(job));
@@ -773,7 +777,9 @@ impl WorkerPool {
             .is_ok();
         }
         let _execution = lock(&self.execution);
-        self.ensure_active(partitions);
+        if self.shared.partitions.0.load(Ordering::Acquire) != partitions {
+            self.ensure_active(partitions);
+        }
         {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::Attention(job));
@@ -8450,7 +8456,7 @@ mod tests {
         // Through the real entry point, not the row kernels: batch>1 jobs are what the reuse
         // module serves and batch=1 jobs its row arm, and the row parity test cannot see either
         // the reuse fold or the selection decision that puts this kernel on the dispatched path.
-        let context = jmodels_kernels_context_create(4);
+        let context = jmodels_kernels_context_create_private(4);
         assert!(!context.is_null());
         // SAFETY: this test owns the context until the single final destroy.
         let c = unsafe { &*context };
