@@ -12,7 +12,7 @@ mod swiglu;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::slice;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 use std::thread::{self, JoinHandle};
 
 #[cfg(test)]
@@ -389,7 +389,7 @@ pub struct KernelContext {
 /// resident model otherwise doubles the threads competing for the same cores. `Owned` exists for
 /// the measurement seam and for tests that need a pool of a known size.
 enum ContextPool {
-    Shared(&'static WorkerPool),
+    Shared(Arc<WorkerPool>),
     Owned(WorkerPool),
 }
 
@@ -404,23 +404,34 @@ impl std::ops::Deref for ContextPool {
     }
 }
 
-/// The process-wide pool, sized for this machine on first use.
+/// The process-wide pool, sized for this machine, held only while a context is using it.
 ///
-/// Sized by the host rather than by whichever model opened first, so one model asking for a
-/// narrow partition cannot cap every later model in the process.
-static SHARED_POOL: OnceLock<Option<WorkerPool>> = OnceLock::new();
+/// Sized by the host rather than by whichever model opened first, so one model asking for a narrow
+/// partition cannot cap every later model in the process.
+///
+/// A `Weak` rather than a `OnceLock` because the pool must not outlive the last context. The
+/// caller unloads this library once it has destroyed its contexts, and a worker still running in
+/// code that has just been unmapped is an access violation -- observed as a JVM crash on Windows,
+/// where unloading is prompt, and survived on Linux and macOS only by luck. `Drop for WorkerPool`
+/// joins every worker, so releasing the last context joins them before the unload. A later context
+/// builds a fresh pool.
+static SHARED_POOL: Mutex<Weak<WorkerPool>> = Mutex::new(Weak::new());
 
-fn shared_pool() -> Option<&'static WorkerPool> {
-    SHARED_POOL
-        .get_or_init(|| {
-            WorkerPool::new(
-                thread::available_parallelism()
-                    .map_or(1, usize::from)
-                    .min(256),
-            )
-            .ok()
-        })
-        .as_ref()
+fn shared_pool() -> Option<Arc<WorkerPool>> {
+    let mut slot = lock(&SHARED_POOL);
+    if let Some(live) = slot.upgrade() {
+        return Some(live);
+    }
+    let pool = Arc::new(
+        WorkerPool::new(
+            thread::available_parallelism()
+                .map_or(1, usize::from)
+                .min(256),
+        )
+        .ok()?,
+    );
+    *slot = Arc::downgrade(&pool);
+    Some(pool)
 }
 
 impl KernelContext {
@@ -1923,11 +1934,12 @@ fn new_context(workers: ContextPool) -> *mut KernelContext {
 pub extern "C" fn jmodels_kernels_context_create(thread_count: u32) -> *mut KernelContext {
     match catch_unwind(AssertUnwindSafe(|| match shared_pool() {
         Some(pool) => {
+            let total_threads = pool.total_threads;
             let context = new_context(ContextPool::Shared(pool));
             if thread_count != 0 && !context.is_null() {
                 // SAFETY: new_context just returned this unique, non-null pointer.
                 let reference = unsafe { &*context };
-                let width = (thread_count as usize).clamp(1, pool.total_threads);
+                let width = (thread_count as usize).clamp(1, total_threads);
                 reference.active_threads.store(width, Ordering::Release);
             }
             context
@@ -9246,10 +9258,15 @@ mod tests {
         );
     }
 
+    /// Tests that reach the process-wide pool run one at a time: a context another test is
+    /// holding would keep the pool alive and hide whether releasing the last one frees it.
+    static SHARED_POOL_TESTS: Mutex<()> = Mutex::new(());
+
     /// The defect this pool sharing fixes: a second resident model used to open a second pool of
     /// one thread per logical CPU, so N models contended with N times the cores' worth of workers.
     #[test]
     fn every_context_shares_one_process_pool() {
+        let _serial = lock(&SHARED_POOL_TESTS);
         let first = jmodels_kernels_context_create(2);
         assert!(!first.is_null());
         let second = jmodels_kernels_context_create(7);
@@ -9291,6 +9308,7 @@ mod tests {
     /// Sharing the threads must not share the decode/prefill tuning: that is per model.
     #[test]
     fn each_context_keeps_its_own_active_thread_preference() {
+        let _serial = lock(&SHARED_POOL_TESTS);
         let a = jmodels_kernels_context_create(4);
         let b = jmodels_kernels_context_create(4);
         assert!(!a.is_null() && !b.is_null());
@@ -9313,9 +9331,53 @@ mod tests {
         assert_eq!(unsafe { jmodels_kernels_context_destroy(b) }, STATUS_OK);
     }
 
+    /// The invariant that a never-dropped pool broke: the caller unloads this library once its
+    /// contexts are gone, so no worker may outlive the last one. Holding the pool in a `OnceLock`
+    /// left workers running in unmapped code and crashed the JVM on Windows with an access
+    /// violation. `Drop for WorkerPool` joins them, so the last release must drop the pool.
+    #[test]
+    fn the_shared_pool_does_not_outlive_its_last_context() {
+        let _serial = lock(&SHARED_POOL_TESTS);
+        let first = jmodels_kernels_context_create(0);
+        let second = jmodels_kernels_context_create(0);
+        assert!(!first.is_null() && !second.is_null());
+        assert!(
+            lock(&SHARED_POOL).upgrade().is_some(),
+            "two live contexts must hold the pool"
+        );
+
+        // SAFETY: each pointer came from a creator above and is destroyed exactly once.
+        assert_eq!(unsafe { jmodels_kernels_context_destroy(first) }, STATUS_OK);
+        assert!(
+            lock(&SHARED_POOL).upgrade().is_some(),
+            "one live context still holds the pool"
+        );
+
+        // SAFETY: as above; this is the last context on the shared pool.
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(second) },
+            STATUS_OK
+        );
+        assert!(
+            lock(&SHARED_POOL).upgrade().is_none(),
+            "the last context must take the pool, and its joined workers, with it"
+        );
+
+        // A later context gets a working pool rather than a dead weak reference.
+        let revived = jmodels_kernels_context_create(0);
+        assert!(!revived.is_null());
+        // SAFETY: just created, non-null, destroyed once.
+        assert!(unsafe { &*revived }.workers.total_threads >= 1);
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(revived) },
+            STATUS_OK
+        );
+    }
+
     /// The measurement seam: a private context must not be on the shared pool.
     #[test]
     fn a_private_context_owns_its_pool() {
+        let _serial = lock(&SHARED_POOL_TESTS);
         let shared = jmodels_kernels_context_create(2);
         let private = jmodels_kernels_context_create_private(3);
         assert!(!shared.is_null() && !private.is_null());

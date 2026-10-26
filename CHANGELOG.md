@@ -27,6 +27,14 @@ All notable changes to models are documented here.
   `-Dmodels.native.kernels.sharedPool=false` restores a pool per model, which is how the two arms
   above were measured against each other.
 
+- **A pool that outlived its contexts, which crashed the JVM on Windows.** The first version of
+  the sharing above held the pool in a `OnceLock`, so it was never dropped. A caller unloads the
+  native library once it has destroyed its contexts, and `Drop for WorkerPool` is what joins the
+  workers, so workers were left running in code that had just been unmapped: an access violation
+  (`0xC0000005`) on both Windows platforms, survived on Linux and macOS only because unloading
+  there is lenient. The pool is now held by its contexts and dropped, joining every worker, when
+  the last one is released; a later context builds a fresh one.
+
 - **A latent stranding in the gated-delta-net and attention dispatchers.** Both stored the pool's
   activation gate directly and never notified it, so a job that *grew* the partition count would
   have waited on workers that were parked and never woken. It was unreachable while every job used
