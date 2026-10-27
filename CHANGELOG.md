@@ -4,6 +4,31 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-10-27
+
+### Dependencies and device evidence
+
+Consumes released Vectors **0.1.32**, up from 0.1.31. That release makes activations reproducible
+on every platform rather than only on aarch64 at a 128-bit float species.
+`lanewise(VectorOperators.EXP)` changes its rounding once HotSpot intrinsifies the call, so the
+same input could previously produce a different answer depending on where in a run it was
+evaluated — on all of x86-64 and on aarch64 above 128 bits.
+
+**Activation output values change on x86-64.** The previous values came from an implementation that
+was not reproducible, so making them reproducible means settling on one set. aarch64 at 128 bits is
+unaffected.
+
+Measured upstream on x86-64 AVX2 with HuatuoGPT-o1-7B-Q4_K_M, eight alternating pairs on an
+isolated host: decode throughput ratio 1.0026 on the median and 1.0039 against the compilation mode
+the previous build selects in six runs of eight. Task impact over 120 JevBench decision cases,
+decoded with the model's own vocabulary: 85/120 correct before, 84/120 after — 0.20 of one standard
+error at that sample size, McNemar exact p = 1.000, so no measurable change.
+
+No CUDA numeric path changed and device gates were not rerun. The last G1 result remains 1280/1280
+exact token IDs on RTX 4090, Granite 4.1 3B Q4_K_M (`benchmark-results/2026-10-07-g1-parity`); G4
+remains 6.184x on that host/model (`benchmark-results/2026-10-07-g4-dualpath`). No model
+qualification changed in this release.
+
 ## [0.5.6] - 2026-10-26
 
 ### Changed
