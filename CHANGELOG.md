@@ -4,6 +4,31 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-10-26
+
+### Changed
+
+- Gate the determinism audit on the contract the library actually makes. The audit asserted an
+  activation cold/hot guarantee that `vectors-core` deliberately does not make outside aarch64 with
+  a 128-bit float species, so it failed on every x86 runner for a documented gap rather than for a
+  defect. Outside that configuration it now records the divergence, prints what was traded, and
+  exits zero; inside it, it gates as before. This brings the end-to-end audit in line with
+  `ActivationColdHotTest`, which already scoped its assertions this way. (#306)
+
+### Dependencies and device evidence
+
+Consumes released Vectors **0.1.31**, up from 0.1.30. That release gives the F32 reductions on the
+GGUF model-inference paths an order the compiler cannot choose, so a projection produces the same
+bits before and after HotSpot compiles the method — ten call sites in `ggufF32MatVecDot` and the
+Q8-to-F32 matrix. Cosine similarity and the integer reductions are unchanged there, and activation
+arithmetic is unchanged: the platform vector exponential is still used everywhere except aarch64 at
+a 128-bit float species.
+
+No CUDA numeric path changed and device gates were not rerun. The last G1 result remains 1280/1280
+exact token IDs on RTX 4090, Granite 4.1 3B Q4_K_M (`benchmark-results/2026-10-07-g1-parity`); G4
+remains 6.184x on that host/model (`benchmark-results/2026-10-07-g4-dualpath`). No model
+qualification changed in this release.
+
 ## [0.5.5] - 2026-10-25
 
 ### Fixed
