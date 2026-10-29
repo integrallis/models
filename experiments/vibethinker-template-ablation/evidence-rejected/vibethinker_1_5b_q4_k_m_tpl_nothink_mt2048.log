@@ -1,0 +1,54 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 29, 2026 4:59:41 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 29, 2026 4:59:41 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Oct 29, 2026 4:59:41 PM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256; FMA enabled
+iteration 1/1 case=amber-determinant-trace correct=true retrieval=28.1ms ttft=2345.4ms decode=35.17 tok/s e2e=7391.4ms
+iteration 1/1 case=birch-function-derivative correct=true retrieval=2.3ms ttft=608.8ms decode=33.11 tok/s e2e=4087.5ms
+iteration 1/1 case=cobalt-red-probability failed: java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048
+java.lang.IllegalStateException: rust-ffm generation failed
+	at com.integrallis.models.rag.InProcessGenerationClient.generate(InProcessGenerationClient.java:150)
+	at com.integrallis.models.rag.PlainJavaRagApplication.run(PlainJavaRagApplication.java:51)
+	at com.integrallis.models.rag.RagBenchmarkCli.run(RagBenchmarkCli.java:239)
+	at com.integrallis.models.rag.RagBenchmarkCli.main(RagBenchmarkCli.java:93)
+Caused by: java.lang.IllegalArgumentException: position out of range: 2048
+	at com.integrallis.models.backend.purejava.llama.LlamaForwardPass.forwardSequenceInternal(LlamaForwardPass.java:1844)
+	at com.integrallis.models.backend.purejava.llama.LlamaForwardPass.forwardInternal(LlamaForwardPass.java:1774)
+	at com.integrallis.models.backend.purejava.llama.LlamaForwardPass.forwardTransient(LlamaForwardPass.java:680)
+	at com.integrallis.models.backend.purejava.LlamaDecoder.forwardTransient(LlamaDecoder.java:89)
+	at com.integrallis.models.backend.purejava.PureJavaBackend.forwardTransient(PureJavaBackend.java:1152)
+	at com.integrallis.models.backend.nativekernel.RustFfmBackend.forwardTransient(RustFfmBackend.java:191)
+	at com.integrallis.models.rag.InProcessGenerationClient$TimingBackend.forwardTransient(InProcessGenerationClient.java:244)
+	at com.integrallis.models.runtime.GenerationLoop.generateSequentially(GenerationLoop.java:560)
+	at com.integrallis.models.runtime.GenerationLoop.generate(GenerationLoop.java:425)
+	at com.integrallis.models.runtime.GenerationLoop.generate(GenerationLoop.java:352)
+	at com.integrallis.models.rag.InProcessGenerationClient.generate(InProcessGenerationClient.java:127)
+	... 3 more
+iteration 1/1 case=delta-sixth-term correct=true retrieval=3.8ms ttft=1258.7ms decode=30.94 tok/s e2e=30802.1ms
+iteration 1/1 case=ember-modulo failed: java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048
+java.lang.IllegalStateException: rust-ffm generation failed
+	at com.integrallis.models.rag.InProcessGenerationClient.generate(InProcessGenerationClient.java:150)
+	at com.integrallis.models.rag.PlainJavaRagApplication.run(PlainJavaRagApplication.java:51)
+	at com.integrallis.models.rag.RagBenchmarkCli.run(RagBenchmarkCli.java:239)
+	at com.integrallis.models.rag.RagBenchmarkCli.main(RagBenchmarkCli.java:93)
+Caused by: java.lang.IllegalArgumentException: position out of range: 2048
+	at com.integrallis.models.backend.purejava.llama.LlamaForwardPass.forwardSequenceInternal(LlamaForwardPass.java:1844)
+	at com.integrallis.models.backend.purejava.llama.LlamaForwardPass.forwardInternal(LlamaForwardPass.java:1774)
+	at com.integrallis.models.backend.purejava.llama.LlamaForwardPass.forwardTransient(LlamaForwardPass.java:680)
+	at com.integrallis.models.backend.purejava.LlamaDecoder.forwardTransient(LlamaDecoder.java:89)
+	at com.integrallis.models.backend.purejava.PureJavaBackend.forwardTransient(PureJavaBackend.java:1152)
+	at com.integrallis.models.backend.nativekernel.RustFfmBackend.forwardTransient(RustFfmBackend.java:191)
+	at com.integrallis.models.rag.InProcessGenerationClient$TimingBackend.forwardTransient(InProcessGenerationClient.java:244)
+	at com.integrallis.models.runtime.GenerationLoop.generateSequentially(GenerationLoop.java:560)
+	at com.integrallis.models.runtime.GenerationLoop.generate(GenerationLoop.java:425)
+	at com.integrallis.models.runtime.GenerationLoop.generate(GenerationLoop.java:352)
+	at com.integrallis.models.rag.InProcessGenerationClient.generate(InProcessGenerationClient.java:127)
+	... 3 more
+iteration 1/1 case=fjord-integral correct=true retrieval=2.2ms ttft=1300.9ms decode=36.57 tok/s e2e=8279.0ms
+iteration 1/1 case=grove-hypotenuse correct=true retrieval=1.8ms ttft=474.1ms decode=37.74 tok/s e2e=3710.2ms
+iteration 1/1 case=harbor-mean-median correct=true retrieval=1.9ms ttft=525.0ms decode=37.58 tok/s e2e=3190.0ms
+iteration 1/1 case=unsupported-maple-limit correct=true retrieval=2.5ms ttft=560.7ms decode=36.97 tok/s e2e=6462.3ms
+plain-java/rust-ffm/vibethinker_1_5b_q4_k_m_tpl_nothink_mt2048: tier=FAILED_RUNTIME success=7/9 p95-retrieval=20.8ms p95-ttft=2032.0ms p50-decode=36.57 tok/s p95-e2e=24045.2ms correct=100.0% model-answered=0.0% of-those-correct=0.0% extractive-fallback=85.7% truncated=0.0%
+report: /root/out/vibethinker_1_5b_q4_k_m_tpl_nothink_mt2048.json

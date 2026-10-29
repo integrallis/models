@@ -1,0 +1,516 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-29T16:59:34.994697301Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.5.7+vibethinker1-ec3ae4ff2fd3",
+  "modelId" : "vibethinker_1_5b_q4_k_m_tpl_answer_mt2048",
+  "model" : "/root/model.gguf",
+  "artifactSha256" : "59fa32aaaf5c4512452a9bff8bb6d08f1e39a75acee226b5e01372f7509e3458",
+  "artifactSizeBytes" : 1117321472,
+  "settings" : {
+    "corpusSha256" : "4da610e627e7481d54d1595ef1191dff454455d9bb04fc814b5ea12fd6180315",
+    "workload" : "math",
+    "caseIds" : [ "amber-determinant-trace", "birch-function-derivative", "cobalt-red-probability", "delta-sixth-term", "ember-modulo", "fjord-integral", "grove-hypotenuse", "harbor-mean-median", "unsupported-maple-limit" ],
+    "promptTemplate" : "chatml-answer",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 2048,
+    "warmups" : 0,
+    "iterations" : 1,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topK" : "1",
+      "seed" : "42",
+      "promptCache" : "longest-common-prefix",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "vibethinker-tpl-202610291625",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-139-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857440256,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.5",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v14",
+    "environment" : {
+      "performance-cliffs" : "fused-grouped-attention-disabled",
+      "kernel-runtime" : "rust-ffm",
+      "compiler" : "hotspot-c2",
+      "native-kernel-decode-threads" : "8",
+      "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+      "native-quantized-decode" : "true",
+      "end-of-generation.151643" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+      "end-of-generation.151645" : "vocabulary-text,chat-template-end-of-turn",
+      "vector-api" : "true",
+      "model-architecture" : "qwen2",
+      "architecture" : "amd64",
+      "gguf-parallel" : "true",
+      "vm-version" : "25.0.5+8-LTS",
+      "gguf-executor" : "persistent",
+      "gguf-chunks-per-thread" : "2",
+      "performance-cliff.fused-grouped-attention-disabled" : "architecture=qwen2, group-size=6",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "native-kernel-poll-millis" : "5",
+      "end-of-generation-token-ids" : "151643,151645",
+      "native-grouped-attention" : "true",
+      "gguf-threads" : "8",
+      "end-of-generation.chat-template" : "resolved:151645",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "tokenizer.pre" : "qwen2",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "os" : "Linux",
+      "active-vector-bits" : "256",
+      "fast-vector-fma" : "true",
+      "java-executor-poll-millis" : "0",
+      "q4-short-pairwise-supported" : "true",
+      "java-feature" : "25",
+      "tokenizer.pre.implemented" : "true",
+      "processors" : "8",
+      "native-gated-delta-net" : "true",
+      "preferred-vector-bits" : "256",
+      "q4-unsigned-pairwise-supported" : "true",
+      "transformer-runtime" : "java",
+      "native-kernel-abi" : "7",
+      "vm-vendor" : "Eclipse Adoptium",
+      "kernel-implementation" : "rust-ffm-quantized-v14",
+      "native-q5-0-grouped" : "false",
+      "fast-scalar-fma" : "true",
+      "projection-layers" : "28",
+      "native-kernel-threads" : "8",
+      "java-version" : "25.0.5",
+      "sve" : "false"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "grouped",
+        "gate-up" : "grouped",
+        "implementation" : "rust-ffm-quantized-v14"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "14"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "architecture" : "amd64",
+        "os" : "Linux",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "batch-size" : "32",
+        "architecture" : "amd64",
+        "kernel" : "one-query-block",
+        "requested-kernel" : "one-query-block",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "2",
+        "parallel" : "true",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "7",
+        "parallel" : "true",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "partitions" : "8",
+        "partition" : "batch-rows",
+        "staged-layers" : "0",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "8"
+      }
+    }, {
+      "id" : "sliding-window-attention",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no sliding window, so every layer attends to the full context",
+      "settings" : {
+        "pattern-source" : "none",
+        "local-layers" : "0/28",
+        "declared-window" : "0"
+      }
+    }, {
+      "id" : "expert-swiglu-clamp",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no expert SwiGLU clamp",
+      "settings" : {
+        "clamped-layers" : "0/28"
+      }
+    }, {
+      "id" : "rust-ptq1-0-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+      "settings" : {
+        "weight" : "PTQ1_0",
+        "activation" : "Q8_0",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "state" : "caller-owned-java-array",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "independent recurrent state slots share one native worker dispatch",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "state" : "branch-major-caller-owned-java-array",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+      "settings" : {
+        "evidence" : "benchmark-results/2026-10-12-q5-production/"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 9,
+    "successfulAttempts" : 1,
+    "loadMillis" : 454.55385,
+    "retrievalMillis" : {
+      "p50" : 2.229933,
+      "p95" : 2.229933
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 3.719354000000749,
+      "p95" : 3.719354000000749
+    },
+    "ttftMillis" : {
+      "p50" : 1417.99641,
+      "p95" : 1417.99641
+    },
+    "tpotMillis" : {
+      "p50" : 30.90824583638444,
+      "p95" : 30.90824583638444
+    },
+    "endToEndMillis" : {
+      "p50" : 28437.752558,
+      "p95" : 28437.752558
+    },
+    "p50PrefillTokensPerSecond" : 119.97490348031366,
+    "p50DecodeTokensPerSecond" : 32.35382574907645,
+    "peakRssBytes" : 1509769216,
+    "totalCpuMillis" : 226890.0,
+    "totalInputTokens" : 170,
+    "totalCacheReadInputTokens" : 0,
+    "totalCacheWriteInputTokens" : 170,
+    "totalOutputTokens" : 875,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 0.0,
+    "meanReciprocalRank" : 0.0,
+    "factCoverage" : 0.0,
+    "citationRecall" : 0.0,
+    "citationPrecision" : 0.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.0,
+    "modelAnswerRate" : 0.0,
+    "modelAnswerCorrectRate" : 0.0,
+    "extractiveFallbackRate" : 0.0,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "FAILED_RUNTIME",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "unsupported-maple-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 1.2100124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "6945e2ef08db106bb6c357c58e2b38e33d4b592dc64e59c1303d1bf7e76ec1ef",
+    "retrievalMillis" : 2.229933,
+    "frameworkOverheadMillis" : 3.719354000000749,
+    "endToEndMillis" : 28437.752558,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 170,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 170,
+      "outputTokens" : 875,
+      "ttftMillis" : 1417.99641,
+      "totalMillis" : 28431.803271,
+      "prefillTokensPerSecond" : 119.97490348031366,
+      "loadMillis" : 454.55385,
+      "peakRssBytes" : 1509769216,
+      "cpuMillis" : 226890.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "0\n\nWait, the user is asking about the limit of a rational function as x approaches infinity. The context provided is about the Birch function, which is f(x) = x³ - 2x and its derivative f'(x) = 3x² - 2. Hmm, that seems unrelated. The user might have made a mistake in the context or the question. Let me check again.\n\nThe question says: \"What is the limit of the Maple rational function at infinity?\" But the context given is about the Birch function, which isn't a rational function. Rational functions are ratios of polynomials, but the Birch function here is a cubic polynomial. Maybe there was a mix-up in the problem statement?\n\nAlternatively, perhaps the user intended to provide a different context but pasted the wrong one. Since the user's instructions say to use only the supplied context, I have to work with that. But the context doesn't mention anything about limits at infinity for a rational function. The Birch function's derivative is a quadratic, but that's a polynomial too, not a rational function. \n\nWait, maybe there's a misunderstanding here. The Birch function in mathematics (especially in number theory) is a specific function, but the problem mentions a \"rational function which is a ratio of polynomials. The given context's functions are polynomials. Since the user says to only use the supplied context, perhaps the answer is that the context doesn't contain the answer. But the user's example answer was 0, but that might be a different scenario. \n\nAlternatively, maybe the user intended to present a different problem but made an error. Since the user's rules say if the context doesn't contain the answer, reply with \"INSUFFICIENT_CONTEXT\". So in this case, since the context provided (Birch polynomial and its derivative) doesn't address the limit of a rational function at infinity, the correct answer would be to say that the context is insufficient. \n\nBut the user's own example in the problem statement shows that the answer is 0. Wait, looking back, the user's example answer is \"0 but that might be a different question. Wait, the user's question is about the limit of a Maple rational function at infinity, but the context given is about the Birch function. Since the context doesn't discuss rational functions or their limits, the answer must be that the context is insufficient. \n\nTherefore, the answer should be \"INSUFFICIENT_CONTEXT\". But the user's own example answer was 0. Wait, maybe the user made a mistake in their example. Let me re-read the user's instructions carefully. \n\nThe user says: \"You answer questions using only the supplied context. Rules: If the context does not contain the answer, reply exactly INSUFFICIENT_CONTEXT. Otherwise answer in one short sentence. Copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry, and put those citations at the end of the sentence. Only IDs present in CONTEXT are valid citations; do not invent or substitute one. Only use the supplied context.\"\n\nIn the given context, there's no mention of a rational function or its limit at infinity. The context is about the Birch polynomial, which is f(x) = x³ - 2x, and its derivative. Since the question is about a rational function's limit at infinity, and the context doesn't address that, the answer must be INSUFFICIENT_CONTEXT. \n\nTherefore, the answer is exactly \"INSUFFICIENT_CONTEXT as per the rules. The user's example answer of 0 might have been a mistake, perhaps from a different question. But according to the given context and the question, there's no relevance. \n\nWait, but maybe the user intended the context to be about a rational function but there was an error. For example, maybe the Birch function was supposed to be a rational function. But given the information, I have to go with what's provided. \n\nSo the correct answer here is to state that the context is insufficient. Therefore, the answer is \"INSUFFICIENT_CONTEXT\".\n</think>\n\nThe context provided discusses the Birch function and its derivative, which are polynomials, not a rational function or its limit at infinity. Since the context does not address the question, the answer is:\n\nINSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ {
+    "iteration" : 0,
+    "caseId" : "amber-determinant-trace",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "birch-function-derivative",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "cobalt-red-probability",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "delta-sixth-term",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "ember-modulo",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "fjord-integral",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "grove-hypotenuse",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "harbor-mean-median",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  } ]
+}

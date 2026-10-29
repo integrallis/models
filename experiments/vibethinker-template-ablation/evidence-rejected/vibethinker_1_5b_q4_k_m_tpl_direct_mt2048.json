@@ -1,0 +1,567 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-29T16:48:06.532880197Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.5.7+vibethinker1-ec3ae4ff2fd3",
+  "modelId" : "vibethinker_1_5b_q4_k_m_tpl_direct_mt2048",
+  "model" : "/root/model.gguf",
+  "artifactSha256" : "59fa32aaaf5c4512452a9bff8bb6d08f1e39a75acee226b5e01372f7509e3458",
+  "artifactSizeBytes" : 1117321472,
+  "settings" : {
+    "corpusSha256" : "4da610e627e7481d54d1595ef1191dff454455d9bb04fc814b5ea12fd6180315",
+    "workload" : "math",
+    "caseIds" : [ "amber-determinant-trace", "birch-function-derivative", "cobalt-red-probability", "delta-sixth-term", "ember-modulo", "fjord-integral", "grove-hypotenuse", "harbor-mean-median", "unsupported-maple-limit" ],
+    "promptTemplate" : "chatml-direct",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 2048,
+    "warmups" : 0,
+    "iterations" : 1,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topK" : "1",
+      "seed" : "42",
+      "promptCache" : "longest-common-prefix",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "vibethinker-tpl-202610291625",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-139-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857440256,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.5",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v14",
+    "environment" : {
+      "projection-layers" : "28",
+      "native-kernel-threads" : "8",
+      "java-version" : "25.0.5",
+      "sve" : "false",
+      "performance-cliffs" : "fused-grouped-attention-disabled",
+      "kernel-runtime" : "rust-ffm",
+      "compiler" : "hotspot-c2",
+      "native-kernel-decode-threads" : "8",
+      "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+      "native-quantized-decode" : "true",
+      "end-of-generation.151643" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+      "end-of-generation.151645" : "vocabulary-text,chat-template-end-of-turn",
+      "vector-api" : "true",
+      "gguf-parallel" : "true",
+      "model-architecture" : "qwen2",
+      "architecture" : "amd64",
+      "vm-version" : "25.0.5+8-LTS",
+      "gguf-executor" : "persistent",
+      "gguf-chunks-per-thread" : "2",
+      "performance-cliff.fused-grouped-attention-disabled" : "architecture=qwen2, group-size=6",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "native-kernel-poll-millis" : "5",
+      "end-of-generation-token-ids" : "151643,151645",
+      "native-grouped-attention" : "true",
+      "gguf-threads" : "8",
+      "end-of-generation.chat-template" : "resolved:151645",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "tokenizer.pre" : "qwen2",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "os" : "Linux",
+      "active-vector-bits" : "256",
+      "fast-vector-fma" : "true",
+      "java-executor-poll-millis" : "0",
+      "q4-short-pairwise-supported" : "true",
+      "java-feature" : "25",
+      "tokenizer.pre.implemented" : "true",
+      "processors" : "8",
+      "native-gated-delta-net" : "true",
+      "preferred-vector-bits" : "256",
+      "q4-unsigned-pairwise-supported" : "true",
+      "transformer-runtime" : "java",
+      "native-kernel-abi" : "7",
+      "vm-vendor" : "Eclipse Adoptium",
+      "kernel-implementation" : "rust-ffm-quantized-v14",
+      "native-q5-0-grouped" : "false",
+      "fast-scalar-fma" : "true"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "grouped",
+        "gate-up" : "grouped",
+        "implementation" : "rust-ffm-quantized-v14"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "14"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "architecture" : "amd64",
+        "os" : "Linux",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "batch-size" : "32",
+        "architecture" : "amd64",
+        "kernel" : "one-query-block",
+        "requested-kernel" : "one-query-block"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "2",
+        "parallel" : "true",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "7",
+        "parallel" : "true",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "partitions" : "8",
+        "partition" : "batch-rows",
+        "staged-layers" : "0",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "8"
+      }
+    }, {
+      "id" : "sliding-window-attention",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no sliding window, so every layer attends to the full context",
+      "settings" : {
+        "pattern-source" : "none",
+        "local-layers" : "0/28",
+        "declared-window" : "0"
+      }
+    }, {
+      "id" : "expert-swiglu-clamp",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no expert SwiGLU clamp",
+      "settings" : {
+        "clamped-layers" : "0/28"
+      }
+    }, {
+      "id" : "rust-ptq1-0-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+      "settings" : {
+        "weight" : "PTQ1_0",
+        "activation" : "Q8_0",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "transformer" : "java",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "state" : "caller-owned-java-array",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "independent recurrent state slots share one native worker dispatch",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "state" : "branch-major-caller-owned-java-array",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+      "settings" : {
+        "evidence" : "benchmark-results/2026-10-12-q5-production/"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 9,
+    "successfulAttempts" : 2,
+    "loadMillis" : 497.771177,
+    "retrievalMillis" : {
+      "p50" : 2.27453,
+      "p95" : 2.573753
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 3.2442539999974542,
+      "p95" : 4.183858499993948
+    },
+    "ttftMillis" : {
+      "p50" : 1308.1223785,
+      "p95" : 1317.04634605
+    },
+    "tpotMillis" : {
+      "p50" : 40.13789076845515,
+      "p95" : 40.46177294368762
+    },
+    "endToEndMillis" : {
+      "p50" : 68000.31131399999,
+      "p95" : 70300.6754499
+    },
+    "p50PrefillTokensPerSecond" : 125.0796011311574,
+    "p50DecodeTokensPerSecond" : 24.916117245693208,
+    "peakRssBytes" : 1482797056,
+    "totalCpuMillis" : 1080390.0,
+    "totalInputTokens" : 327,
+    "totalCacheReadInputTokens" : 0,
+    "totalCacheWriteInputTokens" : 327,
+    "totalOutputTokens" : 3324,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 0.75,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 0.0,
+    "correctAnswerRate" : 0.5,
+    "rawCorrectAnswerRate" : 1.0,
+    "modelAnswerRate" : 0.1111111111111111,
+    "modelAnswerCorrectRate" : 0.0,
+    "extractiveFallbackRate" : 0.5,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "FAILED_RUNTIME",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "delta-sixth-term",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-delta-sequence",
+        "title" : "Delta sequence",
+        "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27."
+      },
+      "score" : 6.3672924,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5be300a124718e9fc68e47787b9a5f3a1fff279388aed5e0f16483ba101a8e51",
+    "retrievalMillis" : 2.607,
+    "frameworkOverheadMillis" : 4.288258999993559,
+    "endToEndMillis" : 70556.271465,
+    "generation" : {
+      "text" : "The start is 7, common difference is 4, and sixth term is 27, [math-delta-sequence]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 165,
+      "outputTokens" : 1711,
+      "ttftMillis" : 1298.206859,
+      "totalMillis" : 70549.376206,
+      "prefillTokensPerSecond" : 127.17972639358365,
+      "loadMillis" : 497.771177,
+      "peakRssBytes" : 1474301952,
+      "cpuMillis" : 560490.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : " the Delta arithmetic sequence starts at 7 and has a common difference of 4. Also, it says its sixth term is 27. The question is asking for the start and common difference, and the sixth term. So, I can directly answer based on the given information.\n\nThe start is 7, common difference is 4, and sixth term is 27. Since the context provides all the necessary information, I don't need any external knowledge.\n\nNow, for the answer format: I need to provide a one-sentence answer. Also, I must include the source context ID at the end, but only if it's valid. The context has [math-delta-sequence], and since the information is from that context, I should use that.\n\nThe instruction says to copy each supporting source ID exactly from the square brackets. Here, the context is given as [math-delta-sequence], so I should use that ID.\n\nThe question is asking for three things: start, common difference, and sixth term. I need to combine that into one sentence. Something like: \"The start is 7, common difference is 4, and sixth term is 27.\"\n\nBut let me make it concise. Perhaps: \"The sequence starts at 7 with a common difference of 4, and its sixth term is 27.\"\n\nNow, for the citation: since the context is [math-delta-sequence], and this information comes from there, I should include the ID at the end. But the instruction says to copy the ID from the square brackets. So in the sentence, I should put the ID at the end.\n\nAlso, it says only valid IDs from CONTEXT are to be used, and here the only ID is math-delta-sequence.\n\nSo, my answer should be: \"The start is 7, common difference is 4, and sixth term is 27. [math-delta-sequence]\"\n\nBut I need to put the ID at the end of the sentence. The instruction says: \"copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry, and put those citations at the end of the sentence.\"\n\nSo, I need to have the sentence followed by the ID.\n\nBut in one sentence? So perhaps: \"The start is 7, common difference is 4, and sixth term is 27; [math-delta-sequence]\"\n\nBut that might not be a full sentence. Alternatively, I can make it a statement: \"According to the context, the start is 7, common difference is 4, and sixth term is 27. [math-delta-sequence]\"\n\nBut that's two sentences. The instruction says \"answer in one short sentence.\" So I need to combine everything into one sentence.\n\nLet me try: \"The Delta sequence, as described in the context, starts at 7 with a common difference of 4 and has a sixth term of 27. [math-delta-sequence]\"\n\nStill two parts. Perhaps I can say: \"The start of the sequence is 7, the common difference is 4, and the sixth term is 27, according to the context [math-delta-sequence].\"\n\nBut again, the context part is not in the sentence. I think the instruction wants the answer in one sentence without external references, but using the context.\n\nThe context is provided, and I need to base on that. The answer should be derived from the context.\n\nThe context says: \"The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27.\"\n\nSo, the answer is directly in the context. I don't need to mention \"according to context\".\n\nTherefore, I can just state the facts.\n\nSo, a single sentence: \"The start is 7, common difference is 4, and sixth term is 27.\"\n\nAnd then at the end of the sentence, I need to put the ID. But how? The instruction says \"put those citations at the end of the sentence.\" So perhaps I can include the ID in the sentence.\n\nFor example: \"The start is 7, common difference is 4, and sixth term is 27. [math-delta-sequence]\"\n\nBut that makes two parts: the statement and then the ID. But the ID is part of the sentence? I think it's acceptable as long as the sentence is one.\n\nI could say: \"The start of the sequence is 7, the common difference is 4, and the sixth term is 27, as per the context [math-delta-sequence].\"\n\nBut again, the \"as per context is not in the context, I think. The context is just the given information.\n\nPerhaps the best way is to present the answer as a fact from the context, so just state the numbers and include the ID at the end without additional text.\n\nI think for simplicity, I'll do: \"The start is 7, common difference is 4, and sixth term is 27. [math-delta-sequence]\"\n\nBut to make it one sentence, I can use a semicolon or something. Let me see.\n\nAnother idea: \"According to the context, the start is 7, common difference is 4, and sixth term is 27; [math-delta-sequence]\"\n\nBut \"according to the context is not part of the context, so it might be introducing something.\n\nThe context doesn't have any of that; it just states the facts.\n\nSo, perhaps the answer should be purely based on the text.\n\nLet me read the context again: \"The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27.\"\n\nSo, the answer is embedded in that.\n\nTherefore, I can say: \"The start is 7, common difference is 4, and sixth term is 27.\"\n\nAnd then, since the ID is part of the context, I include it at the end. But how? I think I can just append the ID.\n\nThe instruction says \"copy each supporting source ID exactly from the square brackets\", so I need to put [math-delta-sequence] at the end.\n\nBut in the sentence, it might be confusing. Perhaps I should not have a separate sentence, but just the facts.\n\nI think for the purpose of this exercise, I can write: \"The start of the sequence is 7, the common difference is 4, and the sixth term is 27. [math-delta-sequence]\"\n\nAnd consider that the ID is attached.\n\nTo be safe, I can make one sentence: \"The Delta sequence, with start 7 and common difference 4, has a sixth term of 27 as per the context [math-delta-sequence].\"\n\nBut again, \"as per context is not in the context. The context is only the two statements.\n\nPerhaps the context is part of a larger text, but here it's given as that, so I think the answer can be direct.\n\nI think I'm overcomplicating. Let me just go with the one-sentence answer as per the facts, and include the ID at the end.\n\nSo, my answer: \"The start is 7, common difference is 4, and sixth term is 27. [math-delta-sequence]\"\n\nBut to make it one sentence, I can use a comma: \"The start is 7, common difference is 4, and sixth term is 27, [math-delta-sequence]\"\n\nThat might work, as the ID is part of the sentence.\n\nI think that's acceptable.\n\nNow, about the common difference: the context says \"common difference 4\", so I can say \"common difference is 4\".\n\nAlso, the start is 7, sixth term is 27.\n\nSo, in one sentence: \"The start is 7, common difference is 4, and sixth term is 27, [math-delta-sequence]\"\n\nYes.\n\nAnd only one ID, which is valid.\n\nSo, I think that's the answer.\n</think>\n\nThe start is 7, common difference is 4, and sixth term is 27, [math-delta-sequence]",
+      "text" : "The start is 7, common difference is 4, and sixth term is 27, [math-delta-sequence]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "grove-hypotenuse",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-grove-geometry",
+        "title" : "Grove triangle",
+        "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13."
+      },
+      "score" : 5.9253526,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4131518b9dddd949b8aa38e66d3d403ece1a357e4d6767da6f9272e9b0fcea9c",
+    "retrievalMillis" : 1.94206,
+    "frameworkOverheadMillis" : 2.2002490000013495,
+    "endToEndMillis" : 65444.351163,
+    "generation" : {
+      "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13. [math-grove-geometry]",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 162,
+      "outputTokens" : 1613,
+      "ttftMillis" : 1318.037898,
+      "totalMillis" : 65440.208854,
+      "prefillTokensPerSecond" : 122.97947586873116,
+      "loadMillis" : 497.771177,
+      "peakRssBytes" : 1482797056,
+      "cpuMillis" : 519900.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : " the Grove right triangle has legs 5 and 12. Its hypotenuse is 13. So, the legs are 5 and 12, and the hypotenuse is 13. The question asks for the legs and the hypotenuse, which are all mentioned.\n\nThe question is: \"What are the Grove triangle legs, and what is its hypotenuse?\" So, I need to provide the legs and the hypotenuse. From the context, legs are 5 and 12, hypotenuse is 13.\n\nNow, according to the rules, I need to answer in one short sentence. Also, I have to copy each supporting source ID exactly from the square brackets at the start of its context entry, and put those citations at the end of the sentence. Only IDs present in CONTEXT are valid citations; do not invent or substitute one.\n\nLooking at the context, there's an entry: [math-grove-geometry] Grove triangle. The context says: \"The Grove right triangle has legs 5 and 12. Its hypotenuse is 13.\"\n\nSo, the supporting source ID is [math-grove-geometry], I assume, since the context is under that tag. But the context itself doesn't have a separate entry for the triangle; it's all in one paragraph. Let me read the context again.\n\nCONTEXT\n[math-grove-geometry] Grove triangle\nThe Grove right triangle has legs 5 and 12. Its hypotenuse is 13.\n\nSo, the context is labeled as [math-grove-geometry] and then the text follows. But the text doesn't have a separate line for each piece of information. It's a single sentence with two parts: legs and hypotenuse.\n\nThe instruction says: \"copy each supporting source ID exactly from the square brackets at the start of its context entry\". The context entry is for the Grove triangle, which is under [math-grove-geometry]. So, the source ID is [math-grove-geometry].\n\nBut in the text, the information is given in the paragraph. I think the entire context is considered one entry, so the source ID applies to the whole thing.\n\nThe rule says: \"Only IDs present in CONTEXT are valid citations\". So, in the CONTEXT provided, the only ID is [math-grove-geometry].\n\nNow, for the answer, I need to provide the legs and hypotenuse. The legs are 5 and 12, hypotenuse is 13.\n\nI should phrase it as a sentence. For example: \"The legs of the Grove triangle are 5 and 12, and its hypotenuse is 13, as per the [math-grove-geometry] context.\"\n\nBut I need to include the citation. The instruction says to put the citations at the end of the sentence. So, perhaps: \"The legs are 5 and 12, and the hypotenuse is 13, citing the [math-grove-geometry] context.\"\n\nBut I need to make sure that I'm not adding anything. The context says \"The Grove right triangle has legs 5 and 12. Its hypotenuse is 13.\" So, it's referring to the triangle as \"the Grove right triangle\".\n\nIn the question, it says \"Grove triangle\", which matches.\n\nNow, for the answer, I should use the exact wording where possible.\n\nThe question is: \"What are the Grove triangle legs, and what is its hypotenuse?\"\n\nSo, I can say: \"The legs are 5 and 12, and the hypotenuse is 13, based on the [math-grove-geometry] context.\"\n\nBut to be precise, the context uses \"the Grove right triangle\", and the question says \"Grove triangle\", but it's the same.\n\nNow, about the citation: I need to copy the source ID exactly. So, [math-grove-geometry] should be in the answer.\n\nAlso, the rule says \"copy each supporting source ID exactly from the square brackets at the start of its context entry\". Since the entire context is under one entry, I think it's just one ID.\n\nBut in the context, the first line is labeled [math-grove-geometry], and then the text. But the text doesn't have its own labels, so probably the source ID is for the whole block.\n\nMoreover, the instruction says \"only IDs present in CONTEXT are valid\", and in the CONTEXT provided, only [math-grove-geometry] is present.\n\nSo, I'll use that.\n\nNow, the answer should be one short sentence. So, I need to keep it concise.\n\nPossible answer: \"The legs of the Grove triangle are 5 and 12, and its hypotenuse is 13, citing the [math-grove-geometry] context.\"\n\nBut to make it more accurate, since the context says \"the Grove right triangle\", and the question says \"Grove triangle\", I should use \"the Grove triangle in the answer, as per the question.\n\nThe context calls it a \"right triangle\", but the question just says \"triangle\", but since it's a right triangle, it should be fine. The legs and hypotenuse are specified, so it's clear.\n\nIn the context, it's a right triangle, as per the name \"right triangle\".\n\nThe question says \"Grove triangle legs\", but I think it's referring to the right triangle.\n\nSo, I'll proceed.\n\nNow, for the citation, I need to put it at the end. So, perhaps: \"The legs are 5 and 12, and the hypotenuse is 13, in the [math-grove-geometry] context.\"\n\nBut to be precise, the context entry is for the Grove triangle, and the information is given.\n\nAnother thing: the context has two sentences. The first is about legs, second about hypotenuse. But I can combine them.\n\nThe rule says \"copy each supporting source ID exactly\", but since there's only one ID, it's fine.\n\nI think I'm overcomplicating. Let me just write the answer.\n\nAnswer: The legs are 5 and 12, and the hypotenuse is 13, based on the [math-grove-geometry] context.\n\nBut the instruction says \"put those citations at the end of the sentence\". So, in this case, \"based on the [math-grove-geometry] context is the citation part.\n\nAlso, the answer should be one short sentence, which this is.\n\nNow, is there any other source? The context only has one entry, so no.\n\nThe question is straightforward, and all information is in the context.\n\nThe rules say \"if the context does not contain the answer, reply exactly INSUFFICIENT_CONTEXT.\" But here it does contain, so I don't need that.\n\nAlso, \"only answer, no prior knowledge\". I didn't use any prior knowledge, just the given context.\n\nSo, I think this is correct.\n\nBut let me check the exact wording.\n\nThe context: \"The Grove right triangle has legs 5 and 12. Its hypotenuse is 13.\"\n\nSo, it's clear that legs are 5 and 12, hypotenuse is 13.\n\nThe question uses \"Grove triangle\", but since it's a right triangle, and the context refers to it as Grove right triangle, it should be fine.\n\nPerhaps I should use the exact terms. The question says \"legs and \"hypotenuse\", which match.\n\nSo, final answer.\n</think>\n\nThe legs of the Grove triangle are 5 and 12, and its hypotenuse is 13, based on the [math-grove-geometry] context.",
+      "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13. [math-grove-geometry]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ {
+    "iteration" : 0,
+    "caseId" : "amber-determinant-trace",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "birch-function-derivative",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "cobalt-red-probability",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "ember-modulo",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "fjord-integral",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "harbor-mean-median",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "unsupported-maple-limit",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  } ]
+}

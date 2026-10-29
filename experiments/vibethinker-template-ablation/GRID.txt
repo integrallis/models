@@ -1,0 +1,58 @@
+artifact sha256  : 59fa32aaaf5c4512452a9bff8bb6d08f1e39a75acee226b5e01372f7509e3458
+corpus sha256    : 4da610e627e7481d54d1595ef1191dff454455d9bb04fc814b5ea12fd6180315
+backend          : rust-ffm models@0.5.7+vibethinker1-ec3ae4ff2fd3
+held             : threads=8, context=2048, cases=9, warmups=0, iterations=1
+grounding policy : bounded-context-injection-screened-citation-safe-statement-grounding-v23
+grid             : 6 cells, caps [768, 1792]
+
+### truncatedAnswerRate
+
+| cap | `chatml-direct` | `chatml-answer` | `chatml-no-think` |
+| --- | --- | --- | --- |
+| **768** | 1.000 | 1.000 | 0.333 |
+| **1792** | 0.778 | 0.889 | 0.222 |
+
+### modelAnswerRate
+
+| cap | `chatml-direct` | `chatml-answer` | `chatml-no-think` |
+| --- | --- | --- | --- |
+| **768** | 0.000 | 0.000 | 0.000 |
+| **1792** | 0.111 | 0.000 | 0.000 |
+
+### modelAnswerCorrectRate
+
+| cap | `chatml-direct` | `chatml-answer` | `chatml-no-think` |
+| --- | --- | --- | --- |
+| **768** | 0.000 | 0.000 | 0.000 |
+| **1792** | 0.000 | 0.000 | 0.000 |
+
+### extractiveFallbackRate
+
+| cap | `chatml-direct` | `chatml-answer` | `chatml-no-think` |
+| --- | --- | --- | --- |
+| **768** | 0.889 | 0.889 | 0.889 |
+| **1792** | 0.778 | 0.889 | 0.889 |
+
+### correctAnswerRate
+
+| cap | `chatml-direct` | `chatml-answer` | `chatml-no-think` |
+| --- | --- | --- | --- |
+| **768** | 1.000 | 1.000 | 1.000 |
+| **1792** | 0.889 | 1.000 | 1.000 |
+
+### totalOutputTokens
+
+| cap | `chatml-direct` | `chatml-answer` | `chatml-no-think` |
+| --- | --- | --- | --- |
+| **768** | 6912 | 6912 | 3296 |
+| **1792** | 15868 | 15211 | 5491 |
+
+_reference_ shard 703, `chatml-direct` at cap 768, threads=16, iterations=3: truncated 0.889, modelAnswerRate 0.000, outputTokens 20175
+
+## Registered decision rule applied
+
+gate: modelAnswerRate >= 0.333 AND modelAnswerCorrectRate >= 0.90
+truncation counts as cleared below 0.05
+
+CAP STILL BINDING at 1792 in every cell -- INCONCLUSIVE.
+Truncation is asked first, so no template can be judged on this grid.
