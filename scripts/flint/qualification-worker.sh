@@ -24,7 +24,8 @@ export OLLAMA_NUM_PARALLEL=1
 export OLLAMA_MAX_LOADED_MODELS=1
 export JAVA_OPTS="-Xmx8g --add-modules=jdk.incubator.vector --enable-native-access=ALL-UNNAMED -XX:ActiveProcessorCount=$THREADS"
 exec > >(tee -a "$OUT/worker.log" /dev/console) 2>&1
-sync_results() { aws s3 sync "$OUT/" "$DEST/" --only-show-errors; }
+# The existing worker role has GetObject/PutObject, but deliberately no ListBucket.
+sync_results() { aws s3 cp "$OUT/" "$DEST/" --recursive --only-show-errors; }
 cleanup() {
   local rc=$?
   trap - EXIT
