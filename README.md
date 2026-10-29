@@ -61,6 +61,9 @@ for the exact boundary and migration policy.
 
 ## Capabilities
 
+Experimental [Flint GGUF execution](docs/flint.md) is available in the pure Java backend.
+Catalog qualification and Flint tool calling remain pending.
+
 Implemented functionality includes:
 
 - GGUF v2/v3 parsing with memory-mapped tensor access

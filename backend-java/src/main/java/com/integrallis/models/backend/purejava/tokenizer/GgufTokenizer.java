@@ -534,6 +534,13 @@ public final class GgufTokenizer implements Tokenizer {
         result.mark(token, SOURCE_VOCABULARY_TEXT);
       }
     }
+    // Flint ends generation on a transition back to another speaker. These are not
+    // universal terminators: the same spellings may be ordinary tokens in other families.
+    if (metadata.getString("general.architecture").orElse("").equals("flint")) {
+      for (String marker : List.of("<|user|>", "<|observation|>", "<|developer|>")) {
+        result.mark(tokenToId.getOrDefault(marker, -1), SOURCE_VOCABULARY_TEXT);
+      }
+    }
     ChatTemplateEndOfTurn.Resolution endOfTurn =
         ChatTemplateEndOfTurn.resolve(
             metadata.getString("tokenizer.chat_template").orElse(null),

@@ -37,7 +37,7 @@ class ChatTemplateEndOfTurnTest {
   @ParameterizedTest
   @EnumSource(
       value = ChatTemplate.class,
-      names = {"RAW", "GPT_OSS", "NEEDLE2", "DEEPSEEK"},
+      names = {"RAW", "GPT_OSS", "NEEDLE2", "DEEPSEEK", "FLINT"},
       mode = EnumSource.Mode.EXCLUDE)
   void theRendererClosesAnAssistantMessageWithTheDeclaredMarker(ChatTemplate template) {
     String rendered =
@@ -56,6 +56,9 @@ class ChatTemplateEndOfTurnTest {
   @Test
   void familiesWhoseAssistantTextIsNotDirectlyFollowedByTheirTerminator() {
     assertThat(ChatTemplate.RAW.endOfTurnMarker()).isEmpty();
+    // Flint history has no closing delimiter; a generated EOS still stops the response.
+    assertThat(ChatTemplate.FLINT.endOfTurnMarker()).contains("<|end_of_text|>");
+    assertThat(render(ChatTemplate.FLINT)).contains("ANSWER<|user|>");
     assertThat(ChatTemplate.GPT_OSS.endOfTurnMarker()).contains("<|return|>");
     assertThat(ChatTemplate.DEEPSEEK.endOfTurnMarker()).contains("<|EOT|>");
     assertThat(ChatTemplate.NEEDLE2.endOfTurnMarker()).contains("<|im_end|>");

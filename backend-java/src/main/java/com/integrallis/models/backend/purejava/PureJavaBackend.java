@@ -43,6 +43,8 @@ import com.integrallis.models.backend.purejava.cact.Needle2Weights;
 import com.integrallis.models.backend.purejava.deepseek2.Deepseek2Config;
 import com.integrallis.models.backend.purejava.deepseek2.Deepseek2ForwardPass;
 import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
+import com.integrallis.models.backend.purejava.flint.FlintConfig;
+import com.integrallis.models.backend.purejava.flint.FlintForwardPass;
 import com.integrallis.models.backend.purejava.gemma3n.Gemma3nConfig;
 import com.integrallis.models.backend.purejava.gemma3n.Gemma3nForwardPass;
 import com.integrallis.models.backend.purejava.gemma4.Gemma4Config;
@@ -505,6 +507,9 @@ public final class PureJavaBackend
         } else if ("gpt-oss".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded = loadGgufGptOss(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
+        } else if ("flint".equals(modelFamily)) {
+          requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
+          loaded = loadFlint(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
         } else if ("deepseek2".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded = loadDeepseek2(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
@@ -961,6 +966,40 @@ public final class PureJavaBackend
             config.numHeads(),
             config.numHeads());
     return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
+  }
+
+  private static LoadedDecoder loadFlint(
+      Path modelPath,
+      GgufFile file,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel batchedMatrixKernel) {
+    FlintConfig config = FlintConfig.fromMetadata(file.metadata());
+    PureJavaExecutionPlan executionPlan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                "flint",
+                config.queryDimension(),
+                config.keyValueDimension(),
+                config.keyValueDimension(),
+                config.numLayers()),
+            planConfiguration,
+            batchedMatrixKernel);
+    int capacity = runtimeContextLength(config.maxPosition(), planConfiguration);
+    PureJavaDecoder decoder =
+        new FlintDecoderAdapter(FlintForwardPass.loadGguf(config, file, capacity));
+    ModelMetadata metadata =
+        new ModelMetadata(
+            "flint",
+            modelName(modelPath, file),
+            config.maxPosition(),
+            config.vocabSize(),
+            config.hiddenSize(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numKvHeads());
+    return new LoadedDecoder(decoder, metadata, capacity, executionPlan);
   }
 
   private static LoadedDecoder loadGemma3n(

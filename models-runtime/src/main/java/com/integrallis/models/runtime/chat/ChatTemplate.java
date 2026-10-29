@@ -42,6 +42,7 @@ public enum ChatTemplate {
   LLAMA3("llama3", ToolSyntax.LLAMA3),
   MOBILE_MOE("mobilemoe", ToolSyntax.NONE),
   GPT_OSS("gpt-oss", ToolSyntax.HARMONY),
+  FLINT("flint", ToolSyntax.NONE),
   NEEDLE2("needle2", ToolSyntax.NEEDLE2),
   HAMMER("hammer", ToolSyntax.HAMMER),
   GEMMA("gemma", ToolSyntax.NONE),
@@ -148,10 +149,12 @@ public enum ChatTemplate {
   /**
    * The token text that terminates an assistant turn in this family, when it has one.
    *
-   * <p>For every family but GPT-OSS this is the marker the renderer writes after an assistant
-   * message. GPT-OSS histories close a turn with {@code <|end|>}, but a final answer ends with
-   * {@code <|return|>}, which is the marker generation has to stop on; {@code <|end|>} must not
-   * stop it. {@link #RAW} has no envelope and so no marker.
+   * <p>For every enveloped family but GPT-OSS and Flint this is the marker the renderer writes
+   * after an assistant message. GPT-OSS histories close a turn with {@code <|end|>}, but a final
+   * answer ends with {@code <|return|>}, which is the marker generation has to stop on; {@code
+   * <|end|>} must not stop it. Flint histories use the next role prefix without a closing marker,
+   * while generation can end with {@code <|end_of_text|>}. {@link #RAW} has no envelope and so no
+   * marker.
    *
    * @return the marker text, as it appears in the model's vocabulary
    */
@@ -172,6 +175,7 @@ public enum ChatTemplate {
           case LLAMA3 -> "<|eot_id|>";
           case MOBILE_MOE -> "<|eot|>";
           case GPT_OSS -> "<|return|>";
+          case FLINT -> "<|end_of_text|>";
           case GEMMA -> "<end_of_turn>";
           case GEMMA4 -> "<turn|>";
           case PHI3 -> "<|end|>";
@@ -249,6 +253,7 @@ public enum ChatTemplate {
       case LLAMA3 -> renderLlama3(conversation);
       case MOBILE_MOE -> renderMobileMoe(conversation);
       case GPT_OSS -> renderGptOss(conversation, List.of());
+      case FLINT -> renderFlint(conversation);
       case NEEDLE2 -> renderNeedle2(conversation, List.of());
       case HAMMER -> renderHammer(conversation, List.of());
       case GEMMA -> renderGemma(conversation);
@@ -1154,6 +1159,51 @@ public enum ChatTemplate {
           .control("<|eot_id|>");
     }
     return prompt.control("<|start_header_id|>assistant<|end_header_id|>\n\n").build();
+  }
+
+  /** Text conversation envelope from RecursiveSI/flint's chat_template.jinja. */
+  private static ModelPrompt renderFlint(List<ChatMessage> messages) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
+    for (ChatMessage message : messages) {
+      if (message.hasToolCalls() || message.role() == ChatRole.TOOL) {
+        throw new IllegalArgumentException("Flint tool-call rendering is not implemented");
+      }
+      prompt.control("<|" + message.role().templateName() + "|>");
+      if (message.role() == ChatRole.ASSISTANT) {
+        // Retain reasoning in assistant history, tokenizing only the known delimiters as controls.
+        String text = message.text();
+        int cursor = 0;
+        while (cursor < text.length()) {
+          int open = text.indexOf("<think>", cursor);
+          int close = text.indexOf("</think>", cursor);
+          int next = open < 0 ? close : close < 0 ? open : Math.min(open, close);
+          if (next < 0) {
+            prompt.text(text.substring(cursor));
+            break;
+          }
+          prompt.text(text.substring(cursor, next));
+          String marker = next == open ? "<think>" : "</think>";
+          prompt.control(marker);
+          cursor = next + marker.length();
+        }
+      } else {
+        String text =
+            message.text().replace("\u0000", "").replace("<think>", "").replace("</think>", "");
+        for (String role :
+            List.of(
+                "begin_of_text",
+                "end_of_text",
+                "system",
+                "developer",
+                "user",
+                "assistant",
+                "observation")) {
+          text = text.replace("<|" + role + "|>", "&lt;|" + role + "|&gt;");
+        }
+        prompt.text(text);
+      }
+    }
+    return prompt.control("<|assistant|>").build();
   }
 
   /** Renders Meta's MobileMoE header protocol, which is distinct from the Llama 3 protocol. */
