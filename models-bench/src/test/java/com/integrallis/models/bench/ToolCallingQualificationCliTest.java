@@ -297,6 +297,43 @@ class ToolCallingQualificationCliTest {
   }
 
   @Test
+  void followUpDoesNotCreditFactsThatOnlyAppearInReasoning() throws Exception {
+    String captured;
+    try (var resource = getClass().getResourceAsStream("/flint/truncated-follow-up.txt")) {
+      captured = new String(resource.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+    }
+    var actual =
+        ToolCallingQualificationCli.evaluateFollowUp(
+            new ObjectMapper(), ToolSyntax.FLINT, List.of(), captured, 40263);
+    assertThat(actual.output()).isEqualTo(captured);
+    assertThat(actual.grounded()).isFalse();
+    assertThat(actual.passed()).isFalse();
+    for (String output :
+        List.of(
+            "<think>78 F and rain",
+            "<think>78 F and rain</think>",
+            "Checking. <think>78 F <think>and rain</think> still thinking</think>Done.",
+            "<reasoning>78 F and rain</reasoning>It is sunny at 20 F.",
+            "<think>Plan.</think>{\"temperature\":78,\"conditions\":\"rain\"}",
+            "<think>Plan.</thinking>It is raining at 78 F.",
+            "<think>Plan.</think><thinking>78 F and rain</thinking>Done.")) {
+      var result =
+          ToolCallingQualificationCli.evaluateFollowUp(
+              new ObjectMapper(), ToolSyntax.FLINT, List.of(), output, 1);
+      assertThat(result.passed()).as(output).isFalse();
+    }
+    assertThat(
+            ToolCallingQualificationCli.evaluateFollowUp(
+                    new ObjectMapper(),
+                    ToolSyntax.FLINT,
+                    List.of(),
+                    "<think>Check the result.</think>It is raining at 78 F.",
+                    1)
+                .passed())
+        .isTrue();
+  }
+
+  @Test
   void activatedFollowUpAsksTheSpecialistWhetherAnotherToolIsNeededBeforeBaseNarration() {
     ScriptedTurn afterResult =
         new ScriptedTurn("<tool_call>[]</tool_call>", "It is raining at 78 F.", null);

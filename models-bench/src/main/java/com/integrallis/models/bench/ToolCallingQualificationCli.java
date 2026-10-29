@@ -43,15 +43,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 /** Runs the shared small-model tool-calling gate through an owned in-process backend. */
 final class ToolCallingQualificationCli {
-  static final String POLICY_VERSION = "small-model-tool-conformance-v1";
+  static final String POLICY_VERSION = "small-model-tool-conformance-v2";
+
+  private static final Pattern REASONING_TAG =
+      Pattern.compile("(?i)<(/?)(think|thinking|reasoning)>");
 
   private static final int PASS = 0;
   private static final int FAIL = 1;
@@ -474,28 +479,29 @@ final class ToolCallingQualificationCli {
       String initialToolOutput,
       String postResultToolOutput) {
     String generated = output == null ? "" : output.strip();
+    String visible = visibleFollowUp(generated);
     List<String> diagnostics = new ArrayList<>();
     boolean repeatedCall = ToolCallScanner.scan(generated, syntax, tools).hasCalls();
     if (repeatedCall) {
       diagnostics.add("model requested another tool instead of answering from the result");
     }
     boolean rawJson = false;
-    if (generated.startsWith("{") && generated.endsWith("}")) {
+    if (visible.startsWith("{") && visible.endsWith("}")) {
       try {
-        rawJson = mapper.readTree(generated).isObject();
+        rawJson = mapper.readTree(visible).isObject();
       } catch (IOException ignored) {
         // Malformed JSON is assessed as ordinary non-conversational output below.
       }
     }
     boolean conversational =
-        !generated.isBlank()
+        !visible.isBlank()
             && !rawJson
-            && !generated.contains("<tool_call>")
-            && !generated.contains("<function name=");
+            && !visible.contains("<tool_call>")
+            && !visible.contains("<function name=");
     if (!conversational) {
       diagnostics.add("follow-up was empty, raw JSON, or tool protocol instead of prose");
     }
-    String normalized = generated.toLowerCase(java.util.Locale.ROOT);
+    String normalized = visible.toLowerCase(java.util.Locale.ROOT);
     boolean grounded = normalized.contains("78") && normalized.contains("rain");
     if (!grounded) {
       diagnostics.add("follow-up did not preserve the temperature and conditions");
@@ -513,6 +519,27 @@ final class ToolCallingQualificationCli {
         repeatedCall,
         passed,
         diagnostics);
+  }
+
+  /** Score the user-facing answer while retaining the untouched completion in the report. */
+  private static String visibleFollowUp(String text) {
+    var visible = new StringBuilder();
+    var reasoning = new ArrayDeque<String>();
+    var tags = REASONING_TAG.matcher(text);
+    int cursor = 0;
+    while (tags.find()) {
+      if (reasoning.isEmpty()) visible.append(text, cursor, tags.start());
+      String name = tags.group(2).toLowerCase(java.util.Locale.ROOT);
+      if (tags.group(1).isEmpty()) {
+        reasoning.push(name);
+      } else if (reasoning.isEmpty() || !reasoning.pop().equals(name)) {
+        return "";
+      }
+      cursor = tags.end();
+    }
+    // An unclosed reasoning block contributes no answer text.
+    if (reasoning.isEmpty()) visible.append(text, cursor, text.length());
+    return visible.toString().strip();
   }
 
   static ActivatedFollowUp generateActivatedFollowUp(

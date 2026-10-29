@@ -10,6 +10,9 @@ All notable changes to models are documented here.
   numerical and Jinja fixtures, and a pinned Q4_K_M checkpoint test. Adds the tool and RAG
   qualification candidates and a bounded remote worker. Catalog qualification remains pending;
   see [Flint execution](docs/flint.md).
+- Correct tool-result follow-up scoring to exclude reasoning blocks. The v2 policy prevents
+  truncated visible answers from passing solely because their reasoning mentioned the facts;
+  includes a captured Flint regression. Historical v1 reports remain unchanged.
 
 ## [0.5.7] - 2026-10-27
 
