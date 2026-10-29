@@ -30,10 +30,47 @@ def read(path):
     return json.loads(path.read_bytes())
 
 
+def default_configuration_smoke(report_path):
+    """The library-default correctness smoke beside the tuned report, or None.
+
+    ModelJars' tools/qualification-smoke-gate.mjs requires this on every new or changed
+    entry, and refuses the publish without it: a tuned performance comparison says nothing
+    about what a caller gets from the public library defaults. It is written by
+    run-controlled-rag-qualification.sh, or for a fleet run by
+    scripts/fleet/collect-default-smoke.sh -- the two-arm worker does not produce one, which
+    is why eleven models measured on 2026-10-29 could not be published until it was
+    collected separately.
+
+    The sidecar is used as written rather than rebuilt here: it was produced next to the run
+    it describes, and its reportSha256 is checked against the file it names.
+    """
+    sidecar = report_path.parent / "default-correctness" / "smoke.json"
+    measured = report_path.parent / "default-correctness" / "models-rust-ffm.json"
+    if not sidecar.exists() or not measured.exists():
+        return None
+    smoke = json.loads(sidecar.read_text())
+    digest = hashlib.sha256(measured.read_bytes()).hexdigest()
+    if smoke.get("reportSha256") != digest:
+        raise SystemExit(
+            f"{sidecar}: reportSha256 {smoke.get('reportSha256')} does not match "
+            f"{measured} ({digest}); the smoke does not describe that file"
+        )
+    return {
+        "configuration": smoke["configuration"],
+        "backend": smoke["backend"],
+        "artifactSha256": smoke["artifactSha256"],
+        "report": smoke["report"],
+        "reportSha256": smoke["reportSha256"],
+        "totalAttempts": smoke["totalAttempts"],
+        "successfulAttempts": smoke["successfulAttempts"],
+        "tuningSystemProperties": smoke["tuningSystemProperties"],
+    }
+
+
 def entry_for(report_path, report, verdict, catalogued, repo_relative):
     summary = report["summary"]
     settings = report["settings"]
-    return {
+    entry = {
         "modelId": report["modelId"],
         "model": catalogued["name"],
         "backend": report["backend"],
@@ -65,6 +102,10 @@ def entry_for(report_path, report, verdict, catalogued, repo_relative):
         "environment": report["environment"],
         "report": repo_relative,
     }
+    smoke = default_configuration_smoke(report_path)
+    if smoke is not None:
+        entry["defaultConfigurationSmoke"] = smoke
+    return entry
 
 
 def main():
@@ -81,7 +122,15 @@ def main():
     models = {m["id"]: m for m in read(catalog / "models.json")["models"]}
     qualifications = read(catalog / "qualifications.json")
     already = {e["modelId"] for e in qualifications["entries"]}
-    allowed = list(next(e for e in qualifications["entries"] if e.get("qualified")).keys())
+    # Sampling one entry cannot express an optional key, and entries legitimately differ:
+    # defaultConfigurationSmoke is carried by the ones measured since the smoke gate landed
+    # and absent from the ones that predate it. Required is what every qualified entry has;
+    # known is what any of them has. A key outside `known` is drift; a missing required key
+    # is drift. An optional key is neither.
+    qualified_entries = [e for e in qualifications["entries"] if e.get("qualified")]
+    known = set().union(*(set(e) for e in qualified_entries))
+    # Named required_keys: line 148 reuses `required` as a loop variable over paths.
+    required_keys = set(qualified_entries[0]).intersection(*(set(e) for e in qualified_entries))
 
     planned, skipped = [], []
     for verdict_path in sorted(args.results.glob("*.verdict.json")):
@@ -127,7 +176,7 @@ def main():
             shutil.copy(verdict_path, destination / "qualification.json")
         written = destination / f"{slug}-rust-ffm-grounded.json"
         entry = entry_for(written if args.apply else candidate_path, report, verdict, catalogued, relative)
-        drift = set(entry) ^ set(allowed)
+        drift = (set(entry) - known) | (required_keys - set(entry))
         if drift:
             raise SystemExit(f"{model_id}: catalog entry schema drift: {sorted(drift)}")
         added.append(entry)

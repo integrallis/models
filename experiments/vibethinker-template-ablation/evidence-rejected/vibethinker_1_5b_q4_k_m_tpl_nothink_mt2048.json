@@ -1,0 +1,822 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-29T17:03:26.330537043Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.5.7+vibethinker1-ec3ae4ff2fd3",
+  "modelId" : "vibethinker_1_5b_q4_k_m_tpl_nothink_mt2048",
+  "model" : "/root/model.gguf",
+  "artifactSha256" : "59fa32aaaf5c4512452a9bff8bb6d08f1e39a75acee226b5e01372f7509e3458",
+  "artifactSizeBytes" : 1117321472,
+  "settings" : {
+    "corpusSha256" : "4da610e627e7481d54d1595ef1191dff454455d9bb04fc814b5ea12fd6180315",
+    "workload" : "math",
+    "caseIds" : [ "amber-determinant-trace", "birch-function-derivative", "cobalt-red-probability", "delta-sixth-term", "ember-modulo", "fjord-integral", "grove-hypotenuse", "harbor-mean-median", "unsupported-maple-limit" ],
+    "promptTemplate" : "chatml-no-think",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 2048,
+    "warmups" : 0,
+    "iterations" : 1,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "topK" : "1",
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topP" : "1.0",
+      "promptCache" : "longest-common-prefix",
+      "seed" : "42"
+    }
+  },
+  "environment" : {
+    "hostname" : "vibethinker-tpl-202610291625",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-139-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857440256,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.5",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v14",
+    "environment" : {
+      "end-of-generation-token-ids" : "151643,151645",
+      "native-kernel-poll-millis" : "5",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "performance-cliff.fused-grouped-attention-disabled" : "architecture=qwen2, group-size=6",
+      "gguf-chunks-per-thread" : "2",
+      "gguf-executor" : "persistent",
+      "vm-version" : "25.0.5+8-LTS",
+      "architecture" : "amd64",
+      "model-architecture" : "qwen2",
+      "gguf-parallel" : "true",
+      "vector-api" : "true",
+      "end-of-generation.151645" : "vocabulary-text,chat-template-end-of-turn",
+      "end-of-generation.151643" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+      "native-quantized-decode" : "true",
+      "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+      "native-kernel-decode-threads" : "8",
+      "compiler" : "hotspot-c2",
+      "performance-cliffs" : "fused-grouped-attention-disabled",
+      "kernel-runtime" : "rust-ffm",
+      "sve" : "false",
+      "java-version" : "25.0.5",
+      "native-kernel-threads" : "8",
+      "projection-layers" : "28",
+      "fast-scalar-fma" : "true",
+      "vm-vendor" : "Eclipse Adoptium",
+      "kernel-implementation" : "rust-ffm-quantized-v14",
+      "native-q5-0-grouped" : "false",
+      "native-kernel-abi" : "7",
+      "preferred-vector-bits" : "256",
+      "q4-unsigned-pairwise-supported" : "true",
+      "transformer-runtime" : "java",
+      "q4-short-pairwise-supported" : "true",
+      "processors" : "8",
+      "tokenizer.pre.implemented" : "true",
+      "java-feature" : "25",
+      "native-gated-delta-net" : "true",
+      "java-executor-poll-millis" : "0",
+      "fast-vector-fma" : "true",
+      "tokenizer.pre" : "qwen2",
+      "active-vector-bits" : "256",
+      "os" : "Linux",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "gguf-threads" : "8",
+      "end-of-generation.chat-template" : "resolved:151645",
+      "native-grouped-attention" : "true"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "grouped",
+        "implementation" : "rust-ffm-quantized-v14",
+        "gate-up" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "14"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64",
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "architecture" : "amd64",
+        "batch-size" : "32",
+        "active-vector-bits" : "256",
+        "requested-kernel" : "one-query-block",
+        "kernel" : "one-query-block"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "2"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "7"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256",
+        "requested-kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "8",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment",
+        "artifact-format" : "gguf"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "8",
+        "chunks-per-thread" : "2",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "sliding-window-attention",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no sliding window, so every layer attends to the full context",
+      "settings" : {
+        "pattern-source" : "none",
+        "declared-window" : "0",
+        "local-layers" : "0/28"
+      }
+    }, {
+      "id" : "expert-swiglu-clamp",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no expert SwiGLU clamp",
+      "settings" : {
+        "clamped-layers" : "0/28"
+      }
+    }, {
+      "id" : "rust-ptq1-0-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+      "settings" : {
+        "weight" : "PTQ1_0",
+        "transformer" : "java",
+        "activation" : "Q8_0"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7",
+        "state" : "caller-owned-java-array"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "independent recurrent state slots share one native worker dispatch",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7",
+        "state" : "branch-major-caller-owned-java-array"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+      "settings" : {
+        "evidence" : "benchmark-results/2026-10-12-q5-production/"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 9,
+    "successfulAttempts" : 7,
+    "loadMillis" : 475.335799,
+    "retrievalMillis" : {
+      "p50" : 2.293369,
+      "p95" : 20.804005299999982
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 2.9211829999994734,
+      "p95" : 11.068634899999225
+    },
+    "ttftMillis" : {
+      "p50" : 608.841264,
+      "p95" : 2032.015160399999
+    },
+    "tpotMillis" : {
+      "p50" : 27.342447709803924,
+      "p95" : 31.682313514058603
+    },
+    "endToEndMillis" : {
+      "p50" : 6462.289673,
+      "p95" : 24045.174642799982
+    },
+    "p50PrefillTokensPerSecond" : 123.3619354118885,
+    "p50DecodeTokensPerSecond" : 36.57317042765851,
+    "peakRssBytes" : 1492516864,
+    "totalCpuMillis" : 506690.0,
+    "totalInputTokens" : 1168,
+    "totalCacheReadInputTokens" : 408,
+    "totalCacheWriteInputTokens" : 760,
+    "totalOutputTokens" : 1907,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.2857142857142857,
+    "modelAnswerRate" : 0.0,
+    "modelAnswerCorrectRate" : 0.0,
+    "extractiveFallbackRate" : 0.8571428571428571,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "FAILED_RUNTIME",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "amber-determinant-trace",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-amber-matrix",
+        "title" : "Amber matrix",
+        "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7."
+      },
+      "score" : 4.5716124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4568e295dc2e66c20d54354bde8a99e0c2fd2e05db4cdb939e52c5a75bb85605",
+    "retrievalMillis" : 28.09849,
+    "frameworkOverheadMillis" : 14.290576999999757,
+    "endToEndMillis" : 7391.385456,
+    "generation" : {
+      "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7. [math-amber-matrix]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 164,
+      "outputTokens" : 177,
+      "ttftMillis" : 2345.362785,
+      "totalMillis" : 7348.996389,
+      "prefillTokensPerSecond" : 70.21268181244834,
+      "loadMillis" : 475.335799,
+      "peakRssBytes" : 1391923200,
+      "cpuMillis" : 55980.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The determinant of the Amber matrix [[3, 1], [2, 4]] is calculated as (3*4) - (1*2) = 12 - 2 = 10. The trace is the sum of the diagonal elements, 3 + 4 = 7. Therefore, the determinant is 10 and the trace is 7.  \nANSWER\nThe determinant is 10 and the trace is 7.\n</think>\n\nThe determinant of the Amber matrix [[3, 1], [2, 4]] is calculated as (3*4) - (1*2) = 12 - 2 = 10. The trace is the sum of the diagonal elements, 3 + 4 = 7.  \nANSWER\nThe determinant is 10 and the trace is 7.",
+      "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7. [math-amber-matrix]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "birch-function-derivative",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 4.115302,
+      "rank" : 1
+    } ],
+    "promptSha256" : "27e52cad3466314794ba7b49d04d160d401b57a08641b3ab8afe35f069cbeab6",
+    "retrievalMillis" : 2.293369,
+    "frameworkOverheadMillis" : 3.116606000000047,
+    "endToEndMillis" : 4087.52668,
+    "generation" : {
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 116,
+      "ttftMillis" : 608.841264,
+      "totalMillis" : 4082.116705,
+      "prefillTokensPerSecond" : 113.66160561023011,
+      "loadMillis" : 475.335799,
+      "peakRssBytes" : 1393504256,
+      "cpuMillis" : 32560.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Birch function is given as \\( f(x) = x^3 - 2x \\), and its derivative is \\( f'(x) = 3x^2 - 2 \\).  \nThe answer is provided in the context.  \nCitations: [math-birch-derivative]  \n</think>\n\nThe Birch function is \\( f(x) = x^3 - 2x \\), and its derivative is \\( f'(x) = 3x^2 - 2 \\).  \nCitations: [math-birch-derivative]",
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "delta-sixth-term",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-delta-sequence",
+        "title" : "Delta sequence",
+        "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27."
+      },
+      "score" : 6.3672924,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1ca7185410e8934b4dc87943e1a6eeb5235b5ae488f9247356cfd2b7ba828ad6",
+    "retrievalMillis" : 3.783541,
+    "frameworkOverheadMillis" : 2.3365319999975327,
+    "endToEndMillis" : 30802.117325,
+    "generation" : {
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 164,
+      "outputTokens" : 915,
+      "ttftMillis" : 1258.657531,
+      "totalMillis" : 30795.997252,
+      "prefillTokensPerSecond" : 130.4188017069445,
+      "loadMillis" : 475.335799,
+      "peakRssBytes" : 1487319040,
+      "cpuMillis" : 245620.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The context states that the Delta arithmetic sequence starts at 7 and has a common difference of 4. The sixth term is given as 27. Therefore, the start is 7, the common difference is 4, and the sixth term is 27. Since the question asks for all these details and the context provides them directly, the answer can be derived without any additional information.\n\nThe answer should be a concise statement that includes all the required information using the exact values and terms from the context. The start is 7, the common difference is 4, and the sixth term is 27. The context explicitly mentions all these points, so the answer is sufficient.\n\nThe answer is: The Delta arithmetic sequence starts at 7 with a common difference of 4, and its sixth term is 27.\n\nHowever, according to the rules, the answer should be in one short sentence. Also, we need to copy each supporting source ID exactly from the square brackets at the start of its context entry and put those citations at the end of the sentence. In this case, the context entry is [math-delta-sequence], so the ID is \"math-delta-sequence\". Since the entire context is one entry, we can use that ID once.\n\nSo the answer should be structured as:\n\n[The Delta arithmetic sequence starts at 7 with a common difference of 4, and its sixth term is 27.](math-delta-sequence)\n\nBut the question is asking for the start and common difference of Delta and its sixth term. The start is given as 7, common difference 4, and sixth term 27. So the answer is directly from the context. Therefore, the answer is as above.\n\nWait, the question says \"What are the start and common difference of Delta, and what is its sixth term?\" So the answer must include all three pieces of information. The context says exactly that: starts at 7, common difference 4, sixth term 27. So the answer is straightforward.\n\nTherefore, the answer is: The start is 7, the common difference is 4, and the sixth term is 27. But to fit in one sentence, perhaps: The start is 7, common difference 4, and sixth term 27. Then add the citation at the end.\n\nBut according to the rules, the answer should be in one short sentence. So perhaps:\n\nThe start is 7, the common difference is 4, and the sixth term is 27. (math-delta-sequence)\n\nBut the instruction says to put the citations at the end of the sentence. So the sentence would be: \"The start is 7, the common difference is 4, and the sixth term is 27.\" followed by the citation. But the citation is part of the answer? Wait, the instruction says \"copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry, and put those citations at the end of the sentence.\"\n\nSo the answer should be a sentence, and then after the sentence, the citations. Wait, perhaps the sentence itself should not include the citation, and the citation is added at the end. For example:\n\n\"The start is 7, the common difference is 4, and the sixth term is 27. (math-delta-sequence)\"\n\nBut the context entry is [math-delta-sequence], so the ID is \"math-delta-sequence\". Since the entire context is one entry, we can use that ID once.\n\nAlternatively, if the context had multiple entries, but here it's just one. So the answer is:\n\nThe start is 7, the common difference is 4, and the sixth term is 27. (math-delta-sequence)\n\nBut the question is asking for the start and common difference of Delta and the sixth term. The answer is all in one sentence. So that's okay.\n\nAlternatively, maybe the answer is three separate pieces of information, but the question says \"what are the start and common difference... and what is its sixth term?\" which can be answered in one sentence as above.\n\nTherefore, the answer is as written. Since the context does not contain any other information, this is sufficient. The answer is not insufficient. So the answer is correct.\n</think>\n\nThe start is 7, the common difference is 4, and the sixth term is 27. (math-delta-sequence)",
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "fjord-integral",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-fjord-integral",
+        "title" : "Fjord integral",
+        "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2."
+      },
+      "score" : 5.5134096,
+      "rank" : 1
+    } ],
+    "promptSha256" : "dea4ef67e8d1a85d3e94b41435308356391b0fdc63139d2d42ff29632f5e964a",
+    "retrievalMillis" : 2.229412,
+    "frameworkOverheadMillis" : 3.5507699999980105,
+    "endToEndMillis" : 8278.975051,
+    "generation" : {
+      "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2. [math-fjord-integral]",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 171,
+      "outputTokens" : 256,
+      "ttftMillis" : 1300.870703,
+      "totalMillis" : 8273.194869,
+      "prefillTokensPerSecond" : 131.56087333803737,
+      "loadMillis" : 475.335799,
+      "peakRssBytes" : 1490886656,
+      "cpuMillis" : 66030.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The context states that the definite integral of 2x from 0 to 3 is 9 and mentions that the antiderivative used is x squared. Therefore, the Fjord definite integral is 9, and the antiderivative used is x². I need to format the answer as per the rules: use the exact context, include the source ID if applicable, and only valid citations from the context. The supporting source is the first sentence in the context, which is [math-fjord-integral] Fjord integral. The answer should be a concise sentence with the citation at the end. Since the question asks for both the integral result and the antiderivative used, I'll combine them into one sentence. The valid citation is the first context entry, so I'll use that. The answer is: The Fjord definite integral of 2x from 0 to 3 is 9, using the antiderivative x². Source: [math-fjord-integral] Fjord integral.\n</think>\n\nThe Fjord definite integral of 2x from 0 to 3 is 9, using the antiderivative x². Source: [math-fjord-integral] Fjord integral.",
+      "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2. [math-fjord-integral]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "grove-hypotenuse",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-grove-geometry",
+        "title" : "Grove triangle",
+        "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13."
+      },
+      "score" : 5.9253526,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a3961ce97bac8231d8e852e6d48f7e77947a0aa8edff18ce622f1c23815b8df2",
+    "retrievalMillis" : 1.774328,
+    "frameworkOverheadMillis" : 1.8089510000004339,
+    "endToEndMillis" : 3710.239472,
+    "generation" : {
+      "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13. [math-grove-geometry]",
+      "inputTokens" : 161,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 59,
+      "outputTokens" : 123,
+      "ttftMillis" : 474.082584,
+      "totalMillis" : 3706.656193,
+      "prefillTokensPerSecond" : 124.70827932813114,
+      "loadMillis" : 475.335799,
+      "peakRssBytes" : 1491443712,
+      "cpuMillis" : 29570.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Grove triangle is a right triangle with legs of lengths 5 and 12, and its hypotenuse is 13. This matches the given context about the Grove right triangle.\n\nANSWER\nThe legs are 5 and 12, and the hypotenuse is 13.\n</think>\n\nThe Grove right triangle has legs 5 and 12, and its hypotenuse is 13. This directly corresponds to the provided context about the Grove triangle. \n\nANSWER\nThe legs are 5 and 12, and the hypotenuse is 13.",
+      "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13. [math-grove-geometry]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "harbor-mean-median",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-harbor-statistics",
+        "title" : "Harbor sample",
+        "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4."
+      },
+      "score" : 4.7371473,
+      "rank" : 1
+    } ],
+    "promptSha256" : "11681ee183e8917283b8c32bf11b020685419e4db8b66b8c80cdf107b0e859fc",
+    "retrievalMillis" : 1.908741,
+    "frameworkOverheadMillis" : 2.257003000000168,
+    "endToEndMillis" : 3189.978101,
+    "generation" : {
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "inputTokens" : 166,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 64,
+      "outputTokens" : 101,
+      "ttftMillis" : 524.993296,
+      "totalMillis" : 3185.812357,
+      "prefillTokensPerSecond" : 122.08852070925006,
+      "loadMillis" : 475.335799,
+      "peakRssBytes" : 1491914752,
+      "cpuMillis" : 25420.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The context states that the Harbor sample is [2, 4, 4, 10], and its arithmetic mean is 5 and its median is 4. Therefore, the mean and median of the Harbor sample are 5 and 4, respectively. The answer should directly use the provided mean and median values without adding any external information.\n\nThe answer is: The mean is 5 and the median is 4.\n</think>\n\nThe mean is 5 and the median is 4.",
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "unsupported-maple-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 1.2100124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a4b9fa5bfd18552e5e426fe990a8ed52c8d467ad5186e4b6490aef54b516b033",
+    "retrievalMillis" : 2.491987,
+    "frameworkOverheadMillis" : 2.9211829999994734,
+    "endToEndMillis" : 6462.289673,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 171,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 69,
+      "outputTokens" : 219,
+      "ttftMillis" : 560.653176,
+      "totalMillis" : 6456.876503,
+      "prefillTokensPerSecond" : 123.3619354118885,
+      "loadMillis" : 475.335799,
+      "peakRssBytes" : 1492516864,
+      "cpuMillis" : 51510.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The question asks for the limit of a rational function as \\( x \\) approaches infinity. However, the provided context only describes the Birch polynomial and its derivative, specifically the function \\( f(x) = x^3 - 2x \\) and its derivative \\( f'(x) = 3x^2 - 2 \\). There is no mention of a rational function or any specific function whose limit at infinity is being asked. The context does not contain the necessary information to answer the question. Therefore, the answer should be \"INSUFFICIENT_CONTEXT as per the rules.\n\n\\boxed{INSUFFICIENT_CONTEXT}\n</think>\n\nThe provided context discusses the Birch polynomial \\( f(x) = x^3 - 2x \\) and its derivative \\( f'(x) = 3x^2 - 2 \\). However, the question asks about the limit of a rational function at infinity, which is not addressed in the context. Since the context does not contain the required information, the answer must be \"INSUFFICIENT_CONTEXT\".\n\n\\boxed{INSUFFICIENT_CONTEXT}",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ {
+    "iteration" : 0,
+    "caseId" : "cobalt-red-probability",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  }, {
+    "iteration" : 0,
+    "caseId" : "ember-modulo",
+    "error" : "java.lang.IllegalStateException: rust-ffm generation failed; caused by: java.lang.IllegalArgumentException: position out of range: 2048"
+  } ]
+}

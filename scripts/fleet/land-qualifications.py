@@ -6,6 +6,12 @@ and is idempotent, so it can be pointed at the same results twice without duplic
 
 It writes; it does not validate. Run the models and ModelJars builds afterwards -- the evidence test it
 generates re-derives each verdict from the committed reports, and that assertion is the point.
+
+The generated Java is not spotless-formatted, so the models build fails at
+`:models-rag-bench:spotlessJavaCheck` until `spotlessApply` has run. That is the documented order:
+
+    ./gradlew :models-rag-bench:spotlessApply
+    ./gradlew build -x :docs:build          # models; ModelJars has no :docs project
 """
 
 import argparse
@@ -16,6 +22,14 @@ import pathlib
 import re
 import subprocess
 import sys
+
+
+# The 2026-09-30 two-arm root. New campaigns get their own root beside it rather than
+# resolving into this one; see generate_tests.
+PINNED_TWO_ARM_ROOT = (
+    '      Path.of(System.getProperty("models.repositoryRoot"))\n'
+    '          .resolve("benchmark-results/certified-20260930/rag");\n'
+)
 
 
 def camel(slug):
@@ -50,11 +64,30 @@ def generate_tests(models_repo, date, test_path):
         comparator = next(p.name for p in directory.glob("*-ollama-grounded.json"))
         decode = comparison["decodeThroughputRatio"]
         latency = comparison["endToEndLatencyRatio"]
-        anchor = '  private static final Path GEMMA_3_4B_EVIDENCE = TWO_ARM_EVIDENCE.resolve("gemma-3-4b-it-q4_k_m");\n'
-        source = source.replace(
-            anchor,
-            anchor + f'  private static final Path {const} = TWO_ARM_EVIDENCE.resolve("{slug}");\n',
-            1,
+        # Resolve off a root for THIS campaign's date, not off TWO_ARM_EVIDENCE. That constant
+        # is pinned to certified-20260930, so a landing under any other date generated tests
+        # pointing at a directory the evidence was never written to -- five
+        # FileNotFoundExceptions on 2026-10-29, discovered only because the generated tests
+        # were run. The root is created once per date and reused.
+        root_const = "TWO_ARM_EVIDENCE_" + str(date)
+        if root_const not in source:
+            base = PINNED_TWO_ARM_ROOT
+            assert base in source, "the pinned two-arm evidence root moved; update PINNED_TWO_ARM_ROOT"
+            source = source.replace(
+                base,
+                base
+                + "  private static final Path " + root_const + " =\n"
+                + '      Path.of(System.getProperty("models.repositoryRoot"))\n'
+                + '          .resolve("benchmark-results/certified-' + str(date) + '/rag");\n',
+                1,
+            )
+        decl = "  private static final Path " + root_const + " =\n"
+        end = source.index(";\n", source.index(decl)) + 2
+        source = (
+            source[:end]
+            + "  private static final Path " + const + " = " + root_const
+            + '.resolve("' + slug + '");\n'
+            + source[end:]
         )
         test = f'''  @Test
   void {camel(slug)}QualifiesAgainstItsSameHostOllamaComparator() throws Exception {{
@@ -135,6 +168,13 @@ def main():
         pinned.write_text(text.replace(current.group(0), f"AGGREGATE_QUALIFIED_MODELS = {qualified};"))
         print(f"pinned aggregate {current.group(1)} -> {qualified}")
     print(f"RAG qualifications now: {qualified}")
+    if added:
+        # The generated Java is not spotless-formatted; the models build fails at
+        # :models-rag-bench:spotlessJavaCheck until this has run.
+        print("\nnext, in this order:")
+        print("  ./gradlew :models-rag-bench:spotlessApply")
+        print("  ./gradlew build -x :docs:build      # in models")
+        print("  ./gradlew build                      # in modeljars (no :docs project)")
 
 
 if __name__ == "__main__":

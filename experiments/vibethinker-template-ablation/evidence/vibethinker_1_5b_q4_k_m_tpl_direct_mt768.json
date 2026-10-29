@@ -1,0 +1,924 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-29T16:30:50.945574106Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.5.7+vibethinker1-ec3ae4ff2fd3",
+  "modelId" : "vibethinker_1_5b_q4_k_m_tpl_direct_mt768",
+  "model" : "/root/model.gguf",
+  "artifactSha256" : "59fa32aaaf5c4512452a9bff8bb6d08f1e39a75acee226b5e01372f7509e3458",
+  "artifactSizeBytes" : 1117321472,
+  "settings" : {
+    "corpusSha256" : "4da610e627e7481d54d1595ef1191dff454455d9bb04fc814b5ea12fd6180315",
+    "workload" : "math",
+    "caseIds" : [ "amber-determinant-trace", "birch-function-derivative", "cobalt-red-probability", "delta-sixth-term", "ember-modulo", "fjord-integral", "grove-hypotenuse", "harbor-mean-median", "unsupported-maple-limit" ],
+    "promptTemplate" : "chatml-direct",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 768,
+    "warmups" : 0,
+    "iterations" : 1,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "promptCache" : "longest-common-prefix",
+      "topP" : "1.0",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0",
+      "topK" : "1",
+      "seed" : "42"
+    }
+  },
+  "environment" : {
+    "hostname" : "vibethinker-tpl-202610291625",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-139-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857440256,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.5",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v14",
+    "environment" : {
+      "java-executor-poll-millis" : "0",
+      "q4-short-pairwise-supported" : "true",
+      "java-feature" : "25",
+      "tokenizer.pre.implemented" : "true",
+      "processors" : "8",
+      "native-gated-delta-net" : "true",
+      "preferred-vector-bits" : "256",
+      "q4-unsigned-pairwise-supported" : "true",
+      "transformer-runtime" : "java",
+      "native-kernel-abi" : "7",
+      "vm-vendor" : "Eclipse Adoptium",
+      "kernel-implementation" : "rust-ffm-quantized-v14",
+      "native-q5-0-grouped" : "false",
+      "fast-scalar-fma" : "true",
+      "projection-layers" : "28",
+      "native-kernel-threads" : "8",
+      "java-version" : "25.0.5",
+      "sve" : "false",
+      "performance-cliffs" : "fused-grouped-attention-disabled",
+      "kernel-runtime" : "rust-ffm",
+      "compiler" : "hotspot-c2",
+      "native-kernel-decode-threads" : "8",
+      "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+      "native-quantized-decode" : "true",
+      "end-of-generation.151643" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+      "end-of-generation.151645" : "vocabulary-text,chat-template-end-of-turn",
+      "vector-api" : "true",
+      "gguf-parallel" : "true",
+      "model-architecture" : "qwen2",
+      "architecture" : "amd64",
+      "vm-version" : "25.0.5+8-LTS",
+      "gguf-executor" : "persistent",
+      "gguf-chunks-per-thread" : "2",
+      "performance-cliff.fused-grouped-attention-disabled" : "architecture=qwen2, group-size=6",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "native-kernel-poll-millis" : "5",
+      "end-of-generation-token-ids" : "151643,151645",
+      "native-grouped-attention" : "true",
+      "end-of-generation.chat-template" : "resolved:151645",
+      "gguf-threads" : "8",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "os" : "Linux",
+      "active-vector-bits" : "256",
+      "tokenizer.pre" : "qwen2",
+      "cpu-model" : "AMD EPYC-Milan Processor",
+      "fast-vector-fma" : "true"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "implementation" : "rust-ffm-quantized-v14",
+        "qkv" : "grouped",
+        "gate-up" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "eligible-layers" : "14",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2",
+        "architecture" : "amd64",
+        "os" : "Linux",
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "batch-size" : "32",
+        "architecture" : "amd64",
+        "kernel" : "one-query-block",
+        "requested-kernel" : "one-query-block"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "output-rows" : "all"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "unused-rows" : "full-attention",
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "parallel" : "true",
+        "eligible-layers" : "0",
+        "executor" : "persistent",
+        "stages" : "2"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "parallel" : "true",
+        "eligible-layers" : "0",
+        "executor" : "persistent",
+        "stages" : "7"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order",
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "eligible-layers" : "0",
+        "partitions" : "8",
+        "partition" : "batch-rows",
+        "staged-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "8",
+        "executor" : "persistent",
+        "chunks-per-thread" : "2"
+      }
+    }, {
+      "id" : "sliding-window-attention",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no sliding window, so every layer attends to the full context",
+      "settings" : {
+        "declared-window" : "0",
+        "pattern-source" : "none",
+        "local-layers" : "0/28"
+      }
+    }, {
+      "id" : "expert-swiglu-clamp",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no expert SwiGLU clamp",
+      "settings" : {
+        "clamped-layers" : "0/28"
+      }
+    }, {
+      "id" : "rust-ptq1-0-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+      "settings" : {
+        "transformer" : "java",
+        "weight" : "PTQ1_0",
+        "activation" : "Q8_0"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+      "settings" : {
+        "state" : "caller-owned-java-array",
+        "abi" : "7",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "independent recurrent state slots share one native worker dispatch",
+      "settings" : {
+        "state" : "branch-major-caller-owned-java-array",
+        "abi" : "7",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+      "settings" : {
+        "evidence" : "benchmark-results/2026-10-12-q5-production/"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 9,
+    "successfulAttempts" : 9,
+    "loadMillis" : 446.24748,
+    "retrievalMillis" : {
+      "p50" : 2.643558,
+      "p95" : 18.076139799999993
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 2.361559999997553,
+      "p95" : 9.950246199999672
+    },
+    "ttftMillis" : {
+      "p50" : 606.192205,
+      "p95" : 1664.0379195999994
+    },
+    "tpotMillis" : {
+      "p50" : 29.44549534680574,
+      "p95" : 30.073120795567146
+    },
+    "endToEndMillis" : {
+      "p50" : 23174.336762,
+      "p95" : 24729.179545400002
+    },
+    "p50PrefillTokensPerSecond" : 113.69814879776463,
+    "p50DecodeTokensPerSecond" : 33.96105204623363,
+    "peakRssBytes" : 1405411328,
+    "totalCpuMillis" : 1680030.0,
+    "totalInputTokens" : 1505,
+    "totalCacheReadInputTokens" : 816,
+    "totalCacheWriteInputTokens" : 689,
+    "totalOutputTokens" : 6912,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.8888888888888888,
+    "modelAnswerRate" : 0.0,
+    "modelAnswerCorrectRate" : 0.0,
+    "extractiveFallbackRate" : 0.8888888888888888,
+    "truncatedAnswerRate" : 1.0
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "amber-determinant-trace",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-amber-matrix",
+        "title" : "Amber matrix",
+        "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7."
+      },
+      "score" : 4.5716124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "94ac11ea22290b00c3ea37a61079df83179bffe61b84ce3ff189611b91ba68c2",
+    "retrievalMillis" : 26.978851,
+    "frameworkOverheadMillis" : 13.031263000000763,
+    "endToEndMillis" : 25438.634041,
+    "generation" : {
+      "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7. [math-amber-matrix]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 165,
+      "outputTokens" : 768,
+      "ttftMillis" : 2323.874644,
+      "totalMillis" : 25398.623927,
+      "prefillTokensPerSecond" : 71.35009321394551,
+      "loadMillis" : 446.24748,
+      "peakRssBytes" : 1380491264,
+      "cpuMillis" : 200190.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : " for the Amber matrix [[3, 1], [2, 4]], the determinant is 10 and the trace is 7. The question is asking for the determinant and trace, which are directly provided in the context. I need to answer based only on this context without adding any external information.\n\nThe rules say to answer in one short sentence and copy the source ID exactly. The source ID here is \"math-amber-matrix\". I should include that citation at the end.\n\nSo, the answer should be: The determinant is 10 and the trace is 7, as stated in the math-amber-matrix context. And then the citation.\n\nBut the question is \"What are the determinant and trace of the Amber matrix?\" and I need to answer in one sentence. Also, I should not use prior knowledge, but since the context gives the answer, I can just use that.\n\nLet me see the context again: \"For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7.\" So it's clear.\n\nNow, for the answer, I need to combine this into one sentence. Something like: According to the math-amber-matrix context, the determinant is 10 and the trace is 7.\n\nBut the context is given as part of the input, so in the answer, I can refer to it.\n\nThe instruction says: \"Copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry, and put those citations at the end of the sentence.\"\n\nIn this case, there's only one entry, so the source ID is \"math-amber-matrix\".\n\nAlso, the context is provided, but in the answer, I need to refer to it using the source ID.\n\nThe context is given as a whole, but I think I need to use the source ID as per the rule.\n\nLooking back: \"the context is provided, and I need to base my answer on that.\n\nIn the answer, I should not repeat the entire context, but extract the necessary parts.\n\nThe question is straightforward, and the answer is directly in the context.\n\nSo, my answer could be: The determinant is 10 and the trace is 7, as per the math-amber-matrix context.\n\nThen, at the end, I need to put the citation: math-amber-matrix.\n\nBut the citation should be at the end of the sentence. So I need to make a sentence that ends with the citation.\n\nFor example: The determinant of the Amber matrix is 10 and the trace is 7, according to the provided math-amber-matrix context.\n\nBut the provided context is the matrix itself? No, the context is the text that follows the matrix.\n\nLooking at the input:\n\nCONTEXT\n\n[math-amber-matrix] Amber matrix\n\nFor the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7.\n\nSo the context is the two lines after \"CONTEXT\", I think. But the first line has [math-amber-matrix] which is probably the source identifier.\n\nIn the context, it says \"the Amber matrix and then gives the definition with the matrix.\n\nBut for the answer, I think the source ID is \"math-amber-matrix\".\n\nThe rule says: \"Only IDs present in CONTEXT are valid citations; do not invent or substitute one.\"\n\nSo I should use \"math-amber-matrix as the citation.\n\nNow, for the answer sentence: I need to state the determinant and trace.\n\nSince the context already says it, I can just report that.\n\nBut the question is separate, so I need to answer based on the context.\n\nPerhaps:",
+      "text" : "For the Amber matrix [[3, 1], [2, 4]], the determinant is 10. The trace is 7. [math-amber-matrix]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "birch-function-derivative",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 4.115302,
+      "rank" : 1
+    } ],
+    "promptSha256" : "665160bf13f58853e7dc859e093866293d5f5afc5db6eff5f0c369e2afd62be4",
+    "retrievalMillis" : 2.851554,
+    "frameworkOverheadMillis" : 5.3287209999980405,
+    "endToEndMillis" : 23360.766041,
+    "generation" : {
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 70,
+      "outputTokens" : 768,
+      "ttftMillis" : 674.282833,
+      "totalMillis" : 23352.585766,
+      "prefillTokensPerSecond" : 104.04876455231967,
+      "loadMillis" : 446.24748,
+      "peakRssBytes" : 1382952960,
+      "cpuMillis" : 186330.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : " the Birch function is f(x) = x^3 - 2x and its derivative is f'(x) = 3x^2 - 2. So, I need to answer the question based on this.\n\nThe question is: \"What is the Birch function, and what is its derivative?\" So, I should provide both parts.\n\nLooking at the instructions, if the context doesn't contain the answer, I should reply with \"INSUFFICIENT_CONTEXT\". But here, the context does contain both pieces of information.\n\nI need to copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry, and put those citations at the end of the sentence. In this case, there's only one entry in the CONTEXT, which is [math-birch-derivative], but the context itself is about the Birch function, not exactly the ID.\n\nThe CONTEXT entry is [math-birch-derivative], but the text that follows is describing the Birch function and its derivative. The ID might be relevant, but the context doesn't explicitly state the ID as the source; it just has that as the context.\n\nThe instruction says: \"copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry\". Here, there's only one entry: [math-birch-derivative]. But the context is about the Birch function, which might be related.\n\nThe context says: \"The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2.\"\n\nI think the ID [math-birch-derivative] might be intended as the source, but the context doesn't explicitly attribute the information to that ID. It just states the facts.\n\nPerhaps the ID is part of the context, but in this case, the context is given as a block, and the first thing after the ID is the description.\n\nTo be precise, I should check if the context contains the answer. Since it does, and I need to use the ID if it's a supporting source.\n\nThe instruction says: \"Only IDs present in CONTEXT are valid citations; do not invent or substitute one.\"\n\nIn this context, the only ID is [math-birch-derivative]. But is this ID the source for the information? The context doesn't say that the information comes from that ID; it just presents the information under that context entry.\n\nPerhaps I should not use any ID because the context itself is the source, but the instruction mentions the ID.\n\nLooking back at the rules: \"copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry\"\n\nIn this case, the CONTEXT entry is [math-birch-derivative], and the text that follows is the context. But the text doesn't refer to the ID; it just states the facts.\n\nFor example, it doesn't say \"as per [math-birch-derivative], the Birch function is...\". It just states the equations.\n\nTherefore, perhaps there are no valid citations because the ID isn't used in the content.\n\nBut the instruction says \"supporting source ID\". If the ID isn't actually supporting or used, maybe it shouldn't be used.\n\nThis is ambiguous. Let me think logically.\n\nThe context is provided, and it contains the answer. The ID is part of the context structure. But in the answer, I need to cite the context using the ID if possible.\n\nPerhaps the ID is meant to be the source, but since the context doesn't attribute it to it, I might not use any ID.\n\nBut the rule says to copy the ID if it's a supporting source.\n\nTo avoid confusion, I should see if the context contains the answer without relying on",
+      "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2. [math-birch-derivative]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "cobalt-red-probability",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-cobalt-probability",
+        "title" : "Cobalt urn",
+        "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5."
+      },
+      "score" : 8.382398,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a2dddc02addfe5a9142ce93970b961a4098ea665ee8d3868a0078922770c098b",
+    "retrievalMillis" : 2.386307,
+    "frameworkOverheadMillis" : 3.334088999999949,
+    "endToEndMillis" : 23664.997802,
+    "generation" : {
+      "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5. [math-cobalt-probability]",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 70,
+      "outputTokens" : 768,
+      "ttftMillis" : 606.192205,
+      "totalMillis" : 23659.277406,
+      "prefillTokensPerSecond" : 115.68373685255777,
+      "loadMillis" : 446.24748,
+      "peakRssBytes" : 1384239104,
+      "cpuMillis" : 188370.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "3/5 is the red probability. The question asks for the number of red and blue balls and the red probability. The numbers are given: 3 red and 2 blue, so total 5 balls. Probability of red is 3/5, which matches. The question also asks for the red probability, which is given as 3/5. But I need to confirm if the numbers are correct. The context says \"three red and two blue balls\", so yes. The probability is given as 3/5, which is correct since 3/ (3+2) = 3/5. Now, the answer should include the numbers and the probability. But the probability is already given in the context. The question is to answer based on the context. So, the red balls are 3, blue are 2, and red probability is 3/5. But the context already provides the probability, so maybe I just state the numbers and repeat the probability? The question says \"how many red and blue balls are in the Cobalt urn, and what is the red probability?\" So I need to answer all parts. From context: red balls: 3, blue balls: 2, red probability: 3/5. But the probability is given as 3/5 in the context, so I can use that. Now, for the answer format. I need to provide a sentence. Also, I have to copy the source ID from the context. The context has [math-cobalt-probability], but that might be the title or the section. Looking back, the context is given as a block, and the first line is \"[math-cobalt-probability] Cobalt urn\", so probably the [math-cobalt-probability] is part of the context or a tag. But in the context provided, it's written as \"The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5.\" So the [math-cobalt-probability] might be indicating the topic. But there is no source ID given in the context. The context doesn't have any source IDs; it's just the text. The instructions say to copy each supporting source ID from the square brackets, but in this context, there are no square brackets around any IDs. Let me check: \"CONTEXT is followed by the text, and the first line has \"[math-cobalt-probability] Cobalt urn\". So the square brackets might be part of the context, but not indicating a source ID. The instructions say \"copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry\". But in this case, the first line has \"[math-cobalt-probability]\" but it's followed by \"Cobalt urn\", so it's probably a single entry. But is \"math-cobalt-probability a source ID? The instructions say \"Only IDs present in CONTEXT are valid citations\". But in this context, there are no citations; the context itself is the source. I think I need to treat the entire context as one source. But the problem is that there are no source IDs provided; the context doesn't have any IDs like \"source 1\", \"source 2\". Looking back at the user's message, the CONTEXT is given as a block of text, and the first line has \"[math-cobalt-probability]\" which might be a way to identify the context. But for the purpose of this task, since no other IDs are present, I might not need to use any ID. The instructions say \"if the context does not contain the answer, reply exactly INSUFFICIENT_CONTEXT.\" But in this case",
+      "text" : "The Cobalt urn contains three red and two blue balls. A single uniform draw has red probability 3/5. [math-cobalt-probability]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "delta-sixth-term",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-delta-sequence",
+        "title" : "Delta sequence",
+        "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27."
+      },
+      "score" : 6.3672924,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5be300a124718e9fc68e47787b9a5f3a1fff279388aed5e0f16483ba101a8e51",
+    "retrievalMillis" : 2.263744,
+    "frameworkOverheadMillis" : 3.3145299999996496,
+    "endToEndMillis" : 23128.065359,
+    "generation" : {
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "inputTokens" : 165,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 768,
+      "ttftMillis" : 537.792154,
+      "totalMillis" : 23122.487085,
+      "prefillTokensPerSecond" : 117.35593152066058,
+      "loadMillis" : 446.24748,
+      "peakRssBytes" : 1385361408,
+      "cpuMillis" : 184370.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : " the Delta arithmetic sequence starts at 7 and has a common difference of 4. Also, it says its sixth term is 27. The question is asking for the start and common difference, and the sixth term. So, I can directly answer based on the given information.\n\nThe start is 7, common difference is 4, and sixth term is 27. Since the context provides all the necessary information, I don't need any external knowledge.\n\nNow, for the answer format: I need to provide a one-sentence answer. Also, I must include the source context ID at the end, but only if it's valid. The context has [math-delta-sequence], and since the information is from that context, I should use that.\n\nThe instruction says to copy each supporting source ID exactly from the square brackets. Here, the context is given as [math-delta-sequence], so I should use that ID.\n\nThe question is asking for three things: start, common difference, and sixth term. I need to combine that into one sentence. Something like: \"The start is 7, common difference is 4, and sixth term is 27.\"\n\nBut let me make it concise. Perhaps: \"The sequence starts at 7 with a common difference of 4, and its sixth term is 27.\"\n\nNow, for the citation: since the context is [math-delta-sequence], and this information comes from there, I should include the ID at the end. But the instruction says to copy the ID from the square brackets. So in the sentence, I should put the ID at the end.\n\nAlso, it says only valid IDs from CONTEXT are to be used, and here the only ID is math-delta-sequence.\n\nSo, my answer should be: \"The start is 7, common difference is 4, and sixth term is 27. [math-delta-sequence]\"\n\nBut I need to put the ID at the end of the sentence. The instruction says: \"copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry, and put those citations at the end of the sentence.\"\n\nSo, I need to have the sentence followed by the ID.\n\nBut in one sentence? So perhaps: \"The start is 7, common difference is 4, and sixth term is 27; [math-delta-sequence]\"\n\nBut that might not be a full sentence. Alternatively, I can make it a statement: \"According to the context, the start is 7, common difference is 4, and sixth term is 27. [math-delta-sequence]\"\n\nBut that's two sentences. The instruction says \"answer in one short sentence.\" So I need to combine everything into one sentence.\n\nLet me try: \"The Delta sequence, as described in the context, starts at 7 with a common difference of 4 and has a sixth term of 27. [math-delta-sequence]\"\n\nStill two parts. Perhaps I can say: \"The start of the sequence is 7, the common difference is 4, and the sixth term is 27, according to the context [math-delta-sequence].\"\n\nBut again, the context part is not in the sentence. I think the instruction wants the answer in one sentence without external references, but using the context.\n\nThe context is provided, and I need to base on that. The answer should be derived from the context.\n\nThe context says: \"The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27.\"\n\nSo, the answer is directly in the context. I don't need to mention \"according to context\".\n\nTherefore, I",
+      "text" : "The Delta arithmetic sequence starts at 7 and has common difference 4. Its sixth term is 27. [math-delta-sequence]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "ember-modulo",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-ember-modulus",
+        "title" : "Ember congruence",
+        "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3."
+      },
+      "score" : 4.442518,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8a17e74f9c44cc1cefe0b9f84092c41d227665f5275128b2ca9675e33cd625c2",
+    "retrievalMillis" : 2.325926,
+    "frameworkOverheadMillis" : 1.9437069999985397,
+    "endToEndMillis" : 23018.838836,
+    "generation" : {
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "inputTokens" : 158,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 56,
+      "outputTokens" : 768,
+      "ttftMillis" : 513.452329,
+      "totalMillis" : 23014.569203,
+      "prefillTokensPerSecond" : 109.25523407098878,
+      "loadMillis" : 446.24748,
+      "peakRssBytes" : 1386516480,
+      "cpuMillis" : 183620.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "38 is reduced modulo 7 and the remainder is 3. The question asks which Ember value is reduced and what the remainder is. From the context, the value being reduced is 38, and the remainder is 3 when divided by 7. I need to make sure I'm following all the rules.\n\nThe rules say that if the context doesn't contain the answer, I should reply with \"INSUFFICIENT_CONTEXT\". But here, the context does provide the answer. I need to answer in one short sentence. Also, I have to copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry and put those citations at the end of the sentence. Looking at the context, there's only one entry: [math-ember-modulus] Ember congruence. The entry is about Ember congruence, and it says that 38 modulo 7 has a remainder of 3. So the supporting ID is [math-ember-modulus].\n\nThe question is: \"Which Ember value is reduced modulo 7, and what remainder results?\" Based on the context, the value is 38, and the remainder is 3. I need to form a sentence that includes this information, and at the end, I should put the citation for the ID. The instruction says to put those citations at the end of the sentence. So, I should write something like: \"The value is 38, and the remainder is 3 when divided by 7, as per the context [math-ember-modulus].\"\n\nBut let me check the rules again. It says \"copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry, and put those citations at the end of the sentence.\" So, for each supporting entry, I need to put the ID at the end. In this case, there's only one entry, so one ID.\n\nAlso, I must not use prior knowledge. The context is given, so I should rely on that. The context mentions \"the remainder is 3\", so I don't need to calculate it; I just state what's given.\n\nNow, the answer should be in one short sentence. So, I need to keep it concise.\n\nLet me draft a sentence: \"The value 38 is reduced modulo 7, resulting in a remainder of 3, according to the context [math-ember-modulus].\"\n\nBut in this sentence, I have included the context, but the rule says to put the citation at the end. So perhaps I should structure it as: \"The value is 38, and the remainder is 3 when divided by 7, as per the context [math-ember-modulus].\"\n\nTo make it more precise, I could say: \"For the Ember congruence, 38 is reduced modulo 7, with a remainder of 3, and the relevant context ID is [math-ember-modulus].\"\n\nBut I need to follow the rules strictly. The question is about which value is reduced and what the remainder is. So, I should state both parts.\n\nPerhaps: \"The value reduced is 38, and the remainder is 3, based on the context [math-ember-modulus].\"\n\nI think that's fine. Now, is there any other supporting entry? Looking back, the context only has one entry, so only one ID.\n\nThe context is titled \"Ember congruence and the entry is \"math-ember-modulus which might be a typo for \"ember-modulus\". But I should use it as given.\n\nAlso, the question says \"Ember value\", and in the context, it's 38. So, I think that's clear.\n\nNow,",
+      "text" : "The Ember calculation reduces 38 modulo 7. The remainder is 3. [math-ember-modulus]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "fjord-integral",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-fjord-integral",
+        "title" : "Fjord integral",
+        "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2."
+      },
+      "score" : 5.5134096,
+      "rank" : 1
+    } ],
+    "promptSha256" : "259ffb7a84b093a4233454dfbd14afefa196498fc5fbfe8b65f3768a1039e814",
+    "retrievalMillis" : 2.643558,
+    "frameworkOverheadMillis" : 2.361559999997553,
+    "endToEndMillis" : 23242.709246,
+    "generation" : {
+      "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2. [math-fjord-integral]",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 70,
+      "outputTokens" : 768,
+      "ttftMillis" : 616.407145,
+      "totalMillis" : 23237.704128,
+      "prefillTokensPerSecond" : 113.69814879776463,
+      "loadMillis" : 446.24748,
+      "peakRssBytes" : 1387360256,
+      "cpuMillis" : 185420.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "2x from 0 to 3 has an integral of 9, and mentions that the antiderivative used is x squared. I need to answer based only on this context without adding anything else.\n\nThe question is: \"What is the Fjord definite integral, and which antiderivative is used?\" But in the context, it's about the math-fjord-integral, and the function is 2x. I think \"Fjord here might be a typo or a reference, but in the context, it's clear that it's about the integral of 2x from 0 to 3.\n\nLooking at the context: \"The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2.\"\n\nSo, for the definite integral, it's of 2x from 0 to 3, and the result is 9. The antiderivative used is x^2.\n\nThe question says \"Fjord definite integral which probably refers to this, as per the context. I should use the information given.\n\nNow, I need to form a one-sentence answer. The instructions say to copy each supporting source ID from the context. In this case, there's only one entry in the context: [math-fjord-integral]. So the ID is \"math-fjord-integral\".\n\nThe context entry is: \"[math-fjord-integral] Fjord integral The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2.\"\n\nSo, the ID is \"math-fjord-integral\".\n\nThe answer should be: The Fjord definite integral is 9, and the used antiderivative is x^2, as per the math-fjord-integral context.\n\nBut I need to format it with the citation at the end. The instructions say: \"Copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry, and put those citations at the end of the sentence.\"\n\nSo, in the answer sentence, I should have the statement and then the citation.\n\nAlso, only valid IDs from CONTEXT are valid. Here, only \"math-fjord-integral is present.\n\nThe answer should be one short sentence. Let me try to construct it.\n\nAccording to the math-fjord-integral context, the Fjord definite integral is 9, and the used antiderivative is x^2.\"\n\nBut the context doesn't say \"According to\", it just states the fact. I should stick closely to the context.\n\nThe context says: \"The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2.\"\n\nSo, perhaps: \"The Fjord definite integral is 9, and the antiderivative used is x^2, as per the math-fjord-integral context.\"\n\nThe \"as per might not be necessary, but it helps to connect to the context. However, the instructions don't say I can add words; it says to answer using the context. But the context is the only source, so I have to reference it.\n\nLooking back: \"Only IDs present in CONTEXT are valid citations; do not invent or substitute one.\"\n\nSo, I need to include the ID exactly as is.\n\nAlso, the question has \"Fjord definite integral\", while context says \"definite integral of 2x from 0 to 3\". I think it's clear that 2x from 0 to 3 is the Fjord part, but I should use the information given.\n\nPerhaps the Fjord integral is the function and limits, so I can",
+      "text" : "The definite integral of 2x from 0 to 3 is 9. The antiderivative used is x^2. [math-fjord-integral]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "grove-hypotenuse",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-grove-geometry",
+        "title" : "Grove triangle",
+        "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13."
+      },
+      "score" : 5.9253526,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4131518b9dddd949b8aa38e66d3d403ece1a357e4d6767da6f9272e9b0fcea9c",
+    "retrievalMillis" : 1.874408,
+    "frameworkOverheadMillis" : 2.313979999998992,
+    "endToEndMillis" : 22937.34767,
+    "generation" : {
+      "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13. [math-grove-geometry]",
+      "inputTokens" : 162,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 60,
+      "outputTokens" : 768,
+      "ttftMillis" : 503.951721,
+      "totalMillis" : 22933.159282,
+      "prefillTokensPerSecond" : 119.23469094383012,
+      "loadMillis" : 446.24748,
+      "peakRssBytes" : 1392455680,
+      "cpuMillis" : 182960.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : " the Grove right triangle has legs 5 and 12. Its hypotenuse is 13. So, the legs are 5 and 12, and the hypotenuse is 13. The question asks for the legs and the hypotenuse, which are all mentioned.\n\nThe question is: \"What are the Grove triangle legs, and what is its hypotenuse?\" So, I need to provide the legs and the hypotenuse. From the context, legs are 5 and 12, hypotenuse is 13.\n\nNow, according to the rules, I need to answer in one short sentence. Also, I have to copy each supporting source ID exactly from the square brackets at the start of its context entry, and put those citations at the end of the sentence. Only IDs present in CONTEXT are valid citations; do not invent or substitute one.\n\nLooking at the context, there's an entry: [math-grove-geometry] Grove triangle. The context says: \"The Grove right triangle has legs 5 and 12. Its hypotenuse is 13.\"\n\nSo, the supporting source ID is [math-grove-geometry], I assume, since the context is under that tag. But the context itself doesn't have a separate entry for the triangle; it's all in one paragraph. Let me read the context again.\n\nCONTEXT\n[math-grove-geometry] Grove triangle\nThe Grove right triangle has legs 5 and 12. Its hypotenuse is 13.\n\nSo, the context is labeled as [math-grove-geometry] and then the text follows. But the text doesn't have a separate line for each piece of information. It's a single sentence with two parts: legs and hypotenuse.\n\nThe instruction says: \"copy each supporting source ID exactly from the square brackets at the start of its context entry\". The context entry is for the Grove triangle, which is under [math-grove-geometry]. So, the source ID is [math-grove-geometry].\n\nBut in the text, the information is given in the paragraph. I think the entire context is considered one entry, so the source ID applies to the whole thing.\n\nThe rule says: \"Only IDs present in CONTEXT are valid citations\". So, in the CONTEXT provided, the only ID is [math-grove-geometry].\n\nNow, for the answer, I need to provide the legs and hypotenuse. The legs are 5 and 12, hypotenuse is 13.\n\nI should phrase it as a sentence. For example: \"The legs of the Grove triangle are 5 and 12, and its hypotenuse is 13, as per the [math-grove-geometry] context.\"\n\nBut I need to include the citation. The instruction says to put the citations at the end of the sentence. So, perhaps: \"The legs are 5 and 12, and the hypotenuse is 13, citing the [math-grove-geometry] context.\"\n\nBut I need to make sure that I'm not adding anything. The context says \"The Grove right triangle has legs 5 and 12. Its hypotenuse is 13.\" So, it's referring to the triangle as \"the Grove right triangle\".\n\nIn the question, it says \"Grove triangle\", which matches.\n\nNow, for the answer, I should use the exact wording where possible.\n\nThe question is: \"What are the Grove triangle legs, and what is its hypotenuse?\"\n\nSo, I can say: \"The legs are 5 and 12, and the hypotenuse is 13, based on the [math-grove-geometry] context",
+      "text" : "The Grove right triangle has legs 5 and 12. Its hypotenuse is 13. [math-grove-geometry]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "harbor-mean-median",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-harbor-statistics",
+        "title" : "Harbor sample",
+        "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4."
+      },
+      "score" : 4.7371473,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7ce4ff8bb1bb9e7bd41de64a198a45f6b5e886a4487f7be741e7ca612dfa60eb",
+    "retrievalMillis" : 4.722073,
+    "frameworkOverheadMillis" : 2.3449929999987944,
+    "endToEndMillis" : 23058.2441,
+    "generation" : {
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "inputTokens" : 167,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 65,
+      "outputTokens" : 768,
+      "ttftMillis" : 599.42095,
+      "totalMillis" : 23051.177034,
+      "prefillTokensPerSecond" : 108.64978652046987,
+      "loadMillis" : 446.24748,
+      "peakRssBytes" : 1398681600,
+      "cpuMillis" : 183900.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1. The Harbor sample is [2, 4, 4, 10]. 2. Its arithmetic mean is 5. 3. Its median is 4. So, the mean is 5 and the median is 4. The question asks for the mean and median, which are directly given. I don't need to calculate anything. I just need to report what's stated.\n\nThe instructions say to answer in one short sentence. Also, I need to copy the source IDs from the context. In this case, the context has three entries, but only two are relevant: one for the sample and one for the mean, and another for the median. Looking back, the context entries are:\n\n- [math-harbor-statistics] Harbor sample\n\n- The Harbor sample is [2, 4, 4, 10].\n\n- Its arithmetic mean is 5 and its median is 4.\n\nSo, the relevant entries are the third one, but it mentions both mean and median. The second entry gives the data. I think I need to reference the entire context, but the instructions say to copy the source IDs exactly. The source ID for the sample is [math-harbor-statistics], and then for the data, it's [2, 4, 4, 10].but the question is about mean and median, which are directly given without calculation.\n\nThe context says: \"The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4.\" So, the mean is 5 and median is 4. I can just state that.\n\nBut I need to follow the rules. The answer should be one short sentence. Also, include the source IDs. The problem is that the context has multiple parts, but only the last part mentions the mean and median. The first part is \"The Harbor sample is [2,4,4,10].\", which is the data, and then \"Its arithmetic mean is 5 and its median is 4.\" which gives the values.\n\nI think the source ID for the entire context is [math-harbor-statistics], but since the mean and median are directly stated, I can use that. However, the instruction says \"copy each supporting source ID exactly from the square brackets at the start of its CONTEXT entry\". So, I need to find all source IDs in the context.\n\nLooking at the context:\n\n- [math-harbor-statistics] Harbor sample\n\n- The Harbor sample is [2, 4, 4, 10].  (this has a bracket, but is that a source ID? Probably not. The source IDs are at the start of entries.)\n\nIn the context provided, the first entry has \"[math-harbor-statistics]\" which is likely the source ID. The second and third entries have [2,4,4,10] which seems like data, not a source ID. The instruction says \"source ID and \"only IDs present in CONTEXT are valid\". But in the context, [2,4,4,10] is part of the text, not a separate source entry. So probably, only [math-harbor-statistics] is a valid source ID.\n\nBut the mean and median are given in the same entry as the data. The entry says \"Its arithmetic mean is 5 and its median is 4.\" which refers to the sample given. Since the sample data is provided in the same context, I think it's fine to use the source ID for the context.\n\nThe question is to answer based on the context. The mean is 5 and median is 4, as stated. So, I can",
+      "text" : "The Harbor sample is [2, 4, 4, 10]. Its arithmetic mean is 5 and its median is 4. [math-harbor-statistics]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "VibeThinker 1.5B",
+    "caseId" : "unsupported-maple-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "math-birch-derivative",
+        "title" : "Birch polynomial",
+        "text" : "The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2."
+      },
+      "score" : 1.2100124,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ac41e60f8b44ec304bd6e652b21ae5c45731ad7836a85b38667691e1d0dc28d1",
+    "retrievalMillis" : 3.798873,
+    "frameworkOverheadMillis" : 1.977005000000645,
+    "endToEndMillis" : 23174.336762,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 172,
+      "cacheReadInputTokens" : 102,
+      "cacheWriteInputTokens" : 70,
+      "outputTokens" : 768,
+      "ttftMillis" : 608.641923,
+      "totalMillis" : 23168.560884,
+      "prefillTokensPerSecond" : 115.16012767336134,
+      "loadMillis" : 446.24748,
+      "peakRssBytes" : 1405411328,
+      "cpuMillis" : 184870.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "1/(x^3 - 2x) has a derivative of 3x^2 - 2, but that seems incorrect because the derivative of 1/(x^3 - 2x) would be different. Let me read carefully.\n\nThe context says: \"The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2.\" But that can't be right because if f(x) = x^3 - 2x, then f'(x) should be 3x^2 - 2, which is actually correct. Oh, wait, the Birch function is defined as f(x) = x^3 - 2x, and its derivative is indeed 3x^2 - 2. But the question is about the limit of the Maple rational function at infinity. The context mentions \"Birch polynomial\", and in the first line it says \"Birch polynomial but then defines the Birch function as x^3 - 2x. Perhaps the rational function is related to the reciprocal or something else?\n\nLooking back, the context is about the Birch function f(x) = x^3 - 2x, and its derivative. But the question is about the limit of \"the Maple rational function at infinity\". The context doesn't mention anything about a rational function or Maple specifically. Maybe I need to infer from the terms.\n\nPerhaps \"Birch polynomial refers to a polynomial associated with the Birch conjecture or something, but the context only gives the function and its derivative. The question mentions \"rational function\", but the given function is a polynomial. Unless... maybe the rational function is 1/f(x) or something? Because in the context it says \"The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2.\" But that derivative is correct for the polynomial, not for a rational function.\n\nPerhaps there's a typo or misinterpretation. Let me read the context again carefully.\n\nCONTEXT\n[math-birch-derivative] Birch polynomial\nThe Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2.\n\nI see, it says \"Birch polynomial in the bracket, but then defines the Birch function. Maybe the rational function in question is related to the derivative or integral? The question is: \"What is the limit of the Maple rational function at infinity?\" But Maple might be a software, but probably it's a typo or misnomer. Perhaps it's \"the Birch rational function or something, but it's not specified.\n\nAnother thought: perhaps \"Birch polynomial is a misnomer, and the polynomial is f(x) = x^3 - 2x, and the rational function is 1/f(x). That makes sense because in the context it mentions \"derivative\", which might be a clue. Let me check.\n\nThe context says: \"The Birch function is f(x) = x^3 - 2x. Its derivative is f'(x) = 3x^2 - 2.\" But if we consider the reciprocal g(x) = 1/f(x) = 1/(x^3 - 2x), then its derivative would be -f'(x)/[f(x)]^2 = -(3x^2 - 2)/(x^3 - 2x)^2, which is not directly given.\n\nBut the question is about the limit at infinity of some rational function. Perhaps the rational function is f(x) itself, but it's a polynomial",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

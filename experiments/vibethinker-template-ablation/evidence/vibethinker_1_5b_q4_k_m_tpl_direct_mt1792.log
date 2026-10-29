@@ -1,0 +1,18 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 29, 2026 5:07:23 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 29, 2026 5:07:23 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Oct 29, 2026 5:07:24 PM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256; FMA enabled
+iteration 1/1 case=amber-determinant-trace correct=true retrieval=28.6ms ttft=2316.6ms decode=23.99 tok/s e2e=77001.2ms
+iteration 1/1 case=birch-function-derivative correct=true retrieval=2.2ms ttft=658.3ms decode=24.50 tok/s e2e=73763.1ms
+iteration 1/1 case=cobalt-red-probability correct=true retrieval=2.3ms ttft=614.7ms decode=24.09 tok/s e2e=74968.7ms
+iteration 1/1 case=delta-sixth-term correct=false retrieval=3.2ms ttft=517.8ms decode=24.70 tok/s e2e=69740.9ms
+iteration 1/1 case=ember-modulo correct=true retrieval=2.3ms ttft=455.8ms decode=24.57 tok/s e2e=73354.0ms
+iteration 1/1 case=fjord-integral correct=true retrieval=1.8ms ttft=596.7ms decode=24.08 tok/s e2e=74974.1ms
+iteration 1/1 case=grove-hypotenuse correct=true retrieval=1.7ms ttft=484.1ms decode=25.01 tok/s e2e=64934.6ms
+iteration 1/1 case=harbor-mean-median correct=true retrieval=1.8ms ttft=513.0ms decode=24.19 tok/s e2e=74545.1ms
+iteration 1/1 case=unsupported-maple-limit correct=true retrieval=1.8ms ttft=556.7ms decode=24.20 tok/s e2e=74577.7ms
+plain-java/rust-ffm/vibethinker_1_5b_q4_k_m_tpl_direct_mt1792: tier=FAILED_QUALITY success=9/9 p95-retrieval=18.4ms p95-ttft=1653.3ms p50-decode=24.20 tok/s p95-e2e=76190.4ms correct=88.9% model-answered=11.1% of-those-correct=0.0% extractive-fallback=77.8% truncated=77.8%
+report: /root/out/vibethinker_1_5b_q4_k_m_tpl_direct_mt1792.json
