@@ -133,9 +133,16 @@ is high. It is not a performance qualification or evidence of frontier-LLM answe
 
 ## Publication work remaining
 
-Controlled default-correctness and RAG performance qualification, longer-context validation,
-tool-calling qualification, and acceleration measurements remain
-separate gates. No claim about all Flint quantizations, frontier-model parity, or catalog
+The [2026-10-29 qualification](../benchmark-results/2026-10-29-flint/README.md) completed all 14
+tool cases: 9 passed, so the tool gate failed. The default RAG correctness smoke passed its
+pipeline criteria, but only 1/9 answers were accepted as model contributions; seven used
+extractive fallback. The warmed, three-iteration run repeated this outcome: 3/27 accepted model
+answers (11.1%), below the one-third minimum. Flint remains outside the catalog.
+The original follow-up scorer credited facts inside reasoning; a separately
+recorded v2 audit corrects that false positive without modifying the original report.
+
+Longer-context validation, acceleration measurements, and released-library evidence remain
+separate work. No claim about all Flint quantizations, frontier-model parity, or catalog
 admission follows from the implementation or short numerical comparisons.
 
 ## Tool protocol and qualification
@@ -146,6 +153,22 @@ The scanner checks structural types, required fields, nested properties/items, e
 `additionalProperties: false`. It is not a full JSON Schema validator. `$ref`, `oneOf`, and `anyOf`
 are unsupported; ambiguous schemas or values degrade to plain text. Flint does not yet have a
 constrained-decoding grammar, so qualification measures the model's natural output.
+
+For experimental tool use, supply the same declarations when rendering and scanning. For example,
+inside an open `InferencePipeline` scope:
+
+```java
+var tools = List.of(new com.integrallis.models.api.ToolSpec(
+    "get_weather", "Get the weather for a city",
+    "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"]}"));
+var toolPrompt = ChatTemplate.FLINT.render(
+    List.of(ChatMessage.user("What is the weather in Austin?")), tools);
+var output = pipeline.generate(toolPrompt,
+    SamplingOptions.builder().temperature(0).maxTokens(256).build());
+var result = com.integrallis.models.runtime.chat.ToolCallScanner.scan(
+    output, ChatTemplate.FLINT.toolSyntax(), tools);
+// Inspect result.toolCalls(); the scanner itself does not execute any function.
+```
 
 The dedicated `scripts/flint/qualification-worker.sh` runs on a disposable Linux host with 64 GB
 RAM and 16 vCPUs. It accepts a JSON manifest with `sourceRevision` (full commit), `payloadUri`,
@@ -164,3 +187,64 @@ llama.cpp revision above; Java is Temurin 25.0.3+9. Cache drops and sequential a
 inference. The existing admission policy is unchanged. Phase timeouts preserve incomplete evidence
 and do not count as passes. A failed correctness smoke prevents admission even if a comparative
 verdict passes. Source-build results cannot stand in for released-library catalog evidence.
+
+## Plan toward catalog admission
+
+The first target is qualified text/RAG use. ModelJars has separate capability manifests, so a
+text qualification can admit an artifact while tool calling remains unqualified. Tool capability
+must earn its own passing evidence. The current failed reports remain the baseline.
+
+1. **Establish answer quality independently of fallback.** Retain raw output, reasoning, visible
+   answer, grounding decision, and fallback separately. Add held-out factual, unanswerable,
+   negation, numeric, identifier, and citation cases. Report complete correct answers, incomplete
+   answers, hallucinations, and appropriate abstentions. The current manual review found four
+   complete factual answers plus one correct abstention in nine distinct questions; repeated
+   trials do not expand that accuracy sample. Investigate lexical grounding false negatives with
+   model-independent regression tests and adversarial counterexamples. Never make negation a
+   blanket ignored word or add a Flint-specific vocabulary exemption. Any policy correction gets
+   a new version and fresh evidence across affected models. Also reject incomplete clause coverage:
+   the Ollama baseline's truncated escalation answer was accepted with a derived citation despite
+   omitting the requested route. Improving acceptance must preserve rejection of incomplete answers.
+2. **Fix completion reliability.** Preregister bounded reasoning/output-budget experiments and
+   compare the same settings across engines. Four of nine RAG cases hit the 256-token limit;
+   the tool follow-up is capped at 96 tokens. Test whether a larger budget or a supported concise
+   generation profile yields complete answers without factual regressions. A larger cap is an
+   explicitly different configuration, not a reinterpretation of this failed run. Measure its
+   latency and memory cost. The pinned publisher template exposes no non-thinking switch.
+3. **Remove avoidable Java work and connect existing Rust kernels.** Flint's `multiply` currently
+   uses the convenience `TensorOps.ggufMatmul` overload, allocating quantization scratch for each
+   product. Move scratch to session ownership and reuse compatible prepared activations across
+   Q/K/V and gate/up projections. Thread `GgufBatchedMatrixKernel` through `loadFlint` into the
+   forward pass; today the supplied kernel reaches planning but not execution. Start with the
+   existing Q4_K/Q6_K Rust FFM kernels and prove actual invocation, fallback behavior, numerical
+   parity, session isolation, and native resource lifetime before claiming acceleration.
+4. **Profile and optimize the remaining hot paths.** Measure matrix products, quantization,
+   thread scheduling, allocation, attention, and prefill separately. Use grouped Q/K/V and
+   gate/up operations, then grouped selected-expert execution with independent scratch and
+   deterministic accumulation. Reuse existing grouped-kernel patterns from Gemma 4. Avoid nested
+   thread pools and excessive FFM crossings. Add batched prefill with token-to-expert grouping
+   only after the single-token path is correct; the present adapter advertises batch size one.
+   Consider new Rust fused operations or bounded expert repacking only where profiles justify
+   them. Account for all extra resident memory on the 32 GB laptop. Retain sliding-window,
+   attention-sink, rewind, and longer-context reference checks. Measure native runner processes as
+   well as server daemons; the present Ollama RSS/CPU fields cover only its daemon PID.
+   Allow a longer bounded comparator startup interval: the initial llama.cpp arm exceeded its
+   180-second readiness deadline before producing a report.
+5. **Qualify tool behavior separately.** Preserve exact argument literals, test dependent
+   sequential calls as well as independent parallel calls, and exercise real adapter continuation
+   with simulated tool responses. Prototype schema-constrained Flint syntax for malformed or
+   truncated calls. Grammar cannot by itself choose the right tool or argument value. Keep the
+   existing 14-case result, add explicit multi-turn coverage, and rerun the full suite plus visible
+   follow-up grading after changes. Do not silently normalize wrong literal arguments into passes.
+6. **Rerun admission and publish only supported claims.** Freeze code, artifact, profile, context,
+   and policy before fresh same-host Java/Rust/Ollama comparisons. Require the default smoke,
+   at least one-third model contribution, at least 90% correctness among accepted model answers,
+   and the unchanged relative performance gates (Ollama: at least 80% decode throughput and
+   at most 1.5 times p95 end-to-end latency). Record the actual latency tier and tested context.
+   Obtain released-library evidence and matching ModelJars metadata, profiles, hashes, and
+   capability manifests before publication. Laptop usability needs its own measurements; a
+   passing EPYC result does not establish laptop speed or API-frontier answer quality.
+
+The next implementation slice should combine session-owned Java scratch with the existing Rust
+kernel connection and instrumentation. Quality evaluation and completion-budget experiments are
+separate, necessary work: faster kernels alone cannot establish answer accuracy.

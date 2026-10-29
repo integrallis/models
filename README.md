@@ -62,7 +62,9 @@ for the exact boundary and migration policy.
 ## Capabilities
 
 Experimental [Flint GGUF execution](docs/flint.md) is available in the pure Java backend.
-Flint's schema-aware tool protocol is implemented; catalog and tool qualification remain pending.
+Flint's schema-aware tool protocol is implemented, but tool qualification (9/14 cases) and the
+RAG model-contribution gate (11.1%, required 33.3%) failed. Flint remains outside the catalog.
+See the [qualification evidence](benchmark-results/2026-10-29-flint/README.md) for measured results.
 
 Implemented functionality includes:
 
