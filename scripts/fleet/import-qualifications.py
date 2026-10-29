@@ -30,7 +30,7 @@ def read(path):
     return json.loads(path.read_bytes())
 
 
-def default_configuration_smoke(report_path):
+def default_configuration_smoke(report_path, repo_relative):
     """The library-default correctness smoke beside the tuned report, or None.
 
     ModelJars' tools/qualification-smoke-gate.mjs requires this on every new or changed
@@ -43,6 +43,12 @@ def default_configuration_smoke(report_path):
 
     The sidecar is used as written rather than rebuilt here: it was produced next to the run
     it describes, and its reportSha256 is checked against the file it names.
+
+    One field is rewritten. The sidecar's `report` is relative to the qualification directory,
+    because run-controlled-rag-qualification.sh writes it beside its own output. The catalog
+    stores a repo-relative path, and ModelJars' gate fetches it from the models repository at
+    `modelsRevision` -- so the bare relative form resolves against the repository root and
+    404s: "Could not fetch .../default-correctness/models-rust-ffm.json: HTTP 404".
     """
     sidecar = report_path.parent / "default-correctness" / "smoke.json"
     measured = report_path.parent / "default-correctness" / "models-rust-ffm.json"
@@ -59,7 +65,7 @@ def default_configuration_smoke(report_path):
         "configuration": smoke["configuration"],
         "backend": smoke["backend"],
         "artifactSha256": smoke["artifactSha256"],
-        "report": smoke["report"],
+        "report": str(pathlib.PurePosixPath(repo_relative).parent / smoke["report"]),
         "reportSha256": smoke["reportSha256"],
         "totalAttempts": smoke["totalAttempts"],
         "successfulAttempts": smoke["successfulAttempts"],
@@ -102,7 +108,7 @@ def entry_for(report_path, report, verdict, catalogued, repo_relative):
         "environment": report["environment"],
         "report": repo_relative,
     }
-    smoke = default_configuration_smoke(report_path)
+    smoke = default_configuration_smoke(report_path, repo_relative)
     if smoke is not None:
         entry["defaultConfigurationSmoke"] = smoke
     return entry
