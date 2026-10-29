@@ -42,7 +42,7 @@ public enum ChatTemplate {
   LLAMA3("llama3", ToolSyntax.LLAMA3),
   MOBILE_MOE("mobilemoe", ToolSyntax.NONE),
   GPT_OSS("gpt-oss", ToolSyntax.HARMONY),
-  FLINT("flint", ToolSyntax.NONE),
+  FLINT("flint", ToolSyntax.FLINT),
   NEEDLE2("needle2", ToolSyntax.NEEDLE2),
   HAMMER("hammer", ToolSyntax.HAMMER),
   GEMMA("gemma", ToolSyntax.NONE),
@@ -253,7 +253,7 @@ public enum ChatTemplate {
       case LLAMA3 -> renderLlama3(conversation);
       case MOBILE_MOE -> renderMobileMoe(conversation);
       case GPT_OSS -> renderGptOss(conversation, List.of());
-      case FLINT -> renderFlint(conversation);
+      case FLINT -> FlintToolProtocol.render(conversation, List.of());
       case NEEDLE2 -> renderNeedle2(conversation, List.of());
       case HAMMER -> renderHammer(conversation, List.of());
       case GEMMA -> renderGemma(conversation);
@@ -306,6 +306,7 @@ public enum ChatTemplate {
               conversation, "", "<think>\n\n</think>\n", declared, ToolSyntax.SMOLLM3);
       case LLAMA3 -> renderLlama3WithTools(conversation, declared);
       case GPT_OSS -> renderGptOss(conversation, declared);
+      case FLINT -> FlintToolProtocol.render(conversation, declared);
       case NEEDLE2 -> renderNeedle2(conversation, declared);
       case HAMMER -> renderHammer(conversation, declared);
       case MINICPM5_NO_THINK -> renderMiniCpm5WithTools(conversation, declared);
@@ -1159,51 +1160,6 @@ public enum ChatTemplate {
           .control("<|eot_id|>");
     }
     return prompt.control("<|start_header_id|>assistant<|end_header_id|>\n\n").build();
-  }
-
-  /** Text conversation envelope from RecursiveSI/flint's chat_template.jinja. */
-  private static ModelPrompt renderFlint(List<ChatMessage> messages) {
-    ModelPrompt.Builder prompt = ModelPrompt.builder();
-    for (ChatMessage message : messages) {
-      if (message.hasToolCalls() || message.role() == ChatRole.TOOL) {
-        throw new IllegalArgumentException("Flint tool-call rendering is not implemented");
-      }
-      prompt.control("<|" + message.role().templateName() + "|>");
-      if (message.role() == ChatRole.ASSISTANT) {
-        // Retain reasoning in assistant history, tokenizing only the known delimiters as controls.
-        String text = message.text();
-        int cursor = 0;
-        while (cursor < text.length()) {
-          int open = text.indexOf("<think>", cursor);
-          int close = text.indexOf("</think>", cursor);
-          int next = open < 0 ? close : close < 0 ? open : Math.min(open, close);
-          if (next < 0) {
-            prompt.text(text.substring(cursor));
-            break;
-          }
-          prompt.text(text.substring(cursor, next));
-          String marker = next == open ? "<think>" : "</think>";
-          prompt.control(marker);
-          cursor = next + marker.length();
-        }
-      } else {
-        String text =
-            message.text().replace("\u0000", "").replace("<think>", "").replace("</think>", "");
-        for (String role :
-            List.of(
-                "begin_of_text",
-                "end_of_text",
-                "system",
-                "developer",
-                "user",
-                "assistant",
-                "observation")) {
-          text = text.replace("<|" + role + "|>", "&lt;|" + role + "|&gt;");
-        }
-        prompt.text(text);
-      }
-    }
-    return prompt.control("<|assistant|>").build();
   }
 
   /** Renders Meta's MobileMoE header protocol, which is distinct from the Llama 3 protocol. */

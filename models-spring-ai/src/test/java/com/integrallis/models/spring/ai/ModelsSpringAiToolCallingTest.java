@@ -1061,6 +1061,26 @@ class ModelsSpringAiToolCallingTest {
   static class Recovery {
 
     @Test
+    void recoversFlintTaggedArgumentsThroughTheDeclaredSpringSchema() {
+      ScriptedModel model =
+          new ScriptedModel(
+              "<tool_call>get_weather<arg_key>city</arg_key><arg_value>Austin</arg_value></tool_call>");
+      ModelsSpringAiChatModel chat =
+          new ModelsSpringAiChatModel(model, ChatTemplate.FLINT, SamplingOptions.builder().build());
+
+      ChatResponse response = chat.call(promptWithTools(List.of(new UserMessage("weather?"))));
+
+      assertThat(response.hasToolCalls()).isTrue();
+      assertThat(response.getResult().getOutput().getToolCalls())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("get_weather");
+                assertThat(call.arguments()).isEqualTo("{\"city\":\"Austin\"}");
+              });
+    }
+
+    @Test
     void recoversMiniCpmTaggedArgumentsThroughTheDeclaredSpringSchema() {
       ScriptedModel model =
           new ScriptedModel(

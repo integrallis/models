@@ -472,6 +472,29 @@ class ModelsChatModelToolCallingTest {
   static class Recovery {
 
     @Test
+    void recoversFlintTaggedArgumentsThroughTheDeclaredLangChain4jSchema() {
+      ScriptedModel model =
+          new ScriptedModel(
+              "<tool_call>get_weather<arg_key>city</arg_key><arg_value>Austin</arg_value></tool_call>");
+      ChatRequest request =
+          ChatRequest.builder()
+              .messages(UserMessage.from("weather?"))
+              .toolSpecifications(WEATHER)
+              .build();
+
+      ChatResponse response = chatModel(model, ChatTemplate.FLINT).chat(request);
+
+      assertThat(response.finishReason()).isEqualTo(FinishReason.TOOL_EXECUTION);
+      assertThat(response.aiMessage().toolExecutionRequests())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("get_weather");
+                assertThat(call.arguments()).isEqualTo("{\"city\":\"Austin\"}");
+              });
+    }
+
+    @Test
     void recoversMiniCpmTaggedArgumentsThroughTheDeclaredLangChain4jSchema() {
       ScriptedModel model =
           new ScriptedModel(

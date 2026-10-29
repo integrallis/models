@@ -62,7 +62,7 @@ for the exact boundary and migration policy.
 ## Capabilities
 
 Experimental [Flint GGUF execution](docs/flint.md) is available in the pure Java backend.
-Catalog qualification and Flint tool calling remain pending.
+Flint's schema-aware tool protocol is implemented; catalog and tool qualification remain pending.
 
 Implemented functionality includes:
 

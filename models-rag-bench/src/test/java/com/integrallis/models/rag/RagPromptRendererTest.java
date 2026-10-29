@@ -51,6 +51,14 @@ class RagPromptRendererTest {
           + "f_role|>";
 
   @Test
+  void flintUsesTheSharedPublisherEnvelopeForBothArms() {
+    assertThat(RagPromptTemplate.parse("flint").apply("Question"))
+        .isEqualTo("<|user|>Question<|assistant|>");
+    assertThat(RagPromptTemplate.FLINT.applyPrompt("Rules", "Question").text())
+        .isEqualTo("<|system|>Rules<|user|>Question<|assistant|>");
+  }
+
+  @Test
   @Tag("integration")
   void officialQwenTokenizerMatchesTransformersForTheControlledChatmlPrompt() throws Exception {
     String configured = System.getProperty("models.fixtures.qwen25HuggingFaceDirectory", "");

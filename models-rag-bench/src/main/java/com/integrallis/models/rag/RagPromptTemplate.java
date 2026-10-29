@@ -16,6 +16,8 @@
 package com.integrallis.models.rag;
 
 import com.integrallis.models.api.ModelPrompt;
+import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.ChatTemplate;
 import com.integrallis.models.runtime.chat.GraniteDocumentsPrompt;
 import java.util.List;
 import java.util.Locale;
@@ -23,6 +25,7 @@ import java.util.Locale;
 /** Explicit prompt envelopes used to keep native and pure-Java requests byte-identical. */
 public enum RagPromptTemplate {
   RAW("raw"),
+  FLINT("flint"),
   CHATML("chatml"),
   CHATML_DIRECT("chatml-direct"),
   CHATML_ANSWER("chatml-answer"),
@@ -63,6 +66,7 @@ public enum RagPromptTemplate {
     ModelPrompt.Builder result = ModelPrompt.builder();
     return switch (this) {
       case RAW -> result.text(prompt).build();
+      case FLINT -> ChatTemplate.FLINT.render(List.of(ChatMessage.user(prompt)));
       case CHATML ->
           result
               .control("<|im_start|>user\n")
@@ -174,6 +178,9 @@ public enum RagPromptTemplate {
   public ModelPrompt applyPrompt(String systemPrompt, String userPrompt) {
     ModelPrompt.Builder result = ModelPrompt.builder();
     return switch (this) {
+      case FLINT ->
+          ChatTemplate.FLINT.render(
+              List.of(ChatMessage.system(systemPrompt), ChatMessage.user(userPrompt)));
       case RAW -> result.text(systemPrompt).text(userPrompt).build();
       case CHATML, CHATML_DIRECT, CHATML_ANSWER, CHATML_NO_THINK -> {
         result
@@ -329,7 +336,7 @@ public enum RagPromptTemplate {
       }
     }
     throw new IllegalArgumentException(
-        "prompt-template must be one of raw, chatml, chatml-direct, chatml-answer, "
+        "prompt-template must be one of raw, flint, chatml, chatml-direct, chatml-answer, "
             + "chatml-no-think, zephyr, llama3, mobilemoe, gemma, gemma4, gemma4-answer, phi3, "
             + "deepseek, "
             + "deepseek-v2, h2o, "

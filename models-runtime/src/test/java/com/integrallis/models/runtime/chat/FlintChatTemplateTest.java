@@ -16,7 +16,6 @@
 package com.integrallis.models.runtime.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import org.junit.jupiter.api.Tag;
@@ -50,9 +49,10 @@ class FlintChatTemplateTest {
   }
 
   @Test
-  void doesNotAdvertiseAnUnimplementedToolProtocol() {
-    assertThat(ChatTemplate.FLINT.canParseToolCallsWithSchemas()).isFalse();
-    assertThatThrownBy(() -> ChatTemplate.FLINT.render(List.of(ChatMessage.tool("result"))))
-        .isInstanceOf(IllegalArgumentException.class);
+  void declaresSchemaAwareToolParsing() {
+    assertThat(ChatTemplate.FLINT.canParseToolCalls()).isFalse();
+    assertThat(ChatTemplate.FLINT.canParseToolCallsWithSchemas()).isTrue();
+    assertThat(ChatTemplate.FLINT.render(List.of(ChatMessage.tool("result"))).text())
+        .isEqualTo("<|observation|><tool_response>result</tool_response><|assistant|>");
   }
 }

@@ -6,8 +6,9 @@ All notable changes to models are documented here.
 
 - Add experimental Flint GGUF execution to the pure Java backend: sigmoid MoE routing,
   shared experts, Q/K normalization, attention sinks, and per-layer sliding/rotary patterns.
-  Includes Flint tokenization, a text-only chat template, independent numerical fixtures,
-  and a pinned Q4_K_M checkpoint test. Catalog and performance qualification remain pending;
+  Includes Flint tokenization, schema-aware tool calls in both framework adapters, independent
+  numerical and Jinja fixtures, and a pinned Q4_K_M checkpoint test. Adds the tool and RAG
+  qualification candidates and a bounded remote worker. Catalog qualification remains pending;
   see [Flint execution](docs/flint.md).
 
 ## [0.5.7] - 2026-10-27

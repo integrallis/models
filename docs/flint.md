@@ -11,9 +11,12 @@ buffers. Sessions are independent. Rewinding replays the prefix only when the re
 window has already been overwritten. Prefill runs sequentially and skips intermediate vocabulary
 projections.
 
-`ChatTemplate.FLINT` renders the publisher's text envelope. Retain `<think>...</think>` in
-assistant history. Its native XML argument protocol is not yet implemented by the tool parser;
-the template explicitly refuses tool requests rather than labelling them as Qwen tool calls.
+`ChatTemplate.FLINT` renders the publisher's text and tool envelopes. Retain `<think>...</think>` in
+assistant history. Native `<arg_key>`/`<arg_value>` calls require the declared `ToolSpec` schemas
+to distinguish raw strings from JSON values. Tool results use the observation role. The shared
+scanner supports parallel calls and rejects malformed, truncated, unknown, or duplicate arguments;
+calls inside reasoning are not executed. LangChain4j and Spring AI use the same schema-aware path.
+This is protocol support, not evidence that the checkpoint passes tool qualification.
 The tokenizer implements Flint's sequential digit/CJK/word splitting and recognizes its EOS
 and user, developer, and observation transitions as generation terminators.
 
@@ -131,6 +134,33 @@ is high. It is not a performance qualification or evidence of frontier-LLM answe
 ## Publication work remaining
 
 Controlled default-correctness and RAG performance qualification, longer-context validation,
-tool protocol integration and its separate qualification, and acceleration measurements remain
+tool-calling qualification, and acceleration measurements remain
 separate gates. No claim about all Flint quantizations, frontier-model parity, or catalog
 admission follows from the implementation or short numerical comparisons.
+
+## Tool protocol and qualification
+
+The tool prompt fixture is independently rendered using Jinja 3.1.6 and the template embedded in
+the pinned GGUF. Its provenance is in `models-runtime/src/test/resources/flint/README.md`.
+The scanner checks structural types, required fields, nested properties/items, enum/const and
+`additionalProperties: false`. It is not a full JSON Schema validator. `$ref`, `oneOf`, and `anyOf`
+are unsupported; ambiguous schemas or values degrade to plain text. Flint does not yet have a
+constrained-decoding grammar, so qualification measures the model's natural output.
+
+The dedicated `scripts/flint/qualification-worker.sh` runs on a disposable Linux host with 64 GB
+RAM and 16 vCPUs. It accepts a JSON manifest with `sourceRevision` (full commit), `payloadUri`,
+`payloadSha256`, and `resultsUri`. The payload contains the Gradle `installDist` directories
+`models-bench`, `models-rag-bench`, and `source-revision.txt`. Bootstrap installs AWS CLI, curl,
+jq, git, CMake, a C++ compiler, zstd and libcurl development headers before running it as a root
+login shell. The bootstrap must schedule unconditional termination after four hours and set EC2
+instance-initiated shutdown to terminate. The worker also shuts down on exit and uploads logs and
+partial reports every 30 seconds. Use a fresh, immutable S3 prefix for each run.
+
+The preregistered configuration is the full shared tool suite at 256 output tokens, then the
+general RAG workload with context 2048, 16 threads, retrieval top-k 1 and 256 output tokens.
+Default correctness uses zero warmups and one iteration. All comparative arms use one warmup
+and three iterations on the same host and artifact. Comparators are Ollama 0.40.9 and the pinned
+llama.cpp revision above; Java is Temurin 25.0.3+9. Cache drops and sequential arms avoid concurrent
+inference. The existing admission policy is unchanged. Phase timeouts preserve incomplete evidence
+and do not count as passes. A failed correctness smoke prevents admission even if a comparative
+verdict passes. Source-build results cannot stand in for released-library catalog evidence.
