@@ -135,6 +135,28 @@ payload_matches_label() {
   esac
 }
 # <<< END payload_label_version
+
+# >>> BEGIN cap_fits_context
+# A cap that does not leave room for the prompt is not a cap, it is a crash. Generation walks the
+# KV window from the end of the prompt, so `--max-tokens` at or near `--context` overruns it and
+# the backend raises "position out of range: <context>". Measured on 2026-10-29: a cap of 2048
+# against a context of 2048 failed 7 of 9, 8 of 9 and 2 of 9 cases depending on the template, and
+# the cases that failed were the long-generating ones -- so the surviving attempts were the short
+# ones and every rate computed over them read better than the truth. A shard that asks for an
+# impossible cap must fail before it burns a box, not produce a biased report.
+#
+# PROMPT_HEADROOM is the room reserved for the rendered prompt. The `math` corpus renders 156-172
+# tokens; 256 covers it with margin and is the same floor the cap itself defaults to.
+# Both arms receive this, so sameWorkload() still admits the comparator.
+CONTEXT=${CONTEXT:-2048}
+PROMPT_HEADROOM=${PROMPT_HEADROOM:-256}
+cap_fits_context() {
+  local cap=$1 context=$2 headroom=${3:-256}
+  [ "$cap" -gt 0 ] 2>/dev/null || return 2
+  [ "$context" -gt 0 ] 2>/dev/null || return 2
+  [ $((cap + headroom)) -le "$context" ]
+}
+# <<< END cap_fits_context
 if ! payload_matches_label "$PAYLOAD" "$BACKEND_VERSION"; then
   say "FATAL BACKEND_VERSION $BACKEND_VERSION does not name the payload $PAYLOAD"
   STATUS=VERSION_PAYLOAD_MISMATCH; exit 1
@@ -338,6 +360,12 @@ while IFS= read -r job; do
   # the finance corpus, which measured the cap and not the model. Both arms receive the same value
   # from this one variable, so sameWorkload() still admits the comparator.
   mt=$(python3 -c "import json,sys;print(json.loads(sys.argv[1]).get('mt') or 256)" "$job")
+  if ! cap_fits_context "$mt" "$CONTEXT" "$PROMPT_HEADROOM"; then
+    say "SKIP $id: mt=$mt leaves no room in a $CONTEXT context (needs $PROMPT_HEADROOM for the prompt)"
+    printf '%s\tCAP_EXCEEDS_CONTEXT\t0\n' "$id" >> /work/out/progress.tsv
+    done_n=$((done_n+1))
+    continue
+  fi
   [ -z "$dt" ] && dt="$DECODE_THREAD_DEFAULT"
   DECODE_THREAD_OPT=""
   if [ -n "$dt" ]; then
@@ -401,7 +429,7 @@ while IFS= read -r job; do
         com.integrallis.models.rag.RagBenchmarkCli \
         --framework plain-java --backend rust-ffm --backend-version "$BACKEND_VERSION" \
         --model "$artifact" --model-id "$id" --workload "$wl" --prompt-template "$tpl" \
-        --context 2048 --threads 8 --max-tokens "$mt" --warmups 1 --iterations 3 \
+        --context "$CONTEXT" --threads 8 --max-tokens "$mt" --warmups 1 --iterations 3 \
         --output "/work/out/$id.json" > "/work/out/$id.log" 2>&1
       rc=$?
       printf '%s\trc%s\t%s\n' "$id" "$rc" "$(( $(date +%s)-T0 ))" >> /work/out/progress.tsv
@@ -424,7 +452,7 @@ while IFS= read -r job; do
     # both for that reason -- a shard that passed --threads 8 to the candidate and let the comparator
     # default to the host's core count was rejected with "benchmark workload differs". The same
     # applies to max tokens, which is why $mt is read once per job and handed to both arms.
-    ARMS="--workload $wl --prompt-template $tpl --context 2048 --threads $THREADS"
+    ARMS="--workload $wl --prompt-template $tpl --context $CONTEXT --threads $THREADS"
     ARMS="$ARMS --max-tokens $mt --warmups 1 --iterations 3"
 
     java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED \
