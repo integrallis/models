@@ -257,6 +257,7 @@ val configuredMobileMoeQatDirectory =
 val configuredHammer21GgufPath = providers.systemProperty("models.fixtures.hammer21Gguf")
 val configuredEdgeRock4bGgufPath = providers.systemProperty("models.fixtures.edgeRock4bGguf")
 val configuredEdgeRockCases = providers.systemProperty("models.fixtures.edgeRockCases")
+val configuredDecodeRateModel = providers.systemProperty("models.fixtures.decodeRateModel")
 val configuredTinyBertRerankerPath =
     providers.systemProperty("models.fixtures.tinyBertReranker")
 val configuredMxbaiRerankerDirectory =
@@ -522,6 +523,29 @@ tasks.register<Test>("needle2CactCompatibilityTest") {
         dependsOn(tasks.named(needle2CactFixture.taskName))
     }
     outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("decodeRateProbe") {
+    description = "Report steady-state pure-java decode rate for a given GGUF"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.PureJavaDecodeRateProbe",
+        )
+    }
+    val configuredDecodeRate = configuredDecodeRateModel.orNull
+    onlyIf("-Dmodels.fixtures.decodeRateModel points to a GGUF") { configuredDecodeRate != null }
+    configuredDecodeRate?.let { systemProperty("models.fixtures.decodeRateModel", it) }
+    providers.systemProperty("models.fixtures.decodeRateContext").orNull?.let {
+        systemProperty("models.fixtures.decodeRateContext", it)
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "8g"
+    extensions.configure<JacocoTaskExtension> { isEnabled = false }
 }
 
 tasks.register<Test>("edgeRockCompatibilityTest") {

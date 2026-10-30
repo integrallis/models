@@ -206,19 +206,38 @@ and nothing from it is copied into our runtime; it is used only as an external o
 Same box (darwin, 12 logical / 6 physical cores), same model file
 (`EdgeRock-4B-Q4_K_M`), both arms at `--ctx-size 16384`, both near 850% CPU.
 
-| arm | decode | note |
-| --- | --- | --- |
-| ours, `pure-java` | ~1.9 tok/s | after the scratch fix below |
-| patched llama.cpp, `-t 8` | 7.2 tok/s | 7.1 at ctx 512, so context is not a factor |
+| model | ours, `pure-java` | patched llama.cpp, `-t 8` | ratio |
+| --- | --- | --- | --- |
+| VibeThinker-1.5B Q4_K_M (control) | 3.10 tok/s | 22.9 tok/s | **0.135** |
+| EdgeRock-4B Q4_K_M | 1.06 tok/s | 7.2 tok/s | **0.147** |
 
-Ratio **~0.26**, against a relative decode floor of 0.80 with a pinned publisher reference and
-0.45 without one (`RagProductionQualificationPolicy:36-38`). **EdgeRock cannot be listed at this
-speed.** This is the same gate that rejected 20 quality-passing models on 2026-10-29, and
-EdgeRock fails it by much more than they did.
+Ratio **~0.15**, against a relative decode floor of 0.80 with a pinned publisher reference and
+0.45 without one (`RagProductionQualificationPolicy:36-38`). EdgeRock cannot be listed on this arm.
 
-The gap is **not** parallelism. Both arms sit near eight of twelve logical cores, so it is per-core
-efficiency: an optimisation project, not plumbing. One earlier CPU sample read 232% and would have
-supported the opposite conclusion; it was a startup transient, and the sustained figure is ~850%.
+**The control is the finding.** EdgeRock scores slightly *better* than an unrelated model measured
+the same way, so ~0.15 is what `pure-java` does against llama.cpp on this box and not something
+EdgeRock's memory layers cost. No amount of EdgeRock-specific optimisation reaches 0.80 from here,
+because the gap is not EdgeRock's. Both numbers come from `:backend-java:decodeRateProbe`, which
+exists for exactly this control and runs on `PureJavaBackend.load(Path)` -- the route
+`InProcessGenerationClient` uses for the `pure-java` arm, so it is the route qualification
+measures.
+
+Two corrections to earlier readings in this experiment, both from measuring instead of inferring:
+an earlier EdgeRock figure of 1.9 tok/s rested on a decode token count estimated from the output
+text rather than counted, and the clean probe says 1.06; and a single CPU sample of 232% would have
+supported a parallelism explanation, where the sustained figure is ~850% on both arms, so the gap
+is per-core efficiency.
+
+### What this implies about the route
+
+The catalog already answers this. Of 68 entries, 65 are `rust-ffm` and the 3 `pure-java` entries
+are all grandfathered from `certified-20260902`. The live qualification route is the Rust shim, and
+that is how EdgeRock reaches the catalog too -- not through the Java decoder. The licences allow
+it: the publisher's patch is Apache-2.0 and llama.cpp is MIT, both permissive, so the shim may
+carry an EdgeRock implementation where a GPL-derived one could not.
+
+The Java decoder built here is not wasted by that: it is the correctness reference the shim is
+checked against, and it is what made the architecture legible in the first place.
 
 What has been recovered so far: `QuantizedProjection` was calling the short `ggufMatmul` overload,
 which allocates four arrays and re-quantizes the activation per call -- about 288 allocations per
