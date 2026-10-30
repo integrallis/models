@@ -12,14 +12,19 @@ set -u
 WORKER="$(cd "$(dirname "$0")" && pwd)/qual-worker-two-arm.sh"
 [ -f "$WORKER" ] || { echo "worker not found at $WORKER"; exit 1; }
 
-BLOCK=$(sed -n '/^# >>> BEGIN payload_label_version$/,/^# <<< END payload_label_version$/p' "$WORKER")
-if [ -z "$BLOCK" ]; then
-  echo "FAIL: could not extract the payload_label_version block from the worker."
-  echo "      The markers were renamed or removed -- this test is now testing nothing, which is"
-  echo "      worse than failing, so it fails."
-  exit 1
-fi
-eval "$BLOCK"
+extract() {
+  local name=$1 block
+  block=$(sed -n "/^# >>> BEGIN $name\$/,/^# <<< END $name\$/p" "$WORKER")
+  if [ -z "$block" ]; then
+    echo "FAIL: could not extract the $name block from the worker."
+    echo "      The markers were renamed or removed -- this test is now testing nothing, which is"
+    echo "      worse than failing, so it fails."
+    exit 1
+  fi
+  eval "$block"
+}
+extract payload_label_version
+extract cap_fits_context
 
 fails=0
 pass() { printf '  ok   %s\n' "$1"; }
@@ -99,6 +104,31 @@ for f in "$FLEET_DIR"/*.sh; do
   fi
 done
 [ "$offenders" -eq 0 ] && pass "every fleet script names its payload and kernel through a variable"
+
+echo
+echo "cap_fits_context:"
+expect_fits() {
+  if cap_fits_context "$1" "$2" "$3"; then pass "cap $1 fits context $2 with headroom $3"
+  else fail "cap $1 rejected for context $2 with headroom $3, which fits"; fi
+}
+expect_unfits() {
+  if cap_fits_context "$1" "$2" "$3"; then fail "cap $1 ACCEPTED for context $2 with headroom $3"
+  else pass "cap $1 rejected for context $2 with headroom $3"; fi
+}
+expect_refuses() {
+  cap_fits_context "$1" "$2" "$3"
+  if [ $? -eq 2 ]; then pass "refuses non-numeric input ($1, $2)"
+  else fail "did not refuse non-numeric input ($1, $2)"; fi
+}
+# The 2026-10-29 failure: cap equal to the context overran the KV window on the math corpus.
+expect_unfits 2048 2048 256
+expect_unfits 1920 2048 256     # 1920+256 = 2176, over
+expect_fits   1792 2048 256     # the cap the ablation actually ran
+expect_fits    768 2048 256     # shard 703's cap
+expect_fits    256 2048 256     # the worker's own default, exactly at the boundary
+expect_unfits 1793 2048 256     # one token past the boundary
+expect_refuses abc 2048 256
+expect_refuses 768 "" 256
 
 echo
 if [ "$fails" -eq 0 ]; then echo "all guard checks passed"; exit 0; fi

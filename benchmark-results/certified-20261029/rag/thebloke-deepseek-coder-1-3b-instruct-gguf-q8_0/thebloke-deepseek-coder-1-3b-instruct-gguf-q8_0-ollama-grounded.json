@@ -1,0 +1,1588 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-29T19:03:33.273271749Z",
+  "framework" : "plain-java",
+  "backend" : "ollama",
+  "backendVersion" : "ollama@ollama version is 0.40.13",
+  "modelId" : "deepseek_coder_1_3b_instruct_q8_0",
+  "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+  "artifactSha256" : "36eb025121a50ee6d37fe900659393ff8fb5ea34adc0e3c11fc635e07624dcdb",
+  "artifactSizeBytes" : 1432219680,
+  "settings" : {
+    "corpusSha256" : "6841c286837b4c45c06fe8d103b2e044b61a1bfe75a61b64fa04c7ca31b20e45",
+    "workload" : "coding",
+    "caseIds" : [ "list-copy-null-handling", "compute-if-absent-null", "virtual-thread-executor", "record-compact-validation", "gradle-java-25", "http-retry-rules", "migration-lock-expiry", "jackson-module-and-feature", "unsupported-cuda-kernel" ],
+    "promptTemplate" : "deepseek",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 256,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v23",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topK" : "1",
+      "rawPrompt" : "true",
+      "seed" : "42",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-8-192",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971646464,
+    "maxHeapBytes" : 16500391936,
+    "javaVersion" : "25.0.5",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "ollama",
+    "planVersion" : "unavailable",
+    "environment" : { },
+    "optimizations" : [ ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 1394.037957,
+    "retrievalMillis" : {
+      "p50" : 1.592139,
+      "p95" : 8.0809161
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 0.30360900000050606,
+      "p95" : 2.5494860000000243
+    },
+    "ttftMillis" : {
+      "p50" : 162.981312,
+      "p95" : 411.3153889
+    },
+    "tpotMillis" : {
+      "p50" : 38.26314393785311,
+      "p95" : 38.93085083725555
+    },
+    "endToEndMillis" : {
+      "p50" : 2242.520088,
+      "p95" : 8797.8709608
+    },
+    "p50PrefillTokensPerSecond" : 1342.5268179507566,
+    "p50DecodeTokensPerSecond" : 26.134810083149393,
+    "peakRssBytes" : 0,
+    "totalCpuMillis" : 0.0,
+    "totalInputTokens" : 5391,
+    "totalCacheReadInputTokens" : 0,
+    "totalCacheWriteInputTokens" : 0,
+    "totalOutputTokens" : 2268,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.0,
+    "modelAnswerRate" : 0.3333333333333333,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.5555555555555556,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "USABLE",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "474240792e67743e70558ada2009fa4e923c249637cbc05c3d1b7c0f192862c3",
+    "retrievalMillis" : 2.847841,
+    "frameworkOverheadMillis" : 0.3766099999998005,
+    "endToEndMillis" : 2189.593697,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "inputTokens" : 206,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 53,
+      "ttftMillis" : 161.803083,
+      "totalMillis" : 2186.369246,
+      "prefillTokensPerSecond" : 1342.5268179507566,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Java method that freezes parsed SKU values is `List.copyOf(values)`. The method throws a `NullPointerException` if any element in the provided list is `null`. The returned list is also unmodifiable.\n",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "425bbfd89455e698b20cbf6a46e10d214714a864acb8775734f3d834a2d99260",
+    "retrievalMillis" : 3.5936,
+    "frameworkOverheadMillis" : 0.4314509999994698,
+    "endToEndMillis" : 6978.418272,
+    "generation" : {
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 202,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 178,
+      "ttftMillis" : 84.918637,
+      "totalMillis" : 6974.393221,
+      "prefillTokensPerSecond" : 5135.114523222412,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The map operation that initializes SessionCache entries is `ConcurrentHashMap.computeIfAbsent`. This method performs a computation if the given key is not present in the map. If the key is present, the existing value is returned. If the key is not present, the computation is performed and the result is stored in the map.\n\nWhen the mapping function returns null, it means that the computation has returned null, and no mapping is recorded for that key in the map. This is the expected behavior as per the Java documentation for `ConcurrentHashMap.computeIfAbsent`:\n\n> If the mapping function returns null, the mapping is not added to the map.\n\nThis behavior is consistent with the behavior of `ConcurrentHashMap.computeIfAbsent` in other concurrent collections like `ConcurrentHashMap`.\n",
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1cc57ee94397fcd8a9afad8407dc823a852301f68114a21c37e153cf79e2386a",
+    "retrievalMillis" : 5.964298,
+    "frameworkOverheadMillis" : 0.35832900000059453,
+    "endToEndMillis" : 8749.767126,
+    "generation" : {
+      "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 200,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 226,
+      "ttftMillis" : 113.649783,
+      "totalMillis" : 8743.444499,
+      "prefillTokensPerSecond" : 5242.738806752647,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses the `Executors.newVirtualThreadPerTaskExecutor` factory to create its task executor. This factory creates a new executor service with a single worker thread and a maximum of `Integer.MAX_VALUE` worker threads. The worker threads are created using `ThreadFactory` that creates threads with the same name as the class name.\n\nClosing the executor waits for all submitted tasks to finish. This is done by calling the `shutdown` method on the executor service. The `shutdown` method waits for all tasks to complete execution, then it attempts to terminate the thread pool. If the thread pool is already terminated, then the method returns immediately. If the thread pool is not terminated, then the method waits for all tasks to complete execution before finally terminating the thread pool.\n\nThe `shutdown` method returns a `boolean` value indicating whether the operation was successful. If the operation was successful, then the method returns `true`. If the operation was not successful, then the method returns `false`.\n",
+      "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0e2e0cd5e6d6f8054102049dc52d8d551231cbd1b676d595ad577924b352fecf",
+    "retrievalMillis" : 1.549959,
+    "frameworkOverheadMillis" : 2.3197670000001835,
+    "endToEndMillis" : 1043.291592,
+    "generation" : {
+      "text" : "ServiceConfig validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 181,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 20,
+      "ttftMillis" : 321.712054,
+      "totalMillis" : 1039.421866,
+      "prefillTokensPerSecond" : 672.6349078936122,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "ServiceConfig validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException.\n",
+      "text" : "ServiceConfig validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "22e1650578555c00edeafce750313dfafeacd6d6d3f8b24b2ff23909079502e4",
+    "retrievalMillis" : 1.623601,
+    "frameworkOverheadMillis" : 0.31134700000029625,
+    "endToEndMillis" : 2530.953588,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 207,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 56,
+      "ttftMillis" : 423.744179,
+      "totalMillis" : 2529.01864,
+      "prefillTokensPerSecond" : 494.9855808548186,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The expression `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))` selects the Gradle Java toolchain and `JavaLanguageVersion.of(25)` sets the compilation target release to 25.\n",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9ce67b7e275c71e0389950c409cc2b8a5dd34588d07f9ebe1da0cd8bf1c13e72",
+    "retrievalMillis" : 2.271146,
+    "frameworkOverheadMillis" : 0.29694800000015675,
+    "endToEndMillis" : 2272.736338,
+    "generation" : {
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 58,
+      "ttftMillis" : 53.197077,
+      "totalMillis" : 2270.168244,
+      "prefillTokensPerSecond" : 5190.847580186974,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The HTTP methods that are retried up to three attempts are GET and HEAD.\n\nThe header that permits retrying POST is the Idempotency-Key header. This header is used to ensure that a request is not sent more than once without any additional information.\n",
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7f7a32923ca16e2ed2b4d5429da79b393975f44decd557478ad8a2e5992a5ed0",
+    "retrievalMillis" : 6.341708,
+    "frameworkOverheadMillis" : 1.9033580000000256,
+    "endToEndMillis" : 1562.692548,
+    "generation" : {
+      "text" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "inputTokens" : 192,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 32,
+      "ttftMillis" : 361.895277,
+      "totalMillis" : 1554.447482,
+      "prefillTokensPerSecond" : 590.2316659288771,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it.\n",
+      "text" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ccf7a8127223c1df80ae217d0b58a44f04aa6af7b0524d68694d5361102472c6",
+    "retrievalMillis" : 1.62112,
+    "frameworkOverheadMillis" : 0.3304980000002615,
+    "endToEndMillis" : 2138.94871,
+    "generation" : {
+      "text" : "The mapper method that registers Java time support is `findAndRegisterModules()`. The deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`. [jackson-wire-format]",
+      "inputTokens" : 209,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 46,
+      "ttftMillis" : 410.578601,
+      "totalMillis" : 2136.997092,
+      "prefillTokensPerSecond" : 522.5209008360334,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The mapper method that registers Java time support is `findAndRegisterModules()`. The deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`.\n",
+      "text" : "The mapper method that registers Java time support is `findAndRegisterModules()`. The deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`. [jackson-wire-format]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1cfe95e787639441c9ad3a201d56b489aee42b6641dc1394c3127dcd117e1552",
+    "retrievalMillis" : 1.146838,
+    "frameworkOverheadMillis" : 6.835630000000037,
+    "endToEndMillis" : 3436.35179,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 199,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 87,
+      "ttftMillis" : 141.192802,
+      "totalMillis" : 3428.369322,
+      "prefillTokensPerSecond" : 1598.8173572111484,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CUDA block size is determined by the number of threads in a block. The block size is a parameter that can be set when launching the kernel, and it determines the number of threads that will be processed simultaneously. The block size is typically set to a multiple of 32, 64, 128, 256, 512, or 1024 threads.\n",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "474240792e67743e70558ada2009fa4e923c249637cbc05c3d1b7c0f192862c3",
+    "retrievalMillis" : 1.592139,
+    "frameworkOverheadMillis" : 0.29875700000002325,
+    "endToEndMillis" : 2150.829789,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "inputTokens" : 206,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 53,
+      "ttftMillis" : 170.424481,
+      "totalMillis" : 2148.938893,
+      "prefillTokensPerSecond" : 1376.4257030795854,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Java method that freezes parsed SKU values is `List.copyOf(values)`. The method throws a `NullPointerException` if any element in the provided list is `null`. The returned list is also unmodifiable.\n",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "425bbfd89455e698b20cbf6a46e10d214714a864acb8775734f3d834a2d99260",
+    "retrievalMillis" : 1.59038,
+    "frameworkOverheadMillis" : 0.3328480000009222,
+    "endToEndMillis" : 6860.575461,
+    "generation" : {
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 202,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 178,
+      "ttftMillis" : 86.075756,
+      "totalMillis" : 6858.652233,
+      "prefillTokensPerSecond" : 5276.355657716017,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The map operation that initializes SessionCache entries is `ConcurrentHashMap.computeIfAbsent`. This method performs a computation if the given key is not present in the map. If the key is present, the existing value is returned. If the key is not present, the computation is performed and the result is stored in the map.\n\nWhen the mapping function returns null, it means that the computation has returned null, and no mapping is recorded for that key in the map. This is the expected behavior as per the Java documentation for `ConcurrentHashMap.computeIfAbsent`:\n\n> If the mapping function returns null, the mapping is not added to the map.\n\nThis behavior is consistent with the behavior of `ConcurrentHashMap.computeIfAbsent` in other concurrent collections like `ConcurrentHashMap`.\n",
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1cc57ee94397fcd8a9afad8407dc823a852301f68114a21c37e153cf79e2386a",
+    "retrievalMillis" : 8.182084,
+    "frameworkOverheadMillis" : 0.30360900000050606,
+    "endToEndMillis" : 8818.48689,
+    "generation" : {
+      "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 200,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 226,
+      "ttftMillis" : 96.860365,
+      "totalMillis" : 8810.001197,
+      "prefillTokensPerSecond" : 5257.070760172432,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses the `Executors.newVirtualThreadPerTaskExecutor` factory to create its task executor. This factory creates a new executor service with a single worker thread and a maximum of `Integer.MAX_VALUE` worker threads. The worker threads are created using `ThreadFactory` that creates threads with the same name as the class name.\n\nClosing the executor waits for all submitted tasks to finish. This is done by calling the `shutdown` method on the executor service. The `shutdown` method waits for all tasks to complete execution, then it attempts to terminate the thread pool. If the thread pool is already terminated, then the method returns immediately. If the thread pool is not terminated, then the method waits for all tasks to complete execution before finally terminating the thread pool.\n\nThe `shutdown` method returns a `boolean` value indicating whether the operation was successful. If the operation was successful, then the method returns `true`. If the operation was not successful, then the method returns `false`.\n",
+      "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0e2e0cd5e6d6f8054102049dc52d8d551231cbd1b676d595ad577924b352fecf",
+    "retrievalMillis" : 1.290492,
+    "frameworkOverheadMillis" : 2.6479369999999562,
+    "endToEndMillis" : 1047.353037,
+    "generation" : {
+      "text" : "ServiceConfig validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 181,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 20,
+      "ttftMillis" : 331.592715,
+      "totalMillis" : 1043.414608,
+      "prefillTokensPerSecond" : 671.0986366686813,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "ServiceConfig validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException.\n",
+      "text" : "ServiceConfig validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "22e1650578555c00edeafce750313dfafeacd6d6d3f8b24b2ff23909079502e4",
+    "retrievalMillis" : 8.015779,
+    "frameworkOverheadMillis" : 0.2777970000001915,
+    "endToEndMillis" : 2516.302083,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 207,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 56,
+      "ttftMillis" : 401.541199,
+      "totalMillis" : 2508.008507,
+      "prefillTokensPerSecond" : 523.2174587808275,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The expression `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))` selects the Gradle Java toolchain and `JavaLanguageVersion.of(25)` sets the compilation target release to 25.\n",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9ce67b7e275c71e0389950c409cc2b8a5dd34588d07f9ebe1da0cd8bf1c13e72",
+    "retrievalMillis" : 1.626,
+    "frameworkOverheadMillis" : 0.27840699999978824,
+    "endToEndMillis" : 2242.520088,
+    "generation" : {
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 58,
+      "ttftMillis" : 66.053936,
+      "totalMillis" : 2240.615681,
+      "prefillTokensPerSecond" : 4121.132593853156,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The HTTP methods that are retried up to three attempts are GET and HEAD.\n\nThe header that permits retrying POST is the Idempotency-Key header. This header is used to ensure that a request is not sent more than once without any additional information.\n",
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7f7a32923ca16e2ed2b4d5429da79b393975f44decd557478ad8a2e5992a5ed0",
+    "retrievalMillis" : 1.478527,
+    "frameworkOverheadMillis" : 1.0330449999999018,
+    "endToEndMillis" : 1555.210226,
+    "generation" : {
+      "text" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "inputTokens" : 192,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 32,
+      "ttftMillis" : 365.401389,
+      "totalMillis" : 1552.698654,
+      "prefillTokensPerSecond" : 581.6507369090716,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it.\n",
+      "text" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ccf7a8127223c1df80ae217d0b58a44f04aa6af7b0524d68694d5361102472c6",
+    "retrievalMillis" : 3.645551,
+    "frameworkOverheadMillis" : 0.3775490000002719,
+    "endToEndMillis" : 2121.171694,
+    "generation" : {
+      "text" : "The mapper method that registers Java time support is `findAndRegisterModules()`. The deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`. [jackson-wire-format]",
+      "inputTokens" : 209,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 46,
+      "ttftMillis" : 410.829521,
+      "totalMillis" : 2117.148594,
+      "prefillTokensPerSecond" : 521.9649858894633,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The mapper method that registers Java time support is `findAndRegisterModules()`. The deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`.\n",
+      "text" : "The mapper method that registers Java time support is `findAndRegisterModules()`. The deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`. [jackson-wire-format]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1cfe95e787639441c9ad3a201d56b489aee42b6641dc1394c3127dcd117e1552",
+    "retrievalMillis" : 1.131379,
+    "frameworkOverheadMillis" : 0.29752600000028906,
+    "endToEndMillis" : 3442.821088,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 199,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 87,
+      "ttftMillis" : 141.164829,
+      "totalMillis" : 3441.392183,
+      "prefillTokensPerSecond" : 1600.1286535600852,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CUDA block size is determined by the number of threads in a block. The block size is a parameter that can be set when launching the kernel, and it determines the number of threads that will be processed simultaneously. The block size is typically set to a multiple of 32, 64, 128, 256, 512, or 1024 threads.\n",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "474240792e67743e70558ada2009fa4e923c249637cbc05c3d1b7c0f192862c3",
+    "retrievalMillis" : 1.566539,
+    "frameworkOverheadMillis" : 0.2602569999999105,
+    "endToEndMillis" : 2138.118596,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "inputTokens" : 206,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 53,
+      "ttftMillis" : 162.981312,
+      "totalMillis" : 2136.2918,
+      "prefillTokensPerSecond" : 1337.0459074063256,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The Java method that freezes parsed SKU values is `List.copyOf(values)`. The method throws a `NullPointerException` if any element in the provided list is `null`. The returned list is also unmodifiable.\n",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable. [java-list-copy]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "425bbfd89455e698b20cbf6a46e10d214714a864acb8775734f3d834a2d99260",
+    "retrievalMillis" : 6.974684,
+    "frameworkOverheadMillis" : 0.4143800000001647,
+    "endToEndMillis" : 6839.632159,
+    "generation" : {
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 202,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 178,
+      "ttftMillis" : 84.464176,
+      "totalMillis" : 6832.243095,
+      "prefillTokensPerSecond" : 5250.298903155378,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The map operation that initializes SessionCache entries is `ConcurrentHashMap.computeIfAbsent`. This method performs a computation if the given key is not present in the map. If the key is present, the existing value is returned. If the key is not present, the computation is performed and the result is stored in the map.\n\nWhen the mapping function returns null, it means that the computation has returned null, and no mapping is recorded for that key in the map. This is the expected behavior as per the Java documentation for `ConcurrentHashMap.computeIfAbsent`:\n\n> If the mapping function returns null, the mapping is not added to the map.\n\nThis behavior is consistent with the behavior of `ConcurrentHashMap.computeIfAbsent` in other concurrent collections like `ConcurrentHashMap`.\n",
+      "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1cc57ee94397fcd8a9afad8407dc823a852301f68114a21c37e153cf79e2386a",
+    "retrievalMillis" : 1.360964,
+    "frameworkOverheadMillis" : 0.25193600000056904,
+    "endToEndMillis" : 8824.57728,
+    "generation" : {
+      "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 200,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 226,
+      "ttftMillis" : 101.606215,
+      "totalMillis" : 8822.96438,
+      "prefillTokensPerSecond" : 5246.039240373518,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses the `Executors.newVirtualThreadPerTaskExecutor` factory to create its task executor. This factory creates a new executor service with a single worker thread and a maximum of `Integer.MAX_VALUE` worker threads. The worker threads are created using `ThreadFactory` that creates threads with the same name as the class name.\n\nClosing the executor waits for all submitted tasks to finish. This is done by calling the `shutdown` method on the executor service. The `shutdown` method waits for all tasks to complete execution, then it attempts to terminate the thread pool. If the thread pool is already terminated, then the method returns immediately. If the thread pool is not terminated, then the method waits for all tasks to complete execution before finally terminating the thread pool.\n\nThe `shutdown` method returns a `boolean` value indicating whether the operation was successful. If the operation was successful, then the method returns `true`. If the operation was not successful, then the method returns `false`.\n",
+      "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0e2e0cd5e6d6f8054102049dc52d8d551231cbd1b676d595ad577924b352fecf",
+    "retrievalMillis" : 1.324022,
+    "frameworkOverheadMillis" : 0.25088700000014796,
+    "endToEndMillis" : 1063.347674,
+    "generation" : {
+      "text" : "ServiceConfig validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 181,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 20,
+      "ttftMillis" : 320.618497,
+      "totalMillis" : 1061.772765,
+      "prefillTokensPerSecond" : 677.2329980842912,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "ServiceConfig validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException.\n",
+      "text" : "ServiceConfig validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "22e1650578555c00edeafce750313dfafeacd6d6d3f8b24b2ff23909079502e4",
+    "retrievalMillis" : 1.044115,
+    "frameworkOverheadMillis" : 0.2784280000000763,
+    "endToEndMillis" : 2493.886014,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 207,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 56,
+      "ttftMillis" : 407.481657,
+      "totalMillis" : 2492.563471,
+      "prefillTokensPerSecond" : 522.0430799028546,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The expression `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))` selects the Gradle Java toolchain and `JavaLanguageVersion.of(25)` sets the compilation target release to 25.\n",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9ce67b7e275c71e0389950c409cc2b8a5dd34588d07f9ebe1da0cd8bf1c13e72",
+    "retrievalMillis" : 1.079657,
+    "frameworkOverheadMillis" : 0.24516600000015387,
+    "endToEndMillis" : 2213.254279,
+    "generation" : {
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "inputTokens" : 201,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 58,
+      "ttftMillis" : 52.139979,
+      "totalMillis" : 2211.929456,
+      "prefillTokensPerSecond" : 5299.794336339187,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The HTTP methods that are retried up to three attempts are GET and HEAD.\n\nThe header that permits retrying POST is the Idempotency-Key header. This header is used to ensure that a request is not sent more than once without any additional information.\n",
+      "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header. [http-retry-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7f7a32923ca16e2ed2b4d5429da79b393975f44decd557478ad8a2e5992a5ed0",
+    "retrievalMillis" : 8.108832,
+    "frameworkOverheadMillis" : 0.287277000000131,
+    "endToEndMillis" : 1553.097113,
+    "generation" : {
+      "text" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "inputTokens" : 192,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 32,
+      "ttftMillis" : 367.812598,
+      "totalMillis" : 1544.701004,
+      "prefillTokensPerSecond" : 593.9289326911477,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it.\n",
+      "text" : "The migration lease is stored in the schema_history_lock table. The lease expires after 90 seconds unless the owner renews it. [database-migration-lock]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "ccf7a8127223c1df80ae217d0b58a44f04aa6af7b0524d68694d5361102472c6",
+    "retrievalMillis" : 1.032386,
+    "frameworkOverheadMillis" : 0.26652599999988524,
+    "endToEndMillis" : 2111.917963,
+    "generation" : {
+      "text" : "The mapper method that registers Java time support is `findAndRegisterModules()`. The deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`. [jackson-wire-format]",
+      "inputTokens" : 209,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 46,
+      "ttftMillis" : 411.523618,
+      "totalMillis" : 2110.619051,
+      "prefillTokensPerSecond" : 519.2598187311178,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The mapper method that registers Java time support is `findAndRegisterModules()`. The deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`.\n",
+      "text" : "The mapper method that registers Java time support is `findAndRegisterModules()`. The deserialization feature that is disabled is `FAIL_ON_UNKNOWN_PROPERTIES`. [jackson-wire-format]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "qual-deepseek_coder_1_3b_instruct_q8_0",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1cfe95e787639441c9ad3a201d56b489aee42b6641dc1394c3127dcd117e1552",
+    "retrievalMillis" : 0.873832,
+    "frameworkOverheadMillis" : 0.24403499999971245,
+    "endToEndMillis" : 3390.856442,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 199,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 87,
+      "ttftMillis" : 151.687021,
+      "totalMillis" : 3389.738575,
+      "prefillTokensPerSecond" : 1606.3803165941508,
+      "loadMillis" : 1394.037957,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CUDA block size is determined by the number of threads in a block. The block size is a parameter that can be set when launching the kernel, and it determines the number of threads that will be processed simultaneously. The block size is typically set to a multiple of 32, 64, 128, 256, 512, or 1024 threads.\n",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}
