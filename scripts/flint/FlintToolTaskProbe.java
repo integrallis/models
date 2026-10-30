@@ -47,8 +47,20 @@ public final class FlintToolTaskProbe {
       SamplingOptions.builder().temperature(0).maxTokens(512).build();
 
   public static void main(String[] args) throws Exception {
-    if (args.length == 1 && args[0].equals("--self-test")) {
+    if ((args.length == 1 || args.length == 2) && args[0].equals("--self-test")) {
       selfTest();
+      if (args.length == 2) {
+        var fixtures = JSON.readTree(Path.of(args[1]).toFile()).path("cases");
+        var ids = new HashSet<String>();
+        for (var fixture : fixtures) {
+          var item = JSON.treeToValue(fixture.path("case"), Needle2ToolQualification.Case.class);
+          if (!ids.add(item.id())) throw new AssertionError("Duplicate case: " + item.id());
+          TEMPLATE.render(List.of(ChatMessage.system(INSTRUCTION), ChatMessage.user(item.query())),
+              item.toolSpecs(JSON));
+        }
+        if (ids.size() != 12) throw new AssertionError("Expected twelve frozen diagnostic cases");
+        System.out.println("PASS: all twelve frozen fixtures deserialize and render without model inference");
+      }
       return;
     }
     if (args.length != 3 || !System.getProperty("os.name").equals("Linux"))
