@@ -38,3 +38,18 @@ worker. A redundant Java copy was removed because the evidence-writer literal
 guard interpreted its negative scorer input (`extra: true`) as an asserted
 measurement. The canonical source, guard, measured reports, and frozen remote
 inputs are unchanged.
+
+## Final diagnostic and cleanup
+
+All 42 optional diagnostic cases completed; the worker exited zero. The unchanged
+original single-turn suite scored 10/14, the expanded ordered-plan prompt 9/14,
+the two original multi-step tasks completed 2/2 with simulated-result continuation,
+and the twelve fresh cases scored 10/12. Manual visible-answer review and the
+legacy flight-date scorer limitation are recorded in
+`validation/tool-diagnostic-review.json`. No tool capability is qualified.
+
+Both the EC2 instance and its root volume are gone, verified through AWS in
+`validation/final-cleanup.json`. The earlier released checkpoint is retained as
+a historical checkpoint; it is not rewritten to claim that cleanup was already
+complete at capture time. The later full catalog CI command passed locally,
+including clean Maven/Gradle consumers; publication remains pending review.
