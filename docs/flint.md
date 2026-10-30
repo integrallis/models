@@ -292,3 +292,19 @@ abstentions, and no detected polarity contradictions. Missing evidence fails clo
 runtime assessment still requires manual raw-answer review and released-library evidence;
 it never grants catalog admission or tool capability by itself. It does not modify the worker
 or runtime of an already deployed campaign.
+
+### Numerical correction after the first improvement attempt
+
+The first native run stopped at parity: Java matched all 16 reference IDs, while Rust changed
+one completion ID and exceeded both logit tolerances. The format ablation reproduced the failure
+with Q4_K native execution alone and with grouping disabled. Q8_0-only native execution was
+bit-identical to Java. Identical-input projection checks found zero Q8_0 differences; Q4_K
+projection differences reached 0.00048828125 and propagated into much larger final logit errors.
+
+Flint now requires sequential Q4_K floating-point block accumulation. The Rust implementation
+keeps AVX2 integer products, folds each block's integer lanes, and performs the two floating-point
+updates in Java's order. This is an additive native capability (bit 30, format 10); other models
+retain their existing reduction mode. Older native libraries decline Flint's Q4_K projections
+and use the Java fallback. Provider configuration does not change a shared worker context.
+Synthetic tests require bitwise equality across single, grouped, and independent projections;
+fresh real-weight parity and the full qualification campaign are still required.

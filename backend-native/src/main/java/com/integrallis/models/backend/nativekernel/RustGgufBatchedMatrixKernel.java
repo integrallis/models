@@ -53,6 +53,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
    */
   private final boolean exactActivations;
 
+  private volatile boolean sequentialQ4KReduction;
+
   private final boolean gatedDeltaNetSupported;
   private final int bfloat16Lanes;
   private final boolean bfloat16Fused;
@@ -154,7 +156,14 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   }
 
   @Override
+  public synchronized void requireSequentialQ4KReduction() {
+    requireOpen();
+    sequentialQ4KReduction = true;
+  }
+
+  @Override
   public String implementation() {
+    if (sequentialQ4KReduction) return "rust-ffm-quantized-v15-ordered-q4-k";
     if (library.supports(NativeKernelCapability.PTQ1_0_Q8_0_BATCHED_MATMUL)) {
       return "rust-ffm-quantized-v14";
     }
@@ -517,7 +526,11 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
           exactActivations
               ? library.supports(NativeKernelCapability.Q8_0_F32_ACTIVATION_BATCHED_MATMUL)
               : library.supports(NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL);
-      case Q4_K -> library.supports(NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL);
+      case Q4_K ->
+          library.supports(
+              sequentialQ4KReduction
+                  ? NativeKernelCapability.Q4_K_ORDERED_REDUCTION
+                  : NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL);
       case Q5_K -> library.supports(NativeKernelCapability.Q5_K_F32_BATCHED_MATMUL);
       case Q6_K -> library.supports(NativeKernelCapability.Q6_K_F32_BATCHED_MATMUL);
       default -> false;
@@ -973,7 +986,19 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
               cols);
         }
       }
-      case Q4_K ->
+      case Q4_K -> {
+        if (sequentialQ4KReduction) {
+          library.q4_KOrderedBatchedMatmul(
+              weights,
+              weightBytes,
+              nativeInput,
+              inputElements,
+              nativeOutput,
+              outputElements,
+              batchSize,
+              rows,
+              cols);
+        } else {
           library.q4_KF32BatchedMatmul(
               weights,
               weightBytes,
@@ -984,6 +1009,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
               batchSize,
               rows,
               cols);
+        }
+      }
       case Q5_K ->
           library.q5_KF32BatchedMatmul(
               weights,
@@ -1073,7 +1100,9 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return switch (type) {
       case Q4_0 -> library.supports(NativeKernelCapability.Q4_0_F32_GROUPED_BATCHED_MATMUL);
       case Q8_0 -> library.supports(NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL);
-      case Q4_K -> library.supports(NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL);
+      case Q4_K ->
+          supports(type)
+              && library.supports(NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL);
       case Q5_K -> library.supports(NativeKernelCapability.Q5_K_F32_GROUPED_BATCHED_MATMUL);
       case Q6_K -> library.supports(NativeKernelCapability.Q6_K_F32_GROUPED_BATCHED_MATMUL);
       default -> false;
@@ -1263,7 +1292,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     };
   }
 
-  private static int formatCode(GgufTensorType type) {
+  private int formatCode(GgufTensorType type) {
+    if (type == GgufTensorType.Q4_K && sequentialQ4KReduction) return 10;
     return switch (type) {
       case Q4_0 -> 0;
       case Q8_0 -> 1;

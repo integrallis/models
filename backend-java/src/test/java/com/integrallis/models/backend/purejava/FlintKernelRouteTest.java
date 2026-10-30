@@ -37,6 +37,7 @@ class FlintKernelRouteTest {
       assertThat(actual.prefill(new int[] {3, 4, 5}, 0))
           .containsExactly(expected.prefill(new int[] {3, 4, 5}, 0));
       assertThat(kernel.singleCalls).isPositive();
+      assertThat(kernel.sequentialQ4KRequired).isTrue();
       assertThat(kernel.closeCalls).isZero();
     }
     assertThat(kernel.closeCalls).isEqualTo(1);
@@ -82,6 +83,12 @@ class FlintKernelRouteTest {
     final boolean grouped;
     final boolean reject;
     int singleCalls, dualCalls, tripleCalls, groupCalls, independentCalls, closeCalls;
+    boolean sequentialQ4KRequired;
+
+    @Override
+    public void requireSequentialQ4KReduction() {
+      sequentialQ4KRequired = true;
+    }
 
     RecordingKernel(boolean grouped, boolean reject) {
       this.grouped = grouped;

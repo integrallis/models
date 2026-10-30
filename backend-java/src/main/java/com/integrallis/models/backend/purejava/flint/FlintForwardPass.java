@@ -137,6 +137,8 @@ public final class FlintForwardPass {
       int maxSequenceLength,
       GgufBatchedMatrixKernel matrixKernel) {
     this.matrixKernel = Objects.requireNonNull(matrixKernel, "matrixKernel");
+    // Tiny projection fold differences can change discrete MoE routing decisions.
+    this.matrixKernel.requireSequentialQ4KReduction();
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     if (maxSequenceLength <= 0 || maxSequenceLength > config.maxPosition()) {

@@ -196,6 +196,17 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
     return false;
   }
 
+  /**
+   * Requires Java's sequential Q4_K floating-point block fold before any projections execute.
+   * Implementations must select that arithmetic or decline Q4_K eligibility, including groups. This
+   * setting belongs to this provider, not to a shared native worker context.
+   */
+  default void requireSequentialQ4KReduction() {
+    if (supports(GgufTensorType.Q4_K)) {
+      throw new UnsupportedOperationException("kernel cannot guarantee sequential Q4_K reduction");
+    }
+  }
+
   /** Returns whether this implementation supports the given GGUF weight format. */
   boolean supports(GgufTensorType type);
 

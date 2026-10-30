@@ -71,6 +71,8 @@ public enum NativeKernelCapability {
    * 54 bytes against Q8_K, PrismML's PTQ1_0 is group 128 in 28 bytes against Q8_0.
    */
   TQ1_0_Q8_K_BATCHED_MATMUL(1L << 29),
+  /** Q4_K with Java-compatible sequential floating-point block accumulation. */
+  Q4_K_ORDERED_REDUCTION(1L << 30),
   /** Fixed-tree BF16 projections for the supported shape and vector configuration. */
   BF16_F32_BATCHED_MATMUL(1L << 25),
   /** Deterministic float SwiGLU with checked finite gates. */

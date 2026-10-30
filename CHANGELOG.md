@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+- Flint requests ordered Q4_K native accumulation after a real-weight parity failure; older native libraries fall back to Java for that format.
+
 - Add experimental Flint GGUF execution to the pure Java backend: sigmoid MoE routing,
   shared experts, Q/K normalization, attention sinks, and per-layer sliding/rotary patterns.
   Includes Flint tokenization, schema-aware tool calls in both framework adapters, independent

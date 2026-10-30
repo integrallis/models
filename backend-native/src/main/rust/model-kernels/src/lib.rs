@@ -156,6 +156,8 @@ const TQ1_0_BLOCK_BYTES: usize = 54;
 const CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL: u64 = 1 << 24;
 /// TQ1_0 weights against Q8_K activations, which is what ggml actually computes for this type.
 const CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL: u64 = 1 << 29;
+/// Q4_K with Java-compatible sequential floating-point block accumulation.
+const CAPABILITY_Q4_K_ORDERED_REDUCTION: u64 = 1 << 30;
 mod ptq;
 const Q8_0_BLOCK_BYTES: usize = 34;
 const Q4_K_BLOCK_BYTES: usize = 144;
@@ -258,6 +260,8 @@ enum DotKernel {
     Q4K,
     #[cfg(target_arch = "x86_64")]
     Q4KAvx2,
+    #[cfg(target_arch = "x86_64")]
+    Q4KOrderedAvx2,
     #[cfg(target_arch = "aarch64")]
     Q4KNeon,
     Q5K,
@@ -281,6 +285,7 @@ enum WeightFormat {
     /// existing Q8_0 route and every generative model on it are untouched.
     Q8_0F32Activation,
     Q4K,
+    Q4KOrdered,
     Q5K,
     Q6K,
     Tq1_0,
@@ -307,6 +312,7 @@ impl WeightFormat {
             7 => Some(Self::Ptq),
             8 => Some(Self::Q8_0F32Activation),
             9 => Some(Self::Tq1_0),
+            10 => Some(Self::Q4KOrdered),
             _ => None,
         }
     }
@@ -320,7 +326,7 @@ impl WeightFormat {
             Self::Ptq => PTQ1_0_BLOCK_BYTES,
             Self::Tq1_0 => TQ1_0_BLOCK_BYTES,
             Self::Q8_0 => Q8_0_BLOCK_BYTES,
-            Self::Q4K => Q4_K_BLOCK_BYTES,
+            Self::Q4K | Self::Q4KOrdered => Q4_K_BLOCK_BYTES,
             Self::Q5K => Q5_K_BLOCK_BYTES,
             Self::Q6K => Q6_K_BLOCK_BYTES,
         }
@@ -330,7 +336,7 @@ impl WeightFormat {
         match self {
             Self::Ptq => 128,
             Self::Q4_0 | Self::Q5_0 | Self::Q5_1 | Self::Q8_0 | Self::Q8_0F32Activation => QK_0,
-            Self::Q4K | Self::Q5K | Self::Q6K | Self::Tq1_0 => QK_K,
+            Self::Q4K | Self::Q4KOrdered | Self::Q5K | Self::Q6K | Self::Tq1_0 => QK_K,
         }
     }
 
@@ -338,7 +344,9 @@ impl WeightFormat {
         match self {
             Self::Q4_0 | Self::Q5_0 | Self::Q8_0 | Self::Ptq => ActivationFormat::Q8_0,
             Self::Q5_1 | Self::Q8_0F32Activation => ActivationFormat::F32,
-            Self::Q4K | Self::Q5K | Self::Q6K | Self::Tq1_0 => ActivationFormat::Q8K,
+            Self::Q4K | Self::Q4KOrdered | Self::Q5K | Self::Q6K | Self::Tq1_0 => {
+                ActivationFormat::Q8K
+            }
         }
     }
 
@@ -368,6 +376,16 @@ impl WeightFormat {
             }
             Self::Q8_0 => selected_q8_kernel(),
             Self::Q4K => selected_q4_k_kernel(),
+            Self::Q4KOrdered => {
+                #[cfg(target_arch = "x86_64")]
+                if std::arch::is_x86_feature_detected!("avx2")
+                    && std::arch::is_x86_feature_detected!("fma")
+                    && std::arch::is_x86_feature_detected!("f16c")
+                {
+                    return DotKernel::Q4KOrderedAvx2;
+                }
+                DotKernel::Q4K
+            }
             Self::Q5K => selected_q5_k_kernel(),
             Self::Q6K => selected_q6_k_kernel(),
         }
@@ -1537,6 +1555,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_Q8_0_F32_ACTIVATION_BATCHED_MATMUL
         | CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL
         | CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL
+        | CAPABILITY_Q4_K_ORDERED_REDUCTION
         | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
         | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
         | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL
@@ -3308,6 +3327,27 @@ unsafe fn compute_batched_row_range(
             }
         }
         #[cfg(target_arch = "x86_64")]
+        DotKernel::Q4KOrderedAvx2 => {
+            for batch in 0..batch_size {
+                for row in start_row..end_row {
+                    // SAFETY: dispatch checked CPU features; this worker owns each output row.
+                    unsafe {
+                        output
+                            .add(batch * rows + row)
+                            .write(dot_q4_k_q8_k_row_ordered_avx2(
+                                weights,
+                                quantized,
+                                activation_scales,
+                                activation_sums,
+                                batch,
+                                row,
+                                cols,
+                            ));
+                    }
+                }
+            }
+        }
+        #[cfg(target_arch = "x86_64")]
         DotKernel::Q4KAvx2 => {
             // SAFETY: runtime dispatch selected this variant only when AVX2 and FMA are available.
             unsafe {
@@ -4621,6 +4661,21 @@ fn compute_output_range(
                 cols,
             ),
             #[cfg(target_arch = "x86_64")]
+            DotKernel::Q4KOrderedAvx2 => {
+                // SAFETY: dispatch checked CPU features and buffers were validated by the caller.
+                unsafe {
+                    dot_q4_k_q8_k_row_ordered_avx2(
+                        weights,
+                        quantized,
+                        activation_scales,
+                        activation_sums,
+                        batch,
+                        row,
+                        cols,
+                    )
+                }
+            }
+            #[cfg(target_arch = "x86_64")]
             DotKernel::Q4KAvx2 => {
                 // SAFETY: this variant is selected only after runtime AVX2 and FMA detection.
                 unsafe {
@@ -4669,14 +4724,7 @@ fn compute_output_range(
             DotKernel::Tq1_0Avx2 => {
                 // SAFETY: this variant is selected only after runtime AVX2 detection.
                 unsafe {
-                    dot_tq1_0_q8_k_row_avx2(
-                        weights,
-                        quantized,
-                        activation_scales,
-                        batch,
-                        row,
-                        cols,
-                    )
+                    dot_tq1_0_q8_k_row_avx2(weights, quantized, activation_scales, batch, row, cols)
                 }
             }
             #[cfg(target_arch = "x86_64")]
@@ -5864,8 +5912,7 @@ unsafe fn dot_tq1_0_q8_k_row_avx2(
                         // selection depends on that wrap, so the mask is load-bearing.
                         let wrapped =
                             _mm256_and_si256(_mm256_mullo_epi16(widened, broadcast), byte_mask);
-                        let selected =
-                            _mm256_srli_epi16::<8>(_mm256_mullo_epi16(wrapped, threes));
+                        let selected = _mm256_srli_epi16::<8>(_mm256_mullo_epi16(wrapped, threes));
                         let trits = _mm256_sub_epi16(selected, ones);
 
                         // SAFETY: the reference's own index, bounded by 256 per block.
@@ -5891,8 +5938,8 @@ unsafe fn dot_tq1_0_q8_k_row_avx2(
                 let packed = u32::from(unsafe { *qs.add(QS_BYTES + lane) });
                 let wrapped = (packed * u32::from(*pow as u16)) & 0xFF;
                 let selected = ((wrapped * 3) >> 8) as i32;
-                total += (selected - 1)
-                    * i32::from(unsafe { *activations.add(activation_base + lane) });
+                total +=
+                    (selected - 1) * i32::from(unsafe { *activations.add(activation_base + lane) });
             }
         }
         sum = d.mul_add(total as f32, sum);
@@ -5969,10 +6016,61 @@ unsafe fn dot_q4_k_q8_k_row_avx2(
     row: usize,
     cols: usize,
 ) -> f32 {
+    // SAFETY: this wrapper requires the same features and validated buffers as the implementation.
+    unsafe {
+        dot_q4_k_q8_k_row_avx2_impl::<false>(
+            weights,
+            quantized,
+            activation_scales,
+            activation_sums,
+            batch,
+            row,
+            cols,
+        )
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn dot_q4_k_q8_k_row_ordered_avx2(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    activation_sums: &[i16],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
+    // SAFETY: this wrapper requires the same features and validated buffers as the implementation.
+    unsafe {
+        dot_q4_k_q8_k_row_avx2_impl::<true>(
+            weights,
+            quantized,
+            activation_scales,
+            activation_sums,
+            batch,
+            row,
+            cols,
+        )
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    activation_sums: &[i16],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> f32 {
     let blocks_per_row = cols / QK_K;
     let nibble_mask = _mm256_set1_epi8(0x0f);
     let mut accumulated = _mm256_setzero_ps();
     let mut minimum_sum = 0_f32;
+    let mut ordered_sum = 0_f32;
     for block in 0..blocks_per_row {
         record_k_quant_weight_block_decode();
         let weight_offset = (row * blocks_per_row + block) * Q4_K_BLOCK_BYTES;
@@ -6018,15 +6116,26 @@ unsafe fn dot_q4_k_q8_k_row_avx2(
                 * (activation_sums[sum_offset + group * 2] as i32
                     + activation_sums[sum_offset + group * 2 + 1] as i32);
         }
-        accumulated = _mm256_fmadd_ps(
-            _mm256_set1_ps(d),
-            _mm256_cvtepi32_ps(quantized_lanes),
-            accumulated,
-        );
-        minimum_sum = (-d_min).mul_add(block_minimum_sum as f32, minimum_sum);
+        if ORDERED {
+            // Integer lanes may fold freely; floating-point blocks must follow Java's order.
+            let integer_sum = horizontal_sum_i32_avx2(quantized_lanes);
+            ordered_sum = d.mul_add(integer_sum as f32, ordered_sum);
+            ordered_sum = (-d_min).mul_add(block_minimum_sum as f32, ordered_sum);
+        } else {
+            accumulated = _mm256_fmadd_ps(
+                _mm256_set1_ps(d),
+                _mm256_cvtepi32_ps(quantized_lanes),
+                accumulated,
+            );
+            minimum_sum = (-d_min).mul_add(block_minimum_sum as f32, minimum_sum);
+        }
     }
-    record_q4_k_single_horizontal_reduction();
-    horizontal_sum_f32_avx2(accumulated) + minimum_sum
+    if ORDERED {
+        ordered_sum
+    } else {
+        record_q4_k_single_horizontal_reduction();
+        horizontal_sum_f32_avx2(accumulated) + minimum_sum
+    }
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -6863,6 +6972,7 @@ mod tests {
                 | CAPABILITY_Q8_0_F32_ACTIVATION_BATCHED_MATMUL
                 | CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL
                 | CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL
+                | CAPABILITY_Q4_K_ORDERED_REDUCTION
                 | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
                 | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
                 | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL
@@ -7563,6 +7673,72 @@ mod tests {
         assert_eq!(
             unsafe { jmodels_kernels_context_destroy(context) },
             STATUS_OK
+        );
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn q4_k_ordered_avx2_matches_scalar_block_fold_bit_for_bit() {
+        if !(std::arch::is_x86_feature_detected!("avx2")
+            && std::arch::is_x86_feature_detected!("fma")
+            && std::arch::is_x86_feature_detected!("f16c"))
+        {
+            return;
+        }
+        let cols = 2048;
+        let rows = 7;
+        let batches = 3;
+        let blocks = cols / QK_K;
+        let mut weights = vec![0u8; rows * blocks * Q4_K_BLOCK_BYTES];
+        for block in 0..rows * blocks {
+            let at = block * Q4_K_BLOCK_BYTES;
+            weights[at..at + 2]
+                .copy_from_slice(&f32_to_f16(0.00137 * (block + 1) as f32).to_le_bytes());
+            weights[at + 2..at + 4]
+                .copy_from_slice(&f32_to_f16(0.00093 * (block + 1) as f32).to_le_bytes());
+            for (i, v) in weights[at + 4..at + Q4_K_BLOCK_BYTES]
+                .iter_mut()
+                .enumerate()
+            {
+                *v = (i * 19 + block * 7 + 3) as u8;
+            }
+        }
+        let quantized: Vec<i8> = (0..batches * cols)
+            .map(|i| (((i * 17 + 11) % 255) as i32 - 127) as i8)
+            .collect();
+        let scales: Vec<f32> = (0..batches * blocks)
+            .map(|i| 0.00371 * (i + 1) as f32)
+            .collect();
+        let sums: Vec<i16> = quantized
+            .chunks_exact(Q8_K_SUM_BLOCK)
+            .map(|v| v.iter().map(|&q| q as i16).sum())
+            .collect();
+        let mut old_differences = 0;
+        for batch in 0..batches {
+            for row in 0..rows {
+                let expected = dot_q4_k_q8_k_row_scalar(
+                    &weights, &quantized, &scales, &sums, batch, row, cols,
+                );
+                // SAFETY: features are checked above and all complete buffers are valid.
+                let actual = unsafe {
+                    dot_q4_k_q8_k_row_ordered_avx2(
+                        &weights, &quantized, &scales, &sums, batch, row, cols,
+                    )
+                };
+                let previous = unsafe {
+                    dot_q4_k_q8_k_row_avx2(&weights, &quantized, &scales, &sums, batch, row, cols)
+                };
+                old_differences += usize::from(previous.to_bits() != expected.to_bits());
+                assert_eq!(
+                    actual.to_bits(),
+                    expected.to_bits(),
+                    "batch {batch} row {row}"
+                );
+            }
+        }
+        assert!(
+            old_differences > 0,
+            "fixture must expose the previous fold-order difference"
         );
     }
 
