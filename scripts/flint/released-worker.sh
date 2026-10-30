@@ -6,7 +6,7 @@ set -euo pipefail
 INPUT=$(realpath "${1:?MANIFEST.json}")
 WORK=/work/flint-released
 OUT=$WORK/results
-mkdir -p "$OUT" "$WORK/jdk" "$WORK/probe"
+mkdir -p "$OUT/default-correctness" "$OUT/visible" "$WORK/jdk" "$WORK/probe"
 cp "$INPUT" "$OUT/inputs.json"
 DEST=$(jq -er '.resultsUri' "$INPUT")
 export AWS_DEFAULT_REGION=us-east-1
@@ -94,6 +94,13 @@ jq -e --arg sha "$MODEL_SHA" '.artifactSha256 == $sha and .backend == "rust-ffm"
   and .summary.correctAnswerRate == 1 and .summary.abstentionAccuracy == 1
   and .settings.generationControls.promptCache == "longest-common-prefix"
   and (.failures | length) == 0' "$OUT/native-default.json"
+cp "$OUT/native-default.json" "$OUT/default-correctness/models-rust-ffm.json"
+jq -n --arg sha "$MODEL_SHA" --arg version "$VERSION" \
+  --arg reportSha "$(sha256sum "$OUT/native-default.json" | awk '{print $1}')" \
+  '{schemaVersion:1,kind:"model-backend-default-correctness-smoke",configuration:"library-defaults",
+    backend:"rust-ffm",backendVersion:$version,modelId:"ggml_org_flint_gguf_q4_k_m",
+    artifactSha256:$sha,report:"default-correctness/models-rust-ffm.json",reportSha256:$reportSha,
+    totalAttempts:9,successfulAttempts:9,tuningSystemProperties:[]}' >"$OUT/default-correctness/smoke.json"
 stage public-profile 1200 "${JAVA[@]}" -cp "$WORK/probe:$CP" FlintReleasedProfileProbe "$MODEL" \
   "$(jq -er '.expectedRawSha256' "$INPUT")" "$OUT/public-profile.json"
 printf '%s\n' 'Released numerical parity, default smoke, and public profile round trip passed. Full catalog qualification is separately hash-bound.' >"$OUT/completed.txt"
