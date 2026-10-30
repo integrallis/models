@@ -1742,6 +1742,9 @@ public final class PureJavaBackend
 
   private static BackendDiagnostics architectureDiagnostics(
       BackendDiagnostics diagnostics, PureJavaDecoder decoder) {
+    if (decoder instanceof FlintDecoderAdapter flint) {
+      return flint.diagnostics(diagnostics);
+    }
     if (decoder instanceof MobileMoeDecoderAdapter mobileMoe) {
       Map<String, String> environment = new LinkedHashMap<>(diagnostics.environment());
       environment.put("artifact-format", "safetensors");

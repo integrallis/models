@@ -337,3 +337,9 @@ types, missing/duplicate keys, nested JSON, and protocol injection. Every declar
 shared tool suite compiles. These checks do not establish real-model accuracy or decoding speed.
 The prototype must earn separate remote evidence before becoming a recommended profile, and
 cannot fix a semantically wrong value or guarantee completion within the output budget.
+
+Flint-specific diagnostics now report mapped-shape eligibility for injected QKV, dense/shared
+gate-up, and routed-expert groups, plus the actual sequential Java attention/prefill paths.
+They replace generic placeholder labels that incorrectly advertised batched attention or said
+all grouping was unsupported. Eligibility counts are not invocation counters or speed evidence.
+The frozen `3336aed1` campaign retains the old generic labels; its reports remain unchanged.

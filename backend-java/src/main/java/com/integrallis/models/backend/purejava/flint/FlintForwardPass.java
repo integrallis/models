@@ -185,6 +185,47 @@ public final class FlintForwardPass {
     return config;
   }
 
+  /** Load-time eligibility, not invocation counts or a claim of measured acceleration. */
+  public record ProjectionRoutes(
+      String implementation, int qkvLayers, int gateUpLayers, int expertLayers) {}
+
+  /** Describes the actual mapped tensor shapes instead of the generic architecture placeholder. */
+  public ProjectionRoutes projectionRoutes() {
+    int qkv = 0;
+    int gateUp = 0;
+    int experts = 0;
+    for (LayerWeights layer : layers) {
+      Matrix q = layer.query(), k = layer.key(), v = layer.value();
+      if (matrixKernel.isTripleEligible(
+          q.type(), q.rows(), k.type(), k.rows(), v.type(), v.rows(), 1, q.columns())) qkv++;
+      MoeFeedForward moe = layer.moe();
+      Matrix gate = moe == null ? layer.ffnGate() : moe.sharedGate();
+      Matrix up = moe == null ? layer.ffnUp() : moe.sharedUp();
+      if (matrixKernel.isDualEligible(
+          gate.type(), gate.rows(), up.type(), up.rows(), 1, gate.columns())) gateUp++;
+      if (moe != null) {
+        int count = config.expertsPerToken();
+        GgufTensorType[] gateTypes = new GgufTensorType[2 * count];
+        int[] gateRows = new int[2 * count];
+        GgufTensorType[] downTypes = new GgufTensorType[count];
+        int[] downRows = new int[count];
+        // Each family is sliced from one stacked tensor, so every expert has the same type/shape.
+        for (int slot = 0; slot < count; slot++) {
+          gateTypes[2 * slot] = moe.gate()[0].type();
+          gateTypes[2 * slot + 1] = moe.up()[0].type();
+          gateRows[2 * slot] = moe.gate()[0].rows();
+          gateRows[2 * slot + 1] = moe.up()[0].rows();
+          downTypes[slot] = moe.down()[0].type();
+          downRows[slot] = moe.down()[0].rows();
+        }
+        if (matrixKernel.isGroupedEligible(gateTypes, gateRows, 2 * count, 1, config.hiddenSize())
+            && matrixKernel.isIndependentEligible(
+                downTypes, downRows, count, 1, config.expertHiddenSize())) experts++;
+      }
+    }
+    return new ProjectionRoutes(matrixKernel.implementation(), qkv, gateUp, experts);
+  }
+
   /** Opens an independent sequence over the same mapped model weights. */
   public Session openSession() {
     return new Session(this);

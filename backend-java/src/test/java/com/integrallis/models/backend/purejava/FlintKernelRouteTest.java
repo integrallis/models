@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
@@ -39,6 +40,17 @@ class FlintKernelRouteTest {
       assertThat(kernel.singleCalls).isPositive();
       assertThat(kernel.sequentialQ4KRequired).isTrue();
       assertThat(kernel.closeCalls).isZero();
+      var routes =
+          actual.diagnostics().optimization("flint-injected-projection-groups").orElseThrow();
+      assertThat(routes.status()).isEqualTo(OptimizationStatus.UNSUPPORTED);
+      assertThat(routes.settings()).containsEntry("qkv-eligible-layers", "0");
+      assertThat(actual.diagnostics().optimization("batched-attention-scores")).isEmpty();
+      assertThat(actual.diagnostics().optimization("batched-attention-values")).isEmpty();
+      assertThat(actual.diagnostics().optimization("flint-java-attention").orElseThrow().settings())
+          .containsEntry("key-score-rows", "1")
+          .containsEntry("value-rows", "1");
+      assertThat(actual.diagnostics().optimization("batched-prefill").orElseThrow().status())
+          .isEqualTo(OptimizationStatus.UNSUPPORTED);
     }
     assertThat(kernel.closeCalls).isEqualTo(1);
   }
@@ -64,6 +76,17 @@ class FlintKernelRouteTest {
       assertThat(kernel.tripleCalls).isPositive();
       assertThat(kernel.groupCalls).isPositive();
       assertThat(kernel.independentCalls).isPositive();
+      var routes =
+          actual.diagnostics().optimization("flint-injected-projection-groups").orElseThrow();
+      assertThat(routes.status()).isEqualTo(OptimizationStatus.ENABLED);
+      assertThat(routes.settings())
+          .containsEntry("qkv-eligible-layers", Integer.toString(actual.metadata().numLayers()))
+          .containsEntry(
+              "dense-shared-gate-up-eligible-layers",
+              Integer.toString(actual.metadata().numLayers()))
+          .containsEntry(
+              "routed-expert-eligible-layers", Integer.toString(actual.metadata().numLayers() - 1));
+      assertThat(actual.diagnostics().optimization("grouped-projections")).isEmpty();
     }
   }
 

@@ -15,9 +15,16 @@
  */
 package com.integrallis.models.backend.purejava;
 
+import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.LogitBatch;
+import com.integrallis.models.api.OptimizationDecision;
+import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.flint.FlintForwardPass;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** Adapts Flint sequence state to the architecture-neutral backend contract. */
 final class FlintDecoderAdapter implements PureJavaDecoder {
@@ -36,6 +43,61 @@ final class FlintDecoderAdapter implements PureJavaDecoder {
 
   FlintDecoderAdapter(FlintForwardPass forwardPass) {
     this.forwardPass = Objects.requireNonNull(forwardPass, "forwardPass");
+  }
+
+  BackendDiagnostics diagnostics(BackendDiagnostics base) {
+    var routes = forwardPass.projectionRoutes();
+    var environment = new LinkedHashMap<>(base.environment());
+    environment.put("flint-diagnostics-version", "1");
+    environment.put("architecture-prefill-batch-size", "1");
+    var decisions = new ArrayList<>(base.optimizations());
+    decisions.removeIf(
+        decision ->
+            Set.of(
+                    "grouped-projections",
+                    "batched-prefill",
+                    "batched-attention-scores",
+                    "batched-attention-values",
+                    "fused-grouped-attention",
+                    "final-layer-prefill-pruning",
+                    "final-layer-kv-only-prefill")
+                .contains(decision.id()));
+    boolean eligible = routes.qkvLayers() + routes.gateUpLayers() + routes.expertLayers() > 0;
+    decisions.add(
+        new OptimizationDecision(
+            "flint-injected-projection-groups",
+            eligible ? OptimizationStatus.ENABLED : OptimizationStatus.UNSUPPORTED,
+            "Flint tests mapped QKV, dense/shared gate-up, and routed-expert shapes against the injected kernel; remaining projections use Java helpers. Counts describe eligibility, not measured invocations.",
+            Map.of(
+                "implementation",
+                routes.implementation(),
+                "qkv-eligible-layers",
+                Integer.toString(routes.qkvLayers()),
+                "dense-shared-gate-up-eligible-layers",
+                Integer.toString(routes.gateUpLayers()),
+                "routed-expert-eligible-layers",
+                Integer.toString(routes.expertLayers()),
+                "q4-k-reduction",
+                "sequential-block-order")));
+    decisions.add(
+        new OptimizationDecision(
+            "batched-prefill",
+            OptimizationStatus.UNSUPPORTED,
+            "Flint advances prompt tokens sequentially and skips only discarded vocabulary projections",
+            Map.of("batch-size", "1")));
+    decisions.add(
+        new OptimizationDecision(
+            "flint-java-attention",
+            OptimizationStatus.ENABLED,
+            "Flint computes per-head pinned key scores, sink softmax, and sequential value accumulation in Java; generic batched/native attention plan switches do not apply",
+            Map.of("key-score-rows", "1", "value-rows", "1", "implementation", "java")));
+    decisions.add(
+        new OptimizationDecision(
+            "final-layer-prefill-pruning",
+            OptimizationStatus.UNSUPPORTED,
+            "Flint retains final-layer attention and FFN work for every prompt token",
+            Map.of("output-rows", "all")));
+    return new BackendDiagnostics(base.backend(), base.planVersion(), environment, decisions);
   }
 
   private FlintSession defaultSession() {
