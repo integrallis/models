@@ -1,0 +1,1277 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-30T21:16:16.685799694Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.5.7+flint-fb5d7a68248ca14da832ae886016b86d62060382 com.integrallis:vectors-core@0.1.32",
+  "modelId" : "ggml_org_flint_gguf_q4_k_m",
+  "model" : "/work/flint/Flint-Q4_K_M.gguf",
+  "artifactSha256" : "c3c4d93f9db92627a2fc47ea8fe8c64a094cabd3549db544bcdd2c00e9a9a347",
+  "artifactSizeBytes" : 23387911136,
+  "settings" : {
+    "corpusSha256" : "f63bbf95c1acad606bc069e9cd689997102f90255617881a83e29ef4c1cb5fe1",
+    "workload" : "answer-reliability",
+    "caseIds" : [ "remote-permit-negation", "office-permit-positive", "amber-form-and-fee", "violet-form-and-fee", "route-identifier", "retry-header-and-expiry", "retention-units", "evidence-format-and-deadline", "delivery-weekdays", "access-approval", "storage-locations", "settlement-directions", "false-premise-permit", "upload-negation", "unknown-satellite", "unknown-moon" ],
+    "promptTemplate" : "flint",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 512,
+    "warmups" : 0,
+    "iterations" : 1,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v24",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "topP" : "1.0",
+      "promptCache" : "longest-common-prefix",
+      "seed" : "42",
+      "topK" : "1",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-7-106",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971650560,
+    "maxHeapBytes" : 8589934592,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v14",
+    "environment" : {
+      "active-vector-bits" : "256",
+      "native-kernel-threads" : "8",
+      "vector-api" : "true",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "q4-unsigned-pairwise-supported" : "true",
+      "tokenizer.pre.implemented" : "true",
+      "q4-short-pairwise-supported" : "true",
+      "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+      "projection-layers" : "49",
+      "transformer-runtime" : "java",
+      "fast-scalar-fma" : "true",
+      "flint-diagnostics-version" : "1",
+      "vm-version" : "25.0.3+9-LTS",
+      "end-of-generation.150018" : "vocabulary-text",
+      "native-kernel-abi" : "7",
+      "java-executor-poll-millis" : "0",
+      "java-feature" : "25",
+      "kernel-runtime" : "rust-ffm",
+      "gguf-executor" : "persistent",
+      "native-q5-0-grouped" : "false",
+      "native-grouped-attention" : "true",
+      "native-quantized-decode" : "true",
+      "model-architecture" : "flint",
+      "compiler" : "hotspot-c2",
+      "gguf-chunks-per-thread" : "2",
+      "end-of-generation-token-ids" : "150001,150003,150005,150018",
+      "architecture-prefill-batch-size" : "1",
+      "kernel-implementation" : "rust-ffm-quantized-v15-ordered-q4-k",
+      "native-kernel-poll-millis" : "5",
+      "native-kernel-decode-threads" : "8",
+      "end-of-generation.150005" : "vocabulary-text,chat-template-end-of-turn",
+      "os" : "Linux",
+      "end-of-generation.150003" : "vocabulary-text",
+      "java-version" : "25.0.3",
+      "end-of-generation.150001" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "flint-router-cache-bytes" : "98566144",
+      "fast-vector-fma" : "true",
+      "native-gated-delta-net" : "true",
+      "gguf-parallel" : "true",
+      "vm-vendor" : "Eclipse Adoptium",
+      "preferred-vector-bits" : "256",
+      "tokenizer.pre" : "flint",
+      "processors" : "16",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "end-of-generation.chat-template" : "resolved:150005",
+      "sve" : "false",
+      "gguf-threads" : "16",
+      "architecture" : "amd64"
+    },
+    "optimizations" : [ {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25",
+        "active-vector-bits" : "256",
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded projection topology has no Q6_K consumer",
+      "settings" : {
+        "requested-kernel" : "one-query-block",
+        "kernel" : "one-query-block",
+        "architecture" : "amd64",
+        "batch-size" : "1",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "parallel" : "true",
+        "stages" : "2",
+        "executor" : "persistent",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "parallel" : "true",
+        "stages" : "7",
+        "executor" : "persistent",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "prefill-batch-size" : "1",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "requested-kernel" : "scattered",
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "16",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment",
+        "artifact-format" : "gguf"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "16",
+        "chunks-per-thread" : "2",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "flint-injected-projection-groups",
+      "status" : "ENABLED",
+      "reason" : "Flint tests mapped QKV, dense/shared gate-up, and routed-expert shapes against the injected kernel; remaining projections use Java helpers. Counts describe eligibility, not measured invocations.",
+      "settings" : {
+        "qkv-eligible-layers" : "49",
+        "q4-k-reduction" : "sequential-block-order",
+        "routed-expert-eligible-layers" : "47",
+        "implementation" : "rust-ffm-quantized-v15-ordered-q4-k",
+        "dense-shared-gate-up-eligible-layers" : "49"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "Flint advances prompt tokens sequentially and skips only discarded vocabulary projections",
+      "settings" : {
+        "batch-size" : "1"
+      }
+    }, {
+      "id" : "flint-java-attention",
+      "status" : "ENABLED",
+      "reason" : "Flint uses pinned key scores, sink softmax, vectorized non-fused chronological values, and independent parallel heads above one million elements; generic batched/native attention switches do not apply",
+      "settings" : {
+        "value-rows" : "1",
+        "implementation" : "java",
+        "key-score-rows" : "1"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "Flint retains final-layer attention and FFN work for every prompt token",
+      "settings" : {
+        "output-rows" : "all"
+      }
+    }, {
+      "id" : "rust-ptq1-0-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+      "settings" : {
+        "transformer" : "java",
+        "activation" : "Q8_0",
+        "weight" : "PTQ1_0"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+      "settings" : {
+        "state" : "caller-owned-java-array",
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "independent recurrent state slots share one native worker dispatch",
+      "settings" : {
+        "state" : "branch-major-caller-owned-java-array",
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+      "settings" : {
+        "evidence" : "benchmark-results/2026-10-12-q5-production/"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 16,
+    "successfulAttempts" : 16,
+    "loadMillis" : 1443.358146,
+    "retrievalMillis" : {
+      "p50" : 2.1614575,
+      "p95" : 16.917168
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 1.8750940000008995,
+      "p95" : 10.898053249999975
+    },
+    "ttftMillis" : {
+      "p50" : 3575.28167,
+      "p95" : 16673.703209
+    },
+    "tpotMillis" : {
+      "p50" : 83.20649273624365,
+      "p95" : 91.15943849344558
+    },
+    "endToEndMillis" : {
+      "p50" : 21637.618191499998,
+      "p95" : 39234.44335275
+    },
+    "p50PrefillTokensPerSecond" : 14.465077018091566,
+    "p50DecodeTokensPerSecond" : 12.018295403402139,
+    "peakRssBytes" : 23639891968,
+    "totalCpuMillis" : 2730770.0,
+    "totalInputTokens" : 2362,
+    "totalCacheReadInputTokens" : 1489,
+    "totalCacheWriteInputTokens" : 873,
+    "totalOutputTokens" : 3137,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.875,
+    "modelAnswerRate" : 0.4375,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.4375,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "remote-permit-negation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "remote-permits",
+        "title" : "Remote service permits",
+        "text" : "Remote service visits do not require a permit. The service fee is 25 dollars per visit."
+      },
+      "score" : 8.573694,
+      "rank" : 1
+    } ],
+    "promptSha256" : "068eb232d42ac20a3181f9bf511e2df3edc54b8f80c3586dcbcff16c1ed2da65",
+    "retrievalMillis" : 56.796981,
+    "frameworkOverheadMillis" : 24.70510700000159,
+    "endToEndMillis" : 74713.02078,
+    "generation" : {
+      "text" : "Remote service visits do not require a permit. The service fee is 25 dollars per visit. [remote-permits]",
+      "inputTokens" : 144,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 144,
+      "outputTokens" : 213,
+      "ttftMillis" : 52174.581761,
+      "totalMillis" : 74631.518692,
+      "prefillTokensPerSecond" : 2.7605336818004487,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 21257879552,
+      "cpuMillis" : 319920.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Remote service visits do not require a permit. The service fee is 25 dollars per visit.\n\nQuestion: Do remote service visits require a permit and what is the service fee?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [remote-permits]. So citation [remote-permits]. Must not invent. Answer: No, remote service visits do not require a permit, and the service fee is 25 dollars per visit. [remote-permits]\n\nCheck rules: If context does not contain answer reply INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nOne short sentence. End citation. Good.</think>No, remote service visits do not require a permit, and the service fee is 25 dollars per visit. [remote-permits]",
+      "text" : "Remote service visits do not require a permit. The service fee is 25 dollars per visit. [remote-permits]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "office-permit-positive",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "office-permits",
+        "title" : "Office service permits",
+        "text" : "Office service visits require a permit. The service fee is 60 dollars per visit."
+      },
+      "score" : 7.7718024,
+      "rank" : 1
+    } ],
+    "promptSha256" : "f008d307d8f9ebea77b485878ce1500c995becd3b686667e319fde2f08c34c7a",
+    "retrievalMillis" : 3.468773,
+    "frameworkOverheadMillis" : 6.295701999999437,
+    "endToEndMillis" : 21612.573009,
+    "generation" : {
+      "text" : "Office service visits require a permit. The service fee is 60 dollars per visit. [office-permits]",
+      "inputTokens" : 142,
+      "cacheReadInputTokens" : 98,
+      "cacheWriteInputTokens" : 44,
+      "outputTokens" : 215,
+      "ttftMillis" : 3331.590969,
+      "totalMillis" : 21602.808534,
+      "prefillTokensPerSecond" : 13.217361222051625,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 21825961984,
+      "cpuMillis" : 173330.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says office service visits require a permit. Service fee is 60 dollars per visit. Question asks both. Answer in one short sentence. Include citation exactly from square brackets at start of CONTEXT entry. Context entry starts [office-permits]. So citation [office-permits]. Must not use prior knowledge. One short sentence. Could say: Yes, office service visits require a permit, and the service fee is 60 dollars per visit. [office-permits]\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nShould we include \"Yes\"? Context says require a permit. Fine. One sentence. Citation at end. No extra sentence. Ensure citation at end. \n</think>Yes, office service visits require a permit, and the service fee is 60 dollars per visit. [office-permits]",
+      "text" : "Office service visits require a permit. The service fee is 60 dollars per visit. [office-permits]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "amber-form-and-fee",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "amber-orders",
+        "title" : "Amber order returns",
+        "text" : "Amber order returns use form R-27. The return deadline is 12 calendar days after delivery. Refunds have a 40 dollar processing fee."
+      },
+      "score" : 5.5414224,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9f79fcc6204b60a6778082e77ad988d0d2468e6df31499ed67cd4fde1079a23a",
+    "retrievalMillis" : 3.029213,
+    "frameworkOverheadMillis" : 2.4338189999998576,
+    "endToEndMillis" : 15970.018723,
+    "generation" : {
+      "text" : "Amber order returns use form R-27 and have a 40 dollar refund processing fee. [amber-orders]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 98,
+      "cacheWriteInputTokens" : 59,
+      "outputTokens" : 130,
+      "ttftMillis" : 4840.077025,
+      "totalMillis" : 15964.555691,
+      "prefillTokensPerSecond" : 12.195729874826858,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 22391631872,
+      "cpuMillis" : 123520.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Amber order returns use form R-27. Refund processing fee $40. Question asks which form and fee. Answer one short sentence. Must include citations exactly from square brackets at start of CONTEXT entry, e.g. [amber-orders]. End sentence. No extra? Should be concise.\n\nNeed maybe: \"Amber order returns use form R-27 and have a 40 dollar refund processing fee. [amber-orders]\" Ensure citation at end. One short sentence.</think>Amber order returns use form R-27 and have a 40 dollar refund processing fee. [amber-orders]",
+      "text" : "Amber order returns use form R-27 and have a 40 dollar refund processing fee. [amber-orders]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "violet-form-and-fee",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "violet-orders",
+        "title" : "Violet order returns",
+        "text" : "Violet order returns use form R-270. The return deadline is 21 calendar days after delivery. Refunds have a 140 dollar processing fee."
+      },
+      "score" : 5.5414224,
+      "rank" : 1
+    } ],
+    "promptSha256" : "497769c511f9effb94e1544f9543a7769315de43ad475279e199858674d6de3e",
+    "retrievalMillis" : 3.623897,
+    "frameworkOverheadMillis" : 2.4672499999978754,
+    "endToEndMillis" : 22624.971685,
+    "generation" : {
+      "text" : "The form used for Violet order returns is R-270, and the refund processing fee is 140 dollars. [violet-orders]",
+      "inputTokens" : 158,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 61,
+      "outputTokens" : 218,
+      "ttftMillis" : 4307.241552,
+      "totalMillis" : 22618.880538,
+      "prefillTokensPerSecond" : 14.169247876423055,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 22636527616,
+      "cpuMillis" : 185440.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Violet order returns use form R-270. Refunds have 140 dollar processing fee. Question asks which form and refund processing fee. Answer one short sentence. Must include citation exactly from square brackets at start of CONTEXT entry. Context entry starts [violet-orders]. So citation [violet-orders]. End sentence. No extra? \"The form used for Violet order returns is R-270, and the refund processing fee is 140 dollars. [violet-orders]\" Check rules: answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nShould we include dollar? Context says 140 dollar processing fee. Could say 140 dollars. Maybe exact? One short sentence. End citation. No period after citation? likely okay.\n\nFinal.</think>The form used for Violet order returns is R-270, and the refund processing fee is 140 dollars. [violet-orders]",
+      "text" : "The form used for Violet order returns is R-270, and the refund processing fee is 140 dollars. [violet-orders]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "route-identifier",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "opal-escalation",
+        "title" : "Opal incident escalation",
+        "text" : "An Opal incident must be acknowledged within 8 minutes. If unresolved after 24 minutes, route OPAL-P2 pages the duty coordinator."
+      },
+      "score" : 5.675621,
+      "rank" : 1
+    } ],
+    "promptSha256" : "9e60aceb4e402c8e2b8fef0144537b849e4dbbcf2567bec3e3dce274aea585a4",
+    "retrievalMillis" : 2.178173,
+    "frameworkOverheadMillis" : 2.5018589999999676,
+    "endToEndMillis" : 27408.250877,
+    "generation" : {
+      "text" : "An Opal incident must be acknowledged within 8 minutes, and if unresolved after 24 minutes, OPAL-P2 pages the duty coordinator [opal-escalation].",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 60,
+      "outputTokens" : 275,
+      "ttftMillis" : 4391.988409,
+      "totalMillis" : 27403.570845,
+      "prefillTokensPerSecond" : 13.665728416928648,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 22988820480,
+      "cpuMillis" : 226980.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Opal incident must be acknowledged within 8 minutes. If unresolved after 24 minutes, route OPAL-P2 pages duty coordinator.\n\nQuestion: How quickly is an Opal incident acknowledged and which route escalates it?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [opal-escalation]. So citation [opal-escalation]. Need maybe \"An Opal incident must be acknowledged within 8 minutes, and if unresolved after 24 minutes, OPAL-P2 pages the duty coordinator.\" But question asks which route escalates it? The route is OPAL-P2 pages duty coordinator. Acknowledged within 8 minutes.\n\nMust not use prior knowledge. One short sentence. End with citation. Copy source ID exactly from square brackets at start of its CONTEXT entry, and put citations at end. So: \"An Opal incident must be acknowledged within 8 minutes, and if unresolved after 24 minutes, OPAL-P2 pages the duty coordinator [opal-escalation].\"\n\nCheck: citation at end. One sentence. Short. Contains answer. Good.</think>An Opal incident must be acknowledged within 8 minutes, and if unresolved after 24 minutes, OPAL-P2 pages the duty coordinator [opal-escalation].",
+      "text" : "An Opal incident must be acknowledged within 8 minutes, and if unresolved after 24 minutes, OPAL-P2 pages the duty coordinator [opal-escalation].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "retry-header-and-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "aster-api",
+        "title" : "Aster API retries",
+        "text" : "Aster create requests send the Replay-Key header. Keys remain valid for 6 hours. Reusing a key with different request content returns HTTP 422."
+      },
+      "score" : 6.4276276,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cace5237d633ca78abb722db04e68756a1de20d2cf912bb9f7d85e9ad966f78f",
+    "retrievalMillis" : 3.622256,
+    "frameworkOverheadMillis" : 2.8725389999999607,
+    "endToEndMillis" : 21920.879567,
+    "generation" : {
+      "text" : "Aster create requests send the Replay-Key header. Keys remain valid for 6 hours. Reusing a key with different request content returns HTTP 422. [aster-api]",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 98,
+      "cacheWriteInputTokens" : 59,
+      "outputTokens" : 212,
+      "ttftMillis" : 4235.581471,
+      "totalMillis" : 21914.384772,
+      "prefillTokensPerSecond" : 13.936822144461615,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 23170789376,
+      "cpuMillis" : 179950.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says Aster create requests send Replay-Key header. Keys remain valid for 6 hours. Question: Which header do Aster create requests send and how long can a key be replayed? Answer should be one short sentence. Include citation exactly from square brackets at start of CONTEXT entry, e.g. [aster-api]. End sentence. No extra? Must not use prior knowledge. Context contains answer.\n\nNeed maybe: \"Aster create requests send the Replay-Key header, and keys remain valid for 6 hours. [aster-api]\" Check citation format: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Source ID likely [aster-api]. So final: \"Aster create requests send the Replay-Key header, and keys remain valid for 6 hours. [aster-api]\" One short sentence? It's one sentence maybe. Good.</think>Aster create requests send the Replay-Key header, and keys remain valid for 6 hours. [aster-api]",
+      "text" : "Aster create requests send the Replay-Key header. Keys remain valid for 6 hours. Reusing a key with different request content returns HTTP 422. [aster-api]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "retention-units",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "birch-records",
+        "title" : "Birch record retention",
+        "text" : "Birch audit records are retained for 9 years. Birch support transcripts are retained for 9 months."
+      },
+      "score" : 8.012731,
+      "rank" : 1
+    } ],
+    "promptSha256" : "69a8b4c6a6988a2a14bbb1172302611b7f54c2234a4c082867133e8732811d33",
+    "retrievalMillis" : 2.818648,
+    "frameworkOverheadMillis" : 2.634994000000006,
+    "endToEndMillis" : 19634.127807,
+    "generation" : {
+      "text" : "Birch audit records are retained for 9 years. Birch support transcripts are retained for 9 months. [birch-records]",
+      "inputTokens" : 144,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 47,
+      "outputTokens" : 197,
+      "ttftMillis" : 3228.12612,
+      "totalMillis" : 19628.674165,
+      "prefillTokensPerSecond" : 14.568442540108746,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 23419559936,
+      "cpuMillis" : 160710.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says Birch audit records retained 9 years. Birch support transcripts retained 9 months. Question asks how long both. Answer one short sentence. Must include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [birch-records]. So citation [birch-records]. Could say: Birch audit records are retained for 9 years and Birch support transcripts are retained for 9 months. [birch-records]\n\nCheck rules: If context does not contain answer reply INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nOne short sentence. End citation. Good.</think>Birch audit records are retained for 9 years and Birch support transcripts are retained for 9 months. [birch-records]",
+      "text" : "Birch audit records are retained for 9 years. Birch support transcripts are retained for 9 months. [birch-records]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "evidence-format-and-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "cedar-evidence",
+        "title" : "Cedar evidence uploads",
+        "text" : "Cedar evidence must arrive within 11 calendar days. The required upload format is PNG under 8 MB. PDF uploads are not accepted."
+      },
+      "score" : 5.5966177,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8c45b3f70c327eae29104a74d343217cb1458021aa4dce1216f4f3fdb1a4582c",
+    "retrievalMillis" : 1.827774,
+    "frameworkOverheadMillis" : 1.7748919999976351,
+    "endToEndMillis" : 23618.431903,
+    "generation" : {
+      "text" : "The Cedar evidence deadline is within 11 calendar days and the required upload format is PNG under 8 MB. [cedar-evidence]",
+      "inputTokens" : 151,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 54,
+      "outputTokens" : 240,
+      "ttftMillis" : 3737.572847,
+      "totalMillis" : 23614.829237,
+      "prefillTokensPerSecond" : 14.451646044009864,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 23468253184,
+      "cpuMillis" : 196170.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Cedar evidence must arrive within 11 calendar days. Required upload format PNG under 8 MB. PDF not accepted.\n\nQuestion: What is Cedar evidence deadline and required upload format?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [cedar-evidence]. So citation [cedar-evidence]. Must not invent. If context contains answer yes.\n\nNeed maybe: \"The Cedar evidence deadline is within 11 calendar days and the required upload format is PNG under 8 MB. [cedar-evidence]\"\n\nCheck rules: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So end with [cedar-evidence]. One short sentence. No extra. Good.\n\nShould we mention PDF not accepted? Question asks deadline and required upload format. Required upload format is PNG under 8 MB; PDF not accepted maybe not necessary. One short sentence.\n\nFinal.</think>The Cedar evidence deadline is within 11 calendar days and the required upload format is PNG under 8 MB. [cedar-evidence]",
+      "text" : "The Cedar evidence deadline is within 11 calendar days and the required upload format is PNG under 8 MB. [cedar-evidence]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "delivery-weekdays",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "maple-delivery",
+        "title" : "Maple parcel delivery",
+        "text" : "Maple parcels ship on Monday and Friday. A missed delivery must be rescheduled before 3 PM local time."
+      },
+      "score" : 4.373618,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1958bf404bb0b4bc66cf054c4a8a8ad40d9110e52058724309c20b87ebae063a",
+    "retrievalMillis" : 3.474273,
+    "frameworkOverheadMillis" : 1.7290509999984351,
+    "endToEndMillis" : 18854.200167,
+    "generation" : {
+      "text" : "Maple parcels ship on Monday and Friday, and a missed delivery must be rescheduled before 3 PM local time. [maple-delivery]",
+      "inputTokens" : 147,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 50,
+      "outputTokens" : 188,
+      "ttftMillis" : 3412.990493,
+      "totalMillis" : 18848.996843,
+      "prefillTokensPerSecond" : 14.653991233882797,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 23502532608,
+      "cpuMillis" : 154350.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Maple parcels ship on Monday and Friday. Missed delivery must be rescheduled before 3 PM local time.\n\nQuestion: Which days do Maple parcels ship and what is the rescheduling deadline?\n\nNeed answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of CONTEXT entry, and put citations at end. Context entries? There is [maple-delivery] Maple parcel delivery ... likely source ID maple-delivery. Need cite exactly [maple-delivery]. At end sentence.\n\nAnswer: Maple parcels ship on Monday and Friday, and a missed delivery must be rescheduled before 3 PM local time. [maple-delivery]\n\nCheck one short sentence. Contains both. Citation at end. No extra. Should be okay.</think>Maple parcels ship on Monday and Friday, and a missed delivery must be rescheduled before 3 PM local time. [maple-delivery]",
+      "text" : "Maple parcels ship on Monday and Friday, and a missed delivery must be rescheduled before 3 PM local time. [maple-delivery]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "access-approval",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "quartz-access",
+        "title" : "Quartz emergency access",
+        "text" : "Quartz emergency access uses code QZ-73. Approval from three on-call managers is required. Credentials expire after 45 minutes."
+      },
+      "score" : 6.1785417,
+      "rank" : 1
+    } ],
+    "promptSha256" : "415c48a2f37ee9bfcf5144453fa50433dbb79dccac7c6dfbc67993a8b7ec8e54",
+    "retrievalMillis" : 1.933416,
+    "frameworkOverheadMillis" : 1.75234300000011,
+    "endToEndMillis" : 26996.510248,
+    "generation" : {
+      "text" : "Quartz emergency access uses code QZ-73 and requires approval from three on-call managers. [quartz-access]",
+      "inputTokens" : 153,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 56,
+      "outputTokens" : 279,
+      "ttftMillis" : 3850.839952,
+      "totalMillis" : 26992.824489,
+      "prefillTokensPerSecond" : 14.546037977592347,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 23558041600,
+      "cpuMillis" : 226220.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Quartz emergency access uses code QZ-73. Approval from three on-call managers required. Credentials expire after 45 minutes.\n\nQuestion: What code is used for Quartz emergency access and how many managers approve it?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [quartz-access]. So citation [quartz-access]. Must copy source ID exactly. Put at end. No prior knowledge.\n\nNeed maybe: \"The code is QZ-73 and it requires approval from three on-call managers. [quartz-access]\"\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present in CONTEXT valid. Do not use prior knowledge.\n\nOne short sentence. Cite at end. Could be: \"Quartz emergency access uses code QZ-73 and requires approval from three on-call managers. [quartz-access]\"\n\nIs that one sentence? Yes. Citation at end. Good. No extra. Ensure source ID exactly [quartz-access]. Yes.\n\nFinal.</think>Quartz emergency access uses code QZ-73 and requires approval from three on-call managers. [quartz-access]",
+      "text" : "Quartz emergency access uses code QZ-73 and requires approval from three on-call managers. [quartz-access]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "storage-locations",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "iris-storage",
+        "title" : "Iris archive storage",
+        "text" : "Iris primary archives are stored in Oslo. The failover location is Bergen. Backups never leave Norway."
+      },
+      "score" : 6.466778,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1fbf68e4d793b0e8a484e1816890e01806e92e3c3312e7f60bf83961a9858003",
+    "retrievalMillis" : 1.651199,
+    "frameworkOverheadMillis" : 1.7200120000015886,
+    "endToEndMillis" : 20868.435611,
+    "generation" : {
+      "text" : "Iris primary archives are stored in Oslo. The failover location is Bergen. Backups never leave Norway. [iris-storage]",
+      "inputTokens" : 140,
+      "cacheReadInputTokens" : 98,
+      "cacheWriteInputTokens" : 42,
+      "outputTokens" : 219,
+      "ttftMillis" : 2855.8029,
+      "totalMillis" : 20865.0644,
+      "prefillTokensPerSecond" : 14.711862003675964,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 23592493056,
+      "cpuMillis" : 172050.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Iris primary archives stored in Oslo. Failover location Bergen. Backups never leave Norway.\n\nQuestion: Where are Iris primary archives stored and where is failover?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [iris-storage]. So citation [iris-storage]. End sentence. No extra? Must not use prior knowledge. If context contains answer, answer. One short sentence.\n\nDraft: \"Iris primary archives are stored in Oslo, and the failover location is Bergen [iris-storage].\"\n\nCheck citation format: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So [iris-storage]. Good.\n\nOne short sentence. End with citation. No period after citation? Probably okay. Sentence: \"Iris primary archives are stored in Oslo, and the failover location is Bergen [iris-storage].\" That is one sentence. Good.</think>Iris primary archives are stored in Oslo, and the failover location is Bergen [iris-storage].",
+      "text" : "Iris primary archives are stored in Oslo. The failover location is Bergen. Backups never leave Norway. [iris-storage]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "settlement-directions",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "copper-settlement",
+        "title" : "Copper payment settlement",
+        "text" : "Copper domestic transfers settle within 3 business days. Copper international transfers settle within 7 business days."
+      },
+      "score" : 6.481844,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1537a3de65f91ab005816a453f59bb3d9df17cc6575d1ba7bcd196b694ce13d7",
+    "retrievalMillis" : 1.374283,
+    "frameworkOverheadMillis" : 1.685951000001296,
+    "endToEndMillis" : 13155.518039,
+    "generation" : {
+      "text" : "Copper domestic transfers settle within 3 business days and international transfers settle within 7 business days. [copper-settlement]",
+      "inputTokens" : 140,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 43,
+      "outputTokens" : 125,
+      "ttftMillis" : 2896.622744,
+      "totalMillis" : 13152.457805,
+      "prefillTokensPerSecond" : 14.849793043148303,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 23605452800,
+      "cpuMillis" : 105120.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context has copper-settlement. Question: When do Copper domestic and international transfers settle? Answer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [copper-settlement]. So citation [copper-settlement]. Need maybe \"Copper domestic transfers settle within 3 business days and international transfers settle within 7 business days. [copper-settlement]\" One short sentence. Ensure no extra.</think>Copper domestic transfers settle within 3 business days and international transfers settle within 7 business days. [copper-settlement]",
+      "text" : "Copper domestic transfers settle within 3 business days and international transfers settle within 7 business days. [copper-settlement]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "false-premise-permit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "remote-permits",
+        "title" : "Remote service permits",
+        "text" : "Remote service visits do not require a permit. The service fee is 25 dollars per visit."
+      },
+      "score" : 7.062652,
+      "rank" : 1
+    } ],
+    "promptSha256" : "eec5d68b4b562d14c9b5d6a3a09f5cf7bd021ec4e570a0ece7e6ad9df73ef9a6",
+    "retrievalMillis" : 2.144742,
+    "frameworkOverheadMillis" : 1.9336160000020755,
+    "endToEndMillis" : 23226.653095,
+    "generation" : {
+      "text" : "Remote service visits do not require a permit. The service fee is 25 dollars per visit. [remote-permits]",
+      "inputTokens" : 144,
+      "cacheReadInputTokens" : 97,
+      "cacheWriteInputTokens" : 47,
+      "outputTokens" : 244,
+      "ttftMillis" : 3148.455736,
+      "totalMillis" : 23222.574737,
+      "prefillTokensPerSecond" : 14.932306888675864,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 23612153856,
+      "cpuMillis" : 193170.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says Remote service visits do not require a permit. Service fee 25 dollars per visit.\n\nQuestion asks require permit correct? What fee applies?\n\nAnswer should be one short sentence. Must include citation exactly from square brackets at start of CONTEXT entry, e.g. [remote-permits]. End sentence. No extra? If context doesn't contain answer no. It does. So answer: No, remote service visits do not require a permit, and the service fee is 25 dollars per visit. [remote-permits]\n\nCheck rules: answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of CONTEXT entry, and put citations at end. Only IDs present. Do not use prior knowledge.\n\nShould we include citation at end. Sentence: \"No, remote service visits do not require a permit, and the service fee is 25 dollars per visit. [remote-permits]\" That's one sentence? Has comma and and, okay. Citation at end. Good.\n\nNeed maybe not say correct? Fine.</think>No, remote service visits do not require a permit, and the service fee is 25 dollars per visit. [remote-permits]",
+      "text" : "Remote service visits do not require a permit. The service fee is 25 dollars per visit. [remote-permits]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "upload-negation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "cedar-evidence",
+        "title" : "Cedar evidence uploads",
+        "text" : "Cedar evidence must arrive within 11 calendar days. The required upload format is PNG under 8 MB. PDF uploads are not accepted."
+      },
+      "score" : 8.211866,
+      "rank" : 1
+    } ],
+    "promptSha256" : "627832ebc8959ad53f2192efb90e48e14dc4f33b9467af3de7f6dfa47a949203",
+    "retrievalMillis" : 1.685471,
+    "frameworkOverheadMillis" : 1.8165719999997236,
+    "endToEndMillis" : 21662.663374,
+    "generation" : {
+      "text" : "Cedar evidence must arrive within 11 calendar days. The required upload format is PNG under 8 MB. PDF uploads are not accepted. [cedar-evidence]",
+      "inputTokens" : 154,
+      "cacheReadInputTokens" : 98,
+      "cacheWriteInputTokens" : 56,
+      "outputTokens" : 217,
+      "ttftMillis" : 3775.66055,
+      "totalMillis" : 21659.161331,
+      "prefillTokensPerSecond" : 14.835592741432668,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 23622025216,
+      "cpuMillis" : 179510.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says PDF uploads are not accepted. Required upload format is PNG under 8 MB. Question asks Are PDF uploads accepted, and what format required? Answer should be one short sentence. Must include citation exactly from square brackets at start of CONTEXT entry, e.g. [cedar-evidence]. End sentence. No prior knowledge. If context contains answer yes. So: \"No, PDF uploads are not accepted; the required format is PNG under 8 MB. [cedar-evidence]\" Check citation format: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So end with [cedar-evidence]. One short sentence. Could be: \"PDF uploads are not accepted, and the required format is PNG under 8 MB. [cedar-evidence]\" That's one sentence? Semicolon okay. End citation. Good.</think>PDF uploads are not accepted, and the required format is PNG under 8 MB. [cedar-evidence]",
+      "text" : "Cedar evidence must arrive within 11 calendar days. The required upload format is PNG under 8 MB. PDF uploads are not accepted. [cedar-evidence]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "unknown-satellite",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "office-permits",
+        "title" : "Office service permits",
+        "text" : "Office service visits require a permit. The service fee is 60 dollars per visit."
+      },
+      "score" : 0.8801649,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7814681f8737ad5cc16cd399c30b78237c35dd6ee200263eb09249da4c34008c",
+    "retrievalMillis" : 1.372883,
+    "frameworkOverheadMillis" : 1.7179500000002008,
+    "endToEndMillis" : 9696.103686,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 138,
+      "cacheReadInputTokens" : 98,
+      "cacheWriteInputTokens" : 40,
+      "outputTokens" : 85,
+      "ttftMillis" : 2781.505127,
+      "totalMillis" : 9693.012853,
+      "prefillTokensPerSecond" : 14.385200296486458,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 23634952192,
+      "cpuMillis" : 76990.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need use supplied context. Question: What fee applies to repairs of a satellite antenna? Context only office service permits, office service visits require permit, fee 60 dollars per visit. No satellite antenna repair. Must reply exactly INSUFFICIENT_CONTEXT. No citation? Rules if context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. So final just that.</think>INSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "unknown-moon",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "office-permits",
+        "title" : "Office service permits",
+        "text" : "Office service visits require a permit. The service fee is 60 dollars per visit."
+      },
+      "score" : 1.0405011,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a7d892c8d9801d1e7dc360ff036ef8ef0296bdee80448498bac50947ba4bc27b",
+    "retrievalMillis" : 1.120387,
+    "frameworkOverheadMillis" : 1.5562780000000203,
+    "endToEndMillis" : 7210.605501,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 136,
+      "cacheReadInputTokens" : 125,
+      "cacheWriteInputTokens" : 11,
+      "outputTokens" : 80,
+      "ttftMillis" : 760.565252,
+      "totalMillis" : 7207.928836,
+      "prefillTokensPerSecond" : 14.478507992173267,
+      "loadMillis" : 1443.358146,
+      "peakRssBytes" : 23639891968,
+      "cpuMillis" : 57340.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context only office-permits about office service permits, fee. Question: Which permit covers mining on the Moon? Context does not contain answer. Must reply exactly INSUFFICIENT_CONTEXT. No citation? The instruction says if context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. So final should be exactly that.</think>INSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

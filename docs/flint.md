@@ -11,8 +11,10 @@ grounding layer accepts 18 model answers, uses six extractive fallbacks, and abs
 The profile uses a 512-token output budget, a 2,048-token context, and eight native workers on
 an m6a.4xlarge (16 vCPUs, 64 GiB RAM); Ollama retains 16 workers. The untuned 256-token smoke
 passes pipeline correctness but truncates four visible answers, so use the separately validated
-output budget for this workload. Fresh held-out accuracy and released-library checks are being
-completed before catalog admission. See the [immutable reports and review](../benchmark-results/2026-10-30-flint-qualification/README.md).
+output budget for this workload. A fresh 16-question held-out run passes all complete visible
+answers, including both abstentions, with manual review of facts, polarity, units, and identifiers.
+Released-library checks are being completed before catalog admission. See the
+[immutable reports and review](../benchmark-results/2026-10-30-flint-qualification/README.md).
 
 Tool protocol support is implemented, but task accuracy has not passed qualification. Earlier
 failed runs below are retained as development history and do not replace the current verdict.

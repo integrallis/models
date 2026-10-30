@@ -1,4 +1,4 @@
-# Flint full qualification — RAG policy passed, held-out run continuing
+# Flint full qualification — runtime and held-out accuracy gates passed
 
 Frozen runtime/worker: `fb5d7a68248ca14da832ae886016b86d62060382`.
 Includes ordered Q4_K, vector attention, and bounded immutable F32 router snapshots.
@@ -15,7 +15,15 @@ correct; six use extractive fallback and three abstain. All raw answers match th
 512-token pilot. The original 256-token default smoke passes the pipeline but truncates four
 answers; it does not establish complete visible-answer accuracy at that budget.
 
-Fresh held-out answers, released-library verification, and catalog admission are still pending.
+The fresh held-out run passes **16/16** complete visible answers, including both unsupported
+questions and every polarity check. Manual review confirms the required facts, identifiers,
+units, directions, and conditions against the source documents. All raw held-out answers are
+byte-identical to the prior ordered-Q4_K run. The original raw evaluator's 14/16 score is retained;
+the separate visible audit excludes reasoning and records 16/16. This is bounded English RAG
+evidence, not a broad reasoning or coding benchmark. `runtime-assessment.json` passes all six gates.
+
+Released-library verification and catalog admission are still pending; the remote worker is
+finishing its separate tool/diagnostic stages.
 The six-worker diagnostic is separate and does not alter this campaign's frozen profile.
 
 Instance `i-0ddc4e4b6b6ffae04`, root `vol-07ed6544dd1caa0d4`, launched 2026-10-30T20:01:35Z.

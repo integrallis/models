@@ -14,7 +14,8 @@ All notable changes to models are documented here.
   128 MiB per model. Older native libraries retain the Java fallback for ordered Q4_K.
 - Qualify the pinned Flint Q4_K_M artifact for the measured Linux CPU RAG workload: 11.93 median
   tokens/second, 83.39% of the same-host Ollama control, and 1.450 times its p95 end-to-end latency.
-  All 27 visible answers pass across nine questions. The measured profile uses eight native
+  All 27 visible answers pass across nine questions, and all 16 held-out answers pass, including
+  both unsupported-question abstentions. The measured profile uses eight native
   workers and a 512-token output budget; the absolute tier is `PERFORMANCE_REDUCED`.
   Raw reports, failed development attempts, output reviews, and checksum-bound regression tests
   are retained in [the qualification evidence](benchmark-results/2026-10-30-flint-qualification/README.md).

@@ -1,0 +1,307 @@
+{
+  "policyId" : "visible-answer-completion-and-bounded-facts-v1",
+  "generatedAt" : "2026-10-30T21:16:37.502659962Z",
+  "newInference" : false,
+  "sourceReport" : "/work/flint/results/native-reliability.json",
+  "sourceReportSha256" : "720a0a3d579ab8b1ed20ae2fbcc47c315da1fb3a9b5d3df944189f3a9884b1b9",
+  "sourceBackendVersion" : "models@0.5.7+flint-fb5d7a68248ca14da832ae886016b86d62060382 com.integrallis:vectors-core@0.1.32",
+  "assessmentGroundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v24",
+  "artifactSha256" : "c3c4d93f9db92627a2fc47ea8fe8c64a094cabd3549db544bcdd2c00e9a9a347",
+  "workload" : "answer-reliability",
+  "corpusSha256" : "f63bbf95c1acad606bc069e9cd689997102f90255617881a83e29ef4c1cb5fe1",
+  "attempts" : 16,
+  "distinctQuestions" : 16,
+  "completeVisibleAnswers" : 16,
+  "requiredFactsAndCitationsPasses" : 16,
+  "budgetReached" : 0,
+  "limitation" : "Deterministic required-fact/citation matching is not a general hallucination or semantic-entailment judge. Budget reached is conservative: reports lack an explicit finish reason. Repetitions are not independent accuracy samples.",
+  "assessments" : [ {
+    "caseId" : "remote-permit-negation",
+    "visibleText" : "No, remote service visits do not require a permit, and the service fee is 25 dollars per visit. [remote-permits]",
+    "reasoningText" : "We need answer. Need follow rules. Context: Remote service visits do not require a permit. The service fee is 25 dollars per visit.\n\nQuestion: Do remote service visits require a permit and what is the service fee?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [remote-permits]. So citation [remote-permits]. Must not invent. Answer: No, remote service visits do not require a permit, and the service fee is 25 dollars per visit. [remote-permits]\n\nCheck rules: If context does not contain answer reply INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nOne short sentence. End citation. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "office-permit-positive",
+    "visibleText" : "Yes, office service visits require a permit, and the service fee is 60 dollars per visit. [office-permits]",
+    "reasoningText" : "We need answer. Need follow rules. Context says office service visits require a permit. Service fee is 60 dollars per visit. Question asks both. Answer in one short sentence. Include citation exactly from square brackets at start of CONTEXT entry. Context entry starts [office-permits]. So citation [office-permits]. Must not use prior knowledge. One short sentence. Could say: Yes, office service visits require a permit, and the service fee is 60 dollars per visit. [office-permits]\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nShould we include \"Yes\"? Context says require a permit. Fine. One sentence. Citation at end. No extra sentence. Ensure citation at end. \n",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "amber-form-and-fee",
+    "visibleText" : "Amber order returns use form R-27 and have a 40 dollar refund processing fee. [amber-orders]",
+    "reasoningText" : "We need answer. Need follow rules. Context: Amber order returns use form R-27. Refund processing fee $40. Question asks which form and fee. Answer one short sentence. Must include citations exactly from square brackets at start of CONTEXT entry, e.g. [amber-orders]. End sentence. No extra? Should be concise.\n\nNeed maybe: \"Amber order returns use form R-27 and have a 40 dollar refund processing fee. [amber-orders]\" Ensure citation at end. One short sentence.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "violet-form-and-fee",
+    "visibleText" : "The form used for Violet order returns is R-270, and the refund processing fee is 140 dollars. [violet-orders]",
+    "reasoningText" : "We need answer. Need follow rules. Context: Violet order returns use form R-270. Refunds have 140 dollar processing fee. Question asks which form and refund processing fee. Answer one short sentence. Must include citation exactly from square brackets at start of CONTEXT entry. Context entry starts [violet-orders]. So citation [violet-orders]. End sentence. No extra? \"The form used for Violet order returns is R-270, and the refund processing fee is 140 dollars. [violet-orders]\" Check rules: answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nShould we include dollar? Context says 140 dollar processing fee. Could say 140 dollars. Maybe exact? One short sentence. End citation. No period after citation? likely okay.\n\nFinal.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "route-identifier",
+    "visibleText" : "An Opal incident must be acknowledged within 8 minutes, and if unresolved after 24 minutes, OPAL-P2 pages the duty coordinator [opal-escalation].",
+    "reasoningText" : "We need answer. Need follow rules. Context: Opal incident must be acknowledged within 8 minutes. If unresolved after 24 minutes, route OPAL-P2 pages duty coordinator.\n\nQuestion: How quickly is an Opal incident acknowledged and which route escalates it?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [opal-escalation]. So citation [opal-escalation]. Need maybe \"An Opal incident must be acknowledged within 8 minutes, and if unresolved after 24 minutes, OPAL-P2 pages the duty coordinator.\" But question asks which route escalates it? The route is OPAL-P2 pages duty coordinator. Acknowledged within 8 minutes.\n\nMust not use prior knowledge. One short sentence. End with citation. Copy source ID exactly from square brackets at start of its CONTEXT entry, and put citations at end. So: \"An Opal incident must be acknowledged within 8 minutes, and if unresolved after 24 minutes, OPAL-P2 pages the duty coordinator [opal-escalation].\"\n\nCheck: citation at end. One sentence. Short. Contains answer. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "retry-header-and-expiry",
+    "visibleText" : "Aster create requests send the Replay-Key header, and keys remain valid for 6 hours. [aster-api]",
+    "reasoningText" : "We need answer. Need follow rules. Context says Aster create requests send Replay-Key header. Keys remain valid for 6 hours. Question: Which header do Aster create requests send and how long can a key be replayed? Answer should be one short sentence. Include citation exactly from square brackets at start of CONTEXT entry, e.g. [aster-api]. End sentence. No extra? Must not use prior knowledge. Context contains answer.\n\nNeed maybe: \"Aster create requests send the Replay-Key header, and keys remain valid for 6 hours. [aster-api]\" Check citation format: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Source ID likely [aster-api]. So final: \"Aster create requests send the Replay-Key header, and keys remain valid for 6 hours. [aster-api]\" One short sentence? It's one sentence maybe. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "retention-units",
+    "visibleText" : "Birch audit records are retained for 9 years and Birch support transcripts are retained for 9 months. [birch-records]",
+    "reasoningText" : "We need answer. Need follow rules. Context says Birch audit records retained 9 years. Birch support transcripts retained 9 months. Question asks how long both. Answer one short sentence. Must include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [birch-records]. So citation [birch-records]. Could say: Birch audit records are retained for 9 years and Birch support transcripts are retained for 9 months. [birch-records]\n\nCheck rules: If context does not contain answer reply INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nOne short sentence. End citation. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "evidence-format-and-deadline",
+    "visibleText" : "The Cedar evidence deadline is within 11 calendar days and the required upload format is PNG under 8 MB. [cedar-evidence]",
+    "reasoningText" : "We need answer. Need follow rules. Context: Cedar evidence must arrive within 11 calendar days. Required upload format PNG under 8 MB. PDF not accepted.\n\nQuestion: What is Cedar evidence deadline and required upload format?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [cedar-evidence]. So citation [cedar-evidence]. Must not invent. If context contains answer yes.\n\nNeed maybe: \"The Cedar evidence deadline is within 11 calendar days and the required upload format is PNG under 8 MB. [cedar-evidence]\"\n\nCheck rules: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So end with [cedar-evidence]. One short sentence. No extra. Good.\n\nShould we mention PDF not accepted? Question asks deadline and required upload format. Required upload format is PNG under 8 MB; PDF not accepted maybe not necessary. One short sentence.\n\nFinal.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "delivery-weekdays",
+    "visibleText" : "Maple parcels ship on Monday and Friday, and a missed delivery must be rescheduled before 3 PM local time. [maple-delivery]",
+    "reasoningText" : "We need answer. Need follow rules. Context: Maple parcels ship on Monday and Friday. Missed delivery must be rescheduled before 3 PM local time.\n\nQuestion: Which days do Maple parcels ship and what is the rescheduling deadline?\n\nNeed answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of CONTEXT entry, and put citations at end. Context entries? There is [maple-delivery] Maple parcel delivery ... likely source ID maple-delivery. Need cite exactly [maple-delivery]. At end sentence.\n\nAnswer: Maple parcels ship on Monday and Friday, and a missed delivery must be rescheduled before 3 PM local time. [maple-delivery]\n\nCheck one short sentence. Contains both. Citation at end. No extra. Should be okay.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "access-approval",
+    "visibleText" : "Quartz emergency access uses code QZ-73 and requires approval from three on-call managers. [quartz-access]",
+    "reasoningText" : "We need answer. Need follow rules. Context: Quartz emergency access uses code QZ-73. Approval from three on-call managers required. Credentials expire after 45 minutes.\n\nQuestion: What code is used for Quartz emergency access and how many managers approve it?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [quartz-access]. So citation [quartz-access]. Must copy source ID exactly. Put at end. No prior knowledge.\n\nNeed maybe: \"The code is QZ-73 and it requires approval from three on-call managers. [quartz-access]\"\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present in CONTEXT valid. Do not use prior knowledge.\n\nOne short sentence. Cite at end. Could be: \"Quartz emergency access uses code QZ-73 and requires approval from three on-call managers. [quartz-access]\"\n\nIs that one sentence? Yes. Citation at end. Good. No extra. Ensure source ID exactly [quartz-access]. Yes.\n\nFinal.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "storage-locations",
+    "visibleText" : "Iris primary archives are stored in Oslo, and the failover location is Bergen [iris-storage].",
+    "reasoningText" : "We need answer. Need follow rules. Context: Iris primary archives stored in Oslo. Failover location Bergen. Backups never leave Norway.\n\nQuestion: Where are Iris primary archives stored and where is failover?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [iris-storage]. So citation [iris-storage]. End sentence. No extra? Must not use prior knowledge. If context contains answer, answer. One short sentence.\n\nDraft: \"Iris primary archives are stored in Oslo, and the failover location is Bergen [iris-storage].\"\n\nCheck citation format: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So [iris-storage]. Good.\n\nOne short sentence. End with citation. No period after citation? Probably okay. Sentence: \"Iris primary archives are stored in Oslo, and the failover location is Bergen [iris-storage].\" That is one sentence. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "settlement-directions",
+    "visibleText" : "Copper domestic transfers settle within 3 business days and international transfers settle within 7 business days. [copper-settlement]",
+    "reasoningText" : "We need answer. Need follow rules. Context has copper-settlement. Question: When do Copper domestic and international transfers settle? Answer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [copper-settlement]. So citation [copper-settlement]. Need maybe \"Copper domestic transfers settle within 3 business days and international transfers settle within 7 business days. [copper-settlement]\" One short sentence. Ensure no extra.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "false-premise-permit",
+    "visibleText" : "No, remote service visits do not require a permit, and the service fee is 25 dollars per visit. [remote-permits]",
+    "reasoningText" : "We need answer. Need follow rules. Context says Remote service visits do not require a permit. Service fee 25 dollars per visit.\n\nQuestion asks require permit correct? What fee applies?\n\nAnswer should be one short sentence. Must include citation exactly from square brackets at start of CONTEXT entry, e.g. [remote-permits]. End sentence. No extra? If context doesn't contain answer no. It does. So answer: No, remote service visits do not require a permit, and the service fee is 25 dollars per visit. [remote-permits]\n\nCheck rules: answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of CONTEXT entry, and put citations at end. Only IDs present. Do not use prior knowledge.\n\nShould we include citation at end. Sentence: \"No, remote service visits do not require a permit, and the service fee is 25 dollars per visit. [remote-permits]\" That's one sentence? Has comma and and, okay. Citation at end. Good.\n\nNeed maybe not say correct? Fine.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "upload-negation",
+    "visibleText" : "PDF uploads are not accepted, and the required format is PNG under 8 MB. [cedar-evidence]",
+    "reasoningText" : "We need answer. Need follow rules. Context says PDF uploads are not accepted. Required upload format is PNG under 8 MB. Question asks Are PDF uploads accepted, and what format required? Answer should be one short sentence. Must include citation exactly from square brackets at start of CONTEXT entry, e.g. [cedar-evidence]. End sentence. No prior knowledge. If context contains answer yes. So: \"No, PDF uploads are not accepted; the required format is PNG under 8 MB. [cedar-evidence]\" Check citation format: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So end with [cedar-evidence]. One short sentence. Could be: \"PDF uploads are not accepted, and the required format is PNG under 8 MB. [cedar-evidence]\" That's one sentence? Semicolon okay. End citation. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "unknown-satellite",
+    "visibleText" : "INSUFFICIENT_CONTEXT",
+    "reasoningText" : "We need answer. Need use supplied context. Question: What fee applies to repairs of a satellite antenna? Context only office service permits, office service visits require permit, fee 60 dollars per visit. No satellite antenna repair. Must reply exactly INSUFFICIENT_CONTEXT. No citation? Rules if context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. So final just that.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "unknown-moon",
+    "visibleText" : "INSUFFICIENT_CONTEXT",
+    "reasoningText" : "We need answer. Need follow rules. Context only office-permits about office service permits, fee. Question: Which permit covers mining on the Moon? Context does not contain answer. Must reply exactly INSUFFICIENT_CONTEXT. No citation? The instruction says if context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. So final should be exactly that.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  } ]
+}

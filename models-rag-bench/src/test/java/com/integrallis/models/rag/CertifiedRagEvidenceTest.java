@@ -3570,6 +3570,51 @@ class CertifiedRagEvidenceTest {
     assertThat(defaults.failures()).isEmpty();
   }
 
+  @Test
+  void flintRetainsAllSixteenCompleteHeldOutAnswersIncludingBothAbstentions() throws Exception {
+    Path evidence =
+        Path.of(System.getProperty("models.repositoryRoot"))
+            .resolve("benchmark-results/2026-10-30-flint-qualification/results");
+    String reportSha = "720a0a3d579ab8b1ed20ae2fbcc47c315da1fb3a9b5d3df944189f3a9884b1b9";
+    assertThat(evidenceSha256(evidence.resolve("native-reliability.json"))).isEqualTo(reportSha);
+    assertThat(evidenceSha256(evidence.resolve("visible/native-reliability.json")))
+        .isEqualTo("e231683d570b216b0854ec801761294ae4096d0458b4f743b72950d48d365fec");
+    var audit = mapper.readTree(evidence.resolve("visible/native-reliability.json").toFile());
+    assertThat(audit.path("sourceReportSha256").asText()).isEqualTo(reportSha);
+    assertThat(audit.path("requiredFactsAndCitationsPasses").asInt()).isEqualTo(16);
+    RagBenchmarkReport candidate = report(evidence, "native-reliability.json");
+    RagCorpus corpus = RagCorpus.load(RagWorkload.ANSWER_RELIABILITY);
+    assertThat(corpus.fingerprint())
+        .isEqualTo("f63bbf95c1acad606bc069e9cd689997102f90255617881a83e29ef4c1cb5fe1");
+    assertThat(candidate.settings().corpusSha256()).isEqualTo(corpus.fingerprint());
+    assertThat(candidate.settings().maxOutputTokens()).isEqualTo(512);
+    assertThat(candidate.backendDiagnostics().environment())
+        .containsEntry("native-kernel-threads", "8");
+    assertThat(candidate.runs()).hasSize(16);
+    assertThat(candidate.runs().stream().map(RagRun::caseId).toList())
+        .containsExactlyInAnyOrderElementsOf(corpus.cases().stream().map(RagCase::id).toList());
+    for (RagRun run : candidate.runs()) {
+      RagCase question =
+          corpus.cases().stream()
+              .filter(c -> c.id().equals(run.caseId()))
+              .findFirst()
+              .orElseThrow();
+      var reassessed =
+          RagVisibleAnswerAudit.assess(
+              question,
+              run.retrieved(),
+              run.grounding().rawText(),
+              run.generation().outputTokens(),
+              candidate.settings().maxOutputTokens());
+      assertThat(reassessed.requiredFactsAndCitationsPass()).as(run.caseId()).isTrue();
+      assertThat(reassessed.polarityConsistent()).as(run.caseId()).isTrue();
+      if (run.caseId().startsWith("unknown-")) {
+        assertThat(reassessed.visibleEvaluation().abstained()).isTrue();
+        assertThat(reassessed.visibleText()).isEqualTo("INSUFFICIENT_CONTEXT");
+      }
+    }
+  }
+
   private static String evidenceSha256(Path file) throws Exception {
     return HexFormat.of()
         .formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));

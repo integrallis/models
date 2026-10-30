@@ -1,0 +1,110 @@
+{
+  "kind": "assistant-visible-answer-review",
+  "newInference": false,
+  "sourceReportSha256": "720a0a3d579ab8b1ed20ae2fbcc47c315da1fb3a9b5d3df944189f3a9884b1b9",
+  "sourceAuditSha256": "e231683d570b216b0854ec801761294ae4096d0458b4f743b72950d48d365fec",
+  "corpusSha256": "f63bbf95c1acad606bc069e9cd689997102f90255617881a83e29ef4c1cb5fe1",
+  "distinctQuestions": 16,
+  "completeCorrectVisibleAnswers": 16,
+  "bothUnsupportedQuestionsAbstained": true,
+  "polarityContradictions": 0,
+  "limitation": "Sixteen synthetic grounded English questions; does not establish broad reasoning, coding, multilingual, or frontier-model accuracy.",
+  "reviews": [
+    {
+      "caseId": "remote-permit-negation",
+      "visibleText": "No, remote service visits do not require a permit, and the service fee is 25 dollars per visit. [remote-permits]",
+      "review": "Explicit no permit; $25 per visit.",
+      "passed": true
+    },
+    {
+      "caseId": "office-permit-positive",
+      "visibleText": "Yes, office service visits require a permit, and the service fee is 60 dollars per visit. [office-permits]",
+      "review": "Explicit permit required; $60 per visit.",
+      "passed": true
+    },
+    {
+      "caseId": "amber-form-and-fee",
+      "visibleText": "Amber order returns use form R-27 and have a 40 dollar refund processing fee. [amber-orders]",
+      "review": "R-27 and $40 fee; distinct from Violet.",
+      "passed": true
+    },
+    {
+      "caseId": "violet-form-and-fee",
+      "visibleText": "The form used for Violet order returns is R-270, and the refund processing fee is 140 dollars. [violet-orders]",
+      "review": "R-270 and $140 fee; distinct from Amber.",
+      "passed": true
+    },
+    {
+      "caseId": "route-identifier",
+      "visibleText": "An Opal incident must be acknowledged within 8 minutes, and if unresolved after 24 minutes, OPAL-P2 pages the duty coordinator [opal-escalation].",
+      "review": "8-minute acknowledgement; OPAL-P2 after 24 unresolved minutes, condition preserved.",
+      "passed": true
+    },
+    {
+      "caseId": "retry-header-and-expiry",
+      "visibleText": "Aster create requests send the Replay-Key header, and keys remain valid for 6 hours. [aster-api]",
+      "review": "Replay-Key and 6 hours.",
+      "passed": true
+    },
+    {
+      "caseId": "retention-units",
+      "visibleText": "Birch audit records are retained for 9 years and Birch support transcripts are retained for 9 months. [birch-records]",
+      "review": "Audit records 9 years; support transcripts 9 months; units preserved.",
+      "passed": true
+    },
+    {
+      "caseId": "evidence-format-and-deadline",
+      "visibleText": "The Cedar evidence deadline is within 11 calendar days and the required upload format is PNG under 8 MB. [cedar-evidence]",
+      "review": "11 calendar days; PNG under 8 MB.",
+      "passed": true
+    },
+    {
+      "caseId": "delivery-weekdays",
+      "visibleText": "Maple parcels ship on Monday and Friday, and a missed delivery must be rescheduled before 3 PM local time. [maple-delivery]",
+      "review": "Monday and Friday; reschedule before 3 PM local time.",
+      "passed": true
+    },
+    {
+      "caseId": "access-approval",
+      "visibleText": "Quartz emergency access uses code QZ-73 and requires approval from three on-call managers. [quartz-access]",
+      "review": "QZ-73 and three on-call managers.",
+      "passed": true
+    },
+    {
+      "caseId": "storage-locations",
+      "visibleText": "Iris primary archives are stored in Oslo, and the failover location is Bergen [iris-storage].",
+      "review": "Primary Oslo; failover Bergen; roles preserved.",
+      "passed": true
+    },
+    {
+      "caseId": "settlement-directions",
+      "visibleText": "Copper domestic transfers settle within 3 business days and international transfers settle within 7 business days. [copper-settlement]",
+      "review": "Domestic 3 business days; international 7 business days.",
+      "passed": true
+    },
+    {
+      "caseId": "false-premise-permit",
+      "visibleText": "No, remote service visits do not require a permit, and the service fee is 25 dollars per visit. [remote-permits]",
+      "review": "Rejects false permit premise; states $25 fee.",
+      "passed": true
+    },
+    {
+      "caseId": "upload-negation",
+      "visibleText": "PDF uploads are not accepted, and the required format is PNG under 8 MB. [cedar-evidence]",
+      "review": "Rejects PDF; requires PNG under 8 MB.",
+      "passed": true
+    },
+    {
+      "caseId": "unknown-satellite",
+      "visibleText": "INSUFFICIENT_CONTEXT",
+      "review": "INSUFFICIENT_CONTEXT; no satellite repair fee invented.",
+      "passed": true
+    },
+    {
+      "caseId": "unknown-moon",
+      "visibleText": "INSUFFICIENT_CONTEXT",
+      "review": "INSUFFICIENT_CONTEXT; no Moon-mining permit invented.",
+      "passed": true
+    }
+  ]
+}
