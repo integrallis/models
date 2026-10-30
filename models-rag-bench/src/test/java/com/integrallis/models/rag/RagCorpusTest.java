@@ -23,6 +23,23 @@ import org.junit.jupiter.api.Test;
 class RagCorpusTest {
 
   @Test
+  void reliabilityWorkloadCoversIndependentFactsAndAbstention() {
+    RagCorpus corpus = RagCorpus.load(RagWorkload.parse("answer-reliability"));
+    assertThat(corpus.documents()).hasSize(12);
+    assertThat(corpus.cases()).hasSize(16);
+    assertThat(corpus.cases()).filteredOn(c -> !c.answerable()).hasSize(2);
+    assertThat(corpus.cases()).extracting(RagCase::id).doesNotHaveDuplicates();
+    assertThat(corpus.cases())
+        .extracting(RagCase::id)
+        .contains(
+            "remote-permit-negation",
+            "office-permit-positive",
+            "route-identifier",
+            "false-premise-permit");
+    assertThat(corpus.fingerprint()).isNotEqualTo(RagCorpus.loadDefault().fingerprint());
+  }
+
+  @Test
   void defaultCorpusHasStableUniqueDocumentsAndCases() {
     RagCorpus corpus = RagCorpus.loadDefault();
 

@@ -67,6 +67,7 @@ final class ToolCallingQualificationCli {
           "adapter",
           "report",
           "max-tokens",
+          "follow-up-max-tokens",
           "models-revision",
           "case",
           "backend");
@@ -79,11 +80,13 @@ final class ToolCallingQualificationCli {
       Path adapter,
       Path report,
       int maxTokens,
+      int followUpMaxTokens,
       String modelsRevision,
       String caseId,
       String backend) {}
 
-  record GenerationControls(double temperature, int maxTokens, String promptTemplate) {}
+  record GenerationControls(
+      double temperature, int maxTokens, int followUpMaxTokens, String promptTemplate) {}
 
   record SuiteIdentity(
       String id,
@@ -183,6 +186,11 @@ final class ToolCallingQualificationCli {
     if (maxTokens < 32 || maxTokens > 512) {
       throw new IllegalArgumentException("--max-tokens must be between 32 and 512");
     }
+    int followUpMaxTokens =
+        BenchmarkCliArguments.integer(values, "follow-up-max-tokens", Math.min(maxTokens, 96));
+    if (followUpMaxTokens < 32 || followUpMaxTokens > 512) {
+      throw new IllegalArgumentException("--follow-up-max-tokens must be between 32 and 512");
+    }
     String revision = values.get("models-revision");
     if (revision == null || !revision.matches("[0-9a-f]{40}")) {
       throw new IllegalArgumentException("--models-revision must be an exact 40-character Git SHA");
@@ -200,7 +208,7 @@ final class ToolCallingQualificationCli {
           "Needle 2 tool retrieval qualification requires --backend pure-java");
     }
     return new Configuration(
-        candidate, model, adapter, report, maxTokens, revision, caseId, backend);
+        candidate, model, adapter, report, maxTokens, followUpMaxTokens, revision, caseId, backend);
   }
 
   private static InferenceBackend loadBackend(Configuration configuration) {
@@ -324,7 +332,7 @@ final class ToolCallingQualificationCli {
               activatedModel,
               suite,
               mapper,
-              configuration.maxTokens());
+              configuration.followUpMaxTokens());
       if (followUp.applicable()) {
         System.out.printf(
             "%-24s %s %6d ms conversational=%s grounded=%s repeated-call=%s%n",
@@ -417,7 +425,7 @@ final class ToolCallingQualificationCli {
                     ChatMessage.tool("get-weather-for-zipcode", result)),
                 tools);
     SamplingOptions options =
-        SamplingOptions.builder().temperature(0.0f).maxTokens(Math.min(maxTokens, 96)).build();
+        SamplingOptions.builder().temperature(0.0f).maxTokens(maxTokens).build();
     long start = System.nanoTime();
     String output;
     String initialToolOutput = "";
@@ -677,7 +685,11 @@ final class ToolCallingQualificationCli {
             artifactSha256,
             Files.size(configuration.model()),
             suiteIdentity(suite),
-            new GenerationControls(0.0, configuration.maxTokens(), candidate.template().id()),
+            new GenerationControls(
+                0.0,
+                configuration.maxTokens(),
+                configuration.followUpMaxTokens(),
+                candidate.template().id()),
             environment,
             diagnostics,
             activatedAdapter,

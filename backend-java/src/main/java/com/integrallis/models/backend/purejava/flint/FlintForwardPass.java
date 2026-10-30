@@ -21,9 +21,14 @@ import com.integrallis.models.backend.purejava.cache.LayeredKvCache.AttentionVie
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache.LayerSpec;
 import com.integrallis.models.backend.purejava.flint.FlintWeights.LayerWeights;
 import com.integrallis.models.backend.purejava.flint.FlintWeights.Matrix;
+import com.integrallis.models.backend.purejava.flint.FlintWeights.MoeFeedForward;
+import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.PinnedReduction;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import com.integrallis.vectors.core.GgufQ4Kernel;
+import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -35,6 +40,10 @@ public final class FlintForwardPass {
     private final FlintForwardPass owner;
     private final LayeredKvCache cache;
     private final RotaryTable rope;
+    private final byte[] quantizedActivation;
+    private final float[] quantizedActivationScales;
+    private final int[] quantizedActivationCorrections;
+    private final short[] quantizedActivationSums;
     private final float[] gate;
     private final float[] up;
     private final float[] contribution;
@@ -50,6 +59,15 @@ public final class FlintForwardPass {
     private final int[] selectedExperts;
     private final float[] routingWeights;
     private final float[] moeOutput;
+    private final MemorySegment[] expertGateUpWeights;
+    private final GgufTensorType[] expertGateUpTypes;
+    private final int[] expertGateUpRows;
+    private final float[][] expertGateUps;
+    private final MemorySegment[] expertDownWeights;
+    private final GgufTensorType[] expertDownTypes;
+    private final int[] expertDownRows;
+    private final float[][] expertActivations;
+    private final float[][] expertContributions;
     private final float[] logits;
     private final int[] tokenHistory;
     private int nextPosition;
@@ -63,6 +81,12 @@ public final class FlintForwardPass {
           Math.max(
               config.denseHiddenSize(),
               Math.max(config.expertHiddenSize(), config.sharedHiddenSize()));
+      int projectionWidth =
+          Math.max(config.queryDimension(), Math.max(config.hiddenSize(), ffnWidth));
+      quantizedActivation = new byte[projectionWidth];
+      quantizedActivationScales = new float[(projectionWidth + 31) / 32];
+      quantizedActivationCorrections = new int[(projectionWidth + 3) / 4];
+      quantizedActivationSums = new short[(projectionWidth + 15) / 16];
       gate = new float[ffnWidth];
       up = new float[ffnWidth];
       contribution = new float[config.hiddenSize()];
@@ -78,6 +102,17 @@ public final class FlintForwardPass {
       selectedExperts = new int[config.expertsPerToken()];
       routingWeights = new float[config.expertsPerToken()];
       moeOutput = new float[config.hiddenSize()];
+      int experts = config.expertsPerToken();
+      expertGateUpWeights = new MemorySegment[2 * experts];
+      expertGateUpTypes = new GgufTensorType[2 * experts];
+      expertGateUpRows = new int[2 * experts];
+      expertGateUps = new float[2 * experts][config.expertHiddenSize()];
+      expertDownWeights = new MemorySegment[experts];
+      expertDownTypes = new GgufTensorType[experts];
+      expertDownRows = new int[experts];
+      expertActivations = new float[experts][];
+      for (int slot = 0; slot < experts; slot++) expertActivations[slot] = expertGateUps[2 * slot];
+      expertContributions = new float[experts][config.hiddenSize()];
       logits = new float[config.vocabSize()];
       tokenHistory = new int[owner.maxSequenceLength];
     }
@@ -88,6 +123,7 @@ public final class FlintForwardPass {
     }
   }
 
+  private final GgufBatchedMatrixKernel matrixKernel;
   private final FlintConfig config;
   private final FlintWeights weights;
   private final LayerWeights[] layers;
@@ -95,7 +131,12 @@ public final class FlintForwardPass {
   private final float[] outputNorm;
   private final int maxSequenceLength;
 
-  FlintForwardPass(FlintConfig config, FlintWeights weights, int maxSequenceLength) {
+  FlintForwardPass(
+      FlintConfig config,
+      FlintWeights weights,
+      int maxSequenceLength,
+      GgufBatchedMatrixKernel matrixKernel) {
+    this.matrixKernel = Objects.requireNonNull(matrixKernel, "matrixKernel");
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     if (maxSequenceLength <= 0 || maxSequenceLength > config.maxPosition()) {
@@ -124,7 +165,17 @@ public final class FlintForwardPass {
       FlintConfig config,
       com.integrallis.models.backend.purejava.gguf.GgufFile file,
       int maxSequenceLength) {
-    return new FlintForwardPass(config, FlintWeights.fromGgufFile(file, config), maxSequenceLength);
+    return loadGguf(config, file, maxSequenceLength, GgufBatchedMatrixKernel.none());
+  }
+
+  /** Loads mapped weights with a caller-owned optional matrix kernel. */
+  public static FlintForwardPass loadGguf(
+      FlintConfig config,
+      com.integrallis.models.backend.purejava.gguf.GgufFile file,
+      int maxSequenceLength,
+      GgufBatchedMatrixKernel matrixKernel) {
+    return new FlintForwardPass(
+        config, FlintWeights.fromGgufFile(file, config), maxSequenceLength, matrixKernel);
   }
 
   /** Returns the validated checkpoint execution configuration. */
@@ -171,7 +222,7 @@ public final class FlintForwardPass {
     if (projectLogits) {
       TensorOps.rmsNorm(
           session.xNorm, session.x, outputNorm, config.hiddenSize(), config.rmsNormEps());
-      multiply(weights.output(), session.xNorm, session.logits);
+      multiply(session, weights.output(), session.xNorm, session.logits);
     }
     session.tokenHistory[position] = token;
     session.nextPosition++;
@@ -227,9 +278,15 @@ public final class FlintForwardPass {
         parameters.attentionNorm(),
         config.hiddenSize(),
         config.rmsNormEps());
-    multiply(parameters.query(), session.xNorm, session.query);
-    multiply(parameters.key(), session.xNorm, session.key);
-    multiply(parameters.value(), session.xNorm, session.value);
+    multiplyTriple(
+        session,
+        parameters.query(),
+        session.query,
+        parameters.key(),
+        session.key,
+        parameters.value(),
+        session.value,
+        session.xNorm);
     for (int head = 0; head < config.numHeads(); head++) {
       int offset = head * config.headDim();
       TensorOps.rmsNorm(
@@ -256,7 +313,8 @@ public final class FlintForwardPass {
     }
     session.cache.store(layer, position, session.key, session.value);
     computeAttention(session, parameters, layer, position);
-    multiply(parameters.attentionOutput(), session.attentionOutput, session.projectedAttention);
+    multiply(
+        session, parameters.attentionOutput(), session.attentionOutput, session.projectedAttention);
     addResidual(session.x, session.projectedAttention);
 
     TensorOps.rmsNorm(
@@ -266,7 +324,7 @@ public final class FlintForwardPass {
       addResidual(session.x, session.contribution);
     } else {
       var moe = parameters.moe();
-      multiply(moe.router(), session.xNorm, session.routerLogits);
+      multiply(session, moe.router(), session.xNorm, session.routerLogits);
       FlintRouting.select(
           session.routerLogits,
           moe.selectionBias(),
@@ -275,11 +333,19 @@ public final class FlintForwardPass {
           config.normalizeExpertWeights(),
           config.expertWeightsScale());
       Arrays.fill(session.moeOutput, 0f);
+      boolean grouped = executeExpertGroup(session, moe);
       for (int slot = 0; slot < config.expertsPerToken(); slot++) {
-        int expert = session.selectedExperts[slot];
-        feedForward(session, moe.gate()[expert], moe.up()[expert], moe.down()[expert]);
+        float[] contribution;
+        if (grouped) {
+          contribution = session.expertContributions[slot];
+        } else {
+          int expert = session.selectedExperts[slot];
+          feedForward(session, moe.gate()[expert], moe.up()[expert], moe.down()[expert]);
+          contribution = session.contribution;
+        }
+        // Accumulate in the original routing order regardless of kernel scheduling.
         for (int i = 0; i < config.hiddenSize(); i++) {
-          session.moeOutput[i] += session.routingWeights[slot] * session.contribution[i];
+          session.moeOutput[i] += session.routingWeights[slot] * contribution[i];
         }
       }
       feedForward(session, moe.sharedGate(), moe.sharedUp(), moe.sharedDown());
@@ -288,19 +354,159 @@ public final class FlintForwardPass {
     }
   }
 
-  private static void feedForward(Session session, Matrix gate, Matrix up, Matrix down) {
-    multiply(gate, session.xNorm, session.gate);
-    multiply(up, session.xNorm, session.up);
+  private boolean executeExpertGroup(Session session, MoeFeedForward moe) {
+    int count = config.expertsPerToken();
+    for (int slot = 0; slot < count; slot++) {
+      int expert = session.selectedExperts[slot];
+      Matrix gate = moe.gate()[expert];
+      Matrix up = moe.up()[expert];
+      Matrix down = moe.down()[expert];
+      session.expertGateUpWeights[2 * slot] = gate.data();
+      session.expertGateUpWeights[2 * slot + 1] = up.data();
+      session.expertGateUpTypes[2 * slot] = gate.type();
+      session.expertGateUpTypes[2 * slot + 1] = up.type();
+      session.expertGateUpRows[2 * slot] = gate.rows();
+      session.expertGateUpRows[2 * slot + 1] = up.rows();
+      session.expertDownWeights[slot] = down.data();
+      session.expertDownTypes[slot] = down.type();
+      session.expertDownRows[slot] = down.rows();
+    }
+    if (!matrixKernel.isGroupedEligible(
+            session.expertGateUpTypes, session.expertGateUpRows, 2 * count, 1, config.hiddenSize())
+        || !matrixKernel.isIndependentEligible(
+            session.expertDownTypes, session.expertDownRows, count, 1, config.expertHiddenSize()))
+      return false;
+    matrixKernel.multiplyGrouped(
+        session.expertGateUps,
+        session.expertGateUpWeights,
+        session.expertGateUpTypes,
+        session.expertGateUpRows,
+        2 * count,
+        session.xNorm,
+        1,
+        config.hiddenSize());
+    for (int slot = 0; slot < count; slot++) {
+      float[] gate = session.expertGateUps[2 * slot];
+      float[] up = session.expertGateUps[2 * slot + 1];
+      for (int i = 0; i < gate.length; i++) {
+        float value = gate[i];
+        gate[i] = (value / (1f + (float) Math.exp(-value))) * up[i];
+      }
+    }
+    matrixKernel.multiplyIndependent(
+        session.expertContributions,
+        session.expertDownWeights,
+        session.expertDownTypes,
+        session.expertDownRows,
+        count,
+        session.expertActivations,
+        1,
+        config.expertHiddenSize());
+    return true;
+  }
+
+  private void feedForward(Session session, Matrix gate, Matrix up, Matrix down) {
+    multiplyDual(session, gate, session.gate, up, session.up, session.xNorm);
     for (int i = 0; i < gate.rows(); i++) {
       float value = session.gate[i];
       session.gate[i] = (value / (1f + (float) Math.exp(-value))) * session.up[i];
     }
-    multiply(down, session.gate, session.contribution);
+    multiply(session, down, session.gate, session.contribution);
   }
 
-  private static void multiply(Matrix matrix, float[] input, float[] output) {
+  private void multiply(Session session, Matrix matrix, float[] input, float[] output) {
+    if (matrixKernel.isEligible(matrix.type(), 1, matrix.rows(), matrix.columns())) {
+      matrixKernel.multiply(
+          output, input, matrix.data(), matrix.type(), 1, matrix.rows(), matrix.columns());
+      return;
+    }
     TensorOps.ggufMatmul(
-        output, input, matrix.data(), matrix.type(), matrix.rows(), matrix.columns());
+        output,
+        input,
+        matrix.data(),
+        matrix.type(),
+        matrix.rows(),
+        matrix.columns(),
+        session.quantizedActivation,
+        session.quantizedActivationScales,
+        session.quantizedActivationCorrections,
+        session.quantizedActivationSums,
+        GgufQ4Kernel.WIDENED);
+  }
+
+  private void multiplyDual(
+      Session session, Matrix a, float[] ao, Matrix b, float[] bo, float[] input) {
+    int cols = a.columns();
+    if (matrixKernel.isDualEligible(a.type(), a.rows(), b.type(), b.rows(), 1, cols)) {
+      matrixKernel.multiplyDual(
+          ao, a.data(), a.type(), a.rows(), bo, b.data(), b.type(), b.rows(), input, 1, cols);
+    } else if (matrixKernel.isEligible(a.type(), 1, a.rows(), cols)
+        || matrixKernel.isEligible(b.type(), 1, b.rows(), cols)) {
+      multiply(session, a, input, ao);
+      multiply(session, b, input, bo);
+    } else {
+      TensorOps.ggufDualMatmul(
+          ao,
+          a.data(),
+          a.type(),
+          a.rows(),
+          bo,
+          b.data(),
+          b.type(),
+          b.rows(),
+          input,
+          cols,
+          session.quantizedActivation,
+          session.quantizedActivationScales,
+          session.quantizedActivationCorrections,
+          session.quantizedActivationSums,
+          GgufQ4Kernel.WIDENED);
+    }
+  }
+
+  private void multiplyTriple(
+      Session session,
+      Matrix a,
+      float[] ao,
+      Matrix b,
+      float[] bo,
+      Matrix c,
+      float[] co,
+      float[] input) {
+    int cols = a.columns();
+    if (matrixKernel.isTripleEligible(
+        a.type(), a.rows(), b.type(), b.rows(), c.type(), c.rows(), 1, cols)) {
+      matrixKernel.multiplyTriple(
+          ao, a.data(), a.type(), a.rows(), bo, b.data(), b.type(), b.rows(), co, c.data(),
+          c.type(), c.rows(), input, 1, cols);
+    } else if (matrixKernel.isEligible(a.type(), 1, a.rows(), cols)
+        || matrixKernel.isEligible(b.type(), 1, b.rows(), cols)
+        || matrixKernel.isEligible(c.type(), 1, c.rows(), cols)) {
+      multiply(session, a, input, ao);
+      multiply(session, b, input, bo);
+      multiply(session, c, input, co);
+    } else {
+      TensorOps.ggufTripleMatmul(
+          ao,
+          a.data(),
+          a.type(),
+          a.rows(),
+          bo,
+          b.data(),
+          b.type(),
+          b.rows(),
+          co,
+          c.data(),
+          c.type(),
+          c.rows(),
+          input,
+          cols,
+          session.quantizedActivation,
+          session.quantizedActivationScales,
+          session.quantizedActivationCorrections,
+          session.quantizedActivationSums,
+          GgufQ4Kernel.WIDENED);
+    }
   }
 
   private void computeAttention(Session session, LayerWeights parameters, int layer, int position) {

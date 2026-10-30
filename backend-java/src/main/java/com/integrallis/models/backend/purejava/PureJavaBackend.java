@@ -988,7 +988,8 @@ public final class PureJavaBackend
             batchedMatrixKernel);
     int capacity = runtimeContextLength(config.maxPosition(), planConfiguration);
     PureJavaDecoder decoder =
-        new FlintDecoderAdapter(FlintForwardPass.loadGguf(config, file, capacity));
+        new FlintDecoderAdapter(
+            FlintForwardPass.loadGguf(config, file, capacity, batchedMatrixKernel));
     ModelMetadata metadata =
         new ModelMetadata(
             "flint",

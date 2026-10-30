@@ -211,11 +211,11 @@ must earn its own passing evidence. The current failed reports remain the baseli
    generation profile yields complete answers without factual regressions. A larger cap is an
    explicitly different configuration, not a reinterpretation of this failed run. Measure its
    latency and memory cost. The pinned publisher template exposes no non-thinking switch.
-3. **Remove avoidable Java work and connect existing Rust kernels.** Flint's `multiply` currently
-   uses the convenience `TensorOps.ggufMatmul` overload, allocating quantization scratch for each
-   product. Move scratch to session ownership and reuse compatible prepared activations across
-   Q/K/V and gate/up projections. Thread `GgufBatchedMatrixKernel` through `loadFlint` into the
-   forward pass; today the supplied kernel reaches planning but not execution. Start with the
+3. **Remove avoidable Java work and connect existing Rust kernels.** The baseline `multiply`
+   used the convenience `TensorOps.ggufMatmul` overload, allocating quantization scratch for each
+   product. The improvement implementation moves scratch to session ownership and groups
+   Q/K/V and gate/up projections. `GgufBatchedMatrixKernel` now reaches the forward pass through
+   `loadFlint`; the baseline passed it only to planning. The implementation uses the
    existing Q4_K/Q6_K Rust FFM kernels and prove actual invocation, fallback behavior, numerical
    parity, session isolation, and native resource lifetime before claiming acceleration.
 4. **Profile and optimize the remaining hot paths.** Measure matrix products, quantization,
@@ -245,6 +245,36 @@ must earn its own passing evidence. The current failed reports remain the baseli
    capability manifests before publication. Laptop usability needs its own measurements; a
    passing EPYC result does not establish laptop speed or API-frontier answer quality.
 
-The next implementation slice should combine session-owned Java scratch with the existing Rust
-kernel connection and instrumentation. Quality evaluation and completion-budget experiments are
-separate, necessary work: faster kernels alone cannot establish answer accuracy.
+The first implementation slice includes reusable Java scratch, existing Rust kernel dispatch,
+grouped expert execution, grounding v24, and a separate visible-answer audit. Its measured quality
+and speed remain subject to the following controlled campaign.
+
+## Preregistered improvement campaign
+
+`scripts/flint/improvement-worker.sh` runs the pinned Q4_K_M artifact on a fresh m6a.4xlarge with
+the same 2048-token context and 16-processor setting. Rust 1.96.0 builds the repository's own
+dependency-free kernels with the lockfile and offline mode. The Java/Rust real-weight probe must
+match all 16 pinned continuation IDs and keep the maximum absolute logit difference at or below
+0.05 and relative RMS difference at or below 0.002 before quality measurements start. These are
+short-context numerical checks, not general accuracy evidence.
+
+The campaign retains zero-warmup, one-iteration Java and Rust correctness reports at 256 output
+tokens. It selects the smallest of 256, 512, and 1024 tokens for which all nine general-workload
+pilot responses pass `visible-answer-completion-and-bounded-facts-v1`. If none passes, 1024 is
+used for diagnosis and `pilotVisibleGatePassed` remains false. The selected budget is frozen
+before the held-out workload runs. Neither the publisher template nor sampling is changed.
+
+The Rust and Ollama comparative arms use that same budget, one full-workload warmup, and three
+measured iterations. Both also run the independent 16-question `answer-reliability` workload once,
+without using its outputs to select the budget. This campaign requires at least 15/16 complete
+visible fact/citation passes, both unanswerable cases correctly abstaining, and no detected
+polarity contradictions on the Rust held-out arm, in addition to the existing catalog gates.
+The audit is a deterministic screen, not a general semantic-entailment judge; retained raw
+answers still require inspection. Repeated trials do not increase the distinct-question count.
+
+Tools are assessed separately with 512 tokens for calls and an explicitly recorded 512-token
+follow-up budget. A separate 64-token single-case JFR run diagnoses CPU/allocation costs and is
+excluded from comparative timings. Ollama's runner is primed before measurement so its PID can
+be sampled; the old daemon-only memory figures are not reused. The worker uploads intermediate
+evidence, shuts down on exit, and requires the bootstrap's independent four-hour termination bound.
+No catalog entry or capability claim follows from a changed scorer or passing unit tests alone.

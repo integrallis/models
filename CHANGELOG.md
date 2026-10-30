@@ -8,11 +8,19 @@ All notable changes to models are documented here.
   shared experts, Q/K normalization, attention sinks, and per-layer sliding/rotary patterns.
   Includes Flint tokenization, schema-aware tool calls in both framework adapters, independent
   numerical and Jinja fixtures, and a pinned Q4_K_M checkpoint test. Adds the tool and RAG
-  qualification candidates and a bounded remote worker. Catalog qualification remains pending;
+  qualification candidates and a bounded remote worker. The first qualification failed;
   see [Flint execution](docs/flint.md).
 - Correct tool-result follow-up scoring to exclude reasoning blocks. The v2 policy prevents
   truncated visible answers from passing solely because their reasoning mentioned the facts;
   includes a captured Flint regression. Historical v1 reports remain unchanged.
+- Connect Flint projections and grouped routed experts to the existing Rust FFM kernels, with
+  session-owned quantization scratch and Java fallback. Add invocation, numerical, isolation,
+  rewind, and resource-lifetime regressions; acceleration still requires real-weight evidence.
+- Version grounding as v24: accept second-person address and redundant negative-answer prefixes,
+  reject unfinished conditionals, and check claim polarity against matching evidence clauses.
+  Add a separate visible-answer audit and a 16-question answer-reliability workload. Original
+  benchmark scoring and archived reports remain intact. Tool follow-up token budgets are now
+  explicit and recorded, retaining the previous 96-token default.
 
 ## [0.5.7] - 2026-10-27
 

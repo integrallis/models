@@ -37,6 +37,27 @@ import org.junit.jupiter.api.io.TempDir;
 class ToolCallingQualificationCliTest {
 
   @Test
+  void recordsAnExplicitFollowUpBudgetWithoutChangingTheDefault() throws Exception {
+    Path artifact = Files.writeString(temporary.resolve("flint.gguf"), "fixture");
+    String[] defaults = {
+      "--candidate",
+      "flint-40b-a2.5b",
+      "--model",
+      artifact.toString(),
+      "--models-revision",
+      REVISION
+    };
+    assertThat(ToolCallingQualificationCli.parse(defaults).followUpMaxTokens()).isEqualTo(96);
+    var args = new java.util.ArrayList<>(List.of(defaults));
+    args.addAll(List.of("--follow-up-max-tokens", "512"));
+    assertThat(ToolCallingQualificationCli.parse(args.toArray(String[]::new)).followUpMaxTokens())
+        .isEqualTo(512);
+    args.set(args.size() - 1, "513");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> ToolCallingQualificationCli.parse(args.toArray(String[]::new)));
+  }
+
+  @Test
   void acceptsThePinnedQwen3EightBArtifact() throws Exception {
     Path artifact = temporary.resolve("qwen3-8b.gguf");
     Files.writeString(artifact, "fixture");
