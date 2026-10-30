@@ -69,6 +69,38 @@ makes admission associative, so prefill uses a balanced reduction tree (`exclusi
 
 So the bank is immutable between commits and changes wholesale every 256 tokens.
 
+## Parity result
+
+`EdgeRockMemoryLayerParityTest` reproduces the reference across 7 tokens and 3 commit boundaries,
+to 2e-4. The fixture comes from `parity/dump_memory_layer.py`, which runs the reference
+`IndependentGQAMemory` at small dimensions with seeded weights.
+
+Getting there found four traps. Three were in how the reference was *fed* and one was in this
+implementation; all four produce finite, fluent output, and none would fail a unit test, a build
+or a correctness smoke.
+
+| trap | where | symptom |
+| --- | --- | --- |
+| norm is `x * (1 + w)`, not `x * w` | fixture | layer returned **zeros** |
+| zero-initialised parameters left alone | fixture | would only prove 0 x anything = 0 |
+| cos width is the rotated span, not half of it | fixture | systematic ~5e-3 offset |
+| **read gate computed after rope instead of before** | **implementation** | **exact at token 0, wrong after** |
+
+The last one is the reason this test exists. `_query_scores` reads the gate off the normed query
+and rotates *afterwards*; this layer rotated first. Position 0 has rope as the identity, so the two
+agree there and diverge by ~5e-2 from the second token on. The stage-by-stage dump is what made it
+findable: every stage sat at float32 noise except `gate`, and `gate` was clean at token 0 only,
+which points at a position-dependent term in that path and nowhere else.
+
+The first is the worst-shaped. Qwen3_5RMSNorm is `normalized * (1.0 + weight)` with a
+zero-initialised weight -- the Gemma convention -- while `TensorOps.rmsNorm` is
+`normalized * weight`. Ours is correct for GGUF, which folds the `+1` into the stored tensor: the
+qwen35 decoder shares that norm and is qualified, and three `unsloth_qwen3_5_*` models passed
+library-default smokes at `correctAnswerRate` 1.0 on 2026-10-29, which norms off by a whole unit
+could not do. But a fixture carrying raw PyTorch norms makes our layer annihilate its input and
+return zeros -- a *dead* layer, not a wrong one, which in a 32-layer residual stack reads as
+slightly worse quality rather than a defect.
+
 ## The five ways a port goes wrong silently
 
 Each of these loads, runs, and produces plausible output.

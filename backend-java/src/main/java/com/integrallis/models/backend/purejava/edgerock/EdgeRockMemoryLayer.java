@@ -141,10 +141,16 @@ final class EdgeRockMemoryLayer {
           dim,
           config.rmsNormEpsilon());
       queries[head] = slice(queryFlat, head * dim, dim);
-      rope(queries[head], cos, sin);
     }
+    // The gate is read off the normed query *before* rope, and only then is the query rotated.
+    // The reference is explicit about the order and it matters from the second token onward: at
+    // position 0 rope is the identity, so gating after rotation agrees there and diverges by
+    // ~5e-2 everywhere else. Parity against the reference is what caught it; no unit test would.
     MemoryRead.gates(
         queries, weights.readGateWeight(), weights.readGateBias(), weights.readScale(), gates);
+    for (int head = 0; head < heads; head++) {
+      rope(queries[head], cos, sin);
+    }
     MemoryRead.read(bank, queries, gates, config.headsPerGroup(), readOut);
     for (int head = 0; head < heads; head++) {
       System.arraycopy(readOut[head], 0, readFlat, head * dim, dim);
