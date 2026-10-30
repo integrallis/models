@@ -561,6 +561,9 @@ tasks.register<Test>("edgeRockCompatibilityTest") {
         includeTestsMatching(
             "com.integrallis.models.backend.purejava.EdgeRockPublisherCaseTest",
         )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.EdgeRockPrefillParityTest",
+        )
     }
     configuredEdgeRockCases.orNull?.let {
         systemProperty("models.fixtures.edgeRockCases", it)

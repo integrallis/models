@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.qwen35;
 import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliff;
 import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.edgerock.EdgeRockMemory;
+import com.integrallis.models.backend.purejava.edgerock.EdgeRockMemoryLayer;
 import com.integrallis.models.backend.purejava.edgerock.MemoryBank;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
@@ -151,15 +152,8 @@ public final class Qwen35ForwardPass {
     // token at a time: prefill() sends batchSize == 1 straight to forwardToken, so clamping here
     // is what keeps every routed token on the one path that implements routing. Clamping rather
     // than rejecting because callers pass a default batch size they did not choose per model.
-    // Memory anchors clamp for a different reason than routing does: the batched prefill path has
-    // no memory contribution wired into it, so batching EdgeRock would skip the anchors on every
-    // prefill token and silently change the answer. Clamping to one keeps every EdgeRock token on
-    // forwardToken, the one path that applies them. This costs prefill throughput and is a known
-    // limitation rather than a design choice -- see the batched paths, which still need it.
     this.prefillBatchSize =
-        config.usesMixtureOfExperts() || config.usesMemoryAnchors()
-            ? 1
-            : Math.min(prefillBatchSize, config.contextLength());
+        config.usesMixtureOfExperts() ? 1 : Math.min(prefillBatchSize, config.contextLength());
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     this.q6BatchedKernel = Objects.requireNonNull(q6BatchedKernel, "q6BatchedKernel");
     this.batchedMatrixKernel = Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
@@ -1244,6 +1238,9 @@ public final class Qwen35ForwardPass {
             batchSize,
             sessionState,
             batch);
+        if (memory != null) {
+          memoryBatched(layerIndex, startPosition, batchSize, dimension, sessionState, batch);
+        }
       } else {
         gatedDeltaNetBatched(
             batch.projected,
@@ -1297,6 +1294,45 @@ public final class Qwen35ForwardPass {
     session.checkpoint += batchSize;
   }
 
+  /**
+   * Adds each row's memory contribution to the batch's attention output.
+   *
+   * <p>Row by row, and that is not a missed optimisation. Each token reads the bank before writing
+   * to it, and a write can trigger the commit that changes what later tokens read, so the rows of
+   * one batch are ordered with respect to each other. What batching buys here is the backbone: the
+   * projections, the feed-forward and the recurrence all run over the whole batch, and only this
+   * part stays sequential.
+   *
+   * <p>Reads {@code batch.state}, the pre-norm residual, not {@code batch.normalized}: the memory
+   * module applies its own {@code memory.input_norm}. Adds into {@code batch.projected} so the
+   * contribution shares the attention output's residual rather than stacking on top of it.
+   */
+  private void memoryBatched(
+      int layerIndex,
+      int startPosition,
+      int batchSize,
+      int dimension,
+      SessionState session,
+      BatchScratch batch) {
+    EdgeRockMemoryLayer memoryLayer = memory.layer(layerIndex);
+    MemoryBank bank = session.memoryBanks[layerIndex];
+    for (int index = 0; index < batchSize; index++) {
+      int position = startPosition + index;
+      int offset = index * dimension;
+      System.arraycopy(batch.state, offset, batch.memoryHidden, 0, dimension);
+      rotary.prepare(position);
+      memoryLayer.forward(
+          batch.memoryHidden,
+          position,
+          head -> rotary.apply(head, 0, true),
+          bank,
+          batch.memoryContribution);
+      for (int lane = 0; lane < dimension; lane++) {
+        batch.projected[offset + lane] += batch.memoryContribution[lane];
+      }
+    }
+  }
+
   private void fullAttentionBatched(
       float[] output,
       float[] input,
@@ -1306,14 +1342,6 @@ public final class Qwen35ForwardPass {
       int batchSize,
       SessionState session,
       BatchScratch batch) {
-    // Neither batched path windows its key span. EdgeRock is the only architecture that declares a
-    // window and it is clamped to one token per step, so this is unreachable today; it throws
-    // rather than silently attending outside the window if that clamp is ever lifted.
-    if (config.attentionWindow() != 0) {
-      throw new UnsupportedOperationException(
-          "batched attention does not implement a sliding window; width "
-              + config.attentionWindow());
-    }
     int headDimension = config.attentionHeadDim();
     int queryHeads = config.numHeads();
     int kvHeads = config.numKvHeads();
@@ -1375,6 +1403,11 @@ public final class Qwen35ForwardPass {
       int position = startPosition + token;
       int queryBase = token * queryDimension;
       int queryGateBase = token * 2 * queryDimension;
+      // Per row, because each row sits at its own position and so has its own window. Same
+      // mechanism as the single-token path: the key cache is contiguous in position, so the
+      // window is a shifted base offset and attendHead is unchanged.
+      int firstVisible = firstVisiblePosition(position, config.attentionWindow());
+      int visiblePositions = position - firstVisible + 1;
       for (int head = 0; head < queryHeads; head++) {
         int kvHead = head / queriesPerKvHead;
         int queryOffset = queryBase + head * headDimension;
@@ -1385,15 +1418,15 @@ public final class Qwen35ForwardPass {
             batch.query,
             queryOffset,
             session.keys[layer],
-            kvHead * headDimension,
+            kvHead * headDimension + firstVisible * keyDimension,
             keyDimension,
             session.values[layer],
-            kvHead * headDimension,
+            kvHead * headDimension + firstVisible * keyDimension,
             keyDimension,
             batch.queryGate,
             gate,
             batch.attentionScores,
-            position + 1,
+            visiblePositions,
             headDimension,
             scale);
       }
@@ -2119,6 +2152,16 @@ public final class Qwen35ForwardPass {
 
   private static final class BatchScratch {
     private final float[] rowState;
+
+    /**
+     * One row's pre-norm residual and one row's memory contribution.
+     *
+     * <p>Two embedding-wide buffers, allocated for every model rather than only for the ones with
+     * anchors, because that is around 20 KB against a batch scratch already measured in megabytes.
+     */
+    private final float[] memoryHidden;
+
+    private final float[] memoryContribution;
     private final float[] state;
     private final float[] normalized;
     private final float[] projected;
@@ -2163,6 +2206,8 @@ public final class Qwen35ForwardPass {
         int batchSize,
         GgufBatchedMatrixKernel kernel) {
       rowState = new float[config.embeddingDim()];
+      memoryHidden = new float[config.embeddingDim()];
+      memoryContribution = new float[config.embeddingDim()];
       state = batchBuffer(batchSize, config.embeddingDim());
       normalized = batchBuffer(batchSize, config.embeddingDim());
       projected = batchBuffer(batchSize, config.embeddingDim());
