@@ -168,8 +168,18 @@ stop_ollama() {
 if jq -e '.diagnosticOnly == true' "$INPUT" >/dev/null; then
   CAP=512
   COMMON+=(--case auto-glass-deadline)
-  idle
-  benchmark native-speed-pilot 1200 rust-ffm "$CAP" 1 3 general
+  if jq -e '.diagnosticProfiles == "pool6"' "$INPUT" >/dev/null; then
+    ORIGINAL_JAVA_OPTS=$JAVA_OPTS
+    for pool_threads in 8 6; do
+      export JAVA_OPTS="$ORIGINAL_JAVA_OPTS -Dmodels.native.kernels.threads=$pool_threads"
+      idle
+      benchmark "native-pool$pool_threads-speed-pilot" 1200 rust-ffm "$CAP" 1 3 general
+    done
+    export JAVA_OPTS=$ORIGINAL_JAVA_OPTS
+  else
+    idle
+    benchmark native-speed-pilot 1200 rust-ffm "$CAP" 1 3 general
+  fi
   if jq -e '.diagnosticProfiles == "workers"' "$INPUT" >/dev/null; then
     ORIGINAL_JAVA_OPTS=$JAVA_OPTS
     for decode_threads in 8 4; do
