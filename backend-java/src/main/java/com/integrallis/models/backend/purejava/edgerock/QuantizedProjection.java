@@ -36,11 +36,32 @@ import java.util.Objects;
  * to undo; a checkpoint that did carry one would need that lookup here, and {@link
  * #requireNoHadamard} exists so such a file fails rather than decoding into noise.
  */
-public record QuantizedProjection(
-    MemorySegment data, GgufTensorType type, int rows, int columns, String name)
-    implements Projection {
+public final class QuantizedProjection implements Projection {
 
-  public QuantizedProjection {
+  private final MemorySegment data;
+  private final GgufTensorType type;
+  private final int rows;
+  private final int columns;
+  private final String name;
+
+  /**
+   * Reusable Q8 activation scratch, allocated once per projection.
+   *
+   * <p>This was a record calling the short {@code ggufMatmul} overload, which allocates four arrays
+   * and re-quantizes the activation on every call. One memory layer makes nine projections per
+   * token and the model has eight of them, so that was on the order of 288 allocations per token
+   * before anything was multiplied. {@code Qwen35ForwardPass} avoids it by carrying a {@code
+   * ProjectionScratch}; this carries its own, sized from its own column count.
+   *
+   * <p>Not thread-safe, which matches the class that owns it: {@code EdgeRockMemoryLayer} already
+   * holds per-layer activation buffers and runs one token at a time.
+   */
+  private final byte[] quantizedActivation;
+
+  private final float[] quantizedActivationScales;
+
+  public QuantizedProjection(
+      MemorySegment data, GgufTensorType type, int rows, int columns, String name) {
     Objects.requireNonNull(data, "data");
     Objects.requireNonNull(type, "type");
     Objects.requireNonNull(name, "name");
@@ -48,6 +69,42 @@ public record QuantizedProjection(
       throw new IllegalArgumentException(
           "rows and columns must be positive: " + rows + "x" + columns);
     }
+    this.data = data;
+    this.type = type;
+    this.rows = rows;
+    this.columns = columns;
+    this.name = name;
+    // The K-quants quantize the activation in blocks of 256, the legacy quants in 32. Only the
+    // types this projection can actually carry are sized here; anything else falls through to the
+    // float path in ggufMatmul and never reads these.
+    int block =
+        switch (type) {
+          case Q4_K, Q5_K, Q6_K -> 256;
+          case Q4_0, Q5_0, Q8_0 -> 32;
+          default -> 0;
+        };
+    this.quantizedActivation = block == 0 ? null : new byte[columns];
+    this.quantizedActivationScales = block == 0 ? null : new float[columns / block];
+  }
+
+  public MemorySegment data() {
+    return data;
+  }
+
+  public GgufTensorType type() {
+    return type;
+  }
+
+  public int rows() {
+    return rows;
+  }
+
+  public int columns() {
+    return columns;
+  }
+
+  public String name() {
+    return name;
   }
 
   @Override
@@ -60,7 +117,12 @@ public record QuantizedProjection(
       throw new IllegalArgumentException(
           name + " produces " + rows + " but was given " + output.length);
     }
-    TensorOps.ggufMatmul(output, input, data, type, rows, columns);
+    if (quantizedActivation == null) {
+      TensorOps.ggufMatmul(output, input, data, type, rows, columns);
+      return;
+    }
+    TensorOps.ggufMatmul(
+        output, input, data, type, rows, columns, quantizedActivation, quantizedActivationScales);
   }
 
   /**
