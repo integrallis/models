@@ -1,0 +1,215 @@
+/*
+ * Copyright 2025-2026 Integrallis Software, LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.integrallis.models.backend.purejava.edgerock;
+
+import java.util.Objects;
+
+/**
+ * One EdgeRock memory layer: read the bank, then write this token into it.
+ *
+ * <p>Order is the contract. The read runs against committed state only, so a token never attends to
+ * itself, and the write stages into the pending chunk which stays invisible until the chunk fills.
+ * Swapping the two is the kind of change that improves a benchmark and stops being this model.
+ *
+ * <p>Projections arrive as {@link Projection} rather than as the quantized {@code Matrix} views the
+ * rest of the backend uses. The dequantizing matvec is private to {@code Qwen35ForwardPass}, a
+ * 2600-line final class on the hot path of three qualified architectures, so taking a seam here
+ * keeps this layer's arithmetic verifiable without duplicating those kernels or cutting into that
+ * path. Wiring the seam is one change when the layer loop lands.
+ */
+final class EdgeRockMemoryLayer {
+
+  /** A linear projection, {@code out = W x}. Implemented over quantized weights in production. */
+  @FunctionalInterface
+  interface Projection {
+    void apply(float[] input, float[] output);
+  }
+
+  /** The weights of one memory layer, in the order the GGUF names them. */
+  record Weights(
+      float[] inputNorm,
+      Projection queryProjection,
+      float[] queryNorm,
+      Projection keyProjection,
+      float[] keyNorm,
+      Projection valueProjection,
+      Projection outputProjection,
+      Projection writeGate,
+      Projection writeUp,
+      Projection writeDown,
+      Projection admissionDown,
+      Projection admissionUp,
+      float[][] readGateWeight,
+      float[] readGateBias,
+      float[] readScale) {}
+
+  private final EdgeRockConfig config;
+  private final Weights weights;
+  private final float[] normed;
+  private final float[] queryFlat;
+  private final float[][] queries;
+  private final float[] gates;
+  private final float[][] readOut;
+  private final float[] readFlat;
+  private final float[] written;
+  private final float[] writeGateOut;
+  private final float[] writeUpOut;
+  private final float[] writeDownOut;
+  private final float[] keyFlat;
+  private final float[] valueFlat;
+  private final float[][] groupKeys;
+  private final float[][] groupValues;
+  private final float[] admissionHidden;
+  private final float[] scores;
+
+  EdgeRockMemoryLayer(EdgeRockConfig config, Weights weights) {
+    this.config = Objects.requireNonNull(config, "config");
+    this.weights = Objects.requireNonNull(weights, "weights");
+    int embedding = config.embeddingLength();
+    int heads = config.headCount();
+    int groups = config.headCountKv();
+    int dim = config.headDim();
+    this.normed = new float[embedding];
+    this.queryFlat = new float[heads * dim];
+    this.queries = new float[heads][];
+    this.gates = new float[heads];
+    this.readOut = new float[heads][dim];
+    this.readFlat = new float[heads * dim];
+    this.written = new float[embedding];
+    this.writeGateOut = new float[config.memoryWriterIntermediate()];
+    this.writeUpOut = new float[config.memoryWriterIntermediate()];
+    this.writeDownOut = new float[embedding];
+    this.keyFlat = new float[groups * dim];
+    this.valueFlat = new float[groups * dim];
+    this.groupKeys = new float[groups][];
+    this.groupValues = new float[groups][];
+    this.admissionHidden = new float[config.memoryAdmissionRank()];
+    this.scores = new float[groups];
+  }
+
+  /**
+   * Runs the layer for one token.
+   *
+   * @param hidden the block's hidden state
+   * @param position the token's sequence position
+   * @param cos cosine table for this position, {@code rope.dimension_count / 2} wide
+   * @param sin sine table for this position
+   * @param bank this layer's state, mutated
+   * @param out the layer's contribution, overwritten
+   */
+  void forward(
+      float[] hidden, int position, float[] cos, float[] sin, MemoryBank bank, float[] out) {
+    int heads = config.headCount();
+    int groups = config.headCountKv();
+    int dim = config.headDim();
+
+    rmsNorm(hidden, weights.inputNorm(), config.rmsNormEpsilon(), normed);
+
+    // --- read, from committed records only ------------------------------------------------
+    weights.queryProjection().apply(normed, queryFlat);
+    for (int head = 0; head < heads; head++) {
+      queries[head] = slice(queryFlat, head * dim, dim);
+      rmsNormInPlace(queries[head], weights.queryNorm(), config.rmsNormEpsilon());
+      rope(queries[head], cos, sin);
+    }
+    MemoryRead.gates(
+        queries, weights.readGateWeight(), weights.readGateBias(), weights.readScale(), gates);
+    MemoryRead.read(bank, queries, gates, config.headsPerGroup(), readOut);
+    for (int head = 0; head < heads; head++) {
+      System.arraycopy(readOut[head], 0, readFlat, head * dim, dim);
+    }
+    weights.outputProjection().apply(readFlat, out);
+
+    // --- write, staged -------------------------------------------------------------------
+    // Residual: the writer refines the normed state rather than replacing it, and write_down is
+    // zero-initialised in the reference, so an untrained writer is exactly the identity.
+    weights.writeGate().apply(normed, writeGateOut);
+    weights.writeUp().apply(normed, writeUpOut);
+    for (int i = 0; i < writeGateOut.length; i++) {
+      writeGateOut[i] = silu(writeGateOut[i]) * writeUpOut[i];
+    }
+    weights.writeDown().apply(writeGateOut, writeDownOut);
+    for (int i = 0; i < written.length; i++) {
+      written[i] = normed[i] + writeDownOut[i];
+    }
+
+    weights.keyProjection().apply(written, keyFlat);
+    weights.valueProjection().apply(written, valueFlat);
+    for (int group = 0; group < groups; group++) {
+      groupKeys[group] = slice(keyFlat, group * dim, dim);
+      rmsNormInPlace(groupKeys[group], weights.keyNorm(), config.rmsNormEpsilon());
+      rope(groupKeys[group], cos, sin);
+      groupValues[group] = slice(valueFlat, group * dim, dim);
+    }
+
+    // Admission reads the normed state, not the written one, and the reference detaches it: the
+    // scorer judges what arrived rather than what the writer made of it.
+    weights.admissionDown().apply(normed, admissionHidden);
+    for (int i = 0; i < admissionHidden.length; i++) {
+      admissionHidden[i] = silu(admissionHidden[i]);
+    }
+    weights.admissionUp().apply(admissionHidden, scores);
+
+    bank.stage(groupKeys, groupValues, scores);
+  }
+
+  private static float[] slice(float[] source, int offset, int length) {
+    float[] out = new float[length];
+    System.arraycopy(source, offset, out, 0, length);
+    return out;
+  }
+
+  private static void rmsNorm(float[] input, float[] weight, float epsilon, float[] out) {
+    double sum = 0.0;
+    for (float value : input) {
+      sum += (double) value * value;
+    }
+    float scale = (float) (1.0 / Math.sqrt(sum / input.length + epsilon));
+    for (int i = 0; i < input.length; i++) {
+      out[i] = input[i] * scale * weight[i];
+    }
+  }
+
+  private static void rmsNormInPlace(float[] values, float[] weight, float epsilon) {
+    double sum = 0.0;
+    for (float value : values) {
+      sum += (double) value * value;
+    }
+    float scale = (float) (1.0 / Math.sqrt(sum / values.length + epsilon));
+    for (int i = 0; i < values.length; i++) {
+      values[i] = values[i] * scale * weight[i];
+    }
+  }
+
+  /**
+   * Partial rotary embedding: rotates the leading {@code 2 * cos.length} lanes and leaves the rest
+   * untouched. EdgeRock's head width is 256 against a rope dimension of 64, so most of each head is
+   * never rotated.
+   */
+  private static void rope(float[] values, float[] cos, float[] sin) {
+    int half = cos.length;
+    for (int i = 0; i < half; i++) {
+      float even = values[i];
+      float odd = values[i + half];
+      values[i] = even * cos[i] - odd * sin[i];
+      values[i + half] = odd * cos[i] + even * sin[i];
+    }
+  }
+
+  private static float silu(float value) {
+    return (float) (value / (1.0 + Math.exp(-value)));
+  }
+}
