@@ -56,12 +56,19 @@ assert provenance['vectorsVersion']==manifest['vectorsVersion']
 for record in json.loads((root/'classpath.json').read_text()):
     name=record['file'];assert Path(name).name==name
     assert hashlib.sha256((root/'lib'/name).read_bytes()).hexdigest()==record['sha256']
-    if name.startswith(('models-','backend-','vectors-')) and not name.startswith('models-rag-bench-'):
+    harness = name in (f"models-rag-bench-{manifest['modelsVersion']}.jar", f"models-bench-{manifest['modelsVersion']}.jar")
+    if harness:
+        assert record['origin']=='source-built measurement harness',name
+    elif name.startswith(('models-','backend-','vectors-')):
         assert record['origin']=='Maven Central',name
 print('All released product JAR identities verified')
 PY
 cp "$WORK/released/provenance.json" "$WORK/released/classpath.json" "$OUT/"
-for source in FlintKernelParity.java FlintReleasedProfileProbe.java reference.properties; do
+SOURCES=(FlintKernelParity.java FlintReleasedProfileProbe.java reference.properties)
+if jq -e '.toolDiagnostic == true' "$INPUT" >/dev/null; then
+  SOURCES+=(FlintToolTaskProbe.java tool-task-held-out-v1.json)
+fi
+for source in "${SOURCES[@]}"; do
   uri=$(jq -er --arg name "$source" '.probeSources[$name].uri' "$INPUT")
   sha=$(jq -er --arg name "$source" '.probeSources[$name].sha256' "$INPUT")
   aws s3 cp "$uri" "$WORK/$source" --only-show-errors
@@ -106,3 +113,13 @@ stage native-default-visible 120 "${JAVA[@]}" -cp "$CP" \
 stage public-profile 1200 "${JAVA[@]}" -cp "$WORK/probe:$CP" FlintReleasedProfileProbe "$MODEL" \
   "$(jq -er '.expectedRawSha256' "$INPUT")" "$OUT/public-profile.json"
 printf '%s\n' 'Released numerical parity, default smoke, and public profile round trip passed. Full catalog qualification is separately hash-bound.' >"$OUT/completed.txt"
+sync_results
+# This optional research stage cannot turn a failed tool result into a catalog qualification.
+# It runs after all required release checks and performs simulated tool actions only.
+if jq -e '.toolDiagnostic == true' "$INPUT" >/dev/null; then
+  javac --release 25 -cp "$CP" -d "$WORK/probe" "$WORK/FlintToolTaskProbe.java"
+  stage tools-diagnostic 2700 "${JAVA[@]}" -cp "$WORK/probe:$CP" \
+    com.integrallis.models.bench.FlintToolTaskProbe "$MODEL" \
+    "$WORK/tool-task-held-out-v1.json" "$OUT/tools-diagnostic.json" || \
+    printf '%s\n' 'Tool diagnostic incomplete; inspect its exit code and raw trace. No tool qualification claimed.' >"$OUT/tools-diagnostic-incomplete.txt"
+fi
