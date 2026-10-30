@@ -136,6 +136,7 @@ public final class FlintToolTaskProbe {
     boolean allTurnsComplete = true;
     long start = System.nanoTime();
     for (int turn = 0; turn < maximumTurns; turn++) {
+      long turnStart = System.nanoTime();
       var prompt = TEMPLATE.render(messages, tools);
       var sink = new Output();
       loop.generate(prompt, OPTIONS, sink);
@@ -145,7 +146,7 @@ public final class FlintToolTaskProbe {
       combined.append(raw).append('\n');
       var parsed = ToolCallScanner.scan(raw, ToolSyntax.FLINT, tools);
       var assessment = Needle2ToolQualification.evaluate(
-          JSON, item, raw, (System.nanoTime() - start) / 1_000_000, ToolSyntax.FLINT);
+          JSON, item, raw, (System.nanoTime() - turnStart) / 1_000_000, ToolSyntax.FLINT);
       trace.add(Map.of("turn", turn, "promptSha256", sha(prompt.text().getBytes(StandardCharsets.UTF_8)),
           "rawText", raw, "calls", parsed.toolCalls(), "turnAssessment", assessment,
           "complete", complete, "stopReason", String.valueOf(sink.reason)));
