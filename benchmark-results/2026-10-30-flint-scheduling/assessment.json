@@ -1,0 +1,54 @@
+{
+  "kind": "diagnostic-scheduling-and-kernel-timing",
+  "catalogQualified": false,
+  "limitation": "Single-case development measurements; full runtime gates and held-out accuracy are separate. Instrumented timings include reflective/timer overhead.",
+  "ollamaDecodeTokensPerSecond": 14.553842050276582,
+  "arms": [
+    {
+      "report": "native-speed-pilot.json",
+      "sha256": "f6a7c8ffe22a80213340451bd5c0b8987d1202eb99419786d11348a013ac6520",
+      "decodeTokensPerSecond": 9.914066708065867,
+      "decodeRatioToOllama": 0.6811992787758377,
+      "p95EndToEndMillis": 15439.1613218,
+      "rawIdenticalToDefault": true,
+      "threads": "16",
+      "pollMillis": "5"
+    },
+    {
+      "report": "native-pool8-speed-pilot.json",
+      "sha256": "bf497164d8f159bbac64de190d2c23f7814ca2a2c54469aa63dd96606ecaacdb",
+      "decodeTokensPerSecond": 11.517392828847564,
+      "decodeRatioToOllama": 0.7913644238449521,
+      "p95EndToEndMillis": 12442.3163299,
+      "rawIdenticalToDefault": true,
+      "threads": "8",
+      "pollMillis": "5"
+    },
+    {
+      "report": "native-pool8-poll1-speed-pilot.json",
+      "sha256": "8eb700f1a8896a274aed70fb183304ebcbd1fd7ecc4d075c098252bac951318c",
+      "decodeTokensPerSecond": 11.726494745583686,
+      "decodeRatioToOllama": 0.8057318957478197,
+      "p95EndToEndMillis": 12656.5031509,
+      "rawIdenticalToDefault": true,
+      "threads": "8",
+      "pollMillis": "1"
+    },
+    {
+      "report": "native-pool16-poll1-speed-pilot.json",
+      "sha256": "6ca5457e473d13c9fbdd66b673a16082ce70cb7a474dc8c3c6b9ebf7d6727ae8",
+      "decodeTokensPerSecond": 9.405142972193795,
+      "decodeRatioToOllama": 0.6462309361131935,
+      "p95EndToEndMillis": 15470.389745,
+      "rawIdenticalToDefault": true,
+      "threads": "16",
+      "pollMillis": "1"
+    }
+  ],
+  "timingRawAnswersIdentical": true,
+  "instrumentedNativeWallFractions": [
+    0.7255536653107482,
+    0.7206445136032066,
+    0.7374098548249176
+  ]
+}

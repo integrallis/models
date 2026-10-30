@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "sourceRevision": "9c453e9de85f77b398e9ad57eba13e305db96f72",
+  "workerRevision": "15df96f1d1d4815af45a0ab57288ee75e8771ea7",
+  "payloadUri": "s3://models-qual-077051030817/payload/flint-attention-20261030-9c453e9d/payload.tar.gz",
+  "payloadSha256": "f1f160426cfee70ac2549034a88cba8b288e6e1200fa9473b437467b1926543a",
+  "payloadBytes": 36007946,
+  "workerUri": "s3://models-qual-077051030817/payload/flint-scheduling-20261030-15df96f1/improvement-worker.sh",
+  "workerSha256": "1e1f43c268356156cd68018b58b39f1f2370e4d7dbd1d43eea6184b094ffde0d",
+  "resultsUri": "s3://models-qual-077051030817/results/flint-scheduling-20261030-15df96f1",
+  "deadlineSeconds": 5400,
+  "diagnosticOnly": true,
+  "instanceType": "m6a.4xlarge",
+  "computeUsdPerHour": 0.6912,
+  "threads": 16,
+  "protocol": "single-case speed diagnosis; not catalog qualification",
+  "optimization": "independent parallel heads and non-fused vector value accumulation",
+  "modelSha256": "c3c4d93f9db92627a2fc47ea8fe8c64a094cabd3549db544bcdd2c00e9a9a347",
+  "rustVersion": "1.96.0",
+  "rustCompilerSha256": "c295047583a56238ea06b43f849f4b877fa12bfd4c7103f8d9a74c94c9c4e108",
+  "diagnosticProfiles": "scheduling",
+  "comparatorThreads": 16,
+  "rootVolumeThroughputMiBps": 500,
+  "timingProbeUri": "s3://models-qual-077051030817/payload/flint-scheduling-20261030-15df96f1/FlintKernelTiming.java",
+  "timingProbeSha256": "66fc1f9472a8dac88926279ce48819217441ec40da7c053e7cac910c4b638a0e",
+  "nativeProfiles": [
+    "default16",
+    "pool8",
+    "pool8-poll1",
+    "pool16-poll1"
+  ]
+}
