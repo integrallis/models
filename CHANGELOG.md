@@ -4,6 +4,9 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+- Cache small Flint F32 routers once per loaded model under a 128 MiB bound, preserving pinned
+  row arithmetic and native eligibility. Shared sessions avoid repeated mapped-row copies.
+
 - Vectorize Flint attention values and parallelize independent heads without changing reduction
   order. Correct Ollama runner discovery in the qualification worker; retain the incomplete
   comparison and failed tool grammar evidence.

@@ -50,6 +50,7 @@ final class FlintDecoderAdapter implements PureJavaDecoder {
     var environment = new LinkedHashMap<>(base.environment());
     environment.put("flint-diagnostics-version", "1");
     environment.put("architecture-prefill-batch-size", "1");
+    environment.put("flint-router-cache-bytes", Long.toString(forwardPass.routerProjectionBytes()));
     var decisions = new ArrayList<>(base.optimizations());
     decisions.removeIf(
         decision ->

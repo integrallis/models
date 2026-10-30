@@ -127,6 +127,9 @@ public final class FlintForwardPass {
   private final LayerWeights[] layers;
   private final LayerSpec[] cacheSpecs;
   private final float[] outputNorm;
+  private final FlintRouterProjection[] routerProjections;
+  private final long routerProjectionBytes;
+  private static final long ROUTER_CACHE_BUDGET = 128L << 20;
   private final int maxSequenceLength;
 
   FlintForwardPass(
@@ -149,15 +152,32 @@ public final class FlintForwardPass {
     this.maxSequenceLength = maxSequenceLength;
     outputNorm = weights.outputNorm();
     layers = new LayerWeights[config.numLayers()];
+    routerProjections = new FlintRouterProjection[layers.length];
+    long routerBytes = 0;
     cacheSpecs = new LayerSpec[config.numLayers()];
     for (int layer = 0; layer < layers.length; layer++) {
       layers[layer] = weights.layer(layer);
+      MoeFeedForward moe = layers[layer].moe();
+      if (moe != null) {
+        Matrix router = moe.router();
+        if (!matrixKernel.isEligible(router.type(), 1, router.rows(), router.columns())) {
+          routerProjections[layer] =
+              FlintRouterProjection.prepare(router, ROUTER_CACHE_BUDGET - routerBytes);
+          if (routerProjections[layer] != null) routerBytes += routerProjections[layer].bytes();
+        }
+      }
       cacheSpecs[layer] =
           config.usesSlidingAttention(layer)
               ? LayerSpec.ring(
                   config.keyValueDimension(), config.keyValueDimension(), config.slidingWindow())
               : LayerSpec.linear(config.keyValueDimension(), config.keyValueDimension());
     }
+    routerProjectionBytes = routerBytes;
+  }
+
+  /** Heap bytes retained for immutable F32 router projections, shared by all sessions. */
+  public long routerProjectionBytes() {
+    return routerProjectionBytes;
   }
 
   /** Loads the validated graph; all expert matrices stay in the mapped GGUF. */
@@ -365,7 +385,11 @@ public final class FlintForwardPass {
       addResidual(session.x, session.contribution);
     } else {
       var moe = parameters.moe();
-      multiply(session, moe.router(), session.xNorm, session.routerLogits);
+      if (routerProjections[layer] != null) {
+        routerProjections[layer].multiply(session.xNorm, session.routerLogits);
+      } else {
+        multiply(session, moe.router(), session.xNorm, session.routerLogits);
+      }
       FlintRouting.select(
           session.routerLogits,
           moe.selectionBias(),

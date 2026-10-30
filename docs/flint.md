@@ -415,3 +415,15 @@ its own real-weight parity check and all budget pilots, candidate and held-out r
 comparator retains 16 threads. The selected profile and diagnostics bind the actual pool size.
 The formal candidate/comparator verdict now runs before held-out and tool work, so those
 separate stages cannot delay discovering a performance failure. All original gates remain.
+
+### Bounded router snapshots
+
+Flint's Java F32 router path originally copied every row from mapped weights for every token.
+The candidate now retains immutable router arrays once per loaded graph, shared by sessions,
+under a total 128 MiB limit. Non-F32 routers, over-budget matrices, and eligible native routes
+retain their existing path. The pinned artifact's 47 routers require 94 MiB. Diagnostics report
+`flint-router-cache-bytes`; this is extra resident heap, not a reduction in model weight size.
+The exact same `PinnedReduction.dot` scores each row. Fixture tests compare every result bit
+at widths 4, 17, 32, 128 and 2048 across changing inputs, and cover budget/type fallbacks.
+The synthetic routing comparison is supporting development evidence only; whole-model gains
+must be measured remotely before qualification.
