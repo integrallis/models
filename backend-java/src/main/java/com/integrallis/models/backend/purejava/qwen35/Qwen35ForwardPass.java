@@ -385,6 +385,22 @@ public final class Qwen35ForwardPass {
 
   /** Captures the Gated DeltaNet state needed to resume this session's retained token prefix. */
   public LinearStateSnapshot captureLinearState(Session session) {
+    // The snapshot carries the convolution and recurrent state only. Restoring one on a model with
+    // memory anchors would rewind the recurrence while leaving the bank holding anchors written
+    // past the restore point, and the first commit afterwards would merge against a bank the
+    // prefix never built -- wrong, and silent. rewind() stays available because it clears the
+    // banks and replays the prefix through the path that rebuilds them.
+    //
+    // Snapshotting the banks instead is the fix; it is not free, which is why this refuses rather
+    // than pretending. EdgeRock-4B carries 8 banks of 4 groups x 1024 slots x 256 lanes of keys
+    // and values, so a snapshot is on the order of 64 MB. The cost of refusing is the prompt-cache
+    // resumption, and therefore TTFT, on EdgeRock only.
+    if (memory != null) {
+      throw new UnsupportedOperationException(
+          "linear state snapshots do not carry memory anchors; "
+              + config.architecture()
+              + " must rewind and replay instead");
+    }
     return new LinearStateSnapshot(requireSession(session));
   }
 

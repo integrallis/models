@@ -86,16 +86,22 @@ class EdgeRockScopeTest {
   }
 
   @Test
-  void edgeRockIsNotAdmittedAsAQwen35Architecture() {
-    // The refusal is deliberate. The backbone would load; the memory.* tensors on the 8 attention
-    // layers would be ignored, and the model would emit plausible wrong logits. See
-    // experiments/edgerock-decoder/README.md for the fifteen missing tensor roles.
+  void edgeRockDeclaringItselfStillNeedsItsOwnPrefixedKeys() {
+    // This test used to assert that edgerock was refused outright. It is now served, and the
+    // assertion was kept alive by its fixture rather than by the behaviour: with every key under
+    // qwen35., renaming the architecture to edgerock made them all missing, so the throw came
+    // from absence and not from any refusal. What is worth pinning is the prefix rule itself --
+    // a file that declares edgerock is read under edgerock., and the real published file is
+    // dual-keyed precisely so that both readings resolve.
     Map<String, GgufMetadataValue> entries = edgeRockShapeUnderQwen35();
     entries.put("general.architecture", new GgufMetadataValue.StringValue("edgerock"));
 
     assertThatThrownBy(() -> Qwen35Config.fromMetadata(new GgufMetadata(entries)))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("edgerock");
+        .hasMessageContaining("edgerock.embedding_length");
+
+    // Admission and the memory-anchor requirement are asserted against the transcribed header in
+    // Qwen35ConfigEdgeRockTest, which carries the edgerock.* keys the real file publishes.
   }
 
   /**
