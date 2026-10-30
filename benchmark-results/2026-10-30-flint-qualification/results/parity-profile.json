@@ -1,0 +1,1021 @@
+{
+  "kind" : "flint-native-parity-v1",
+  "maximumAbsoluteLogitDifference" : 0.05,
+  "maximumRelativeRmsLogitDifference" : 0.002,
+  "passed" : true,
+  "cases" : [ {
+    "backend" : "pure-java",
+    "case" : "completion",
+    "tokenizerMatches" : true,
+    "continuationMatches" : true,
+    "actualContinuation" : [ 332, 260, 2635, 3222, 762, 260, 34325, 366 ],
+    "teacherForcedReferenceContinuation" : [ 332, 260, 2635, 3222, 762, 260, 34325, 366 ],
+    "finiteLogits" : true,
+    "maxAbsoluteLogitDifferenceFromJava" : 0.0,
+    "relativeRmsLogitDifferenceFromJava" : 0.0,
+    "elapsedMillis" : 48084.807378,
+    "passed" : true,
+    "backendDiagnostics" : {
+      "backend" : "pure-java",
+      "planVersion" : "pure-java-v20",
+      "environment" : {
+        "q4-unsigned-pairwise-supported" : "true",
+        "flint-router-cache-bytes" : "98566144",
+        "sve" : "false",
+        "gguf-parallel" : "true",
+        "vm-vendor" : "Eclipse Adoptium",
+        "compiler" : "hotspot-c2",
+        "fast-vector-fma" : "true",
+        "fast-scalar-fma" : "true",
+        "preferred-vector-bits" : "256",
+        "model-architecture" : "flint",
+        "os" : "Linux",
+        "cpu-model" : "AMD EPYC 7R13 Processor",
+        "gguf-threads" : "16",
+        "end-of-generation.150018" : "vocabulary-text",
+        "q4-short-pairwise-supported" : "true",
+        "vector-provider" : "PanamaVectorUtilSupport",
+        "java-version" : "25.0.3",
+        "gguf-chunks-per-thread" : "2",
+        "gguf-executor" : "persistent",
+        "architecture" : "amd64",
+        "tokenizer.pre" : "flint",
+        "projection-layers" : "49",
+        "end-of-generation-token-ids" : "150001,150003,150005,150018",
+        "flint-diagnostics-version" : "1",
+        "architecture-prefill-batch-size" : "1",
+        "end-of-generation.chat-template" : "resolved:150005",
+        "end-of-generation.150001" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+        "tokenizer.pre.implemented" : "true",
+        "processors" : "16",
+        "active-vector-bits" : "256",
+        "vm-version" : "25.0.3+9-LTS",
+        "end-of-generation.150003" : "vocabulary-text",
+        "end-of-generation.150005" : "vocabulary-text,chat-template-end-of-turn",
+        "vector-api" : "true",
+        "vm-name" : "OpenJDK 64-Bit Server VM",
+        "java-feature" : "25"
+      },
+      "optimizations" : [ {
+        "id" : "mixed-k-projections",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+        "settings" : {
+          "formats" : "Q4_K,Q4_K,Q6_K",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "q4-kernel",
+        "status" : "UNSUPPORTED",
+        "reason" : "the loaded model has no Q4_0 projection tensors",
+        "settings" : {
+          "architecture" : "amd64",
+          "os" : "Linux",
+          "unsigned-supported" : "true",
+          "active-vector-bits" : "256",
+          "java-feature" : "25",
+          "short-supported" : "true",
+          "requested" : "widened",
+          "compiler" : "hotspot-c2"
+        }
+      }, {
+        "id" : "q6-batched-kernel",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded projection topology has no Q6_K consumer",
+        "settings" : {
+          "active-vector-bits" : "256",
+          "batch-size" : "1",
+          "architecture" : "amd64",
+          "kernel" : "one-query-block",
+          "requested-kernel" : "one-query-block"
+        }
+      }, {
+        "id" : "staged-quantized-ffn",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+        "settings" : {
+          "executor" : "persistent",
+          "stages" : "2",
+          "parallel" : "true",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "staged-quantized-layer",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+        "settings" : {
+          "executor" : "persistent",
+          "stages" : "7",
+          "parallel" : "true",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "block-major-q8-activations",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded staged projection topology has no Q8_0 consumer",
+        "settings" : {
+          "layout" : "block-major-bytes",
+          "prefill-batch-size" : "1"
+        }
+      }, {
+        "id" : "q8-block-major-kernel",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded staged projection topology has no Q8_0 consumer",
+        "settings" : {
+          "active-vector-bits" : "256",
+          "compiler" : "hotspot-c2",
+          "floating-point-order" : "scalar-block-order",
+          "kernel" : "scattered",
+          "requested-kernel" : "scattered"
+        }
+      }, {
+        "id" : "parallel-q8-ffn-preparation",
+        "status" : "UNSUPPORTED",
+        "reason" : "every staged layer requires Q8_0 gate and up projections",
+        "settings" : {
+          "partitions" : "16",
+          "partition" : "batch-rows",
+          "staged-layers" : "0",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "mapped-model-weights",
+        "status" : "ENABLED",
+        "reason" : "model tensors remain mapped for model-scale streaming locality",
+        "settings" : {
+          "artifact-format" : "gguf",
+          "storage" : "memory-segment"
+        }
+      }, {
+        "id" : "vector-fma",
+        "status" : "ENABLED",
+        "reason" : "vectors-core selected deterministic vector FMA for this platform",
+        "settings" : {
+          "fast-scalar-fma" : "true"
+        }
+      }, {
+        "id" : "persistent-row-executor",
+        "status" : "ENABLED",
+        "reason" : "vectors-core selected reusable GGUF row workers",
+        "settings" : {
+          "executor" : "persistent",
+          "chunks-per-thread" : "2",
+          "threads" : "16"
+        }
+      }, {
+        "id" : "flint-injected-projection-groups",
+        "status" : "UNSUPPORTED",
+        "reason" : "Flint tests mapped QKV, dense/shared gate-up, and routed-expert shapes against the injected kernel; remaining projections use Java helpers. Counts describe eligibility, not measured invocations.",
+        "settings" : {
+          "implementation" : "vector-api",
+          "routed-expert-eligible-layers" : "0",
+          "q4-k-reduction" : "sequential-block-order",
+          "qkv-eligible-layers" : "0",
+          "dense-shared-gate-up-eligible-layers" : "0"
+        }
+      }, {
+        "id" : "batched-prefill",
+        "status" : "UNSUPPORTED",
+        "reason" : "Flint advances prompt tokens sequentially and skips only discarded vocabulary projections",
+        "settings" : {
+          "batch-size" : "1"
+        }
+      }, {
+        "id" : "flint-java-attention",
+        "status" : "ENABLED",
+        "reason" : "Flint uses pinned key scores, sink softmax, vectorized non-fused chronological values, and independent parallel heads above one million elements; generic batched/native attention switches do not apply",
+        "settings" : {
+          "implementation" : "java",
+          "value-rows" : "1",
+          "key-score-rows" : "1"
+        }
+      }, {
+        "id" : "final-layer-prefill-pruning",
+        "status" : "UNSUPPORTED",
+        "reason" : "Flint retains final-layer attention and FFN work for every prompt token",
+        "settings" : {
+          "output-rows" : "all"
+        }
+      } ]
+    }
+  }, {
+    "backend" : "pure-java",
+    "case" : "chat",
+    "tokenizerMatches" : true,
+    "continuationMatches" : true,
+    "actualContinuation" : [ 150006, 16, 13, 220, 937, 74091, 269, 101439 ],
+    "teacherForcedReferenceContinuation" : [ 150006, 16, 13, 220, 937, 74091, 269, 101439 ],
+    "finiteLogits" : true,
+    "maxAbsoluteLogitDifferenceFromJava" : 0.0,
+    "relativeRmsLogitDifferenceFromJava" : 0.0,
+    "elapsedMillis" : 41060.191271,
+    "passed" : true,
+    "backendDiagnostics" : {
+      "backend" : "pure-java",
+      "planVersion" : "pure-java-v20",
+      "environment" : {
+        "q4-unsigned-pairwise-supported" : "true",
+        "flint-router-cache-bytes" : "98566144",
+        "sve" : "false",
+        "gguf-parallel" : "true",
+        "vm-vendor" : "Eclipse Adoptium",
+        "compiler" : "hotspot-c2",
+        "fast-vector-fma" : "true",
+        "fast-scalar-fma" : "true",
+        "preferred-vector-bits" : "256",
+        "model-architecture" : "flint",
+        "os" : "Linux",
+        "cpu-model" : "AMD EPYC 7R13 Processor",
+        "gguf-threads" : "16",
+        "end-of-generation.150018" : "vocabulary-text",
+        "q4-short-pairwise-supported" : "true",
+        "vector-provider" : "PanamaVectorUtilSupport",
+        "java-version" : "25.0.3",
+        "gguf-chunks-per-thread" : "2",
+        "gguf-executor" : "persistent",
+        "architecture" : "amd64",
+        "tokenizer.pre" : "flint",
+        "projection-layers" : "49",
+        "end-of-generation-token-ids" : "150001,150003,150005,150018",
+        "flint-diagnostics-version" : "1",
+        "architecture-prefill-batch-size" : "1",
+        "end-of-generation.chat-template" : "resolved:150005",
+        "end-of-generation.150001" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+        "tokenizer.pre.implemented" : "true",
+        "processors" : "16",
+        "active-vector-bits" : "256",
+        "vm-version" : "25.0.3+9-LTS",
+        "end-of-generation.150003" : "vocabulary-text",
+        "end-of-generation.150005" : "vocabulary-text,chat-template-end-of-turn",
+        "vector-api" : "true",
+        "vm-name" : "OpenJDK 64-Bit Server VM",
+        "java-feature" : "25"
+      },
+      "optimizations" : [ {
+        "id" : "mixed-k-projections",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+        "settings" : {
+          "formats" : "Q4_K,Q4_K,Q6_K",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "q4-kernel",
+        "status" : "UNSUPPORTED",
+        "reason" : "the loaded model has no Q4_0 projection tensors",
+        "settings" : {
+          "architecture" : "amd64",
+          "os" : "Linux",
+          "unsigned-supported" : "true",
+          "active-vector-bits" : "256",
+          "java-feature" : "25",
+          "short-supported" : "true",
+          "requested" : "widened",
+          "compiler" : "hotspot-c2"
+        }
+      }, {
+        "id" : "q6-batched-kernel",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded projection topology has no Q6_K consumer",
+        "settings" : {
+          "active-vector-bits" : "256",
+          "batch-size" : "1",
+          "architecture" : "amd64",
+          "kernel" : "one-query-block",
+          "requested-kernel" : "one-query-block"
+        }
+      }, {
+        "id" : "staged-quantized-ffn",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+        "settings" : {
+          "executor" : "persistent",
+          "stages" : "2",
+          "parallel" : "true",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "staged-quantized-layer",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+        "settings" : {
+          "executor" : "persistent",
+          "stages" : "7",
+          "parallel" : "true",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "block-major-q8-activations",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded staged projection topology has no Q8_0 consumer",
+        "settings" : {
+          "layout" : "block-major-bytes",
+          "prefill-batch-size" : "1"
+        }
+      }, {
+        "id" : "q8-block-major-kernel",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded staged projection topology has no Q8_0 consumer",
+        "settings" : {
+          "active-vector-bits" : "256",
+          "compiler" : "hotspot-c2",
+          "floating-point-order" : "scalar-block-order",
+          "kernel" : "scattered",
+          "requested-kernel" : "scattered"
+        }
+      }, {
+        "id" : "parallel-q8-ffn-preparation",
+        "status" : "UNSUPPORTED",
+        "reason" : "every staged layer requires Q8_0 gate and up projections",
+        "settings" : {
+          "partitions" : "16",
+          "partition" : "batch-rows",
+          "staged-layers" : "0",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "mapped-model-weights",
+        "status" : "ENABLED",
+        "reason" : "model tensors remain mapped for model-scale streaming locality",
+        "settings" : {
+          "artifact-format" : "gguf",
+          "storage" : "memory-segment"
+        }
+      }, {
+        "id" : "vector-fma",
+        "status" : "ENABLED",
+        "reason" : "vectors-core selected deterministic vector FMA for this platform",
+        "settings" : {
+          "fast-scalar-fma" : "true"
+        }
+      }, {
+        "id" : "persistent-row-executor",
+        "status" : "ENABLED",
+        "reason" : "vectors-core selected reusable GGUF row workers",
+        "settings" : {
+          "executor" : "persistent",
+          "chunks-per-thread" : "2",
+          "threads" : "16"
+        }
+      }, {
+        "id" : "flint-injected-projection-groups",
+        "status" : "UNSUPPORTED",
+        "reason" : "Flint tests mapped QKV, dense/shared gate-up, and routed-expert shapes against the injected kernel; remaining projections use Java helpers. Counts describe eligibility, not measured invocations.",
+        "settings" : {
+          "implementation" : "vector-api",
+          "routed-expert-eligible-layers" : "0",
+          "q4-k-reduction" : "sequential-block-order",
+          "qkv-eligible-layers" : "0",
+          "dense-shared-gate-up-eligible-layers" : "0"
+        }
+      }, {
+        "id" : "batched-prefill",
+        "status" : "UNSUPPORTED",
+        "reason" : "Flint advances prompt tokens sequentially and skips only discarded vocabulary projections",
+        "settings" : {
+          "batch-size" : "1"
+        }
+      }, {
+        "id" : "flint-java-attention",
+        "status" : "ENABLED",
+        "reason" : "Flint uses pinned key scores, sink softmax, vectorized non-fused chronological values, and independent parallel heads above one million elements; generic batched/native attention switches do not apply",
+        "settings" : {
+          "implementation" : "java",
+          "value-rows" : "1",
+          "key-score-rows" : "1"
+        }
+      }, {
+        "id" : "final-layer-prefill-pruning",
+        "status" : "UNSUPPORTED",
+        "reason" : "Flint retains final-layer attention and FFN work for every prompt token",
+        "settings" : {
+          "output-rows" : "all"
+        }
+      } ]
+    }
+  }, {
+    "backend" : "rust-ffm",
+    "case" : "completion",
+    "tokenizerMatches" : true,
+    "continuationMatches" : true,
+    "actualContinuation" : [ 332, 260, 2635, 3222, 762, 260, 34325, 366 ],
+    "teacherForcedReferenceContinuation" : [ 332, 260, 2635, 3222, 762, 260, 34325, 366 ],
+    "finiteLogits" : true,
+    "maxAbsoluteLogitDifferenceFromJava" : 0.0,
+    "relativeRmsLogitDifferenceFromJava" : 0.0,
+    "elapsedMillis" : 943.137553,
+    "passed" : true,
+    "backendDiagnostics" : {
+      "backend" : "rust-ffm",
+      "planVersion" : "rust-ffm-v14",
+      "environment" : {
+        "vector-provider" : "PanamaVectorUtilSupport",
+        "end-of-generation.chat-template" : "resolved:150005",
+        "processors" : "16",
+        "preferred-vector-bits" : "256",
+        "gguf-parallel" : "true",
+        "vm-vendor" : "Eclipse Adoptium",
+        "tokenizer.pre" : "flint",
+        "native-gated-delta-net" : "true",
+        "fast-vector-fma" : "true",
+        "flint-router-cache-bytes" : "98566144",
+        "vm-name" : "OpenJDK 64-Bit Server VM",
+        "java-version" : "25.0.3",
+        "end-of-generation.150001" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+        "end-of-generation.150003" : "vocabulary-text",
+        "os" : "Linux",
+        "end-of-generation.150005" : "vocabulary-text,chat-template-end-of-turn",
+        "native-kernel-decode-threads" : "8",
+        "native-kernel-poll-millis" : "5",
+        "kernel-implementation" : "rust-ffm-quantized-v15-ordered-q4-k",
+        "end-of-generation-token-ids" : "150001,150003,150005,150018",
+        "architecture-prefill-batch-size" : "1",
+        "compiler" : "hotspot-c2",
+        "gguf-chunks-per-thread" : "2",
+        "model-architecture" : "flint",
+        "native-quantized-decode" : "true",
+        "native-grouped-attention" : "true",
+        "native-q5-0-grouped" : "false",
+        "gguf-executor" : "persistent",
+        "kernel-runtime" : "rust-ffm",
+        "java-feature" : "25",
+        "java-executor-poll-millis" : "0",
+        "native-kernel-abi" : "7",
+        "end-of-generation.150018" : "vocabulary-text",
+        "vm-version" : "25.0.3+9-LTS",
+        "flint-diagnostics-version" : "1",
+        "fast-scalar-fma" : "true",
+        "transformer-runtime" : "java",
+        "projection-layers" : "49",
+        "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+        "q4-short-pairwise-supported" : "true",
+        "tokenizer.pre.implemented" : "true",
+        "q4-unsigned-pairwise-supported" : "true",
+        "cpu-model" : "AMD EPYC 7R13 Processor",
+        "vector-api" : "true",
+        "native-kernel-threads" : "8",
+        "active-vector-bits" : "256",
+        "gguf-threads" : "16",
+        "architecture" : "amd64",
+        "sve" : "false"
+      },
+      "optimizations" : [ {
+        "id" : "mixed-k-projections",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+        "settings" : {
+          "formats" : "Q4_K,Q4_K,Q6_K",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "q4-kernel",
+        "status" : "UNSUPPORTED",
+        "reason" : "the loaded model has no Q4_0 projection tensors",
+        "settings" : {
+          "architecture" : "amd64",
+          "os" : "Linux",
+          "unsigned-supported" : "true",
+          "active-vector-bits" : "256",
+          "java-feature" : "25",
+          "short-supported" : "true",
+          "requested" : "widened",
+          "compiler" : "hotspot-c2"
+        }
+      }, {
+        "id" : "q6-batched-kernel",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded projection topology has no Q6_K consumer",
+        "settings" : {
+          "active-vector-bits" : "256",
+          "batch-size" : "1",
+          "architecture" : "amd64",
+          "kernel" : "one-query-block",
+          "requested-kernel" : "one-query-block"
+        }
+      }, {
+        "id" : "staged-quantized-ffn",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+        "settings" : {
+          "executor" : "persistent",
+          "stages" : "2",
+          "parallel" : "true",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "staged-quantized-layer",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+        "settings" : {
+          "executor" : "persistent",
+          "stages" : "7",
+          "parallel" : "true",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "block-major-q8-activations",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded staged projection topology has no Q8_0 consumer",
+        "settings" : {
+          "layout" : "block-major-bytes",
+          "prefill-batch-size" : "1"
+        }
+      }, {
+        "id" : "q8-block-major-kernel",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded staged projection topology has no Q8_0 consumer",
+        "settings" : {
+          "active-vector-bits" : "256",
+          "compiler" : "hotspot-c2",
+          "floating-point-order" : "scalar-block-order",
+          "kernel" : "scattered",
+          "requested-kernel" : "scattered"
+        }
+      }, {
+        "id" : "parallel-q8-ffn-preparation",
+        "status" : "UNSUPPORTED",
+        "reason" : "every staged layer requires Q8_0 gate and up projections",
+        "settings" : {
+          "partitions" : "16",
+          "partition" : "batch-rows",
+          "staged-layers" : "0",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "mapped-model-weights",
+        "status" : "ENABLED",
+        "reason" : "model tensors remain mapped for model-scale streaming locality",
+        "settings" : {
+          "artifact-format" : "gguf",
+          "storage" : "memory-segment"
+        }
+      }, {
+        "id" : "vector-fma",
+        "status" : "ENABLED",
+        "reason" : "vectors-core selected deterministic vector FMA for this platform",
+        "settings" : {
+          "fast-scalar-fma" : "true"
+        }
+      }, {
+        "id" : "persistent-row-executor",
+        "status" : "ENABLED",
+        "reason" : "vectors-core selected reusable GGUF row workers",
+        "settings" : {
+          "executor" : "persistent",
+          "chunks-per-thread" : "2",
+          "threads" : "16"
+        }
+      }, {
+        "id" : "flint-injected-projection-groups",
+        "status" : "ENABLED",
+        "reason" : "Flint tests mapped QKV, dense/shared gate-up, and routed-expert shapes against the injected kernel; remaining projections use Java helpers. Counts describe eligibility, not measured invocations.",
+        "settings" : {
+          "implementation" : "rust-ffm-quantized-v15-ordered-q4-k",
+          "routed-expert-eligible-layers" : "47",
+          "q4-k-reduction" : "sequential-block-order",
+          "qkv-eligible-layers" : "49",
+          "dense-shared-gate-up-eligible-layers" : "49"
+        }
+      }, {
+        "id" : "batched-prefill",
+        "status" : "UNSUPPORTED",
+        "reason" : "Flint advances prompt tokens sequentially and skips only discarded vocabulary projections",
+        "settings" : {
+          "batch-size" : "1"
+        }
+      }, {
+        "id" : "flint-java-attention",
+        "status" : "ENABLED",
+        "reason" : "Flint uses pinned key scores, sink softmax, vectorized non-fused chronological values, and independent parallel heads above one million elements; generic batched/native attention switches do not apply",
+        "settings" : {
+          "implementation" : "java",
+          "value-rows" : "1",
+          "key-score-rows" : "1"
+        }
+      }, {
+        "id" : "final-layer-prefill-pruning",
+        "status" : "UNSUPPORTED",
+        "reason" : "Flint retains final-layer attention and FFN work for every prompt token",
+        "settings" : {
+          "output-rows" : "all"
+        }
+      }, {
+        "id" : "rust-ptq1-0-q8-0-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+        "settings" : {
+          "weight" : "PTQ1_0",
+          "activation" : "Q8_0",
+          "transformer" : "java"
+        }
+      }, {
+        "id" : "rust-q4-0-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-q5-0-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-q8-0-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-q4-k-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-q5-k-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-q6-k-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-mixed-k-grouped-matmul",
+        "status" : "ENABLED",
+        "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-gated-delta-net",
+        "status" : "ENABLED",
+        "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+        "settings" : {
+          "boundary" : "panama-ffm-critical",
+          "state" : "caller-owned-java-array",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-grouped-gated-delta-net",
+        "status" : "ENABLED",
+        "reason" : "independent recurrent state slots share one native worker dispatch",
+        "settings" : {
+          "boundary" : "panama-ffm-critical",
+          "state" : "branch-major-caller-owned-java-array",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-q5-0-grouped-matmul",
+        "status" : "DISABLED",
+        "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+        "settings" : {
+          "evidence" : "benchmark-results/2026-10-12-q5-production/"
+        }
+      }, {
+        "id" : "rust-quantized-decode",
+        "status" : "ENABLED",
+        "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+        "settings" : {
+          "transformer" : "java"
+        }
+      } ]
+    }
+  }, {
+    "backend" : "rust-ffm",
+    "case" : "chat",
+    "tokenizerMatches" : true,
+    "continuationMatches" : true,
+    "actualContinuation" : [ 150006, 16, 13, 220, 937, 74091, 269, 101439 ],
+    "teacherForcedReferenceContinuation" : [ 150006, 16, 13, 220, 937, 74091, 269, 101439 ],
+    "finiteLogits" : true,
+    "maxAbsoluteLogitDifferenceFromJava" : 0.0,
+    "relativeRmsLogitDifferenceFromJava" : 0.0,
+    "elapsedMillis" : 1125.892779,
+    "passed" : true,
+    "backendDiagnostics" : {
+      "backend" : "rust-ffm",
+      "planVersion" : "rust-ffm-v14",
+      "environment" : {
+        "vector-provider" : "PanamaVectorUtilSupport",
+        "end-of-generation.chat-template" : "resolved:150005",
+        "processors" : "16",
+        "preferred-vector-bits" : "256",
+        "gguf-parallel" : "true",
+        "vm-vendor" : "Eclipse Adoptium",
+        "tokenizer.pre" : "flint",
+        "native-gated-delta-net" : "true",
+        "fast-vector-fma" : "true",
+        "flint-router-cache-bytes" : "98566144",
+        "vm-name" : "OpenJDK 64-Bit Server VM",
+        "java-version" : "25.0.3",
+        "end-of-generation.150001" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+        "end-of-generation.150003" : "vocabulary-text",
+        "os" : "Linux",
+        "end-of-generation.150005" : "vocabulary-text,chat-template-end-of-turn",
+        "native-kernel-decode-threads" : "8",
+        "native-kernel-poll-millis" : "5",
+        "kernel-implementation" : "rust-ffm-quantized-v15-ordered-q4-k",
+        "end-of-generation-token-ids" : "150001,150003,150005,150018",
+        "architecture-prefill-batch-size" : "1",
+        "compiler" : "hotspot-c2",
+        "gguf-chunks-per-thread" : "2",
+        "model-architecture" : "flint",
+        "native-quantized-decode" : "true",
+        "native-grouped-attention" : "true",
+        "native-q5-0-grouped" : "false",
+        "gguf-executor" : "persistent",
+        "kernel-runtime" : "rust-ffm",
+        "java-feature" : "25",
+        "java-executor-poll-millis" : "0",
+        "native-kernel-abi" : "7",
+        "end-of-generation.150018" : "vocabulary-text",
+        "vm-version" : "25.0.3+9-LTS",
+        "flint-diagnostics-version" : "1",
+        "fast-scalar-fma" : "true",
+        "transformer-runtime" : "java",
+        "projection-layers" : "49",
+        "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+        "q4-short-pairwise-supported" : "true",
+        "tokenizer.pre.implemented" : "true",
+        "q4-unsigned-pairwise-supported" : "true",
+        "cpu-model" : "AMD EPYC 7R13 Processor",
+        "vector-api" : "true",
+        "native-kernel-threads" : "8",
+        "active-vector-bits" : "256",
+        "gguf-threads" : "16",
+        "architecture" : "amd64",
+        "sve" : "false"
+      },
+      "optimizations" : [ {
+        "id" : "mixed-k-projections",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+        "settings" : {
+          "formats" : "Q4_K,Q4_K,Q6_K",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "q4-kernel",
+        "status" : "UNSUPPORTED",
+        "reason" : "the loaded model has no Q4_0 projection tensors",
+        "settings" : {
+          "architecture" : "amd64",
+          "os" : "Linux",
+          "unsigned-supported" : "true",
+          "active-vector-bits" : "256",
+          "java-feature" : "25",
+          "short-supported" : "true",
+          "requested" : "widened",
+          "compiler" : "hotspot-c2"
+        }
+      }, {
+        "id" : "q6-batched-kernel",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded projection topology has no Q6_K consumer",
+        "settings" : {
+          "active-vector-bits" : "256",
+          "batch-size" : "1",
+          "architecture" : "amd64",
+          "kernel" : "one-query-block",
+          "requested-kernel" : "one-query-block"
+        }
+      }, {
+        "id" : "staged-quantized-ffn",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+        "settings" : {
+          "executor" : "persistent",
+          "stages" : "2",
+          "parallel" : "true",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "staged-quantized-layer",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+        "settings" : {
+          "executor" : "persistent",
+          "stages" : "7",
+          "parallel" : "true",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "block-major-q8-activations",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded staged projection topology has no Q8_0 consumer",
+        "settings" : {
+          "layout" : "block-major-bytes",
+          "prefill-batch-size" : "1"
+        }
+      }, {
+        "id" : "q8-block-major-kernel",
+        "status" : "UNSUPPORTED",
+        "reason" : "loaded staged projection topology has no Q8_0 consumer",
+        "settings" : {
+          "active-vector-bits" : "256",
+          "compiler" : "hotspot-c2",
+          "floating-point-order" : "scalar-block-order",
+          "kernel" : "scattered",
+          "requested-kernel" : "scattered"
+        }
+      }, {
+        "id" : "parallel-q8-ffn-preparation",
+        "status" : "UNSUPPORTED",
+        "reason" : "every staged layer requires Q8_0 gate and up projections",
+        "settings" : {
+          "partitions" : "16",
+          "partition" : "batch-rows",
+          "staged-layers" : "0",
+          "eligible-layers" : "0"
+        }
+      }, {
+        "id" : "mapped-model-weights",
+        "status" : "ENABLED",
+        "reason" : "model tensors remain mapped for model-scale streaming locality",
+        "settings" : {
+          "artifact-format" : "gguf",
+          "storage" : "memory-segment"
+        }
+      }, {
+        "id" : "vector-fma",
+        "status" : "ENABLED",
+        "reason" : "vectors-core selected deterministic vector FMA for this platform",
+        "settings" : {
+          "fast-scalar-fma" : "true"
+        }
+      }, {
+        "id" : "persistent-row-executor",
+        "status" : "ENABLED",
+        "reason" : "vectors-core selected reusable GGUF row workers",
+        "settings" : {
+          "executor" : "persistent",
+          "chunks-per-thread" : "2",
+          "threads" : "16"
+        }
+      }, {
+        "id" : "flint-injected-projection-groups",
+        "status" : "ENABLED",
+        "reason" : "Flint tests mapped QKV, dense/shared gate-up, and routed-expert shapes against the injected kernel; remaining projections use Java helpers. Counts describe eligibility, not measured invocations.",
+        "settings" : {
+          "implementation" : "rust-ffm-quantized-v15-ordered-q4-k",
+          "routed-expert-eligible-layers" : "47",
+          "q4-k-reduction" : "sequential-block-order",
+          "qkv-eligible-layers" : "49",
+          "dense-shared-gate-up-eligible-layers" : "49"
+        }
+      }, {
+        "id" : "batched-prefill",
+        "status" : "UNSUPPORTED",
+        "reason" : "Flint advances prompt tokens sequentially and skips only discarded vocabulary projections",
+        "settings" : {
+          "batch-size" : "1"
+        }
+      }, {
+        "id" : "flint-java-attention",
+        "status" : "ENABLED",
+        "reason" : "Flint uses pinned key scores, sink softmax, vectorized non-fused chronological values, and independent parallel heads above one million elements; generic batched/native attention switches do not apply",
+        "settings" : {
+          "implementation" : "java",
+          "value-rows" : "1",
+          "key-score-rows" : "1"
+        }
+      }, {
+        "id" : "final-layer-prefill-pruning",
+        "status" : "UNSUPPORTED",
+        "reason" : "Flint retains final-layer attention and FFN work for every prompt token",
+        "settings" : {
+          "output-rows" : "all"
+        }
+      }, {
+        "id" : "rust-ptq1-0-q8-0-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+        "settings" : {
+          "weight" : "PTQ1_0",
+          "activation" : "Q8_0",
+          "transformer" : "java"
+        }
+      }, {
+        "id" : "rust-q4-0-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-q5-0-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-q8-0-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-q4-k-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-q5-k-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-q6-k-batched-matmul",
+        "status" : "ENABLED",
+        "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-mixed-k-grouped-matmul",
+        "status" : "ENABLED",
+        "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+        "settings" : {
+          "boundary" : "panama-ffm",
+          "transformer" : "java",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-gated-delta-net",
+        "status" : "ENABLED",
+        "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+        "settings" : {
+          "boundary" : "panama-ffm-critical",
+          "state" : "caller-owned-java-array",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-grouped-gated-delta-net",
+        "status" : "ENABLED",
+        "reason" : "independent recurrent state slots share one native worker dispatch",
+        "settings" : {
+          "boundary" : "panama-ffm-critical",
+          "state" : "branch-major-caller-owned-java-array",
+          "abi" : "7"
+        }
+      }, {
+        "id" : "rust-q5-0-grouped-matmul",
+        "status" : "DISABLED",
+        "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+        "settings" : {
+          "evidence" : "benchmark-results/2026-10-12-q5-production/"
+        }
+      }, {
+        "id" : "rust-quantized-decode",
+        "status" : "ENABLED",
+        "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+        "settings" : {
+          "transformer" : "java"
+        }
+      } ]
+    }
+  } ]
+}
