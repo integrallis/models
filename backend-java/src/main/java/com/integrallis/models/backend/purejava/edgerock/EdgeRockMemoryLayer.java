@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava.edgerock;
 
+import com.integrallis.models.backend.purejava.ops.TensorOps;
 import java.util.Objects;
 
 /**
@@ -116,13 +117,30 @@ final class EdgeRockMemoryLayer {
     int groups = config.headCountKv();
     int dim = config.headDim();
 
-    rmsNorm(hidden, weights.inputNorm(), config.rmsNormEpsilon(), normed);
+    TensorOps.rmsNorm(
+        normed,
+        0,
+        hidden,
+        0,
+        weights.inputNorm(),
+        config.embeddingLength(),
+        config.rmsNormEpsilon());
 
     // --- read, from committed records only ------------------------------------------------
     weights.queryProjection().apply(normed, queryFlat);
     for (int head = 0; head < heads; head++) {
+      // In place at this head's offset. Elementwise, so aliasing out and x at the same offset is
+      // safe, and it keeps the shared pinned reduction rather than a local sum that would not be
+      // bit-identical to every other norm in the model.
+      TensorOps.rmsNorm(
+          queryFlat,
+          head * dim,
+          queryFlat,
+          head * dim,
+          weights.queryNorm(),
+          dim,
+          config.rmsNormEpsilon());
       queries[head] = slice(queryFlat, head * dim, dim);
-      rmsNormInPlace(queries[head], weights.queryNorm(), config.rmsNormEpsilon());
       rope(queries[head], cos, sin);
     }
     MemoryRead.gates(
@@ -149,8 +167,15 @@ final class EdgeRockMemoryLayer {
     weights.keyProjection().apply(written, keyFlat);
     weights.valueProjection().apply(written, valueFlat);
     for (int group = 0; group < groups; group++) {
+      TensorOps.rmsNorm(
+          keyFlat,
+          group * dim,
+          keyFlat,
+          group * dim,
+          weights.keyNorm(),
+          dim,
+          config.rmsNormEpsilon());
       groupKeys[group] = slice(keyFlat, group * dim, dim);
-      rmsNormInPlace(groupKeys[group], weights.keyNorm(), config.rmsNormEpsilon());
       rope(groupKeys[group], cos, sin);
       groupValues[group] = slice(valueFlat, group * dim, dim);
     }
@@ -170,28 +195,6 @@ final class EdgeRockMemoryLayer {
     float[] out = new float[length];
     System.arraycopy(source, offset, out, 0, length);
     return out;
-  }
-
-  private static void rmsNorm(float[] input, float[] weight, float epsilon, float[] out) {
-    double sum = 0.0;
-    for (float value : input) {
-      sum += (double) value * value;
-    }
-    float scale = (float) (1.0 / Math.sqrt(sum / input.length + epsilon));
-    for (int i = 0; i < input.length; i++) {
-      out[i] = input[i] * scale * weight[i];
-    }
-  }
-
-  private static void rmsNormInPlace(float[] values, float[] weight, float epsilon) {
-    double sum = 0.0;
-    for (float value : values) {
-      sum += (double) value * value;
-    }
-    float scale = (float) (1.0 / Math.sqrt(sum / values.length + epsilon));
-    for (int i = 0; i < values.length; i++) {
-      values[i] = values[i] * scale * weight[i];
-    }
   }
 
   /**

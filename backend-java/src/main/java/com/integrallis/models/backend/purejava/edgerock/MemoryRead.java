@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava.edgerock;
 
+import com.integrallis.models.backend.purejava.ops.TensorOps;
 import java.util.Objects;
 
 /**
@@ -82,8 +83,10 @@ final class MemoryRead {
       float[] query = queries[head];
       java.util.Arrays.fill(out[head], 0f);
 
-      // The sink's logit is zero, so its unnormalised weight is exactly one.
-      float max = 0f;
+      // Absent slots are masked to -inf, which exp()s to zero inside the shared softmax. The
+      // sink's logit is zero: TensorOps.softmaxWithZeroValueSink is the same primitive another
+      // architecture already needed, and it rejects NaN and +inf scores, which a hand-rolled loop
+      // here did not.
       int occupied = 0;
       for (int slot = 0; slot < capacity; slot++) {
         if (!selection.occupied(slot)) {
@@ -96,31 +99,22 @@ final class MemoryRead {
           dot += query[i] * key[i];
         }
         logits[slot] = dot * scale;
-        max = Math.max(max, logits[slot]);
         occupied++;
       }
       if (occupied == 0) {
-        // Nothing committed: the sink is the whole distribution and the read is zero. Not a
-        // special case bolted on -- it falls out of the sink -- but asserted because an empty
-        // bank is every sequence's first 256 tokens.
+        // Nothing committed: the sink is the whole distribution and the read is zero. It falls out
+        // of the sink rather than being special-cased, but an empty bank is every sequence's first
+        // chunk, so it is asserted.
         continue;
       }
+      TensorOps.softmaxWithZeroValueSink(logits, 0, capacity, 0.0f);
 
-      float total = (float) Math.exp(0.0 - max);
-      for (int slot = 0; slot < capacity; slot++) {
-        if (logits[slot] == Float.NEGATIVE_INFINITY) {
-          continue;
-        }
-        float weight = (float) Math.exp(logits[slot] - max);
-        logits[slot] = weight;
-        total += weight;
-      }
       float gate = gates[head];
       for (int slot = 0; slot < capacity; slot++) {
-        if (logits[slot] == Float.NEGATIVE_INFINITY) {
+        if (!selection.occupied(slot)) {
           continue;
         }
-        float weight = gate * logits[slot] / total;
+        float weight = gate * logits[slot];
         float[] value = bank.value(group, slot);
         for (int i = 0; i < dim; i++) {
           out[head][i] += weight * value[i];
