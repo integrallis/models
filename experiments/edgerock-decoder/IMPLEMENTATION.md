@@ -133,6 +133,22 @@ Each of these loads, runs, and produces plausible output.
    logits first, then the selected reference set after a commit, which is where divergence will
    show first.
 
+## Measured on real weights, 2026-10-30
+
+- EdgeRock-4B-Q4_K_M loads and decodes through the Qwen3.5 decoder. Greedy continuation and the
+  reproduce command are in README.md.
+- Layer 3's memory contribution, real weights, after one commit: **L1 = 5.94**, finite.
+- Layer 3's memory contribution across all 256 tokens before the first commit: **exactly 0.0**.
+  This is correct. The read precedes the write, the read sees only the committed selection, and
+  `commit()` fires when the pending chunk reaches `commit_chunk` = 256. A test that drove one
+  token called the layer dead when it was merely early -- add this to the silent-failure list
+  below as the sixth: *a correct memory layer contributes nothing at all until the first chunk
+  commits, so any check shorter than `commit_chunk` cannot tell it from a dead one.*
+- Independent corroboration of the snapshot problem: the publisher's llama.cpp patch forces
+  `COMMON_CONTEXT_SEQ_RM_TYPE_FULL` for `edgerock`, i.e. its context cannot be partially removed.
+  We refuse `captureLinearState` on a model with anchors for the same reason, reached before
+  reading the patch.
+
 ## Not yet established
 
 - Whether mRoPE `dimension_sections [11, 11, 10, 0]` can be ignored for text-only input.

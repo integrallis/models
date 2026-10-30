@@ -112,17 +112,104 @@ EdgeRock fits that mechanism directly, and ships its own reference runtime in th
 two-arm discipline is preserved. The gate currently hard-codes Bonsai's id and artifact, so it
 needs generalising to a table of (model, pinned reference) pairs -- contained, not a new protocol.
 
+## State, 2026-10-30
+
+Measured here unless marked otherwise.
+
+**EdgeRock-4B-Q4_K_M runs through our decoder.** Greedy from `"The capital of France is"`,
+16 tokens, library defaults: `" Paris. Paris is known for its historical landmarks and
+attractions. One of the most"`. Logits finite at every step; vocabulary 248320, resolved from
+`tokenizer.ggml.tokens` because the file publishes no `vocab_size` under either prefix.
+Reproduce with `:backend-java:edgeRockCompatibilityTest
+-Dmodels.fixtures.edgeRock4bGguf=<path>`.
+
+**That run is not evidence the memory works.** A memory module returning zeros leaves a plain
+Qwen3.5 hybrid, which also produces fluent text, so the continuation above cannot distinguish the
+two and must not be cited as if it could. The second test in that task drives one real memory
+layer with real weights and measures L1 = 5.94 for layer 3's contribution after one commit.
+
+**The anchors contribute exactly nothing before the first commit**, and that is correct, not
+broken: the read precedes the write, the read sees only the committed selection, and `commit()`
+fires when the pending chunk reaches `commit_chunk` = 256. The first version of that test drove a
+single token and would have reported a dead layer that was merely early. Consequence for
+qualification: RAG prompts here run 171-379 tokens, so the feature is barely exercised at all, and
+a flat result from it is "no data", not "no effect". The publisher's own long-memory cases, at 9664
+and 10462 input tokens, are the ones that exercise it.
+
+### Why this became a fourth name rather than a new decoder
+
+The published GGUF is **dual-keyed**: a complete `qwen35.*` metadata set beside its own
+`edgerock.*`, identical values, and every one of its 546 tensors carries a name
+`Qwen35Weights` already resolves. The publisher's own llama.cpp patch does the same thing from the
+other side -- `patch_llama.py` maps `edgerock` to `LLM_ARCH_QWEN35` and extends
+`src/models/qwen35.cpp`. Two independent implementations reached the same decision.
+
+Read off the artifact, not assumed: `attn_q` is `[2560, 8192]`, twice the query width, because
+`attn_output_gate` packs the gate into it; `attn_gate` exists only on the 24 recurrent layers;
+there is no `output.weight`, so the head ties.
+
+### Corroborated independently
+
+Our snapshot refusal was reached before reading the patch, and the patch agrees: it forces
+`COMMON_CONTEXT_SEQ_RM_TYPE_FULL` for `edgerock`, because its context cannot be partially removed.
+`captureLinearState` therefore refuses on a model with anchors -- a snapshot carries convolution
+and recurrent state only, so restoring one would rewind the recurrence while the bank kept anchors
+written past the restore point. `rewind()` is unaffected: it clears the banks and replays.
+
+### A defect this work found in our own reader
+
+`attention.window` was read with `getUint32().orElse(0)`, and `getUint32` strictly filters on
+`Uint32Value`. A width stored as int32 would have been dropped to 0 and served as **full attention
+with nothing reported**. Absent and present-but-unreadable are now different answers.
+
+## The reference, and what it costs to use
+
+The GGUF repository ships its own backend, and the licences are permissive: the patch is
+Apache-2.0 (`LICENSE-CODE`), llama.cpp MIT (`backend/llama-cpp-LICENSE`). Rule 6 is satisfied --
+and nothing from it is copied into our runtime; it is used only as an external oracle.
+
+- `backend/llama-cpp-runtime.patch`, against llama.cpp
+  `62318cd57dc63900ecb153272c0b10f78550855d`, plus `backend/edgerock-rma.h` (to `src/`) and
+  `backend/edgerock-rma-graph.inc` (to `src/models/`). All 9 hunks apply cleanly at that commit
+  and the CPU build succeeds; verified here on 2026-10-30.
+- The prebuilt `edgerock-native-linux-sm90.tar.gz` is Linux x86-64 + CUDA SM90 only, so any other
+  platform must rebuild. Their published receipts are CUDA runs with `--n-gpu-layers 99`, so their
+  numbers are GPU numbers and are **read, not ours**.
+- `receipts/*.json` carry the exact server command, four cases with expected answers, outputs and
+  timings. Two are long-memory cases at 9664 and 10462 input tokens. `Modelfile.Q4_K_M` gives the
+  template: ChatML with a forced `<think>` opener, `temperature 0`.
+
 ## Order of work
 
-1. **Prove the config parses** the real header with `edgerock` admitted, and prove the loader's
-   tensor expectations against the real tensor list. Answers the `ssm_ba` question.
-2. **Refuse rather than mis-serve.** Until the memory module exists, `edgerock` must fail loudly.
-   Routing it to the qwen35 forward pass would ignore 8 layers of memory contribution and emit
-   plausible, wrong logits -- the worst available outcome.
-3. **Implement the memory module** against the paper, with a parity test versus the reference
-   runtime on a fixed prompt before any quality claim.
-4. **Sliding-window attention**, then mRoPE if the multimodal path is wanted.
-5. **Qualify** under the generalised publisher-reference policy.
+1. ~~Prove the config parses the real header with `edgerock` admitted, and the loader's tensor
+   expectations against the real tensor list.~~ Done; `ssm_ba` answered -- the split
+   `ssm_alpha`/`ssm_beta` form is the one already supported.
+2. ~~Refuse rather than mis-serve.~~ Superseded. The memory module exists, so the blanket refusal
+   is gone and three narrower ones replace it: the graph will not construct unless anchors are
+   present exactly when the architecture declares them; batched prefill clamps to one token
+   because it has no memory wiring; grouped decisions are refused because the bank is not
+   branch-scoped.
+3. ~~Implement the memory module, with a parity test against the reference.~~ Done at layer
+   scope -- `EdgeRockMemoryLayerParityTest` against a dumped reference layer. **Full-model parity
+   is still open.**
+4. ~~Sliding-window attention.~~ Done, as a shifted base offset into the position-contiguous key
+   cache, so `attendHead` is unchanged. mRoPE is **not** implemented; see below.
+5. **Pin greedy output against the patched llama.cpp** built above. This is the correctness gate
+   and it is the next thing to run.
+6. **Qualify**: candidate `pure-java` against that same build as the pinned publisher reference,
+   plus the 9/9 library-defaults smoke, then generalise
+   `rag-publisher-reference-gate.mjs` off its hard-coded Bonsai pair to a table of
+   (model, pinned reference) pairs.
+
+## Still unverified
+
+- **mRoPE.** The file publishes `rope.dimension_sections [11, 11, 10, 0]` and the reference config
+  sets `mrope_interleaved`; we apply plain NeoX over `rope.dimension_count`. For text-only input
+  the three sections are expected to carry the same position and collapse to exactly that, which
+  is why the model loads rather than being refused. Coherent output over 16 tokens is weak support
+  and nothing more -- a rope error can stay invisible at short context. Step 5 settles it.
+- **Full-model parity.** Layer-scope parity passes; whole-model does not exist yet.
+- **Prefill throughput.** EdgeRock is clamped to one token per step. Real cost, not yet measured.
 
 ## What this document does not claim
 
