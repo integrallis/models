@@ -216,7 +216,7 @@ must earn its own passing evidence. The current failed reports remain the baseli
    product. The improvement implementation moves scratch to session ownership and groups
    Q/K/V and gate/up projections. `GgufBatchedMatrixKernel` now reaches the forward pass through
    `loadFlint`; the baseline passed it only to planning. The implementation uses the
-   existing Q4_K/Q6_K Rust FFM kernels and prove actual invocation, fallback behavior, numerical
+   existing Q4_K/Q6_K Rust FFM kernels; verify actual invocation, fallback behavior, numerical
    parity, session isolation, and native resource lifetime before claiming acceleration.
 4. **Profile and optimize the remaining hot paths.** Measure matrix products, quantization,
    thread scheduling, allocation, attention, and prefill separately. Use grouped Q/K/V and
@@ -278,3 +278,17 @@ excluded from comparative timings. Ollama's runner is primed before measurement 
 be sampled; the old daemon-only memory figures are not reused. The worker uploads intermediate
 evidence, shuts down on exit, and requires the bootstrap's independent four-hour termination bound.
 No catalog entry or capability claim follows from a changed scorer or passing unit tests alone.
+
+After collecting a complete campaign, run the additional offline evidence gate:
+
+```bash
+python3 scripts/flint/assess-improvement.py RESULTS_DIR NEW_ASSESSMENT.json
+python3 -m unittest discover -s scripts/flint -p test_assess_improvement.py
+```
+
+The gate binds audits and qualification decisions to their original report hashes, checks the
+frozen budget, and enforces all 16 distinct held-out questions, at least 15 passes, both
+abstentions, and no detected polarity contradictions. Missing evidence fails closed. A passing
+runtime assessment still requires manual raw-answer review and released-library evidence;
+it never grants catalog admission or tool capability by itself. It does not modify the worker
+or runtime of an already deployed campaign.
