@@ -23,7 +23,10 @@ package com.integrallis.models.runtime;
  */
 public interface TokenConstraint {
 
-  /** Returns whether {@code token} is valid as the next generated token. */
+  /**
+   * Returns whether {@code token} is valid as the next generated token, without advancing decode
+   * state. The sampler need not consult tokens whose scores cannot win.
+   */
   boolean allows(int token);
 
   /** Advances this constraint after {@code token} was generated and accepted. */

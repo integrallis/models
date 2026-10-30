@@ -343,3 +343,18 @@ gate-up, and routed-expert groups, plus the actual sequential Java attention/pre
 They replace generic placeholder labels that incorrectly advertised batched attention or said
 all grouping was unsupported. Eligibility counts are not invocation counters or speed evidence.
 The frozen `3336aed1` campaign retains the old generic labels; its reports remain unchanged.
+
+The separate `scripts/flint/tool-grammar-worker.sh` comparison freezes two full 14-case tool arms:
+default and `flint-schema-v1`, sequentially on one fresh m6a.4xlarge. Both use greedy generation,
+512 tokens for calls, and an unconstrained 512-token visible follow-up. It first repeats reference
+parity, preserves incomplete reports, and requires an independent 90-minute termination bound.
+Its payload uses the same pinned model, JDK, and Rust versions as the ordered-Q4_K campaign.
+Only declared schemas reach the grammar; it never receives expected argument values. The existing
+follow-up fixture supplies a scripted prior weather call and result, then grades the generated
+visible answer. It is a result-synthesis check, not a live multi-step agent evaluation.
+Tool capability remains unqualified until the full suite and visible follow-up actually pass.
+
+Greedy constrained sampling also avoids grammar evaluation for scores that cannot beat the best
+allowed token. Exhaustive-mask regressions preserve tie and non-finite-score behavior. A synthetic
+150,016-token vocabulary probe selected the same token five times while reducing predicate calls
+from 750,080 to 15. This is a sampler overhead diagnostic, not a real-model speed measurement.

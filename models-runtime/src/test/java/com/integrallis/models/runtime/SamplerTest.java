@@ -37,6 +37,45 @@ class SamplerTest {
   class Constraints {
 
     @Test
+    void greedyAvoidsGrammarChecksForScoresThatCannotWin() {
+      float[] logits = new float[150_016];
+      logits[0] = 10;
+      int[] checked = {0};
+      Sampler sampler = new Sampler(SamplingOptions.builder().temperature(0).build());
+      assertThat(
+              sampler.sample(
+                  logits,
+                  List.of(),
+                  token -> {
+                    checked[0]++;
+                    return true;
+                  }))
+          .isZero();
+      assertThat(checked[0]).isEqualTo(1);
+    }
+
+    @Test
+    void greedyMatchesExhaustiveFilteringForMasksTiesAndNonFiniteScores() {
+      var random = new java.util.Random(712);
+      Sampler sampler = new Sampler(SamplingOptions.builder().temperature(0).build());
+      float[] values = {
+        Float.NaN, Float.NEGATIVE_INFINITY, -1, -0f, 0f, 1, Float.POSITIVE_INFINITY
+      };
+      for (int trial = 0; trial < 100; trial++) {
+        float[] logits = new float[128];
+        boolean[] allowed = new boolean[logits.length];
+        int expected = -1;
+        for (int token = 0; token < logits.length; token++) {
+          logits[token] = values[random.nextInt(values.length)];
+          allowed[token] = random.nextBoolean();
+          if (allowed[token] && (expected < 0 || logits[token] > logits[expected]))
+            expected = token;
+        }
+        assertThat(sampler.sample(logits, List.of(), token -> allowed[token])).isEqualTo(expected);
+      }
+    }
+
+    @Test
     void greedySelectsBestAllowedToken() {
       float[] logits = {1.0f, 100.0f, 5.0f};
       Sampler sampler = new Sampler(SamplingOptions.builder().temperature(0.0f).build());
