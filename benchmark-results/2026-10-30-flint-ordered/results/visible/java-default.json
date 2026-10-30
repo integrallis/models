@@ -1,0 +1,181 @@
+{
+  "policyId" : "visible-answer-completion-and-bounded-facts-v1",
+  "generatedAt" : "2026-10-30T15:04:50.200121516Z",
+  "newInference" : false,
+  "sourceReport" : "/work/flint/results/java-default.json",
+  "sourceReportSha256" : "8e07e921f0092e61db8dbcc5e54b81ad9f77e9a0e31d33e9533906825876bfd7",
+  "sourceBackendVersion" : "models@0.5.7+flint-3336aed192786be17cca9360fdf65ee5ede731c7 com.integrallis:vectors-core@0.1.32",
+  "assessmentGroundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v24",
+  "artifactSha256" : "c3c4d93f9db92627a2fc47ea8fe8c64a094cabd3549db544bcdd2c00e9a9a347",
+  "workload" : "general",
+  "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+  "attempts" : 9,
+  "distinctQuestions" : 9,
+  "completeVisibleAnswers" : 5,
+  "requiredFactsAndCitationsPasses" : 5,
+  "budgetReached" : 4,
+  "limitation" : "Deterministic required-fact/citation matching is not a general hallucination or semantic-entailment judge. Budget reached is conservative: reports lack an explicit finish reason. Repetitions are not independent accuracy samples.",
+  "assessments" : [ {
+    "caseId" : "auto-glass-deadline",
+    "visibleText" : "You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+    "reasoningText" : "We need answer. Need follow rules. Context says within 30 calendar days. Deductible $75. Need one short sentence. Include citations exactly from square brackets start of CONTEXT entry. Only [claims-auto-glass]. End sentence. No extra. Should answer. Ensure if context contains answer yes. One short sentence. \"You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].\" Check citation format: source ID exactly from square brackets at start of CONTEXT entry, so [claims-auto-glass]. Put at end. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "travel-limit",
+    "visibleText" : "The trip interruption claim uses form T-19 and has a reimbursement limit of 3,500 dollars per",
+    "reasoningText" : "We need answer. Need follow rules. Context: Travel interruption claims. Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. Reimbursement limit is 3,500 dollars per covered traveler.\n\nQuestion: Which form is used for trip interruption and what is the reimbursement limit?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [claims-travel]. So citation [claims-travel]. Must not invent. Answer: Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler. Include citation at end. One short sentence.\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. So end: [claims-travel]. Sentence: The trip interruption claim uses form T-19 and has a reimbursement limit of 3,500 dollars per covered traveler. [claims-travel]\n\nShould we include supporting receipts? Not asked. Fine.\n\nFinal.",
+    "reasoningComplete" : true,
+    "budgetReached" : true,
+    "completeVisibleAnswer" : false,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "requiredFactsAndCitationsPass" : false
+  }, {
+    "caseId" : "telemedicine-benefit",
+    "visibleText" : "No, in-network behavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine].",
+    "reasoningText" : "We need answer. Need follow rules. Context says in-network behavioral health telemedicine visits do not require referral. Copay 15 per visit. Question asks does need referral and copay? Answer one short sentence. Include citation [health-telemedicine]. Must copy source ID exactly from square brackets at start of CONTEXT entry. Context entry starts [health-telemedicine]. So citation at end. No extra citations. One short sentence. Could say: No, in-network behavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine]. Check rules: If context does not contain answer reply INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge. This is fine. One sentence. Copay maybe 15 dollars. End citation. No period after citation? Sentence ends with citation. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "claim-payment-times",
+    "visibleText" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].",
+    "reasoningText" : "We need answer. Need follow rules. Context has [payments-settlement] Approved claim settlement. Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur intermediary bank fee.\n\nQuestion: When do approved domestic ACH claims and international claim wires settle?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [payments-settlement]. So citation [payments-settlement]. Maybe mention domestic ACH within 2 business days, international wires within 5 business days.\n\nNeed no prior knowledge. One short sentence. End with citation. Could be: \"Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].\"\n\nCheck rules: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. So [payments-settlement]. Good.\n\nOne short sentence. No extra.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "chargeback-evidence",
+    "visibleText" : "",
+    "reasoningText" : "We need answer. Need follow rules. Context says merchants must submit chargeback evidence within 7 calendar days of notification. Evidence uploaded as PDF under 10 MB in Disputes console.\n\nQuestion: What is merchant chargeback evidence deadline and upload format?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [payments-chargeback]. So citation [payments-chargeback]. Must copy each supporting source ID exactly. Only one source. Put at end.\n\nNeed maybe: \"Merchants must submit chargeback evidence within 7 calendar days of notification, and upload it as a PDF under 10 MB in the Disputes console. [payments-chargeback]\"\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nOne short sentence. This is one sentence. Citation at end. Good. No extra. Ensure no period after citation? \"Merchants must submit chargeback evidence within 7 calendar days of notification and upload it as a PDF under 10 MB in the Disputes console. [payments-charge",
+    "reasoningComplete" : false,
+    "budgetReached" : true,
+    "completeVisibleAnswer" : false,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "requiredFactsAndCitationsPass" : false
+  }, {
+    "caseId" : "break-glass",
+    "visibleText" : "",
+    "reasoningText" : "We need answer. Need follow rules. Context has security-access. Question: What is production break-glass code name and how many managers approve it? Context: code-named Cobalt-17. Requires approval from two on-call managers. Credentials expire after 60 minutes. Need answer in one short sentence. Copy supporting source ID exactly from square brackets at start of CONTEXT entry, and put citations at end. Source ID likely [security-access]. Must include citation at end. One short sentence. Could say: The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present in CONTEXT valid. Do not use prior knowledge.\n\nShould we include expiration? Not asked. One short sentence. Citation at end. No extra sentence? The citation at end. Sentence: \"The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]\" That's two sentences? Citation maybe part. Better: \"The production break-glass code name is Cobalt-",
+    "reasoningComplete" : false,
+    "budgetReached" : true,
+    "completeVisibleAnswer" : false,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "requiredFactsAndCitationsPass" : false
+  }, {
+    "caseId" : "idempotency",
+    "visibleText" : "The Claims API uses the Idempotency-Key header, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+    "reasoningText" : "We need answer. Need follow rules. Context says Claims API clients send Idempotency-Key header on create requests. Keys remain valid for 24 hour replay window. Reusing key with different payload returns HTTP 409.\n\nQuestion: Which header makes Claims API creates idempotent and how long can a key be replayed?\n\nNeed answer one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [api-idempotency]. So citation [api-idempotency]. Must not invent. Answer: The Claims API uses the Idempotency-Key header, and keys remain valid for a 24-hour replay window. Maybe mention different payload 409? Not needed.\n\nEnsure one short sentence. End with citation. \"The Claims API uses the Idempotency-Key header, and keys remain valid for a 24-hour replay window. [api-idempotency]\" That is one sentence? Yes. Citation at end. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "priority-one",
+    "visibleText" : "",
+    "reasoningText" : "We need answer. Need follow rules. Context: Priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages incident commander.\n\nQuestion: How quickly is a priority one incident acknowledged and which route escalates it?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [support-escalation]. So citation [support-escalation]. Need maybe \"A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, NORTHSTAR-P1 pages the incident commander.\" But question asks which route escalates it? The route is NORTHSTAR-P1 pages incident commander. Acknowledged within 15 min.\n\nMust not use prior knowledge. One short sentence. End with citation. Could be: \"A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, NORTHSTAR-P1 pages the incident commander [support-escalation].\"\n\nCheck citation format: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So [support-escalation]. Good.\n\nIs it one short sentence? Yes. Contains answer. No extra",
+    "reasoningComplete" : false,
+    "budgetReached" : true,
+    "completeVisibleAnswer" : false,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "requiredFactsAndCitationsPass" : false
+  }, {
+    "caseId" : "unsupported-lunar-vehicle",
+    "visibleText" : "INSUFFICIENT_CONTEXT",
+    "reasoningText" : "We need answer. Need follow rules. Context only auto glass claims. Question lunar rover damage. No context. Must reply exactly INSUFFICIENT_CONTEXT. No citation? Since context does not contain answer. Final should be exactly INSUFFICIENT_CONTEXT.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  } ]
+}

@@ -1,0 +1,19 @@
+{
+  "runtimeRevision": "3336aed192786be17cca9360fdf65ee5ede731c7",
+  "newInference": false,
+  "kind": "scripted-framework-continuation",
+  "command": "./gradlew :models-langchain4j:spotlessApply :models-spring-ai:spotlessApply :models-langchain4j:test --tests '*ModelsChatModelToolCallingTest*' :models-spring-ai:test --tests '*ModelsSpringAiToolCallingTest*' --console=plain",
+  "exitCode": 0,
+  "langchain4j": {
+    "tests": 22,
+    "failures": 0,
+    "skipped": 0
+  },
+  "springAi": {
+    "tests": 37,
+    "failures": 0,
+    "skipped": 1
+  },
+  "newCases": "flintReplaysTwoDependentToolResultsBeforeTheFinalAnswer in both framework adapters",
+  "limitation": "Scripted outputs verify adapter history and parsing, not model selection or argument accuracy."
+}

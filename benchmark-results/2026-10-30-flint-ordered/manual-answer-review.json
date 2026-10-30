@@ -1,0 +1,57 @@
+{
+  "kind": "flint-raw-answer-review-v1",
+  "status": "in-progress",
+  "reviewer": "Codex",
+  "scope": "Visible answers inspected against retained retrieved documents; reasoning is not credited as an answer. This small suite does not establish general knowledge or frontier-model accuracy.",
+  "reports": {
+    "native-reliability.json": {
+      "sha256": "e9fbf02afa8f329948e6eaf1a6ae2188af915a674f87d1ec6a0fbb6c86010f39",
+      "distinctQuestions": 16,
+      "completeCorrectVisibleAnswers": 16,
+      "incompleteAnswers": 0,
+      "correctAbstentions": 2,
+      "detectedPolarityContradictions": 0,
+      "review": "Inspected all 16 visible answers against their retained retrieved documents. Permit requirements and fees remain correctly associated with remote versus office visits; the false premise is rejected. R-27/$40 and R-270/$140 are not confused. The OPAL-P2 answer preserves both the 8-minute acknowledgment and conditional 24-minute escalation. Replay-Key/6 hours, 9 years versus 9 months, PNG under 8 MB/11 calendar days, Monday and Friday/before 3 PM, QZ-73/three on-call managers, Oslo/Bergen, and domestic 3 versus international 7 business days all match the evidence with correct citations. PDF acceptance is explicitly negated. Both unrelated satellite and Moon questions correctly abstain despite retrieving the office fee policy. Seven correct visible answers still trigger conservative runtime fallback; these decisions and the original summary remain unchanged. No generation profile was tuned on these results."
+    },
+    "native-candidate.json": {
+      "sha256": "3c1d99cb0fd5bf1bf1c722f0d5909a372b6ed8c11f95d536b028d728044c291b",
+      "distinctQuestions": 9,
+      "attempts": 27,
+      "completeCorrectVisibleAnswers": 27,
+      "incompleteAnswers": 0,
+      "review": "All 27 rawText strings exactly match their corresponding manually reviewed native-budget-512 pilot answers. The three measured repetitions do not add new distinct accuracy questions. The visible audit also passes 27/27."
+    },
+    "native-budget-512.json": {
+      "sha256": "ef377abd36e777bb59684a6a533f48dd5de822dba5f86085a6f25a57b4d54760",
+      "distinctQuestions": 9,
+      "completeCorrectVisibleAnswers": 9,
+      "incompleteAnswers": 0,
+      "maximumObservedOutputTokens": 405,
+      "review": "Inspected all nine visible answers against their retained retrieved documents. All requested facts, identifiers, units, negations and citations are correct; the lunar-rover case correctly abstains. The completed travel answer includes per covered traveler; chargeback includes 7 calendar days and PDF under 10 MB; break-glass includes Cobalt-17 and two on-call managers; priority-one includes 15-minute acknowledgment and the 30-minute NORTHSTAR-P1 escalation condition. Travel and idempotency remain conservative runtime grounding false negatives despite correct visible answers. These are the same pilot questions used to select the budget, not held-out evidence."
+    },
+    "native-default.json": {
+      "sha256": "cf7632eb8cdd8b908f853d3ca0b0f1c5dcd8fc92b90480101cb581f0a4d6db83",
+      "distinctQuestions": 9,
+      "completeCorrectVisibleAnswers": 5,
+      "incompleteAnswers": 4,
+      "review": "All nine retained rawText strings are exactly equal to their corresponding java-default.json answers. The per-case findings below apply unchanged. This is nine repeated questions, not nine new accuracy samples."
+    },
+    "java-default.json": {
+      "sha256": "8e07e921f0092e61db8dbcc5e54b81ad9f77e9a0e31d33e9533906825876bfd7",
+      "distinctQuestions": 9,
+      "completeCorrectVisibleAnswers": 5,
+      "incompleteAnswers": 4,
+      "cases": {
+        "auto-glass-deadline": "Correct: 30 calendar days and $75, with the supporting citation.",
+        "travel-limit": "Incomplete: ends at '3,500 dollars per'; no final citation.",
+        "telemedicine-benefit": "Correct: no referral and $15 per visit, with the supporting citation.",
+        "claim-payment-times": "Correct: domestic ACH 2 business days and international wires 5 business days, with the supporting citation.",
+        "chargeback-evidence": "Incomplete: token budget exhausted inside reasoning; no visible answer.",
+        "break-glass": "Incomplete: token budget exhausted inside reasoning; no visible answer.",
+        "idempotency": "Correct: Idempotency-Key and 24-hour replay window, with the supporting citation. This visible answer passes manual review even though the conservative runtime grounder uses fallback.",
+        "priority-one": "Incomplete: token budget exhausted inside reasoning; no visible answer.",
+        "unsupported-lunar-vehicle": "Correct abstention: INSUFFICIENT_CONTEXT. Retrieved auto-glass policy does not answer the lunar-rover question."
+      }
+    }
+  }
+}
