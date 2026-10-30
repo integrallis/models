@@ -22,13 +22,15 @@ byte-identical to the prior ordered-Q4_K run. The original raw evaluator's 14/16
 the separate visible audit excludes reasoning and records 16/16. This is bounded English RAG
 evidence, not a broad reasoning or coding benchmark. `runtime-assessment.json` passes all six gates.
 
-Released-library verification and catalog admission are still pending; the remote worker is
-finishing its separate tool/diagnostic stages.
+Released-library verification and catalog admission are still pending. All remote stages are
+complete: the separate tool run remains 10/14 with valid structure but incorrect task arguments
+in four cases. No tool qualification is claimed. The 64-token JFR run is diagnostic only.
 The six-worker diagnostic is separate and does not alter this campaign's frozen profile.
 
 Instance `i-0ddc4e4b6b6ffae04`, root `vol-07ed6544dd1caa0d4`, launched 2026-10-30T20:01:35Z.
 Root: 120 GiB gp3, 500 MiB/s, 3000 IOPS, DeleteOnTermination. Independent four-hour shutdown,
-terminate-on-shutdown; bootstrap worker timeout is 14100 seconds. Cleanup pending.
+terminate-on-shutdown; bootstrap worker timeout is 14100 seconds. The worker completed with exit zero; the instance
+terminated and its root volume is confirmed absent (see cleanup.json).
 
 Full Models build/compliance/installDist passed in 10m58s (399 tasks). All Flint fixture tests
 passed separately. ModelJars branch checks passed in 1m47s, and all 357 Node tests passed.

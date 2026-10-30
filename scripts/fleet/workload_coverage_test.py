@@ -61,6 +61,14 @@ class ParsesTheRealEnum(unittest.TestCase):
         self.assertEqual(docs, "/rag/sql/documents.json")
         self.assertEqual(cases, "/rag/sql/cases.json")
 
+    def test_hyphenated_workload_retains_its_resource_paths_and_coverage(self):
+        workloads, unreadable = wc.parse_workloads(REPO)
+        self.assertNotIn("ANSWER_RELIABILITY", unreadable)
+        docs, cases = workloads["answer-reliability"]
+        self.assertEqual(docs, "/rag/answer-reliability/documents.json")
+        self.assertEqual(cases, "/rag/answer-reliability/cases.json")
+        self.assertEqual(wc.corpus_state(REPO, docs, cases), {"documents": 12, "cases": 16})
+
 
 class SeparatesNoCorpusFromNoQualifiedModel(unittest.TestCase):
     def test_a_real_corpus_reports_its_case_count(self):

@@ -29,12 +29,6 @@ import sys
 ENUM = "models-rag-bench/src/main/java/com/integrallis/models/rag/RagWorkload.java"
 RESOURCES = "models-rag-bench/src/main/resources"
 
-# GENERAL("general", "/rag/documents.json", "/rag/cases.json"),
-ENTRY = re.compile(
-    r'^\s*[A-Z_]+\(\s*$|^\s*[A-Z_]+\(\s*"(?P<id1>[a-z]+)"\s*,\s*"(?P<docs1>[^"]+)"\s*,'
-    r'\s*"(?P<cases1>[^"]+)"', re.MULTILINE)
-
-
 def parse_workloads(repo_root):
     """Workload id -> (documents resource, cases resource), straight from the enum.
 
@@ -49,7 +43,7 @@ def parse_workloads(repo_root):
     body = re.sub(r"//[^\n]*", "", body)
     flat = " ".join(body.split())
     found, names = {}, []
-    for m in re.finditer(r'([A-Z][A-Z_]*)\s*\(\s*"([a-z]+)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)',
+    for m in re.finditer(r'([A-Z][A-Z_]*)\s*\(\s*"([a-z]+(?:-[a-z]+)*)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)',
                          flat):
         names.append(m.group(1))
         found[m.group(2)] = (m.group(3), m.group(4))
@@ -183,7 +177,7 @@ def main(argv=None):
             note = "thin: one model"
         else:
             note = ""
-        line = f"{wl:<{width}}  {n:>9}  {d:>5}  {c:>5}  {note}"
+        line = f"{wl:<{width}}  {n:>9}  {d:>5}  {c:>5}  {note}".rstrip()
         table_lines.append(line)
         print(line)
 
