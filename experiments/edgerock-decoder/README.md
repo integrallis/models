@@ -290,6 +290,33 @@ allocation, since the KV caches at ctx 16384 are ~1 GB. It is slower per token t
 is the tell. A real prefill number needs a long prompt, and EdgeRock is additionally clamped to one
 token per step.
 
+## The next prefill win: batch the memory read, keep only the stage sequential
+
+Observed while running the long cases: prefill holds about 400% CPU where decode sustains ~850%.
+`memoryBatched` walks the batch row by row, and each row issues nine native matvecs at batch size
+one, so a 9664-token prefill makes on the order of 700k single-row kernel calls while the backbone
+around them runs batched.
+
+Most of that does not need to be sequential, and the reason is specific: **the read sees only the
+committed selection, never the pending chunk** (`MemoryRead.read` takes `bank.selection()`). So
+within any span of rows containing no commit, every row reads an identical bank. Staging does not
+change what a read sees; only `commit()` does.
+
+That splits the layer cleanly:
+
+- Batchable, because they are pure functions of the row's hidden state: `memory.input_norm`,
+  `q_proj` with its norm and gate and rope, `o_proj`, the writer SwiGLU
+  (`write_gate`/`write_up`/`write_down`), `k_proj`, `v_proj`, and both admission projections.
+- Batchable within a commit-free span: the read itself, since the committed selection is fixed.
+- Genuinely sequential, and cheap: `bank.stage()`, which is array copies plus the commit trigger.
+
+So the batch is processed in sub-spans delimited by commit boundaries --
+`min(remaining, commitChunk - staged())` -- batching everything but the stage inside each span.
+With `commit_chunk` at 256 and prefill batches at or below that, most spans are the whole batch.
+
+This matters for the gate rather than for tidiness: TTFT is what the relative end-to-end ceiling of
+1.50 measures, and the patched llama.cpp reports 23.1 tok/s on the prompt for this model.
+
 ## Still unverified
 
 - **mRoPE.** The file publishes `rope.dimension_sections [11, 11, 10, 0]` and the reference config

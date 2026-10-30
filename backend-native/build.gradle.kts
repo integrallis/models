@@ -359,6 +359,32 @@ tasks.register<Test>("gemma426BA4BNativeSlowTest") {
     maxHeapSize = "4g"
 }
 
+tasks.register<Test>("edgeRockNativeCaseTest") {
+    group = "verification"
+    description = "Run EdgeRock's publisher long-memory cases on the rust-ffm route"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("slow")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.nativekernel.EdgeRockNativePublisherCaseTest",
+        )
+    }
+    for (key in listOf("models.fixtures.edgeRock4bGguf", "models.fixtures.edgeRockCases")) {
+        providers.systemProperty(key).orNull?.let { systemProperty(key, it) }
+    }
+    val configuredEdgeRock = providers.systemProperty("models.fixtures.edgeRock4bGguf").orNull
+    onlyIf("-Dmodels.fixtures.edgeRock4bGguf points to the EdgeRock-4B GGUF") {
+        configuredEdgeRock != null
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "12g"
+    extensions.configure<JacocoTaskExtension> { isEnabled = false }
+}
+
 tasks.register<Test>("nativeDecodeRateProbe") {
     group = "verification"
     description = "Report steady-state decode rate for a given GGUF on the rust-ffm route"
