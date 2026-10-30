@@ -1,0 +1,73 @@
+{
+  "policyId" : "visible-answer-completion-and-bounded-facts-v1",
+  "generatedAt" : "2026-10-30T21:02:04.510377797Z",
+  "newInference" : false,
+  "sourceReport" : "/work/flint/results/ollama-speed-pilot.json",
+  "sourceReportSha256" : "d3d8cae49adc7306f57498bc30974b1ca25bfd4784eb6416ce603bcb6005cde0",
+  "sourceBackendVersion" : "ollama@0.40.9",
+  "assessmentGroundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v24",
+  "artifactSha256" : "c3c4d93f9db92627a2fc47ea8fe8c64a094cabd3549db544bcdd2c00e9a9a347",
+  "workload" : "general",
+  "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+  "attempts" : 3,
+  "distinctQuestions" : 1,
+  "completeVisibleAnswers" : 3,
+  "requiredFactsAndCitationsPasses" : 3,
+  "budgetReached" : 0,
+  "limitation" : "Deterministic required-fact/citation matching is not a general hallucination or semantic-entailment judge. Budget reached is conservative: reports lack an explicit finish reason. Repetitions are not independent accuracy samples.",
+  "assessments" : [ {
+    "caseId" : "auto-glass-deadline",
+    "visibleText" : "The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]",
+    "reasoningText" : "We need answer. Need follow rules. Context says Northstar Mutual auto glass claims must be reported through Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. Police report not required.\n\nQuestion: How long do I have to report an auto glass claim and what is the deductible?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry ID [claims-auto-glass]. Put citations at end. Only IDs present. Do not use prior knowledge.\n\nNeed maybe: \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\"\n\nCheck rules: If context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So end with [claims-auto-glass]. One short sentence. Could mention auto glass claims generally? Deductible specifically windshield repair. Question asks auto glass claim and deductible. Context: auto glass claims must be reported within 30 days. Windshield repair has 75 deductible. So answer: \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\"\n\nIs that one sentence? Yes. Citation at end. Good. No extra. Ensure no period after citation? \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\" That's one sentence? Period before citation maybe okay? Better: \"You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass]\" No period? Citation at end. One sentence. But source ID at end. Good.\n\nNeed maybe \"The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]\". This is one sentence. Ends with citation. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "auto-glass-deadline",
+    "visibleText" : "The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]",
+    "reasoningText" : "We need answer. Need follow rules. Context says Northstar Mutual auto glass claims must be reported through Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. Police report not required.\n\nQuestion: How long do I have to report an auto glass claim and what is the deductible?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry ID [claims-auto-glass]. Put citations at end. Only IDs present. Do not use prior knowledge.\n\nNeed maybe: \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\"\n\nCheck rules: If context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So end with [claims-auto-glass]. One short sentence. Could mention auto glass claims generally? Deductible specifically windshield repair. Question asks auto glass claim and deductible. Context: auto glass claims must be reported within 30 days. Windshield repair has 75 deductible. So answer: \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\"\n\nIs that one sentence? Yes. Citation at end. Good. No extra. Ensure no period after citation? \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\" That's one sentence? Period before citation maybe okay? Better: \"You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass]\" No period? Citation at end. One sentence. But source ID at end. Good.\n\nNeed maybe \"The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]\". This is one sentence. Ends with citation. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "auto-glass-deadline",
+    "visibleText" : "The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]",
+    "reasoningText" : "We need answer. Need follow rules. Context says Northstar Mutual auto glass claims must be reported through Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. Police report not required.\n\nQuestion: How long do I have to report an auto glass claim and what is the deductible?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry ID [claims-auto-glass]. Put citations at end. Only IDs present. Do not use prior knowledge.\n\nNeed maybe: \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\"\n\nCheck rules: If context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So end with [claims-auto-glass]. One short sentence. Could mention auto glass claims generally? Deductible specifically windshield repair. Question asks auto glass claim and deductible. Context: auto glass claims must be reported within 30 days. Windshield repair has 75 deductible. So answer: \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\"\n\nIs that one sentence? Yes. Citation at end. Good. No extra. Ensure no period after citation? \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\" That's one sentence? Period before citation maybe okay? Better: \"You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass]\" No period? Citation at end. One sentence. But source ID at end. Good.\n\nNeed maybe \"The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]\". This is one sentence. Ends with citation. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  } ]
+}

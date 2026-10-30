@@ -101,6 +101,8 @@ jq -n --arg sha "$MODEL_SHA" --arg version "$VERSION" \
     backend:"rust-ffm",backendVersion:$version,modelId:"ggml_org_flint_gguf_q4_k_m",
     artifactSha256:$sha,report:"default-correctness/models-rust-ffm.json",reportSha256:$reportSha,
     totalAttempts:9,successfulAttempts:9,tuningSystemProperties:[]}' >"$OUT/default-correctness/smoke.json"
+stage native-default-visible 120 "${JAVA[@]}" -cp "$CP" \
+  com.integrallis.models.rag.RagVisibleAnswerAudit "$OUT/native-default.json" "$OUT/visible/native-default.json"
 stage public-profile 1200 "${JAVA[@]}" -cp "$WORK/probe:$CP" FlintReleasedProfileProbe "$MODEL" \
   "$(jq -er '.expectedRawSha256' "$INPUT")" "$OUT/public-profile.json"
 printf '%s\n' 'Released numerical parity, default smoke, and public profile round trip passed. Full catalog qualification is separately hash-bound.' >"$OUT/completed.txt"

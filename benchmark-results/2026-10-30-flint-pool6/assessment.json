@@ -1,0 +1,29 @@
+{
+  "kind": "diagnostic-public-pool-size-comparison",
+  "catalogQualified": false,
+  "limitation": "One prompt, one warmup and three measurements per arm; no full coverage or held-out qualification. Independent host; does not modify the frozen primary campaign.",
+  "ollamaReportSha256": "d3d8cae49adc7306f57498bc30974b1ca25bfd4784eb6416ce603bcb6005cde0",
+  "ollamaDecodeTokensPerSecond": 14.052945935006294,
+  "arms": [
+    {
+      "report": "native-pool8-speed-pilot.json",
+      "sha256": "24d8c1d73cc6d12948afbf2a51314070908949597679e8a9a8ae1c0dc6d55dd5",
+      "nativePoolThreads": "8",
+      "decodeTokensPerSecond": 11.879690009223864,
+      "ratioToPool8": 1.0,
+      "ratioToOllama": 0.8453522887063284,
+      "rawOutputsIdenticalToPool8": true,
+      "visiblePasses": 3
+    },
+    {
+      "report": "native-pool6-speed-pilot.json",
+      "sha256": "4ca21cc15bdd79f18317ba169073ef707a5d6d1ee44ab2f2ef74e4c9a981c13d",
+      "nativePoolThreads": "6",
+      "decodeTokensPerSecond": 12.11809458182345,
+      "ratioToPool8": 1.0200682486171337,
+      "ratioToOllama": 0.86231702860515,
+      "rawOutputsIdenticalToPool8": true,
+      "visiblePasses": 3
+    }
+  ]
+}
