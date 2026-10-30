@@ -73,11 +73,15 @@ class ModelsSpringAiToolCallingTest {
 
   /** Records the rendered prompt and replays a canned completion. */
   private static final class ScriptedModel implements TextGenerationModel {
-    private final String completion;
+    private final ArrayDeque<String> completions;
     private final AtomicReference<String> lastPrompt = new AtomicReference<>();
 
-    ScriptedModel(String completion) {
-      this.completion = completion;
+    ScriptedModel(String... completions) {
+      this.completions = new ArrayDeque<>(List.of(completions));
+    }
+
+    private String nextCompletion() {
+      return completions.size() > 1 ? completions.removeFirst() : completions.getFirst();
     }
 
     @Override
@@ -93,26 +97,26 @@ class ModelsSpringAiToolCallingTest {
     @Override
     public String generate(String prompt, SamplingOptions options) {
       lastPrompt.set(prompt);
-      return completion;
+      return nextCompletion();
     }
 
     @Override
     public String generate(ModelPrompt prompt, SamplingOptions options) {
       lastPrompt.set(prompt.text());
-      return completion;
+      return nextCompletion();
     }
 
     @Override
     public void generate(String prompt, SamplingOptions options, TokenStream stream) {
       lastPrompt.set(prompt);
-      stream.onToken(completion);
+      stream.onToken(nextCompletion());
       stream.onComplete();
     }
 
     @Override
     public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
       lastPrompt.set(prompt.text());
-      stream.onToken(completion);
+      stream.onToken(nextCompletion());
       stream.onComplete();
     }
 
@@ -1059,6 +1063,62 @@ class ModelsSpringAiToolCallingTest {
 
   @Nested
   static class Recovery {
+
+    @Test
+    void flintReplaysTwoDependentToolResultsBeforeTheFinalAnswer() {
+      String firstOutput =
+          "<think>The backup city comes from the first result.</think>"
+              + "<tool_call>get_weather<arg_key>city</arg_key><arg_value>Austin</arg_value></tool_call>";
+      String secondOutput =
+          "<tool_call>get_weather<arg_key>city</arg_key><arg_value>Dallas</arg_value></tool_call>";
+      ScriptedModel model =
+          new ScriptedModel(firstOutput, secondOutput, "Austin is 88; Dallas is 90.");
+      var adapter =
+          new ModelsSpringAiChatModel(model, ChatTemplate.FLINT, SamplingOptions.builder().build());
+      var messages = new ArrayList<org.springframework.ai.chat.messages.Message>();
+      messages.add(
+          new UserMessage("Get Austin weather, then weather for the backupCity in its result."));
+      var first = adapter.call(promptWithTools(messages)).getResult().getOutput();
+      assertThat(model.lastPrompt()).doesNotContain("Dallas");
+      var firstCall = first.getToolCalls().getFirst();
+      assertThat(firstCall.arguments()).isEqualTo("{\"city\":\"Austin\"}");
+      messages.add(first);
+      messages.add(
+          ToolResponseMessage.builder()
+              .responses(
+                  List.of(
+                      new ToolResponseMessage.ToolResponse(
+                          firstCall.id(),
+                          firstCall.name(),
+                          "{\"tempF\":88,\"backupCity\":\"Dallas\"}")))
+              .build());
+      var second = adapter.call(promptWithTools(messages)).getResult().getOutput();
+      assertThat(second.getToolCalls()).hasSize(1);
+      var secondCall = second.getToolCalls().getFirst();
+      assertThat(secondCall.arguments()).isEqualTo("{\"city\":\"Dallas\"}");
+      assertThat(model.lastPrompt())
+          .contains(
+              firstOutput,
+              "<|observation|><tool_response>{\"tempF\":88,\"backupCity\":\"Dallas\"}</tool_response>");
+      messages.add(second);
+      messages.add(
+          ToolResponseMessage.builder()
+              .responses(
+                  List.of(
+                      new ToolResponseMessage.ToolResponse(
+                          secondCall.id(), secondCall.name(), "{\"tempF\":90}")))
+              .build());
+      var answer = adapter.call(promptWithTools(messages));
+      assertThat(answer.hasToolCalls()).isFalse();
+      assertThat(answer.getResult().getOutput().getText()).isEqualTo("Austin is 88; Dallas is 90.");
+      assertThat(model.lastPrompt())
+          .containsSubsequence(
+              firstOutput,
+              "\"backupCity\":\"Dallas\"",
+              secondOutput,
+              "<|observation|><tool_response>{\"tempF\":90}</tool_response>",
+              "<|assistant|>");
+    }
 
     @Test
     void recoversFlintTaggedArgumentsThroughTheDeclaredSpringSchema() {

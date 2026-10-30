@@ -308,3 +308,9 @@ retain their existing reduction mode. Older native libraries decline Flint's Q4_
 and use the Java fallback. Provider configuration does not change a shared worker context.
 Synthetic tests require bitwise equality across single, grouped, and independent projections;
 fresh real-weight parity and the full qualification campaign are still required.
+
+The Spring AI and LangChain4j adapter tests also replay a dependent two-call Flint conversation:
+the first weather result supplies the backup city for the second call, and both results reach
+the final answer prompt. They assert exact recovered arguments, observation envelopes, ordering,
+and retained reasoning. These use scripted model outputs and prove adapter behavior only;
+they do not change the real-model tool qualification or its deployed runtime.
