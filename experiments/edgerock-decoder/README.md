@@ -317,6 +317,49 @@ With `commit_chunk` at 256 and prefill batches at or below that, most spans are 
 This matters for the gate rather than for tidiness: TTFT is what the relative end-to-end ceiling of
 1.50 measures, and the patched llama.cpp reports 23.1 tok/s on the prompt for this model.
 
+## Provenance for a publisher-reference entry
+
+`RagPublisherReference` is the enum that admits a llama.cpp comparator at all, and it carries one
+entry today (`BONSAI2_PTQ1_0`). Its `repository`/`revision` pair works for Bonsai because the
+publisher ships a *fork*, so the fork's revision pins the implementation. EdgeRock ships a patch
+against upstream instead, so a faithful entry has to pin the patch as well as the commit -- which
+is a real schema gap, not a formality: the same upstream commit without the patch does not serve
+the architecture.
+
+Measured on 2026-10-30, and identical on the bench pod and locally (both arms must read the same
+bytes or `sameWorkload` excludes the comparison):
+
+| item | value |
+| --- | --- |
+| artifact | `EdgeRock-4B-Q4_K_M.gguf` |
+| artifact sha256 | `67c354bcb2abe0cba407fbfe8e7f7cc100dd44458b6fbdfee95ae22f3aaa2c6a` |
+| artifact bytes | 2936478592 |
+| upstream | `https://github.com/ggml-org/llama.cpp` |
+| revision | `62318cd57dc63900ecb153272c0b10f78550855d` |
+| `llama-cpp-runtime.patch` sha256 | `6a4c32359d88c84a8cee2a6920847220da61d7931d406dc2c0970f0da9dbf20f` |
+| `edgerock-rma.h` sha256 | `4018dd0a6d8368673eb9019df4cbde6721213b0d1ecc2063407bd3eb1ab4a058` |
+| `edgerock-rma-graph.inc` sha256 | `35a01ac0aa9c68d40055d844354d785383c5a4a8851efa436970ea6fd00adfbb` |
+
+## Measured on the bench pod: RunPod `cpu3c`, 16 vCPU AMD EPYC 7702P, AVX2, ctx 16384
+
+The laptop was the wrong instrument, and the runbook says so outright -- "do not burden the local
+Mac with model downloads, oracle runs, or benchmarks". Two long cases were lost to a 30-minute
+cap there before this moved.
+
+| arm | decode | note |
+| --- | --- | --- |
+| ours, `pure-java` | 3.20 tok/s | |
+| ours, `rust-ffm` | **7.14 tok/s** | 16 threads |
+| patched llama.cpp | 9.0 tok/s | 16 threads, prompt 20.6 tok/s |
+
+Decode ratio **0.79** against the 0.80 floor, before any prefill work. The earlier 0.147 in this
+document came from the laptop's `pure-java` arm and was the wrong arm on the wrong hardware.
+
+Still not a pass, for the reason that has not changed: the gate measures both arms through the RAG
+harness with `sameWorkload` matching -- workload, corpus, cases, template, topK, max tokens,
+context, **threads**, grounding policy -- and `--publisher-reference` is what admits the llama.cpp
+arm. These are probe numbers, not gate numbers.
+
 ## Still unverified
 
 - **mRoPE.** The file publishes `rope.dimension_sections [11, 11, 10, 0]` and the reference config
