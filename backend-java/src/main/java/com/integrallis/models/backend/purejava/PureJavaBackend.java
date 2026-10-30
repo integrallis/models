@@ -482,6 +482,20 @@ public final class PureJavaBackend
           throw new UnsupportedOperationException(
               "Prism Hadamard execution is not supported for " + modelFamily);
         }
+        // EdgeRock shares the Qwen3.5 gated-delta-net backbone -- 22 of its 37 tensor roles are
+        // already read by qwen35/, and Qwen35Config resolves every key it publishes -- so adding
+        // "edgerock" to that dispatch would load and run. It would also silently ignore the
+        // memory.* tensors on 8 of its 32 layers and emit plausible, wrong logits, which is worse
+        // than refusing. The fifteen missing tensor roles and the remaining gaps (sliding-window
+        // attention at edgerock.attention.window, mRoPE dimension_sections) are enumerated in
+        // experiments/edgerock-decoder/README.md.
+        if ("edgerock".equals(modelFamily)) {
+          throw new UnsupportedOperationException(
+              "edgerock is not served yet: its memory module (memory.* on "
+                  + "edgerock.full_attention_interval-spaced layers) has no implementation here, "
+                  + "and routing it to the Qwen3.5 decoder would drop that contribution silently. "
+                  + "See experiments/edgerock-decoder/README.md");
+        }
         if ("gemma-embedding2".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded =
