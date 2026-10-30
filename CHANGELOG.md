@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-10-30
+
 - Cache small Flint F32 routers once per loaded model under a 128 MiB bound, preserving pinned
   row arithmetic and native eligibility. Shared sessions avoid repeated mapped-row copies.
 
