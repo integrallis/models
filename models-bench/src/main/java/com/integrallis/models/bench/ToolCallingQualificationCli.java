@@ -33,6 +33,7 @@ import com.integrallis.models.runtime.SharedToolTurn;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.ToolCallTokenConstraints;
 import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.FlintToolCallConstraint;
 import com.integrallis.models.runtime.chat.ToolCallScanner;
 import com.integrallis.models.runtime.chat.ToolSpecRetriever;
 import com.integrallis.models.runtime.chat.ToolSyntax;
@@ -43,15 +44,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 /** Runs the shared small-model tool-calling gate through an owned in-process backend. */
 final class ToolCallingQualificationCli {
-  static final String POLICY_VERSION = "small-model-tool-conformance-v1";
+  static final String POLICY_VERSION = "small-model-tool-conformance-v2";
+
+  private static final Pattern REASONING_TAG =
+      Pattern.compile("(?i)<(/?)(think|thinking|reasoning)>");
 
   private static final int PASS = 0;
   private static final int FAIL = 1;
@@ -62,6 +68,8 @@ final class ToolCallingQualificationCli {
           "adapter",
           "report",
           "max-tokens",
+          "follow-up-max-tokens",
+          "tool-constraints",
           "models-revision",
           "case",
           "backend");
@@ -74,11 +82,18 @@ final class ToolCallingQualificationCli {
       Path adapter,
       Path report,
       int maxTokens,
+      int followUpMaxTokens,
       String modelsRevision,
       String caseId,
-      String backend) {}
+      String backend,
+      String toolConstraints) {}
 
-  record GenerationControls(double temperature, int maxTokens, String promptTemplate) {}
+  record GenerationControls(
+      double temperature,
+      int maxTokens,
+      int followUpMaxTokens,
+      String promptTemplate,
+      String toolConstraints) {}
 
   record SuiteIdentity(
       String id,
@@ -143,6 +158,13 @@ final class ToolCallingQualificationCli {
       throw new IllegalArgumentException("--candidate is required");
     }
     ToolCallingCandidate candidate = ToolCallingCandidate.parse(candidateValue);
+    String constraints = values.getOrDefault("tool-constraints", "default");
+    if (!Set.of("default", "flint-schema").contains(constraints)
+        || (constraints.equals("flint-schema")
+            && candidate != ToolCallingCandidate.FLINT_40B_A2_5B)) {
+      throw new IllegalArgumentException(
+          "--tool-constraints must be default, or flint-schema with the Flint candidate");
+    }
     String backend = values.getOrDefault("backend", "pure-java");
     if (!Set.of("pure-java", "rust-ffm").contains(backend)) {
       throw new IllegalArgumentException("--backend must be pure-java or rust-ffm");
@@ -178,6 +200,11 @@ final class ToolCallingQualificationCli {
     if (maxTokens < 32 || maxTokens > 512) {
       throw new IllegalArgumentException("--max-tokens must be between 32 and 512");
     }
+    int followUpMaxTokens =
+        BenchmarkCliArguments.integer(values, "follow-up-max-tokens", Math.min(maxTokens, 96));
+    if (followUpMaxTokens < 32 || followUpMaxTokens > 512) {
+      throw new IllegalArgumentException("--follow-up-max-tokens must be between 32 and 512");
+    }
     String revision = values.get("models-revision");
     if (revision == null || !revision.matches("[0-9a-f]{40}")) {
       throw new IllegalArgumentException("--models-revision must be an exact 40-character Git SHA");
@@ -195,7 +222,16 @@ final class ToolCallingQualificationCli {
           "Needle 2 tool retrieval qualification requires --backend pure-java");
     }
     return new Configuration(
-        candidate, model, adapter, report, maxTokens, revision, caseId, backend);
+        candidate,
+        model,
+        adapter,
+        report,
+        maxTokens,
+        followUpMaxTokens,
+        revision,
+        caseId,
+        backend,
+        constraints);
   }
 
   private static InferenceBackend loadBackend(Configuration configuration) {
@@ -280,7 +316,14 @@ final class ToolCallingQualificationCli {
         long start = System.nanoTime();
         String output =
             activatedModel == null
-                ? generate(candidate, backend, generation, prompt, options, tools)
+                ? generate(
+                    candidate,
+                    backend,
+                    generation,
+                    prompt,
+                    options,
+                    tools,
+                    configuration.toolConstraints())
                 : generateActivated(activatedModel, prompt, options);
         long elapsedMillis = (System.nanoTime() - start) / 1_000_000L;
         Needle2ToolQualification.CaseResult result =
@@ -319,7 +362,7 @@ final class ToolCallingQualificationCli {
               activatedModel,
               suite,
               mapper,
-              configuration.maxTokens());
+              configuration.followUpMaxTokens());
       if (followUp.applicable()) {
         System.out.printf(
             "%-24s %s %6d ms conversational=%s grounded=%s repeated-call=%s%n",
@@ -412,7 +455,7 @@ final class ToolCallingQualificationCli {
                     ChatMessage.tool("get-weather-for-zipcode", result)),
                 tools);
     SamplingOptions options =
-        SamplingOptions.builder().temperature(0.0f).maxTokens(Math.min(maxTokens, 96)).build();
+        SamplingOptions.builder().temperature(0.0f).maxTokens(maxTokens).build();
     long start = System.nanoTime();
     String output;
     String initialToolOutput = "";
@@ -474,28 +517,29 @@ final class ToolCallingQualificationCli {
       String initialToolOutput,
       String postResultToolOutput) {
     String generated = output == null ? "" : output.strip();
+    String visible = visibleFollowUp(generated);
     List<String> diagnostics = new ArrayList<>();
     boolean repeatedCall = ToolCallScanner.scan(generated, syntax, tools).hasCalls();
     if (repeatedCall) {
       diagnostics.add("model requested another tool instead of answering from the result");
     }
     boolean rawJson = false;
-    if (generated.startsWith("{") && generated.endsWith("}")) {
+    if (visible.startsWith("{") && visible.endsWith("}")) {
       try {
-        rawJson = mapper.readTree(generated).isObject();
+        rawJson = mapper.readTree(visible).isObject();
       } catch (IOException ignored) {
         // Malformed JSON is assessed as ordinary non-conversational output below.
       }
     }
     boolean conversational =
-        !generated.isBlank()
+        !visible.isBlank()
             && !rawJson
-            && !generated.contains("<tool_call>")
-            && !generated.contains("<function name=");
+            && !visible.contains("<tool_call>")
+            && !visible.contains("<function name=");
     if (!conversational) {
       diagnostics.add("follow-up was empty, raw JSON, or tool protocol instead of prose");
     }
-    String normalized = generated.toLowerCase(java.util.Locale.ROOT);
+    String normalized = visible.toLowerCase(java.util.Locale.ROOT);
     boolean grounded = normalized.contains("78") && normalized.contains("rain");
     if (!grounded) {
       diagnostics.add("follow-up did not preserve the temperature and conditions");
@@ -513,6 +557,27 @@ final class ToolCallingQualificationCli {
         repeatedCall,
         passed,
         diagnostics);
+  }
+
+  /** Score the user-facing answer while retaining the untouched completion in the report. */
+  private static String visibleFollowUp(String text) {
+    var visible = new StringBuilder();
+    var reasoning = new ArrayDeque<String>();
+    var tags = REASONING_TAG.matcher(text);
+    int cursor = 0;
+    while (tags.find()) {
+      if (reasoning.isEmpty()) visible.append(text, cursor, tags.start());
+      String name = tags.group(2).toLowerCase(java.util.Locale.ROOT);
+      if (tags.group(1).isEmpty()) {
+        reasoning.push(name);
+      } else if (reasoning.isEmpty() || !reasoning.pop().equals(name)) {
+        return "";
+      }
+      cursor = tags.end();
+    }
+    // An unclosed reasoning block contributes no answer text.
+    if (reasoning.isEmpty()) visible.append(text, cursor, text.length());
+    return visible.toString().strip();
   }
 
   static ActivatedFollowUp generateActivatedFollowUp(
@@ -545,7 +610,12 @@ final class ToolCallingQualificationCli {
       GenerationLoop generation,
       ModelPrompt prompt,
       SamplingOptions options,
-      List<ToolSpec> tools) {
+      List<ToolSpec> tools,
+      String constraints) {
+    if (constraints.equals("flint-schema")) {
+      return generation.generate(
+          prompt, options, FlintToolCallConstraint.compile(backend.tokenizer(), tools));
+    }
     if (candidate == ToolCallingCandidate.NEEDLE2) {
       return generation.generate(
           prompt,
@@ -650,7 +720,14 @@ final class ToolCallingQualificationCli {
             artifactSha256,
             Files.size(configuration.model()),
             suiteIdentity(suite),
-            new GenerationControls(0.0, configuration.maxTokens(), candidate.template().id()),
+            new GenerationControls(
+                0.0,
+                configuration.maxTokens(),
+                configuration.followUpMaxTokens(),
+                candidate.template().id(),
+                configuration.toolConstraints().equals("flint-schema")
+                    ? "flint-schema-v1"
+                    : "default"),
             environment,
             diagnostics,
             activatedAdapter,

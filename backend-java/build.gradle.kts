@@ -89,6 +89,7 @@ fun modelFixture(taskName: String, id: String): ModelFixture {
 
 val modelFixtures =
     listOf(
+        modelFixture("downloadFlintQ4KMModel", "flint_40b_a2_5b_q4_k_m"),
         modelFixture("downloadBonsai2Ptq10Model", "bonsai2_27b_ptq1_0"),
         // Laya's gates read these two paths and skip when they are absent, so before this entry
         // existed the oracle-parity gate, the JevBench qualification and the BF16 quantization
@@ -1389,4 +1390,30 @@ tasks.register<Test>("bonsai2IntegrationTest") {
     // Real-model correctness runs do not feed the unit coverage gate.
     extensions.configure<JacocoTaskExtension> { isEnabled = false }
 
+}
+
+tasks.register<Test>("flintIntegrationTest") {
+    description = "Verify the pinned Flint 40B-A2.5B Q4_K_M checkpoint against llama.cpp"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform { includeTags("slow") }
+    filter {
+        includeTestsMatching("com.integrallis.models.backend.purejava.FlintModelFixtureIntegrationTest")
+    }
+    dependsOn(tasks.named("downloadFlintQ4KMModel"))
+    outputs.upToDateWhen { false }
+    systemProperty("models.purejava.maxContextLength", "128")
+    maxParallelForks = 1
+    maxHeapSize = "2g"
+    extensions.configure<JacocoTaskExtension> { isEnabled = false }
+}
+
+tasks.register<JavaExec>("flintReferenceFixture") {
+    description = "Write the small F32 Flint fixture for the independent numerical oracle"
+    group = "verification"
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.integrallis.models.backend.purejava.FlintGgufRouteTest")
+    args(layout.buildDirectory.dir("flint-reference").get().asFile.absolutePath)
 }

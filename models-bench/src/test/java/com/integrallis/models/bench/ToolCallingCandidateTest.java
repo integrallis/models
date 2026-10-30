@@ -25,7 +25,9 @@ class ToolCallingCandidateTest {
 
   @Test
   void pinsTheQualificationCandidatesAndTheirProtocols() {
-    assertThat(ToolCallingCandidate.values()).hasSize(10);
+    assertThat(ToolCallingCandidate.values()).hasSize(11);
+    assertThat(ToolCallingCandidate.parse("flint-40b-a2.5b").template())
+        .isEqualTo(ChatTemplate.FLINT);
     assertThat(ToolCallingCandidate.parse("needle2").template()).isEqualTo(ChatTemplate.NEEDLE2);
     assertThat(ToolCallingCandidate.parse("hammer2.1-0.5b").template())
         .isEqualTo(ChatTemplate.HAMMER);

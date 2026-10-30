@@ -21,6 +21,12 @@ import java.util.Locale;
 
 /** Exact artifacts admitted to the small-model tool-calling qualification round. */
 enum ToolCallingCandidate {
+  FLINT_40B_A2_5B(
+      "flint-40b-a2.5b",
+      "ggml_org_flint_gguf_q4_k_m",
+      "Flint 40B-A2.5B GGUF Q4_K_M",
+      "c3c4d93f9db92627a2fc47ea8fe8c64a094cabd3549db544bcdd2c00e9a9a347",
+      ChatTemplate.FLINT),
   NEEDLE2(
       "needle2",
       "cactus_compute_needle2_cact_cq2_mixed",

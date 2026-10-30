@@ -1,0 +1,45 @@
+{
+  "policyId": "flint-improvement-evidence-v1",
+  "runtimeEvidencePassed": false,
+  "catalogAdmitted": false,
+  "manualAnswerReviewRequired": true,
+  "releasedLibraryEvidenceRequired": true,
+  "toolCapabilityAssessedSeparately": true,
+  "checks": {
+    "numericalParity": {
+      "passed": true
+    },
+    "defaultCorrectness": {
+      "passed": true
+    },
+    "frozenBudgetPilot": {
+      "passed": false,
+      "reason": "[Errno 2] No such file or directory: '/private/tmp/flint-ordered-20261030-3336aed1/results/ollama-candidate.json'"
+    },
+    "heldOutAccuracy": {
+      "passed": true
+    },
+    "catalogRuntimePolicy": {
+      "passed": false,
+      "reason": "[Errno 2] No such file or directory: '/private/tmp/flint-ordered-20261030-3336aed1/results/qualification.json'"
+    },
+    "runtimeProvenance": {
+      "passed": true
+    }
+  },
+  "failedChecks": [
+    "frozenBudgetPilot",
+    "catalogRuntimePolicy"
+  ],
+  "inputSha256": {
+    "parity.json": "2260622d62b67fa1fc00e4791daab0f9108c928e6eb782c10015a0263bdf0e61",
+    "default-correctness/smoke.json": "db1d1896544b108679cda8e8663ca66229b596dc1c8af51e7a5c8f79dc8113b0",
+    "native-default.json": "cf7632eb8cdd8b908f853d3ca0b0f1c5dcd8fc92b90480101cb581f0a4d6db83",
+    "selected-profile.json": "905c2f6d070cc447e3c56db2e770dac6ac4dc54c354d2d1555012d27b0831497",
+    "visible/native-budget-512.json": "de3f9fcd17b92eb6d0fb9509e07d6e4e3943f5c881a8c28c68b8847a4e6e64b6",
+    "native-candidate.json": "3c1d99cb0fd5bf1bf1c722f0d5909a372b6ed8c11f95d536b028d728044c291b",
+    "visible/native-reliability.json": "3c853752d059d601f54d87db9cf051cf2f713e0544cb404d407b1bf7f9dc8526",
+    "inputs.json": "1578fae98cab3d581eba0579b576bc2cc964aa769cb21e1e27ea7f0c241a1b51",
+    "native-reliability.json": "e9fbf02afa8f329948e6eaf1a6ae2188af915a674f87d1ec6a0fbb6c86010f39"
+  }
+}

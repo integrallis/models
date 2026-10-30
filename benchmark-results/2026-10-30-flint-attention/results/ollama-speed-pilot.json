@@ -1,0 +1,268 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-30T19:26:44.372860497Z",
+  "framework" : "plain-java",
+  "backend" : "ollama",
+  "backendVersion" : "ollama@0.40.9",
+  "modelId" : "ggml_org_flint_gguf_q4_k_m",
+  "model" : "flint-qualification",
+  "artifactSha256" : "c3c4d93f9db92627a2fc47ea8fe8c64a094cabd3549db544bcdd2c00e9a9a347",
+  "artifactSizeBytes" : 23387911136,
+  "settings" : {
+    "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+    "workload" : "general",
+    "caseIds" : [ "auto-glass-deadline" ],
+    "promptTemplate" : "flint",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 512,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v24",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topK" : "1",
+      "rawPrompt" : "true",
+      "seed" : "42",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-4-103",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971654656,
+    "maxHeapBytes" : 8589934592,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "ollama",
+    "planVersion" : "unavailable",
+    "environment" : { },
+    "optimizations" : [ ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 3,
+    "successfulAttempts" : 3,
+    "loadMillis" : 2.338853,
+    "retrievalMillis" : {
+      "p50" : 5.568711,
+      "p95" : 5.9601138
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 1.3246959999996761,
+      "p95" : 3.7790626000016343
+    },
+    "ttftMillis" : {
+      "p50" : 211.93975,
+      "p95" : 218.41873569999998
+    },
+    "tpotMillis" : {
+      "p50" : 68.80075032671081,
+      "p95" : 69.43643079293597
+    },
+    "endToEndMillis" : {
+      "p50" : 31392.013278,
+      "p95" : 31674.5717313
+    },
+    "p50PrefillTokensPerSecond" : 984.8962555925892,
+    "p50DecodeTokensPerSecond" : 14.534725206503536,
+    "peakRssBytes" : 23806234624,
+    "totalCpuMillis" : 1504450.0,
+    "totalInputTokens" : 492,
+    "totalCacheReadInputTokens" : 0,
+    "totalCacheWriteInputTokens" : 0,
+    "totalOutputTokens" : 1362,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 0.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 1.0,
+    "modelAnswerRate" : 1.0,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.0,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "FAILED_QUALITY",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c601f43e2071081b9e57fd99ded3af1992fb788afa1dfde06b787ece1e8c315",
+    "retrievalMillis" : 6.003603,
+    "frameworkOverheadMillis" : 1.3246959999996761,
+    "endToEndMillis" : 31705.967115,
+    "generation" : {
+      "text" : "The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 454,
+      "ttftMillis" : 211.93975,
+      "totalMillis" : 31698.638816,
+      "prefillTokensPerSecond" : 950.2619014508876,
+      "loadMillis" : 2.338853,
+      "peakRssBytes" : 23728328704,
+      "cpuMillis" : 504620.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says Northstar Mutual auto glass claims must be reported through Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. Police report not required.\n\nQuestion: How long do I have to report an auto glass claim and what is the deductible?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry ID [claims-auto-glass]. Put citations at end. Only IDs present. Do not use prior knowledge.\n\nNeed maybe: \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\"\n\nCheck rules: If context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So end with [claims-auto-glass]. One short sentence. Could mention auto glass claims generally? Deductible specifically windshield repair. Question asks auto glass claim and deductible. Context: auto glass claims must be reported within 30 days. Windshield repair has 75 deductible. So answer: \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\"\n\nIs that one sentence? Yes. Citation at end. Good. No extra. Ensure no period after citation? \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\" That's one sentence? Period before citation maybe okay? Better: \"You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass]\" No period? Citation at end. One sentence. But source ID at end. Good.\n\nNeed maybe \"The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]\". This is one sentence. Ends with citation. Good.</think>The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]",
+      "text" : "The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c601f43e2071081b9e57fd99ded3af1992fb788afa1dfde06b787ece1e8c315",
+    "retrievalMillis" : 5.130369,
+    "frameworkOverheadMillis" : 1.0043880000011995,
+    "endToEndMillis" : 31392.013278,
+    "generation" : {
+      "text" : "The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 454,
+      "ttftMillis" : 219.138623,
+      "totalMillis" : 31385.878521,
+      "prefillTokensPerSecond" : 984.8962555925892,
+      "loadMillis" : 2.338853,
+      "peakRssBytes" : 23805956096,
+      "cpuMillis" : 500740.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says Northstar Mutual auto glass claims must be reported through Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. Police report not required.\n\nQuestion: How long do I have to report an auto glass claim and what is the deductible?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry ID [claims-auto-glass]. Put citations at end. Only IDs present. Do not use prior knowledge.\n\nNeed maybe: \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\"\n\nCheck rules: If context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So end with [claims-auto-glass]. One short sentence. Could mention auto glass claims generally? Deductible specifically windshield repair. Question asks auto glass claim and deductible. Context: auto glass claims must be reported within 30 days. Windshield repair has 75 deductible. So answer: \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\"\n\nIs that one sentence? Yes. Citation at end. Good. No extra. Ensure no period after citation? \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\" That's one sentence? Period before citation maybe okay? Better: \"You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass]\" No period? Citation at end. One sentence. But source ID at end. Good.\n\nNeed maybe \"The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]\". This is one sentence. Ends with citation. Good.</think>The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]",
+      "text" : "The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c601f43e2071081b9e57fd99ded3af1992fb788afa1dfde06b787ece1e8c315",
+    "retrievalMillis" : 5.568711,
+    "frameworkOverheadMillis" : 4.051770000001852,
+    "endToEndMillis" : 31284.10714,
+    "generation" : {
+      "text" : "The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 454,
+      "ttftMillis" : 169.659753,
+      "totalMillis" : 31274.486659,
+      "prefillTokensPerSecond" : 1022.5395142937307,
+      "loadMillis" : 2.338853,
+      "peakRssBytes" : 23806234624,
+      "cpuMillis" : 499090.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says Northstar Mutual auto glass claims must be reported through Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. Police report not required.\n\nQuestion: How long do I have to report an auto glass claim and what is the deductible?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry ID [claims-auto-glass]. Put citations at end. Only IDs present. Do not use prior knowledge.\n\nNeed maybe: \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\"\n\nCheck rules: If context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So end with [claims-auto-glass]. One short sentence. Could mention auto glass claims generally? Deductible specifically windshield repair. Question asks auto glass claim and deductible. Context: auto glass claims must be reported within 30 days. Windshield repair has 75 deductible. So answer: \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\"\n\nIs that one sentence? Yes. Citation at end. Good. No extra. Ensure no period after citation? \"You have 30 calendar days to report an auto glass claim, and the windshield repair deductible is $75. [claims-auto-glass]\" That's one sentence? Period before citation maybe okay? Better: \"You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass]\" No period? Citation at end. One sentence. But source ID at end. Good.\n\nNeed maybe \"The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]\". This is one sentence. Ends with citation. Good.</think>The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]",
+      "text" : "The auto glass claim must be reported within 30 calendar days, and the windshield repair deductible is $75 [claims-auto-glass]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

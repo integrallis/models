@@ -89,6 +89,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private static final int FORMAT_Q8_0_F32_ACTIVATION = 8;
   private static final int FORMAT_PTQ1_0 = 7;
   private static final int FORMAT_TQ1_0 = 9;
+  private static final int FORMAT_Q4_K_ORDERED = 10;
   private static final Linker LINKER = Linker.nativeLinker();
   private static final MethodHandle FLOAT_ARRAY_SEGMENT = floatArraySegment();
   private static final FunctionDescriptor BF16_BATCHED_DESCRIPTOR =
@@ -1491,6 +1492,31 @@ public final class NativeKernelLibrary implements AutoCloseable {
         "Q4_K",
         FORMAT_Q4_K,
         NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL,
+        weights,
+        weightBytes,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        rows,
+        cols);
+  }
+
+  void q4_KOrderedBatchedMatmul(
+      MemorySegment weights,
+      long weightBytes,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int batchSize,
+      int rows,
+      int cols) {
+    invokeBatched(
+        "Q4_K",
+        FORMAT_Q4_K_ORDERED,
+        NativeKernelCapability.Q4_K_ORDERED_REDUCTION,
         weights,
         weightBytes,
         nativeInput,

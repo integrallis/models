@@ -37,6 +37,49 @@ import org.junit.jupiter.api.io.TempDir;
 class ToolCallingQualificationCliTest {
 
   @Test
+  void flintSchemaGrammarIsExplicitAndCannotBeUsedWithAnotherProtocol() throws Exception {
+    Path artifact = Files.writeString(temporary.resolve("flint.gguf"), "fixture");
+    var args =
+        new java.util.ArrayList<>(
+            List.of(
+                "--candidate",
+                "flint-40b-a2.5b",
+                "--model",
+                artifact.toString(),
+                "--models-revision",
+                REVISION));
+    assertThat(ToolCallingQualificationCli.parse(args.toArray(String[]::new)).toolConstraints())
+        .isEqualTo("default");
+    args.addAll(List.of("--tool-constraints", "flint-schema"));
+    assertThat(ToolCallingQualificationCli.parse(args.toArray(String[]::new)).toolConstraints())
+        .isEqualTo("flint-schema");
+    args.set(1, "qwen3-8b");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> ToolCallingQualificationCli.parse(args.toArray(String[]::new)));
+  }
+
+  @Test
+  void recordsAnExplicitFollowUpBudgetWithoutChangingTheDefault() throws Exception {
+    Path artifact = Files.writeString(temporary.resolve("flint.gguf"), "fixture");
+    String[] defaults = {
+      "--candidate",
+      "flint-40b-a2.5b",
+      "--model",
+      artifact.toString(),
+      "--models-revision",
+      REVISION
+    };
+    assertThat(ToolCallingQualificationCli.parse(defaults).followUpMaxTokens()).isEqualTo(96);
+    var args = new java.util.ArrayList<>(List.of(defaults));
+    args.addAll(List.of("--follow-up-max-tokens", "512"));
+    assertThat(ToolCallingQualificationCli.parse(args.toArray(String[]::new)).followUpMaxTokens())
+        .isEqualTo(512);
+    args.set(args.size() - 1, "513");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> ToolCallingQualificationCli.parse(args.toArray(String[]::new)));
+  }
+
+  @Test
   void acceptsThePinnedQwen3EightBArtifact() throws Exception {
     Path artifact = temporary.resolve("qwen3-8b.gguf");
     Files.writeString(artifact, "fixture");
@@ -294,6 +337,43 @@ class ToolCallingQualificationCliTest {
                     20)
                 .passed())
         .isFalse();
+  }
+
+  @Test
+  void followUpDoesNotCreditFactsThatOnlyAppearInReasoning() throws Exception {
+    String captured;
+    try (var resource = getClass().getResourceAsStream("/flint/truncated-follow-up.txt")) {
+      captured = new String(resource.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+    }
+    var actual =
+        ToolCallingQualificationCli.evaluateFollowUp(
+            new ObjectMapper(), ToolSyntax.FLINT, List.of(), captured, 40263);
+    assertThat(actual.output()).isEqualTo(captured);
+    assertThat(actual.grounded()).isFalse();
+    assertThat(actual.passed()).isFalse();
+    for (String output :
+        List.of(
+            "<think>78 F and rain",
+            "<think>78 F and rain</think>",
+            "Checking. <think>78 F <think>and rain</think> still thinking</think>Done.",
+            "<reasoning>78 F and rain</reasoning>It is sunny at 20 F.",
+            "<think>Plan.</think>{\"temperature\":78,\"conditions\":\"rain\"}",
+            "<think>Plan.</thinking>It is raining at 78 F.",
+            "<think>Plan.</think><thinking>78 F and rain</thinking>Done.")) {
+      var result =
+          ToolCallingQualificationCli.evaluateFollowUp(
+              new ObjectMapper(), ToolSyntax.FLINT, List.of(), output, 1);
+      assertThat(result.passed()).as(output).isFalse();
+    }
+    assertThat(
+            ToolCallingQualificationCli.evaluateFollowUp(
+                    new ObjectMapper(),
+                    ToolSyntax.FLINT,
+                    List.of(),
+                    "<think>Check the result.</think>It is raining at 78 F.",
+                    1)
+                .passed())
+        .isTrue();
   }
 
   @Test

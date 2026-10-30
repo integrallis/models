@@ -82,11 +82,15 @@ class ModelsChatModelToolCallingTest {
           .build();
 
   private static final class ScriptedModel implements TextGenerationModel {
-    private final String completion;
+    private final ArrayDeque<String> completions;
     private final AtomicReference<String> lastPrompt = new AtomicReference<>();
 
-    ScriptedModel(String completion) {
-      this.completion = completion;
+    ScriptedModel(String... completions) {
+      this.completions = new ArrayDeque<>(List.of(completions));
+    }
+
+    private String nextCompletion() {
+      return completions.size() > 1 ? completions.removeFirst() : completions.getFirst();
     }
 
     @Override
@@ -102,26 +106,26 @@ class ModelsChatModelToolCallingTest {
     @Override
     public String generate(String prompt, SamplingOptions options) {
       lastPrompt.set(prompt);
-      return completion;
+      return nextCompletion();
     }
 
     @Override
     public String generate(ModelPrompt prompt, SamplingOptions options) {
       lastPrompt.set(prompt.text());
-      return completion;
+      return nextCompletion();
     }
 
     @Override
     public void generate(String prompt, SamplingOptions options, TokenStream stream) {
       lastPrompt.set(prompt);
-      stream.onToken(completion);
+      stream.onToken(nextCompletion());
       stream.onComplete();
     }
 
     @Override
     public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
       lastPrompt.set(prompt.text());
-      stream.onToken(completion);
+      stream.onToken(nextCompletion());
       stream.onComplete();
     }
 
@@ -470,6 +474,80 @@ class ModelsChatModelToolCallingTest {
 
   @Nested
   static class Recovery {
+
+    @Test
+    void flintReplaysTwoDependentToolResultsBeforeTheFinalAnswer() {
+      String firstOutput =
+          "<think>The backup city comes from the first result.</think>"
+              + "<tool_call>get_weather<arg_key>city</arg_key><arg_value>Austin</arg_value></tool_call>";
+      String secondOutput =
+          "<tool_call>get_weather<arg_key>city</arg_key><arg_value>Dallas</arg_value></tool_call>";
+      ScriptedModel model =
+          new ScriptedModel(firstOutput, secondOutput, "Austin is 88; Dallas is 90.");
+      var adapter = chatModel(model, ChatTemplate.FLINT);
+      var user =
+          UserMessage.from("Get Austin weather, then weather for the backupCity in its result.");
+      var messages = new ArrayList<dev.langchain4j.data.message.ChatMessage>();
+      messages.add(user);
+      var first =
+          adapter.chat(
+              ChatRequest.builder().messages(messages).toolSpecifications(WEATHER).build());
+      assertThat(model.lastPrompt()).doesNotContain("Dallas");
+      var firstCall = first.aiMessage().toolExecutionRequests().getFirst();
+      assertThat(firstCall.arguments()).isEqualTo("{\"city\":\"Austin\"}");
+      messages.add(first.aiMessage());
+      messages.add(
+          ToolExecutionResultMessage.from(
+              firstCall.id(), firstCall.name(), "{\"tempF\":88,\"backupCity\":\"Dallas\"}"));
+      var second =
+          adapter.chat(
+              ChatRequest.builder().messages(messages).toolSpecifications(WEATHER).build());
+      assertThat(second.aiMessage().toolExecutionRequests()).hasSize(1);
+      var secondCall = second.aiMessage().toolExecutionRequests().getFirst();
+      assertThat(secondCall.arguments()).isEqualTo("{\"city\":\"Dallas\"}");
+      assertThat(model.lastPrompt())
+          .contains(
+              firstOutput,
+              "<|observation|><tool_response>{\"tempF\":88,\"backupCity\":\"Dallas\"}</tool_response>");
+      messages.add(second.aiMessage());
+      messages.add(
+          ToolExecutionResultMessage.from(secondCall.id(), secondCall.name(), "{\"tempF\":90}"));
+      var answer =
+          adapter.chat(
+              ChatRequest.builder().messages(messages).toolSpecifications(WEATHER).build());
+      assertThat(answer.aiMessage().hasToolExecutionRequests()).isFalse();
+      assertThat(answer.aiMessage().text()).isEqualTo("Austin is 88; Dallas is 90.");
+      assertThat(model.lastPrompt())
+          .containsSubsequence(
+              firstOutput,
+              "\"backupCity\":\"Dallas\"",
+              secondOutput,
+              "<|observation|><tool_response>{\"tempF\":90}</tool_response>",
+              "<|assistant|>");
+    }
+
+    @Test
+    void recoversFlintTaggedArgumentsThroughTheDeclaredLangChain4jSchema() {
+      ScriptedModel model =
+          new ScriptedModel(
+              "<tool_call>get_weather<arg_key>city</arg_key><arg_value>Austin</arg_value></tool_call>");
+      ChatRequest request =
+          ChatRequest.builder()
+              .messages(UserMessage.from("weather?"))
+              .toolSpecifications(WEATHER)
+              .build();
+
+      ChatResponse response = chatModel(model, ChatTemplate.FLINT).chat(request);
+
+      assertThat(response.finishReason()).isEqualTo(FinishReason.TOOL_EXECUTION);
+      assertThat(response.aiMessage().toolExecutionRequests())
+          .singleElement()
+          .satisfies(
+              call -> {
+                assertThat(call.name()).isEqualTo("get_weather");
+                assertThat(call.arguments()).isEqualTo("{\"city\":\"Austin\"}");
+              });
+    }
 
     @Test
     void recoversMiniCpmTaggedArgumentsThroughTheDeclaredLangChain4jSchema() {

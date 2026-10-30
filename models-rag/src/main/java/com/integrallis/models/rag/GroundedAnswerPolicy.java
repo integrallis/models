@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
 public final class GroundedAnswerPolicy {
   public static final String ABSTENTION = "INSUFFICIENT_CONTEXT";
   public static final String POLICY_ID =
-      "bounded-context-injection-screened-citation-safe-statement-grounding-v23";
+      "bounded-context-injection-screened-citation-safe-statement-grounding-v24";
   public static final float DEFAULT_MINIMUM_RETRIEVAL_SCORE = 2.0f;
 
   /**
@@ -182,7 +182,8 @@ public final class GroundedAnswerPolicy {
           "which",
           "who",
           "why",
-          "with");
+          "with",
+          "you");
 
   private final float minimumRetrievalScore;
   private final GroundingLimits limits;
@@ -261,6 +262,8 @@ public final class GroundedAnswerPolicy {
     String validationCandidate =
         removeValidationOnlyMarkup(removeLeadingContextAttribution(candidate));
     if (validationCandidate.isBlank()
+        || hasUnfinishedClause(validationCandidate)
+        || !preservesClaimPolarity(validationCandidate, retrieved)
         || !preservesAtomicIdentifiers(validationCandidate, retrieved)
         || !hasOnlySupportedClaims(question, validationCandidate, retrieved)
         || !hasEvidenceAnchorsForEveryQuestionClause(question, validationCandidate, retrieved)) {
@@ -337,10 +340,61 @@ public final class GroundedAnswerPolicy {
   }
 
   static String removeValidationOnlyMarkup(String candidate) {
-    String withoutMatrixDelimiters = LATEX_MATRIX_DELIMITER.matcher(candidate).replaceAll(" ");
+    String addressed = candidate;
+    // A redundant answer prefix is not the negation of the following already-negative claim.
+    // Preserve the claim's negation; its polarity is checked against its own best-matching source.
+    if (candidate.matches("(?is)^no,\\s+[^.;!?]*\\b(?:not|never|cannot|without)\\b.*")) {
+      addressed = candidate.replaceFirst("(?i)^no,\\s+", "");
+    }
+    String withoutMatrixDelimiters = LATEX_MATRIX_DELIMITER.matcher(addressed).replaceAll(" ");
     String withoutPluralMarkers =
         OPTIONAL_PLURAL_MARKER.matcher(withoutMatrixDelimiters).replaceAll("");
     return NUMBERED_LIST_MARKER.matcher(withoutPluralMarkers).replaceAll("$1");
+  }
+
+  private static final Pattern NEGATION =
+      Pattern.compile("(?i)\\b(?:no|not|never|without|cannot)\\b|n['’]t\\b");
+  private static final Pattern UNFINISHED_CLAUSE =
+      Pattern.compile(
+          "(?is)(?:\\b(?:and|or|but)\\s+(?:if|unless|when)\\b[^,;.!?]*[.!?]?"
+              + "|\\b(?:and|or|but|per|within|after|before|of|to|with|without|for))\\s*$");
+
+  private static boolean hasUnfinishedClause(String candidate) {
+    return UNFINISHED_CLAUSE.matcher(CITATION.matcher(candidate).replaceAll(" ").strip()).find();
+  }
+
+  private static final Pattern POLARITY_CLAUSE_BOUNDARY =
+      Pattern.compile("(?i)(?:[,;?!]\\s+|\\.\\s+|\\s+and\\s+)");
+
+  /** Rejects a polarity reversal of the most closely matching evidence clause. */
+  static boolean preservesClaimPolarity(String candidate, List<GroundingDocument> retrieved) {
+    List<String> sources =
+        retrieved.stream()
+            .flatMap(document -> POLARITY_CLAUSE_BOUNDARY.splitAsStream(document.text()))
+            .filter(clause -> !clause.isBlank())
+            .toList();
+    String uncited = CITATION.matcher(candidate).replaceAll(" ");
+    for (String claim : POLARITY_CLAUSE_BOUNDARY.split(uncited)) {
+      Set<String> claimWords = words(NEGATION.matcher(claim).replaceAll(" "));
+      if (claimWords.isEmpty()) continue;
+      long bestOverlap = 0;
+      boolean polarityMatches = true;
+      boolean negative = NEGATION.matcher(claim).find();
+      for (String source : sources) {
+        Set<String> sourceWords = words(NEGATION.matcher(source).replaceAll(" "));
+        long overlap =
+            claimWords.stream().filter(word -> containsEquivalentWord(sourceWords, word)).count();
+        boolean matches = negative == NEGATION.matcher(source).find();
+        if (overlap > bestOverlap) {
+          bestOverlap = overlap;
+          polarityMatches = matches;
+        } else if (overlap > 0 && overlap == bestOverlap) {
+          polarityMatches &= matches;
+        }
+      }
+      if (bestOverlap > 0 && !polarityMatches) return false;
+    }
+    return true;
   }
 
   static boolean isExplicitAbstention(String candidate) {

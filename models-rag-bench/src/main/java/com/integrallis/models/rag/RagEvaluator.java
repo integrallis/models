@@ -41,6 +41,16 @@ public final class RagEvaluator {
 
   public static RagEvaluation evaluate(
       RagCase testCase, List<RetrievedDocument> retrieved, String answer) {
+    return evaluate(testCase, retrieved, answer, false);
+  }
+
+  static RagEvaluation evaluateVisible(
+      RagCase testCase, List<RetrievedDocument> retrieved, String answer) {
+    return evaluate(testCase, retrieved, answer, true);
+  }
+
+  private static RagEvaluation evaluate(
+      RagCase testCase, List<RetrievedDocument> retrieved, String answer, boolean boundedFacts) {
     Set<String> expected = normalizedSet(testCase.relevantDocumentIds());
     Set<String> retrievedIds = new HashSet<>();
     retrieved.forEach(hit -> retrievedIds.add(normalizeId(hit.document().id())));
@@ -49,7 +59,7 @@ public final class RagEvaluator {
     double retrievalRecall = expected.isEmpty() ? 1.0 : fractionPresent(expected, retrievedIds);
     double reciprocalRank = reciprocalRank(expected, retrieved);
     double factCoverage =
-        factCoverage(testCase.requiredFacts(), testCase.factAlternatives(), answer);
+        factCoverage(testCase.requiredFacts(), testCase.factAlternatives(), answer, boundedFacts);
     double citationRecall =
         expected.isEmpty()
             ? (citations.isEmpty() ? 1.0 : 0.0)
@@ -86,7 +96,10 @@ public final class RagEvaluator {
   }
 
   private static double factCoverage(
-      List<String> facts, List<RagFactAlternative> alternatives, String answer) {
+      List<String> facts,
+      List<RagFactAlternative> alternatives,
+      String answer,
+      boolean boundedFacts) {
     if (facts.isEmpty()) {
       return 1.0;
     }
@@ -95,18 +108,22 @@ public final class RagEvaluator {
         facts.stream()
             .filter(
                 fact ->
-                    matches(normalizedAnswer, fact)
+                    matches(normalizedAnswer, fact, boundedFacts)
                         || alternatives.stream()
                             .filter(alternative -> alternative.fact().equals(fact))
                             .anyMatch(
                                 alternative ->
-                                    matches(normalizedAnswer, alternative.alternative())))
+                                    matches(
+                                        normalizedAnswer, alternative.alternative(), boundedFacts)))
             .count();
     return (double) present / facts.size();
   }
 
-  private static boolean matches(String normalizedAnswer, String fact) {
-    return normalizedAnswer.contains(normalizeText(fact));
+  private static boolean matches(String normalizedAnswer, String fact, boolean boundedFacts) {
+    String normalizedFact = normalizeText(fact);
+    return boundedFacts
+        ? (" " + normalizedAnswer + " ").contains(" " + normalizedFact + " ")
+        : normalizedAnswer.contains(normalizedFact);
   }
 
   private static Set<String> citations(String answer) {

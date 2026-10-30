@@ -227,6 +227,23 @@ public record ToolSyntax(
           "<tool_response>",
           "</tool_response>");
 
+  /**
+   * Flint uses raw strings and JSON nonstrings in arg_key/arg_value pairs, followed by an
+   * observation turn.
+   */
+  public static final ToolSyntax FLINT =
+      new ToolSyntax(
+          Mode.TAG_WITH_TAGGED,
+          "<tool_call>",
+          "</tool_call>",
+          "name",
+          "arguments",
+          false,
+          true,
+          ResultStyle.TOOL_ROLE,
+          "<tool_response>",
+          "</tool_response>");
+
   public ToolSyntax {
     Objects.requireNonNull(mode, "mode");
     Objects.requireNonNull(resultStyle, "resultStyle");
@@ -285,6 +302,6 @@ public record ToolSyntax(
 
   /** Whether calls can be recovered when the request's declared JSON Schemas are available. */
   public boolean parsableWithSchemas() {
-    return parsable() || this.equals(MINICPM5);
+    return parsable() || this.equals(MINICPM5) || this.equals(FLINT);
   }
 }

@@ -42,6 +42,7 @@ public enum ChatTemplate {
   LLAMA3("llama3", ToolSyntax.LLAMA3),
   MOBILE_MOE("mobilemoe", ToolSyntax.NONE),
   GPT_OSS("gpt-oss", ToolSyntax.HARMONY),
+  FLINT("flint", ToolSyntax.FLINT),
   NEEDLE2("needle2", ToolSyntax.NEEDLE2),
   HAMMER("hammer", ToolSyntax.HAMMER),
   GEMMA("gemma", ToolSyntax.NONE),
@@ -148,10 +149,12 @@ public enum ChatTemplate {
   /**
    * The token text that terminates an assistant turn in this family, when it has one.
    *
-   * <p>For every family but GPT-OSS this is the marker the renderer writes after an assistant
-   * message. GPT-OSS histories close a turn with {@code <|end|>}, but a final answer ends with
-   * {@code <|return|>}, which is the marker generation has to stop on; {@code <|end|>} must not
-   * stop it. {@link #RAW} has no envelope and so no marker.
+   * <p>For every enveloped family but GPT-OSS and Flint this is the marker the renderer writes
+   * after an assistant message. GPT-OSS histories close a turn with {@code <|end|>}, but a final
+   * answer ends with {@code <|return|>}, which is the marker generation has to stop on; {@code
+   * <|end|>} must not stop it. Flint histories use the next role prefix without a closing marker,
+   * while generation can end with {@code <|end_of_text|>}. {@link #RAW} has no envelope and so no
+   * marker.
    *
    * @return the marker text, as it appears in the model's vocabulary
    */
@@ -172,6 +175,7 @@ public enum ChatTemplate {
           case LLAMA3 -> "<|eot_id|>";
           case MOBILE_MOE -> "<|eot|>";
           case GPT_OSS -> "<|return|>";
+          case FLINT -> "<|end_of_text|>";
           case GEMMA -> "<end_of_turn>";
           case GEMMA4 -> "<turn|>";
           case PHI3 -> "<|end|>";
@@ -249,6 +253,7 @@ public enum ChatTemplate {
       case LLAMA3 -> renderLlama3(conversation);
       case MOBILE_MOE -> renderMobileMoe(conversation);
       case GPT_OSS -> renderGptOss(conversation, List.of());
+      case FLINT -> FlintToolProtocol.render(conversation, List.of());
       case NEEDLE2 -> renderNeedle2(conversation, List.of());
       case HAMMER -> renderHammer(conversation, List.of());
       case GEMMA -> renderGemma(conversation);
@@ -301,6 +306,7 @@ public enum ChatTemplate {
               conversation, "", "<think>\n\n</think>\n", declared, ToolSyntax.SMOLLM3);
       case LLAMA3 -> renderLlama3WithTools(conversation, declared);
       case GPT_OSS -> renderGptOss(conversation, declared);
+      case FLINT -> FlintToolProtocol.render(conversation, declared);
       case NEEDLE2 -> renderNeedle2(conversation, declared);
       case HAMMER -> renderHammer(conversation, declared);
       case MINICPM5_NO_THINK -> renderMiniCpm5WithTools(conversation, declared);

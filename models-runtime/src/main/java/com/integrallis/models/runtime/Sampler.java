@@ -269,10 +269,9 @@ public final class Sampler {
   private static int constrainedArgmax(float[] logits, IntPredicate allowedToken) {
     int best = -1;
     for (int token = 0; token < logits.length; token++) {
-      if (!allowedToken.test(token)) {
-        continue;
-      }
-      if (best < 0 || logits[token] > logits[best]) {
+      // Grammar evaluation can be expensive. A dominated score cannot change the result,
+      // including ties (which retain the first allowed token), so do not evaluate its grammar.
+      if ((best < 0 || logits[token] > logits[best]) && allowedToken.test(token)) {
         best = token;
       }
     }

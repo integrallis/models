@@ -20,7 +20,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.integrallis.models.api.OptimizationStatus;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -3865,6 +3868,127 @@ class CertifiedRagEvidenceTest {
               assertThat(comparison.decodeThroughputRatio()).isBetween(0.887, 0.897);
               assertThat(comparison.endToEndLatencyRatio()).isBetween(1.39, 1.41);
             });
+  }
+
+  @Test
+  void flintQualifiesAgainstItsSameHostOllamaControlWithCompleteVisibleAnswers() throws Exception {
+    Path evidence =
+        Path.of(System.getProperty("models.repositoryRoot"))
+            .resolve("benchmark-results/2026-10-30-flint-qualification/results");
+    String candidateSha = "7b52f13b8909e7ba849e44fda2d2a5824fc1ea6690b2a72d329e3e21bda334fa";
+    String comparatorSha = "326db910035a4fa3676ede42a76e82a28dfdefabd5e31cafda45f4d077116449";
+    assertThat(evidenceSha256(evidence.resolve("native-candidate.json"))).isEqualTo(candidateSha);
+    assertThat(evidenceSha256(evidence.resolve("ollama-candidate.json"))).isEqualTo(comparatorSha);
+    assertThat(evidenceSha256(evidence.resolve("qualification.json")))
+        .isEqualTo("5b89dfbaa21f5a2818aabdecedd45a5025cf627a00c29561055aa415e6194560");
+    var receipt = mapper.readTree(evidence.resolve("qualification.json").toFile());
+    assertThat(receipt.path("candidate").path("sha256").asText()).isEqualTo(candidateSha);
+    assertThat(receipt.path("comparators").get(0).path("sha256").asText()).isEqualTo(comparatorSha);
+
+    RagBenchmarkReport candidate = report(evidence, "native-candidate.json");
+    RagBenchmarkReport ollama = report(evidence, "ollama-candidate.json");
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+    assertThat(candidate.modelId()).isEqualTo("ggml_org_flint_gguf_q4_k_m");
+    assertThat(candidate.artifactSha256())
+        .isEqualTo("c3c4d93f9db92627a2fc47ea8fe8c64a094cabd3549db544bcdd2c00e9a9a347");
+    assertThat(candidate.artifactSizeBytes()).isEqualTo(23_387_911_136L);
+    assertThat(candidate.backendVersion())
+        .contains("flint-fb5d7a68248ca14da832ae886016b86d62060382");
+    assertThat(candidate.settings().maxOutputTokens()).isEqualTo(512);
+    assertThat(ollama.settings().maxOutputTokens()).isEqualTo(512);
+    assertThat(candidate.backendDiagnostics().environment())
+        .containsEntry("native-kernel-threads", "8");
+    assertThat(candidate.summary().successfulAttempts()).isEqualTo(27);
+    assertThat(candidate.summary().correctAnswerRate()).isEqualTo(1.0);
+    assertThat(candidate.summary().truncatedAnswerRate()).isZero();
+    assertThat(candidate.performanceTier()).isEqualTo(RagPerformanceTier.PERFORMANCE_REDUCED);
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerCount()).isEqualTo(18);
+    assertThat(qualification.modelAnswerCorrectRate()).isEqualTo(1.0);
+    assertThat(qualification.comparisons())
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.83, 0.84);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.45, 1.46);
+            });
+
+    assertThat(evidenceSha256(evidence.resolve("visible/native-candidate.json")))
+        .isEqualTo("06466defd9c3c1ad1000e3b5e19035950a40f4f351cb72918142ab6ba9f94c75");
+    var visible = mapper.readTree(evidence.resolve("visible/native-candidate.json").toFile());
+    assertThat(visible.path("sourceReportSha256").asText()).isEqualTo(candidateSha);
+    assertThat(visible.path("attempts").asInt()).isEqualTo(27);
+    assertThat(visible.path("distinctQuestions").asInt()).isEqualTo(9);
+    assertThat(visible.path("requiredFactsAndCitationsPasses").asInt()).isEqualTo(27);
+    assertThat(visible.path("budgetReached").asInt()).isZero();
+
+    Path defaultReport = evidence.resolve("default-correctness/models-rust-ffm.json");
+    assertThat(evidenceSha256(defaultReport))
+        .isEqualTo("a0c57ebb8b94dfa6d4292d00c7e20bcea7c8ac509247c3abd5e59eb404d87c8e");
+    RagBenchmarkReport defaults =
+        report(defaultReport.getParent(), defaultReport.getFileName().toString());
+    assertThat(defaults.backendDiagnostics().environment())
+        .containsEntry("native-kernel-threads", "16");
+    assertThat(defaults.settings().warmups()).isZero();
+    assertThat(defaults.settings().iterations()).isEqualTo(1);
+    assertThat(defaults.summary().successfulAttempts()).isEqualTo(9);
+    assertThat(defaults.summary().correctAnswerRate()).isEqualTo(1.0);
+    assertThat(defaults.summary().abstentionAccuracy()).isEqualTo(1.0);
+    assertThat(defaults.failures()).isEmpty();
+  }
+
+  @Test
+  void flintRetainsAllSixteenCompleteHeldOutAnswersIncludingBothAbstentions() throws Exception {
+    Path evidence =
+        Path.of(System.getProperty("models.repositoryRoot"))
+            .resolve("benchmark-results/2026-10-30-flint-qualification/results");
+    String reportSha = "720a0a3d579ab8b1ed20ae2fbcc47c315da1fb3a9b5d3df944189f3a9884b1b9";
+    assertThat(evidenceSha256(evidence.resolve("native-reliability.json"))).isEqualTo(reportSha);
+    assertThat(evidenceSha256(evidence.resolve("visible/native-reliability.json")))
+        .isEqualTo("e231683d570b216b0854ec801761294ae4096d0458b4f743b72950d48d365fec");
+    var audit = mapper.readTree(evidence.resolve("visible/native-reliability.json").toFile());
+    assertThat(audit.path("sourceReportSha256").asText()).isEqualTo(reportSha);
+    assertThat(audit.path("requiredFactsAndCitationsPasses").asInt()).isEqualTo(16);
+    RagBenchmarkReport candidate = report(evidence, "native-reliability.json");
+    RagCorpus corpus = RagCorpus.load(RagWorkload.ANSWER_RELIABILITY);
+    assertThat(corpus.fingerprint())
+        .isEqualTo("f63bbf95c1acad606bc069e9cd689997102f90255617881a83e29ef4c1cb5fe1");
+    assertThat(candidate.settings().corpusSha256()).isEqualTo(corpus.fingerprint());
+    assertThat(candidate.settings().maxOutputTokens()).isEqualTo(512);
+    assertThat(candidate.backendDiagnostics().environment())
+        .containsEntry("native-kernel-threads", "8");
+    assertThat(candidate.runs()).hasSize(16);
+    assertThat(candidate.runs().stream().map(RagRun::caseId).toList())
+        .containsExactlyInAnyOrderElementsOf(corpus.cases().stream().map(RagCase::id).toList());
+    for (RagRun run : candidate.runs()) {
+      RagCase question =
+          corpus.cases().stream()
+              .filter(c -> c.id().equals(run.caseId()))
+              .findFirst()
+              .orElseThrow();
+      var reassessed =
+          RagVisibleAnswerAudit.assess(
+              question,
+              run.retrieved(),
+              run.grounding().rawText(),
+              run.generation().outputTokens(),
+              candidate.settings().maxOutputTokens());
+      assertThat(reassessed.requiredFactsAndCitationsPass()).as(run.caseId()).isTrue();
+      assertThat(reassessed.polarityConsistent()).as(run.caseId()).isTrue();
+      if (run.caseId().startsWith("unknown-")) {
+        assertThat(reassessed.visibleEvaluation().abstained()).isTrue();
+        assertThat(reassessed.visibleText()).isEqualTo("INSUFFICIENT_CONTEXT");
+      }
+    }
+  }
+
+  private static String evidenceSha256(Path file) throws Exception {
+    return HexFormat.of()
+        .formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
   }
 
   private RagBenchmarkReport report(Path directory, String filename) throws IOException {

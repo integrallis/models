@@ -29,7 +29,8 @@
     "SWIGLU_F32": 67108864,
     "SLEEF_ACTIVATIONS_F32": 134217728,
     "Q8_0_F32_ACTIVATION_BATCHED_MATMUL": 268435456,
-    "TQ1_0_Q8_K_BATCHED_MATMUL": 536870912
+    "TQ1_0_Q8_K_BATCHED_MATMUL": 536870912,
+    "Q4_K_ORDERED_REDUCTION": 1073741824
   },
   "exports": {
     "cpu": [
@@ -189,12 +190,13 @@
     {
       "id": "q4_k-projection",
       "status": "UNPROVEN",
-      "summary": "Q4_K packed-weight projections; speed measurements alone do not prove a JVM limitation.",
+      "summary": "Q4_K packed-weight projections, including the sequential block-fold variant required by Flint numerical parity. Format ablation isolates the previous reduction-order error; this does not establish performance or a JVM limitation.",
       "capabilities": [
         "Q4_K_F32_BATCHED_MATMUL",
         "Q4_K_F32_GROUPED_BATCHED_MATMUL",
         "Q4_K_BATCH_VECTOR_ACCUMULATION",
-        "K_QUANT_BATCH_WEIGHT_REUSE"
+        "K_QUANT_BATCH_WEIGHT_REUSE",
+        "Q4_K_ORDERED_REDUCTION"
       ],
       "exports": {
         "cpu": [
@@ -207,6 +209,10 @@
         {
           "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGgufBatchedMatrixKernel.java",
           "anchor": "case Q4_K ->"
+        },
+        {
+          "path": "backend-java/src/main/java/com/integrallis/models/backend/purejava/flint/FlintForwardPass.java",
+          "anchor": "this.matrixKernel.requireSequentialQ4KReduction();"
         }
       ],
       "requiredProfiles": [
@@ -217,8 +223,20 @@
         "windows-x86_64",
         "windows-aarch64"
       ],
-      "evidence": [],
+      "evidence": [
+        {
+          "path": "benchmark-results/2026-10-30-flint-improvement/results/parity.json",
+          "sha256": "5595135faf1504ac6d794c3941b3050831e90de5e0f9242d06a9a82c3e184839",
+          "kind": "diagnostic"
+        },
+        {
+          "path": "benchmark-results/2026-10-30-flint-diagnosis/results/diagnosis.json",
+          "sha256": "6fbc84ed9846567225ac78f315cd780cd0b0e94b02dac90ed7c278ab421ca894",
+          "kind": "diagnostic"
+        }
+      ],
       "remaining": [
+        "Verify the ordered Q4_K variant with all pinned Flint continuations and bounded full-logit tolerances, then rerun unchanged held-out quality and whole-model performance gates; short ablations and synthetic parity do not qualify a model.",
         "Reproduce the best exact Java alternative and native route with matched scheduling and actual model calls.",
         "Identify a controlled JVM cause, qualify whole-model cost and resources on every retained profile, then adopt or remove."
       ],

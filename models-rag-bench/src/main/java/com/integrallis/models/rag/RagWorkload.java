@@ -22,6 +22,10 @@ import java.util.stream.Collectors;
 /** Versioned RAG workloads available to the controlled benchmark. */
 public enum RagWorkload {
   GENERAL("general", "/rag/documents.json", "/rag/cases.json"),
+  ANSWER_RELIABILITY(
+      "answer-reliability",
+      "/rag/answer-reliability/documents.json",
+      "/rag/answer-reliability/cases.json"),
   CODING("coding", "/rag/coding/documents.json", "/rag/coding/cases.json"),
   FINANCE("finance", "/rag/finance/documents.json", "/rag/finance/cases.json"),
   HEALTHCARE("healthcare", "/rag/healthcare/documents.json", "/rag/healthcare/cases.json"),

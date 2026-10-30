@@ -1460,6 +1460,56 @@ class NativeKernelLibraryTest {
   }
 
   @Test
+  void orderedQ4KMatchesJavaAcrossSingleGroupedAndIndependentDispatch() {
+    int cols = 2048;
+    int[] rows = {7, 11};
+    var types = new GgufTensorType[] {GgufTensorType.Q4_K, GgufTensorType.Q4_K};
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      kernel.requireSequentialQ4KReduction();
+      assertThat(kernel.supports(GgufTensorType.Q4_K)).isTrue();
+      var weights = new MemorySegment[2];
+      for (int m = 0; m < 2; m++) {
+        weights[m] = arena.allocate((long) rows[m] * cols / 256 * 144);
+        for (int row = 0; row < rows[m]; row++) {
+          for (int block = 0; block < cols / 256; block++) {
+            byte[] data =
+                q4KBlock(0.00137f * (row + block + 1), 0.00093f * (block + 1), row, block);
+            MemorySegment.copy(
+                data,
+                0,
+                weights[m],
+                ValueLayout.JAVA_BYTE,
+                ((long) row * cols / 256 + block) * 144,
+                data.length);
+          }
+        }
+      }
+      for (int batch : new int[] {1, 3}) {
+        float[][] input = {inputs(batch, cols), inputs(batch, cols)};
+        for (int i = 0; i < input[1].length; i++) input[1][i] += 0.0137f;
+        float[][] output = {new float[batch * rows[0]], new float[batch * rows[1]]};
+        for (int m = 0; m < 2; m++) {
+          kernel.multiply(output[m], input[m], weights[m], types[m], batch, rows[m], cols);
+          assertThat(output[m])
+              .containsExactly(
+                  tensorOpsReference(weights[m], types[m], input[m], batch, rows[m], cols));
+        }
+        kernel.multiplyGrouped(output, weights, types, rows, 2, input[0], batch, cols);
+        for (int m = 0; m < 2; m++)
+          assertThat(output[m])
+              .containsExactly(
+                  tensorOpsReference(weights[m], types[m], input[0], batch, rows[m], cols));
+        kernel.multiplyIndependent(output, weights, types, rows, 2, input, batch, cols);
+        for (int m = 0; m < 2; m++)
+          assertThat(output[m])
+              .containsExactly(
+                  tensorOpsReference(weights[m], types[m], input[m], batch, rows[m], cols));
+      }
+    }
+  }
+
+  @Test
   void raggedIndependentKernelPreservesEachProjectionBatchSize() {
     int cols = 512;
     int matrixCount = 4;

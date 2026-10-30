@@ -314,6 +314,9 @@ public final class ToolCallScanner {
    */
   public static Result scan(String generated, ToolSyntax syntax, List<ToolSpec> tools) {
     Objects.requireNonNull(tools, "tools");
+    if (ToolSyntax.FLINT.equals(syntax)) {
+      return FlintToolProtocol.scan(generated, tools);
+    }
     if (syntax != ToolSyntax.MINICPM5) {
       return scan(generated, syntax);
     }

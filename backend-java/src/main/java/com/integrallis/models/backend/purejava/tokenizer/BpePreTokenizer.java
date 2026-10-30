@@ -319,6 +319,17 @@ final class BpePreTokenizer {
   private static final BpePreTokenizer DEEPSEEK_LLM =
       new BpePreTokenizer(DEEPSEEK_LLM_PATTERNS, false);
 
+  /** Flint splits digits, then CJK runs, then words/punctuation, in that order. */
+  private static final BpePreTokenizer FLINT =
+      new BpePreTokenizer(
+          List.of(
+              Pattern.compile("\\p{N}{1,3}", Pattern.UNICODE_CHARACTER_CLASS),
+              Pattern.compile("[一-龥぀-ゟ゠-ヿ]+", Pattern.UNICODE_CHARACTER_CLASS),
+              Pattern.compile(
+                  "[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]*[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]+(?:'[sS]|'[tT]|'[rR][eE]|'[vV][eE]|'[mM]|'[lL][lL]|'[dD])?|[^\\r\\n\\p{L}\\p{N}]?[\\p{Lu}\\p{Lt}\\p{Lm}\\p{Lo}\\p{M}]+[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]*(?:'[sS]|'[tT]|'[rR][eE]|'[vV][eE]|'[mM]|'[lL][lL]|'[dD])?| ?[\\p{P}\\p{S}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+",
+                  Pattern.UNICODE_CHARACTER_CLASS)),
+          false);
+
   private final List<Pattern> patterns;
   private final boolean ignoreMerges;
   private final String declaredName;
@@ -383,6 +394,9 @@ final class BpePreTokenizer {
     }
     if (O200K_NAMES.contains(name)) {
       return GPT_OSS.named(name, true);
+    }
+    if ("flint".equals(name)) {
+      return FLINT.named(name, true);
     }
     if ("tekken".equals(name)) {
       return TEKKEN.named(name, true);

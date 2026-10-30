@@ -61,6 +61,12 @@ for the exact boundary and migration policy.
 
 ## Capabilities
 
+[Flint GGUF execution](docs/flint.md) supports pure Java and Rust FFM. The pinned Q4_K_M
+artifact passes the RAG qualification policy on the measured Linux CPU host at 11.93 tokens/second,
+with 27/27 complete visible answers across nine questions. Tool task qualification is separate
+and has not passed. See the [current evidence](benchmark-results/2026-10-30-flint-qualification/README.md)
+for the measured profile, latency limits, and remaining catalog-admission checks.
+
 Implemented functionality includes:
 
 - GGUF v2/v3 parsing with memory-mapped tensor access

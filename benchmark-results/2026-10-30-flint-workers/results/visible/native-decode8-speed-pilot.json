@@ -1,0 +1,73 @@
+{
+  "policyId" : "visible-answer-completion-and-bounded-facts-v1",
+  "generatedAt" : "2026-10-30T19:38:56.735057711Z",
+  "newInference" : false,
+  "sourceReport" : "/work/flint/results/native-decode8-speed-pilot.json",
+  "sourceReportSha256" : "34f21b6be74de0eb04a6ad257a08b6694b27af52c5f708552b83bea27230d382",
+  "sourceBackendVersion" : "models@0.5.7+flint-9c453e9de85f77b398e9ad57eba13e305db96f72 com.integrallis:vectors-core@0.1.32",
+  "assessmentGroundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v24",
+  "artifactSha256" : "c3c4d93f9db92627a2fc47ea8fe8c64a094cabd3549db544bcdd2c00e9a9a347",
+  "workload" : "general",
+  "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+  "attempts" : 3,
+  "distinctQuestions" : 1,
+  "completeVisibleAnswers" : 3,
+  "requiredFactsAndCitationsPasses" : 3,
+  "budgetReached" : 0,
+  "limitation" : "Deterministic required-fact/citation matching is not a general hallucination or semantic-entailment judge. Budget reached is conservative: reports lack an explicit finish reason. Repetitions are not independent accuracy samples.",
+  "assessments" : [ {
+    "caseId" : "auto-glass-deadline",
+    "visibleText" : "You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+    "reasoningText" : "We need answer. Need follow rules. Context says within 30 calendar days. Deductible $75. Need one short sentence. Include citations exactly from square brackets start of CONTEXT entry. Only [claims-auto-glass]. End sentence. No extra. Should answer. Ensure if context contains answer yes. One short sentence. \"You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].\" Check citation format: source ID exactly from square brackets at start of CONTEXT entry, so [claims-auto-glass]. Put at end. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "auto-glass-deadline",
+    "visibleText" : "You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+    "reasoningText" : "We need answer. Need follow rules. Context says within 30 calendar days. Deductible $75. Need one short sentence. Include citations exactly from square brackets start of CONTEXT entry. Only [claims-auto-glass]. End sentence. No extra. Should answer. Ensure if context contains answer yes. One short sentence. \"You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].\" Check citation format: source ID exactly from square brackets at start of CONTEXT entry, so [claims-auto-glass]. Put at end. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  }, {
+    "caseId" : "auto-glass-deadline",
+    "visibleText" : "You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+    "reasoningText" : "We need answer. Need follow rules. Context says within 30 calendar days. Deductible $75. Need one short sentence. Include citations exactly from square brackets start of CONTEXT entry. Only [claims-auto-glass]. End sentence. No extra. Should answer. Ensure if context contains answer yes. One short sentence. \"You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].\" Check citation format: source ID exactly from square brackets at start of CONTEXT entry, so [claims-auto-glass]. Put at end. Good.",
+    "reasoningComplete" : true,
+    "budgetReached" : false,
+    "completeVisibleAnswer" : true,
+    "polarityConsistent" : true,
+    "visibleEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "requiredFactsAndCitationsPass" : true
+  } ]
+}

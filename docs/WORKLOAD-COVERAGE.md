@@ -3,27 +3,29 @@
 Regenerate the table below with:
 
 ```
-python3 scripts/fleet/workload-coverage.py --catalog ../model-jars/catalog
+python3 scripts/fleet/workload-coverage.py --catalog scripts/fleet/fixtures/candidate-catalog
 ```
 
-The workload list is parsed out of `RagWorkload.java`, not written down here, so this report cannot
+The table uses the pinned catalog snapshot checked by CI. Point `--catalog` at a live catalog
+for its current inventory. The workload list is parsed out of `RagWorkload.java`, not written down here, so this report cannot
 quietly omit a workload that the enum gains.
 
 ## Where coverage stands
 
 ```
-workload        qualified   docs  cases  state
-------------------------------------------------------
-coding                  7     12      9  
-finance                 1     12      9  thin: one model
-general                51     12      9  
-healthcare              1     12      9  thin: one model
-legal                   2     12      9  
-math                    1     12      9  thin: one model
-multilingual            1     12      9  thin: one model
-sql                     0     12      9  NO QUALIFIED MODEL (corpus is usable; this is a closable gap)
-summarization           0     12      9  NO QUALIFIED MODEL (corpus is usable; this is a closable gap)
-transportation          1     12      9  thin: one model
+workload            qualified   docs  cases  state
+----------------------------------------------------------
+answer-reliability          0     12     16  NO QUALIFIED MODEL (corpus is usable; this is a closable gap)
+coding                      7     12      9
+finance                     1     12      9  thin: one model
+general                    51     12      9
+healthcare                  1     12      9  thin: one model
+legal                       2     12      9
+math                        1     12      9  thin: one model
+multilingual                1     12      9  thin: one model
+sql                         0     12      9  NO QUALIFIED MODEL (corpus is usable; this is a closable gap)
+summarization               0     12      9  NO QUALIFIED MODEL (corpus is usable; this is a closable gap)
+transportation              1     12      9  thin: one model
 ```
 
 One row in `qualifications.json` is a **rejection**, not a qualification: the manifest header
@@ -42,6 +44,10 @@ qualified models.
 For `summarization` the gap has a concrete consequence, stated in the enum itself: *"The router
 cannot select a model for a summarization request until a qualification records that capability."*
 Nothing is missing but a passing verdict.
+
+The `answer-reliability` diagnostic adds 16 cases: 14 answerable and two unsupported. It checks
+negation, units, identifiers, and abstention. Its results accompany primary RAG qualification as
+supplemental accuracy evidence; the table counts primary manifest entries only.
 
 ## What these two workloads actually ask for
 
@@ -63,7 +69,7 @@ from a one-sentence document, with the required facts cited:
 > how was it recovered?"*
 > requiredFacts — `38 minutes`, `migration`, `rolling`
 
-Every workload is 9 cases: **8 answerable plus 1 deliberately unanswerable**, which carries no
+The existing domain workloads each have 9 cases: **8 answerable plus 1 deliberately unanswerable**, which carries no
 required facts and tests abstention instead. That ratio is worth knowing before reading any
 result from this harness, because `extractiveFallbackRate = 0.889` is exactly 8/9 — it means the
 extractive fallback fired on *every answerable case* and the model contributed nothing on any of

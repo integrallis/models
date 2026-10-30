@@ -1,0 +1,48 @@
+{
+  "ImageId": "ami-0045d7fc2ad003464",
+  "InstanceType": "m6a.4xlarge",
+  "MinCount": 1,
+  "MaxCount": 1,
+  "IamInstanceProfile": {
+    "Name": "models-qual-worker"
+  },
+  "SubnetId": "subnet-08fcc910aba0d5b23",
+  "SecurityGroupIds": [
+    "sg-0e9ff523da4140d55"
+  ],
+  "InstanceInitiatedShutdownBehavior": "terminate",
+  "BlockDeviceMappings": [
+    {
+      "DeviceName": "/dev/sda1",
+      "Ebs": {
+        "VolumeSize": 120,
+        "VolumeType": "gp3",
+        "DeleteOnTermination": true
+      }
+    }
+  ],
+  "MetadataOptions": {
+    "HttpTokens": "required",
+    "HttpEndpoint": "enabled"
+  },
+  "TagSpecifications": [
+    {
+      "ResourceType": "instance",
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "flint-attention-20261030-9c453e9d"
+        },
+        {
+          "Key": "project",
+          "Value": "models-qualification"
+        },
+        {
+          "Key": "campaign",
+          "Value": "flint-attention-20261030-9c453e9d"
+        }
+      ]
+    }
+  ],
+  "ClientToken": "flint-attention-20261030-9c453e9d"
+}

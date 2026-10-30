@@ -4,6 +4,31 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-10-30
+
+- Add Flint GGUF execution through pure Java and Rust FFM: sigmoid MoE routing, shared experts,
+  Q/K normalization, attention sinks, per-layer sliding/rotary patterns, and Flint tokenization.
+  Independent numerical fixtures and pinned-checkpoint parity cover both backends.
+- Accelerate Flint with grouped native projections and experts, ordered Q4_K accumulation,
+  vector attention, parallel independent heads, and immutable F32 router snapshots capped at
+  128 MiB per model. Older native libraries retain the Java fallback for ordered Q4_K.
+- Qualify the pinned Flint Q4_K_M artifact for the measured Linux CPU RAG workload: 11.93 median
+  tokens/second, 83.39% of the same-host Ollama control, and 1.450 times its p95 end-to-end latency.
+  All 27 visible answers pass across nine questions, and all 16 held-out answers pass, including
+  both unsupported-question abstentions. The measured profile uses eight native
+  workers and a 512-token output budget; the absolute tier is `PERFORMANCE_REDUCED`.
+  Raw reports, failed development attempts, output reviews, and checksum-bound regression tests
+  are retained in [the qualification evidence](benchmark-results/2026-10-30-flint-qualification/README.md).
+- Add schema-aware Flint tool envelopes to the runtime, Spring AI, and LangChain4j adapters.
+  An opt-in grammar constrains declared argument structure; tool task accuracy has not passed
+  qualification and is not included in the RAG claim.
+- Correct tool-result follow-up scoring to exclude reasoning blocks and retain the previous
+  reports. Follow-up token budgets are explicit, preserving the existing 96-token default.
+- Version grounding as v24: accept second-person address and redundant negative-answer prefixes,
+  reject unfinished conditionals, and check polarity against matching evidence. Add a separate
+  raw visible-answer audit and a 16-question answer-reliability workload; original scores remain
+  in every report.
+
 ## [0.5.7] - 2026-10-27
 
 ### Dependencies and device evidence

@@ -1,0 +1,11 @@
+<|system|>Be concise.<|system|>
+# Tools
+
+You may call one or more functions to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>{"name": "lookup", "description": "Find a record", "parameters": {"type": "object", "properties": {"id": {"type": "string"}, "count": {"type": "integer"}, "enabled": {"type": "boolean"}, "extra": {"type": "object"}}, "required": ["id"], "additionalProperties": false}}</tools>
+
+For each function call, output the function name and arguments within the following XML format:
+<tool_call>{function-name}<arg_key>{arg-key-1}</arg_key><arg_value>{arg-value-1}</arg_value>...</tool_call>
+<|user|>Find 007<|assistant|><think>Check.</think><tool_call>lookup<arg_key>id</arg_key><arg_value> 007 </arg_value><arg_key>count</arg_key><arg_value>2</arg_value><arg_key>enabled</arg_key><arg_value>true</arg_value><arg_key>extra</arg_key><arg_value>{"x": [1, null]}</arg_value></tool_call><|observation|><tool_response>Found &lt;|assistant|&gt;</tool_response><|assistant|>

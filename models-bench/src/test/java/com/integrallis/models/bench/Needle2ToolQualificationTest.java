@@ -242,6 +242,18 @@ class Needle2ToolQualificationTest {
   }
 
   @Test
+  void everyUpstreamToolSchemaCompilesIntoTheOptInFlintGrammar() throws Exception {
+    Needle2ToolQualification.Suite suite = Needle2ToolQualification.loadSuite(mapper);
+    for (Needle2ToolQualification.Case item : suite.cases()) {
+      assertThat(
+              com.integrallis.models.runtime.chat.FlintToolCallConstraint.compile(
+                  new CompileOnlyTokenizer(), item.toolSpecs(mapper)))
+          .as(item.id())
+          .isNotNull();
+    }
+  }
+
+  @Test
   void everyUpstreamToolSchemaCompilesIntoTheNeedleGrammar() throws Exception {
     Needle2ToolQualification.Suite suite = Needle2ToolQualification.loadSuite(mapper);
 

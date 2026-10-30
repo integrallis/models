@@ -1,0 +1,1588 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-30T21:04:42.924958882Z",
+  "framework" : "plain-java",
+  "backend" : "ollama",
+  "backendVersion" : "ollama@0.40.9",
+  "modelId" : "ggml_org_flint_gguf_q4_k_m",
+  "model" : "flint-qualification",
+  "artifactSha256" : "c3c4d93f9db92627a2fc47ea8fe8c64a094cabd3549db544bcdd2c00e9a9a347",
+  "artifactSizeBytes" : 23387911136,
+  "settings" : {
+    "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+    "workload" : "general",
+    "caseIds" : [ "auto-glass-deadline", "travel-limit", "telemedicine-benefit", "claim-payment-times", "chargeback-evidence", "break-glass", "idempotency", "priority-one", "unsupported-lunar-vehicle" ],
+    "promptTemplate" : "flint",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 512,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v24",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "topP" : "1.0",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0",
+      "topK" : "1",
+      "rawPrompt" : "true",
+      "seed" : "42"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-7-106",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971650560,
+    "maxHeapBytes" : 8589934592,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "ollama",
+    "planVersion" : "unavailable",
+    "environment" : { },
+    "optimizations" : [ ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 2.49005,
+    "retrievalMillis" : {
+      "p50" : 1.936537,
+      "p95" : 8.9561608
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 0.8026490000002013,
+      "p95" : 1.4874200000020208
+    },
+    "ttftMillis" : {
+      "p50" : 208.839604,
+      "p95" : 1611.3092649
+    },
+    "tpotMillis" : {
+      "p50" : 69.91786123026316,
+      "p95" : 74.37225402323706
+    },
+    "endToEndMillis" : {
+      "p50" : 16719.237836,
+      "p95" : 26138.689866099998
+    },
+    "p50PrefillTokensPerSecond" : 952.9336306160471,
+    "p50DecodeTokensPerSecond" : 14.302496992959522,
+    "peakRssBytes" : 24174522368,
+    "totalCpuMillis" : 6962860.0,
+    "totalInputTokens" : 4260,
+    "totalCacheReadInputTokens" : 0,
+    "totalCacheWriteInputTokens" : 0,
+    "totalOutputTokens" : 6072,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.8888888888888888,
+    "modelAnswerRate" : 0.7777777777777778,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.1111111111111111,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c601f43e2071081b9e57fd99ded3af1992fb788afa1dfde06b787ece1e8c315",
+    "retrievalMillis" : 7.556269,
+    "frameworkOverheadMillis" : 1.2314790000018547,
+    "endToEndMillis" : 26511.108746,
+    "generation" : {
+      "text" : "You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass].",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 352,
+      "ttftMillis" : 1612.554444,
+      "totalMillis" : 26502.320998,
+      "prefillTokensPerSecond" : 102.24668384078446,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24047575040,
+      "cpuMillis" : 422650.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says Northstar Mutual auto glass claims must be reported through Aurora portal within 30 calendar days. Windshield repair has 75 dollar deductible. Police report not required.\n\nQuestion: How long do I have to report an auto glass claim and what is the deductible?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry ID [claims-auto-glass]. Put citations at end. Only IDs present. Do you have 30 calendar days to report and a $75 deductible for windshield repair? Need maybe auto glass claims deductible? Context says windshield repair has 75 dollar deductible. Could say: You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75. [claims-auto-glass]\n\nCheck rules: If context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present in CONTEXT are valid citations; do not invent or substitute one.\n\nOne short sentence. End citation. Maybe \"You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75. [claims-auto-glass]\" That's one sentence? Period before citation maybe okay? Better: \"You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass].\" Citation at end. One sentence. Short. Includes answer. Good.\n\nNeed no extra.</think>You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass].",
+      "text" : "You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "db0adc77e9defa52c59f5a340c148634f536e1e978bf500006cbd09cba83116c",
+    "retrievalMillis" : 2.267544,
+    "frameworkOverheadMillis" : 1.0254949999998644,
+    "endToEndMillis" : 13979.534751,
+    "generation" : {
+      "text" : "Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler [claims-travel].",
+      "inputTokens" : 156,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 167,
+      "ttftMillis" : 1595.444413,
+      "totalMillis" : 13976.241712,
+      "prefillTokensPerSecond" : 101.1454724757883,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24049295360,
+      "cpuMillis" : 222220.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: claims-travel. Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. Reimbursement limit is 3,500 dollars per covered traveler.\n\nQuestion: Which form is used for trip interruption and what is the reimbursement limit?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [claims-travel]. So citation [claims-travel]. Must not invent. Answer: Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler. Cite [claims-travel]. Ensure one short sentence. No extra.</think>Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler [claims-travel].",
+      "text" : "Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler [claims-travel].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d86183b69f5e0b2db1d442d7c20c7af8ca5be7c19fcd6794d026acf0d6ffa795",
+    "retrievalMillis" : 1.803932,
+    "frameworkOverheadMillis" : 0.8633829999998852,
+    "endToEndMillis" : 9473.575645,
+    "generation" : {
+      "text" : "No, it does not require a referral, and the copay is $15 per visit. [health-telemedicine]",
+      "inputTokens" : 156,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 137,
+      "ttftMillis" : 208.943368,
+      "totalMillis" : 9470.90833,
+      "prefillTokensPerSecond" : 952.9336306160471,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24091070464,
+      "cpuMillis" : 151400.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says in-network behavioral health telemedicine visits do not require referral. Copay 15 per visit. Question asks does need referral and what copay? Answer one short sentence. Must include citation exactly from square brackets at start of CONTEXT entry, e.g. [health-telemedicine]. End sentence. No extra. Could say: No, it does not require a referral, and the copay is $15 per visit. [health-telemedicine] Ensure citation at end. One short sentence.</think>No, it does not require a referral, and the copay is $15 per visit. [health-telemedicine]",
+      "text" : "No, it does not require a referral, and the copay is $15 per visit. [health-telemedicine]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "05a9e05f1a2fd12fe0aa2920475b5aacce5f649044e6d201df72d15fe21d02e2",
+    "retrievalMillis" : 6.332379,
+    "frameworkOverheadMillis" : 1.1624990000000253,
+    "endToEndMillis" : 16005.685195,
+    "generation" : {
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].",
+      "inputTokens" : 153,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 234,
+      "ttftMillis" : 199.641944,
+      "totalMillis" : 15998.190317,
+      "prefillTokensPerSecond" : 941.1619967397656,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24096759808,
+      "cpuMillis" : 255800.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur intermediary bank fee.\n\nQuestion: When do approved domestic ACH claims and international claim wires settle?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [payments-settlement]. So citation [payments-settlement]. End sentence. No extra? Must not use prior knowledge.\n\nDraft: Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nShould we include may incur fee? Not asked. One short sentence. Citation at end. Good.\n\nFinal.</think>Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].",
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5bbbb5862c3c16f8092f8c590f204c087420987cf25e20e66cbdacdc0cf59b58",
+    "retrievalMillis" : 10.53914,
+    "frameworkOverheadMillis" : 0.8009299999976065,
+    "endToEndMillis" : 18351.576199,
+    "generation" : {
+      "text" : "The merchant chargeback evidence deadline is 7 calendar days from notification, and the upload format is a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "inputTokens" : 155,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 254,
+      "ttftMillis" : 208.839604,
+      "totalMillis" : 18340.236129,
+      "prefillTokensPerSecond" : 956.8610020495345,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24109428736,
+      "cpuMillis" : 292150.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says merchants must submit chargeback evidence within 7 calendar days of notification. Evidence uploaded as PDF under 10 MB in Disputes console.\n\nQuestion: What is merchant chargeback evidence deadline and upload format?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [payments-chargeback]. So citation [payments-chargeback]. Must copy source ID exactly. Put at end. No prior knowledge.\n\nOne short sentence: The deadline is 7 calendar days from notification, and evidence must be uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback]\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nShould we include \"merchant chargeback evidence deadline and upload format\"? One sentence. Citation at end. Good.\n\nFinal.</think>The merchant chargeback evidence deadline is 7 calendar days from notification, and the upload format is a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "text" : "The merchant chargeback evidence deadline is 7 calendar days from notification, and the upload format is a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1f511254e305339631d01c50046a834c7b1ba9fe5a45a6f1ecf68bb995ea6cd7",
+    "retrievalMillis" : 8.485471,
+    "frameworkOverheadMillis" : 1.176657999996678,
+    "endToEndMillis" : 21856.441783,
+    "generation" : {
+      "text" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].",
+      "inputTokens" : 155,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 305,
+      "ttftMillis" : 223.116266,
+      "totalMillis" : 21846.779654,
+      "prefillTokensPerSecond" : 947.7629736521893,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24130768896,
+      "cpuMillis" : 348150.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context has security-access. Question: What is production break-glass code name and how many managers approve it? Context: code-named Cobalt-17. Requires approval from two on-call managers. Credentials expire after 60 minutes.\n\nNeed answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of CONTEXT entry, and put citations at end. Source ID likely [security-access]. Must include citation at end. One short sentence. Could say: The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]\n\nCheck rules: If context does not contain answer, INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present in CONTEXT valid. Do not use prior knowledge.\n\nSo final should be one sentence, citation at end. Maybe \"The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]\" That's two sentences? First sentence ends period, citation after? Better: \"The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].\" One sentence. Citation at end. Good.\n\nEnsure no extra.</think>The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].",
+      "text" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5fcd32835943d6005d1fd270c6c82fcd1179bb2414c2fa9c12e382393611c9d0",
+    "retrievalMillis" : 7.810798,
+    "frameworkOverheadMillis" : 0.8169999999990978,
+    "endToEndMillis" : 15809.771636,
+    "generation" : {
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 231,
+      "ttftMillis" : 227.848891,
+      "totalMillis" : 15801.143838,
+      "prefillTokensPerSecond" : 1019.44840559483,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24133849088,
+      "cpuMillis" : 252590.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says Claims API clients send Idempotency-Key header on create requests. Keys remain valid for 24 hour replay window. Reusing key with different payload returns HTTP 409.\n\nQuestion: Which header makes Claims API creates idempotent and how long can a key be replayed?\n\nNeed answer one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Source ID likely [api-idempotency]. Must put at end. Only IDs present. Do not use prior knowledge.\n\nAnswer: The Claims API uses the Idempotency-Key header, and keys remain valid for a 24-hour replay window. [api-idempotency]\n\nCheck: \"Which header makes Claims API creates idempotent\" grammar. Should be \"The Claims API uses the Idempotency-Key header for idempotent creates, and keys remain valid for a 24-hour replay window. [api-idempotency]\"\n\nOne short sentence. Citations at end. Good.</think>The Claims API uses the Idempotency-Key header for idempotent creates, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "773b86482cbcc0b53cfe5e40ae7380dc371f461320480a0514d3b2d23fa01cd0",
+    "retrievalMillis" : 8.543256,
+    "frameworkOverheadMillis" : 0.8618209999985993,
+    "endToEndMillis" : 19983.862833,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, the route NORTHSTAR-P1 pages the incident commander [support-escalation].",
+      "inputTokens" : 156,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 278,
+      "ttftMillis" : 215.06749,
+      "totalMillis" : 19974.457756,
+      "prefillTokensPerSecond" : 952.3693239398787,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24157663232,
+      "cpuMillis" : 318310.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages incident commander.\n\nQuestion: How quickly is a priority one incident acknowledged and which route escalates it?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [support-escalation]. So citation [support-escalation]. Need maybe \"Acknowledged within 15 minutes; if unresolved after 30 minutes, NORTHSTAR-P1 pages the incident commander.\" Which route escalates it? Route NORTHSTAR-P1 pages incident commander. Acknowledged within 15 min.\n\nMust not use prior knowledge. One short sentence. End with citation. Could be: \"A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, the route NORTHSTAR-P1 pages the incident commander [support-escalation].\"\n\nCheck citation format: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So [support-escalation]. Good.\n\nOne short sentence. Yes.</think>A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, the route NORTHSTAR-P1 pages the incident commander [support-escalation].",
+      "text" : "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, the route NORTHSTAR-P1 pages the incident commander [support-escalation].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "857ff42dbd89e8581d625243e9c2c417dba8b3ed3b520208313c6d1c30e332a0",
+    "retrievalMillis" : 5.123702,
+    "frameworkOverheadMillis" : 0.8026490000002013,
+    "endToEndMillis" : 5973.073716,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 66,
+      "ttftMillis" : 1615.047135,
+      "totalMillis" : 5967.147365,
+      "prefillTokensPerSecond" : 100.3530253241179,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24157663232,
+      "cpuMillis" : 95410.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context only auto glass claims. Question asks lunar rover deductible. Context doesn't contain. Must reply exactly INSUFFICIENT_CONTEXT. No citation? If context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. So final should be exactly that.</think>INSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c601f43e2071081b9e57fd99ded3af1992fb788afa1dfde06b787ece1e8c315",
+    "retrievalMillis" : 1.70998,
+    "frameworkOverheadMillis" : 1.0875359999990906,
+    "endToEndMillis" : 26442.778528,
+    "generation" : {
+      "text" : "You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass].",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 352,
+      "ttftMillis" : 1608.403847,
+      "totalMillis" : 26439.981012,
+      "prefillTokensPerSecond" : 102.61075548420077,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24157663232,
+      "cpuMillis" : 421660.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says Northstar Mutual auto glass claims must be reported through Aurora portal within 30 calendar days. Windshield repair has 75 dollar deductible. Police report not required.\n\nQuestion: How long do I have to report an auto glass claim and what is the deductible?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry ID [claims-auto-glass]. Put citations at end. Only IDs present. Do you have 30 calendar days to report and a $75 deductible for windshield repair? Need maybe auto glass claims deductible? Context says windshield repair has 75 dollar deductible. Could say: You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75. [claims-auto-glass]\n\nCheck rules: If context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present in CONTEXT are valid citations; do not invent or substitute one.\n\nOne short sentence. End citation. Maybe \"You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75. [claims-auto-glass]\" That's one sentence? Period before citation maybe okay? Better: \"You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass].\" Citation at end. One sentence. Short. Includes answer. Good.\n\nNeed no extra.</think>You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass].",
+      "text" : "You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "db0adc77e9defa52c59f5a340c148634f536e1e978bf500006cbd09cba83116c",
+    "retrievalMillis" : 1.611178,
+    "frameworkOverheadMillis" : 0.795099000000846,
+    "endToEndMillis" : 11385.784683,
+    "generation" : {
+      "text" : "Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler [claims-travel].",
+      "inputTokens" : 156,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 167,
+      "ttftMillis" : 224.858763,
+      "totalMillis" : 11383.378406,
+      "prefillTokensPerSecond" : 960.9402430686025,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24157663232,
+      "cpuMillis" : 181950.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: claims-travel. Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. Reimbursement limit is 3,500 dollars per covered traveler.\n\nQuestion: Which form is used for trip interruption and what is the reimbursement limit?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [claims-travel]. So citation [claims-travel]. Must not invent. Answer: Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler. Cite [claims-travel]. Ensure one short sentence. No extra.</think>Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler [claims-travel].",
+      "text" : "Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler [claims-travel].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d86183b69f5e0b2db1d442d7c20c7af8ca5be7c19fcd6794d026acf0d6ffa795",
+    "retrievalMillis" : 5.617573,
+    "frameworkOverheadMillis" : 0.7802279999996244,
+    "endToEndMillis" : 10255.357616,
+    "generation" : {
+      "text" : "No, it does not require a referral, and the copay is $15 per visit. [health-telemedicine]",
+      "inputTokens" : 156,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 137,
+      "ttftMillis" : 201.246884,
+      "totalMillis" : 10248.959815,
+      "prefillTokensPerSecond" : 960.4018912529551,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24166125568,
+      "cpuMillis" : 162780.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says in-network behavioral health telemedicine visits do not require referral. Copay 15 per visit. Question asks does need referral and what copay? Answer one short sentence. Must include citation exactly from square brackets at start of CONTEXT entry, e.g. [health-telemedicine]. End sentence. No extra. Could say: No, it does not require a referral, and the copay is $15 per visit. [health-telemedicine] Ensure citation at end. One short sentence.</think>No, it does not require a referral, and the copay is $15 per visit. [health-telemedicine]",
+      "text" : "No, it does not require a referral, and the copay is $15 per visit. [health-telemedicine]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "05a9e05f1a2fd12fe0aa2920475b5aacce5f649044e6d201df72d15fe21d02e2",
+    "retrievalMillis" : 1.342032,
+    "frameworkOverheadMillis" : 0.7832679999992251,
+    "endToEndMillis" : 15749.196424,
+    "generation" : {
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].",
+      "inputTokens" : 153,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 234,
+      "ttftMillis" : 185.410025,
+      "totalMillis" : 15747.071124,
+      "prefillTokensPerSecond" : 951.8003334411626,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24164823040,
+      "cpuMillis" : 251760.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur intermediary bank fee.\n\nQuestion: When do approved domestic ACH claims and international claim wires settle?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [payments-settlement]. So citation [payments-settlement]. End sentence. No extra? Must not use prior knowledge.\n\nDraft: Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nShould we include may incur fee? Not asked. One short sentence. Citation at end. Good.\n\nFinal.</think>Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].",
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5bbbb5862c3c16f8092f8c590f204c087420987cf25e20e66cbdacdc0cf59b58",
+    "retrievalMillis" : 9.13312,
+    "frameworkOverheadMillis" : 0.7881990000023507,
+    "endToEndMillis" : 18220.829189,
+    "generation" : {
+      "text" : "The merchant chargeback evidence deadline is 7 calendar days from notification, and the upload format is a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "inputTokens" : 155,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 254,
+      "ttftMillis" : 204.23367,
+      "totalMillis" : 18210.90787,
+      "prefillTokensPerSecond" : 967.6372172002198,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24164970496,
+      "cpuMillis" : 290010.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says merchants must submit chargeback evidence within 7 calendar days of notification. Evidence uploaded as PDF under 10 MB in Disputes console.\n\nQuestion: What is merchant chargeback evidence deadline and upload format?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [payments-chargeback]. So citation [payments-chargeback]. Must copy source ID exactly. Put at end. No prior knowledge.\n\nOne short sentence: The deadline is 7 calendar days from notification, and evidence must be uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback]\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nShould we include \"merchant chargeback evidence deadline and upload format\"? One sentence. Citation at end. Good.\n\nFinal.</think>The merchant chargeback evidence deadline is 7 calendar days from notification, and the upload format is a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "text" : "The merchant chargeback evidence deadline is 7 calendar days from notification, and the upload format is a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1f511254e305339631d01c50046a834c7b1ba9fe5a45a6f1ecf68bb995ea6cd7",
+    "retrievalMillis" : 3.327439,
+    "frameworkOverheadMillis" : 0.72762800000055,
+    "endToEndMillis" : 20719.747035,
+    "generation" : {
+      "text" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].",
+      "inputTokens" : 155,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 305,
+      "ttftMillis" : 202.433676,
+      "totalMillis" : 20715.691968,
+      "prefillTokensPerSecond" : 961.2939636940977,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24165236736,
+      "cpuMillis" : 331050.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context has security-access. Question: What is production break-glass code name and how many managers approve it? Context: code-named Cobalt-17. Requires approval from two on-call managers. Credentials expire after 60 minutes.\n\nNeed answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of CONTEXT entry, and put citations at end. Source ID likely [security-access]. Must include citation at end. One short sentence. Could say: The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]\n\nCheck rules: If context does not contain answer, INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present in CONTEXT valid. Do not use prior knowledge.\n\nSo final should be one sentence, citation at end. Maybe \"The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]\" That's two sentences? First sentence ends period, citation after? Better: \"The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].\" One sentence. Citation at end. Good.\n\nEnsure no extra.</think>The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].",
+      "text" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5fcd32835943d6005d1fd270c6c82fcd1179bb2414c2fa9c12e382393611c9d0",
+    "retrievalMillis" : 1.936537,
+    "frameworkOverheadMillis" : 0.717956000000413,
+    "endToEndMillis" : 16719.237836,
+    "generation" : {
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 231,
+      "ttftMillis" : 208.728646,
+      "totalMillis" : 16716.583343,
+      "prefillTokensPerSecond" : 1022.5695712511869,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24165322752,
+      "cpuMillis" : 266210.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says Claims API clients send Idempotency-Key header on create requests. Keys remain valid for 24 hour replay window. Reusing key with different payload returns HTTP 409.\n\nQuestion: Which header makes Claims API creates idempotent and how long can a key be replayed?\n\nNeed answer one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Source ID likely [api-idempotency]. Must put at end. Only IDs present. Do not use prior knowledge.\n\nAnswer: The Claims API uses the Idempotency-Key header, and keys remain valid for a 24-hour replay window. [api-idempotency]\n\nCheck: \"Which header makes Claims API creates idempotent\" grammar. Should be \"The Claims API uses the Idempotency-Key header for idempotent creates, and keys remain valid for a 24-hour replay window. [api-idempotency]\"\n\nOne short sentence. Citations at end. Good.</think>The Claims API uses the Idempotency-Key header for idempotent creates, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "773b86482cbcc0b53cfe5e40ae7380dc371f461320480a0514d3b2d23fa01cd0",
+    "retrievalMillis" : 1.160827,
+    "frameworkOverheadMillis" : 0.686957000001712,
+    "endToEndMillis" : 18937.551627,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, the route NORTHSTAR-P1 pages the incident commander [support-escalation].",
+      "inputTokens" : 156,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 278,
+      "ttftMillis" : 208.173988,
+      "totalMillis" : 18935.703843,
+      "prefillTokensPerSecond" : 955.1273809305145,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24165326848,
+      "cpuMillis" : 302800.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages incident commander.\n\nQuestion: How quickly is a priority one incident acknowledged and which route escalates it?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [support-escalation]. So citation [support-escalation]. Need maybe \"Acknowledged within 15 minutes; if unresolved after 30 minutes, NORTHSTAR-P1 pages the incident commander.\" Which route escalates it? Route NORTHSTAR-P1 pages incident commander. Acknowledged within 15 min.\n\nMust not use prior knowledge. One short sentence. End with citation. Could be: \"A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, the route NORTHSTAR-P1 pages the incident commander [support-escalation].\"\n\nCheck citation format: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So [support-escalation]. Good.\n\nOne short sentence. Yes.</think>A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, the route NORTHSTAR-P1 pages the incident commander [support-escalation].",
+      "text" : "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, the route NORTHSTAR-P1 pages the incident commander [support-escalation].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "857ff42dbd89e8581d625243e9c2c417dba8b3ed3b520208313c6d1c30e332a0",
+    "retrievalMillis" : 0.898501,
+    "frameworkOverheadMillis" : 0.7507989999994606,
+    "endToEndMillis" : 6924.420646,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 66,
+      "ttftMillis" : 1602.654738,
+      "totalMillis" : 6922.771346,
+      "prefillTokensPerSecond" : 101.20002604128058,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24165351424,
+      "cpuMillis" : 109620.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context only auto glass claims. Question asks lunar rover deductible. Context doesn't contain. Must reply exactly INSUFFICIENT_CONTEXT. No citation? If context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. So final should be exactly that.</think>INSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c601f43e2071081b9e57fd99ded3af1992fb788afa1dfde06b787ece1e8c315",
+    "retrievalMillis" : 1.431634,
+    "frameworkOverheadMillis" : 0.7213680000022578,
+    "endToEndMillis" : 25429.149655,
+    "generation" : {
+      "text" : "You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass].",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 352,
+      "ttftMillis" : 1603.271753,
+      "totalMillis" : 25426.996653,
+      "prefillTokensPerSecond" : 103.1143034628801,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24165351424,
+      "cpuMillis" : 406520.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says Northstar Mutual auto glass claims must be reported through Aurora portal within 30 calendar days. Windshield repair has 75 dollar deductible. Police report not required.\n\nQuestion: How long do I have to report an auto glass claim and what is the deductible?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry ID [claims-auto-glass]. Put citations at end. Only IDs present. Do you have 30 calendar days to report and a $75 deductible for windshield repair? Need maybe auto glass claims deductible? Context says windshield repair has 75 dollar deductible. Could say: You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75. [claims-auto-glass]\n\nCheck rules: If context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present in CONTEXT are valid citations; do not invent or substitute one.\n\nOne short sentence. End citation. Maybe \"You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75. [claims-auto-glass]\" That's one sentence? Period before citation maybe okay? Better: \"You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass].\" Citation at end. One sentence. Short. Includes answer. Good.\n\nNeed no extra.</think>You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass].",
+      "text" : "You have 30 calendar days to report an auto glass claim and the windshield repair deductible is $75 [claims-auto-glass].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "db0adc77e9defa52c59f5a340c148634f536e1e978bf500006cbd09cba83116c",
+    "retrievalMillis" : 2.846368,
+    "frameworkOverheadMillis" : 0.8086199999997916,
+    "endToEndMillis" : 12302.146927,
+    "generation" : {
+      "text" : "Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler [claims-travel].",
+      "inputTokens" : 156,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 167,
+      "ttftMillis" : 204.374955,
+      "totalMillis" : 12298.491939,
+      "prefillTokensPerSecond" : 959.8582363220202,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24166785024,
+      "cpuMillis" : 195590.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: claims-travel. Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. Reimbursement limit is 3,500 dollars per covered traveler.\n\nQuestion: Which form is used for trip interruption and what is the reimbursement limit?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [claims-travel]. So citation [claims-travel]. Must not invent. Answer: Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler. Cite [claims-travel]. Ensure one short sentence. No extra.</think>Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler [claims-travel].",
+      "text" : "Form T-19 is used for trip interruption, and the reimbursement limit is 3,500 dollars per covered traveler [claims-travel].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "d86183b69f5e0b2db1d442d7c20c7af8ca5be7c19fcd6794d026acf0d6ffa795",
+    "retrievalMillis" : 2.91447,
+    "frameworkOverheadMillis" : 0.7968590000000404,
+    "endToEndMillis" : 9254.943501,
+    "generation" : {
+      "text" : "No, it does not require a referral, and the copay is $15 per visit. [health-telemedicine]",
+      "inputTokens" : 156,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 137,
+      "ttftMillis" : 176.037446,
+      "totalMillis" : 9251.232172,
+      "prefillTokensPerSecond" : 974.7928565179899,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24166793216,
+      "cpuMillis" : 147940.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says in-network behavioral health telemedicine visits do not require referral. Copay 15 per visit. Question asks does need referral and what copay? Answer one short sentence. Must include citation exactly from square brackets at start of CONTEXT entry, e.g. [health-telemedicine]. End sentence. No extra. Could say: No, it does not require a referral, and the copay is $15 per visit. [health-telemedicine] Ensure citation at end. One short sentence.</think>No, it does not require a referral, and the copay is $15 per visit. [health-telemedicine]",
+      "text" : "No, it does not require a referral, and the copay is $15 per visit. [health-telemedicine]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "05a9e05f1a2fd12fe0aa2920475b5aacce5f649044e6d201df72d15fe21d02e2",
+    "retrievalMillis" : 1.135977,
+    "frameworkOverheadMillis" : 2.6681839999982913,
+    "endToEndMillis" : 16735.877313,
+    "generation" : {
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].",
+      "inputTokens" : 153,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 234,
+      "ttftMillis" : 184.543287,
+      "totalMillis" : 16732.073152,
+      "prefillTokensPerSecond" : 943.4834890389418,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24165392384,
+      "cpuMillis" : 266460.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur intermediary bank fee.\n\nQuestion: When do approved domestic ACH claims and international claim wires settle?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [payments-settlement]. So citation [payments-settlement]. End sentence. No extra? Must not use prior knowledge.\n\nDraft: Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nShould we include may incur fee? Not asked. One short sentence. Citation at end. Good.\n\nFinal.</think>Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].",
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5bbbb5862c3c16f8092f8c590f204c087420987cf25e20e66cbdacdc0cf59b58",
+    "retrievalMillis" : 1.26517,
+    "frameworkOverheadMillis" : 1.5971090000020922,
+    "endToEndMillis" : 17045.618275,
+    "generation" : {
+      "text" : "The merchant chargeback evidence deadline is 7 calendar days from notification, and the upload format is a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "inputTokens" : 155,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 254,
+      "ttftMillis" : 201.161194,
+      "totalMillis" : 17042.755996,
+      "prefillTokensPerSecond" : 965.2449542598439,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24165400576,
+      "cpuMillis" : 272540.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says merchants must submit chargeback evidence within 7 calendar days of notification. Evidence uploaded as PDF under 10 MB in Disputes console.\n\nQuestion: What is merchant chargeback evidence deadline and upload format?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [payments-chargeback]. So citation [payments-chargeback]. Must copy source ID exactly. Put at end. No prior knowledge.\n\nOne short sentence: The deadline is 7 calendar days from notification, and evidence must be uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback]\n\nCheck rules: If context does not contain answer, no. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present. Do not use prior knowledge.\n\nShould we include \"merchant chargeback evidence deadline and upload format\"? One sentence. Citation at end. Good.\n\nFinal.</think>The merchant chargeback evidence deadline is 7 calendar days from notification, and the upload format is a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "text" : "The merchant chargeback evidence deadline is 7 calendar days from notification, and the upload format is a PDF under 10 MB in the Disputes console. [payments-chargeback]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "1f511254e305339631d01c50046a834c7b1ba9fe5a45a6f1ecf68bb995ea6cd7",
+    "retrievalMillis" : 1.203059,
+    "frameworkOverheadMillis" : 0.7313979999998992,
+    "endToEndMillis" : 21476.061418,
+    "generation" : {
+      "text" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].",
+      "inputTokens" : 155,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 305,
+      "ttftMillis" : 219.097147,
+      "totalMillis" : 21474.126961,
+      "prefillTokensPerSecond" : 951.0486077875541,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24174333952,
+      "cpuMillis" : 342190.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context has security-access. Question: What is production break-glass code name and how many managers approve it? Context: code-named Cobalt-17. Requires approval from two on-call managers. Credentials expire after 60 minutes.\n\nNeed answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of CONTEXT entry, and put citations at end. Source ID likely [security-access]. Must include citation at end. One short sentence. Could say: The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]\n\nCheck rules: If context does not contain answer, INSUFFICIENT_CONTEXT. It does. Otherwise answer in one short sentence. Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. Only IDs present in CONTEXT valid. Do not use prior knowledge.\n\nSo final should be one sentence, citation at end. Maybe \"The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers. [security-access]\" That's two sentences? First sentence ends period, citation after? Better: \"The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].\" One sentence. Citation at end. Good.\n\nEnsure no extra.</think>The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].",
+      "text" : "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "5fcd32835943d6005d1fd270c6c82fcd1179bb2414c2fa9c12e382393611c9d0",
+    "retrievalMillis" : 1.127288,
+    "frameworkOverheadMillis" : 0.7597680000017135,
+    "endToEndMillis" : 15550.370166,
+    "generation" : {
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "inputTokens" : 168,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 231,
+      "ttftMillis" : 207.451017,
+      "totalMillis" : 15548.48311,
+      "prefillTokensPerSecond" : 1026.5183917878528,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24174391296,
+      "cpuMillis" : 248600.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says Claims API clients send Idempotency-Key header on create requests. Keys remain valid for 24 hour replay window. Reusing key with different payload returns HTTP 409.\n\nQuestion: Which header makes Claims API creates idempotent and how long can a key be replayed?\n\nNeed answer one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Source ID likely [api-idempotency]. Must put at end. Only IDs present. Do not use prior knowledge.\n\nAnswer: The Claims API uses the Idempotency-Key header, and keys remain valid for a 24-hour replay window. [api-idempotency]\n\nCheck: \"Which header makes Claims API creates idempotent\" grammar. Should be \"The Claims API uses the Idempotency-Key header for idempotent creates, and keys remain valid for a 24-hour replay window. [api-idempotency]\"\n\nOne short sentence. Citations at end. Good.</think>The Claims API uses the Idempotency-Key header for idempotent creates, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "773b86482cbcc0b53cfe5e40ae7380dc371f461320480a0514d3b2d23fa01cd0",
+    "retrievalMillis" : 1.027315,
+    "frameworkOverheadMillis" : 0.8089499999987311,
+    "endToEndMillis" : 19614.896502,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, the route NORTHSTAR-P1 pages the incident commander [support-escalation].",
+      "inputTokens" : 156,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 278,
+      "ttftMillis" : 199.717821,
+      "totalMillis" : 19613.060237,
+      "prefillTokensPerSecond" : 978.2772287161993,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24174391296,
+      "cpuMillis" : 312500.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context: Priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages incident commander.\n\nQuestion: How quickly is a priority one incident acknowledged and which route escalates it?\n\nAnswer should be one short sentence. Include citations exactly from square brackets at start of CONTEXT entry. Context entry starts [support-escalation]. So citation [support-escalation]. Need maybe \"Acknowledged within 15 minutes; if unresolved after 30 minutes, NORTHSTAR-P1 pages the incident commander.\" Which route escalates it? Route NORTHSTAR-P1 pages incident commander. Acknowledged within 15 min.\n\nMust not use prior knowledge. One short sentence. End with citation. Could be: \"A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, the route NORTHSTAR-P1 pages the incident commander [support-escalation].\"\n\nCheck citation format: Copy each supporting source ID exactly from square brackets at start of its CONTEXT entry, and put those citations at end of sentence. So [support-escalation]. Good.\n\nOne short sentence. Yes.</think>A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, the route NORTHSTAR-P1 pages the incident commander [support-escalation].",
+      "text" : "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, the route NORTHSTAR-P1 pages the incident commander [support-escalation].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "ollama",
+    "model" : "flint-qualification",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "857ff42dbd89e8581d625243e9c2c417dba8b3ed3b520208313c6d1c30e332a0",
+    "retrievalMillis" : 0.916182,
+    "frameworkOverheadMillis" : 0.8736010000002352,
+    "endToEndMillis" : 5881.516245,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 157,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 66,
+      "ttftMillis" : 1598.008743,
+      "totalMillis" : 5879.726462,
+      "prefillTokensPerSecond" : 101.07903479179006,
+      "loadMillis" : 2.49005,
+      "peakRssBytes" : 24174522368,
+      "cpuMillis" : 94000.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context only auto glass claims. Question asks lunar rover deductible. Context doesn't contain. Must reply exactly INSUFFICIENT_CONTEXT. No citation? If context does not contain answer, reply exactly INSUFFICIENT_CONTEXT. So final should be exactly that.</think>INSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "sourceRevision": "23e4e083ec311a216a8d19d78084dfefe82f3133",
+  "workerRevision": "23e4e083ec311a216a8d19d78084dfefe82f3133",
+  "payloadUri": "s3://models-qual-077051030817/payload/flint-improvement-20261030-23e4e083/payload.tar.gz",
+  "payloadSha256": "280127a5e1a8cbbb0c2d4712547ace9d140af7b2affb4353606dabde78686553",
+  "payloadBytes": 35692333,
+  "workerUri": "s3://models-qual-077051030817/payload/flint-improvement-20261030-23e4e083/improvement-worker.sh",
+  "workerSha256": "4ed8037dc5dc9ee3dc2a898a81a1f6757c6a815b553245ca6f478fcbdcc8a7ce",
+  "resultsUri": "s3://models-qual-077051030817/results/flint-improvement-20261030-23e4e083",
+  "deadlineSeconds": 14400,
+  "instanceType": "m6a.4xlarge",
+  "computeUsdPerHour": 0.6912,
+  "context": 2048,
+  "threads": 16,
+  "budgetCandidates": [
+    256,
+    512,
+    1024
+  ],
+  "pilotRule": "smallest budget with 9/9 complete visible fact/citation/polarity passes; use 1024 for diagnosis if none",
+  "heldOutWorkload": "answer-reliability",
+  "heldOutRequiredPasses": 15,
+  "heldOutQuestions": 16,
+  "requireBothAbstentions": true,
+  "allowPolarityContradictions": false,
+  "comparativeWarmups": 1,
+  "comparativeIterations": 3,
+  "toolMaxTokens": 512,
+  "toolFollowUpMaxTokens": 512,
+  "rustVersion": "1.96.0",
+  "rustCompilerSha256": "c295047583a56238ea06b43f849f4b877fa12bfd4c7103f8d9a74c94c9c4e108"
+}

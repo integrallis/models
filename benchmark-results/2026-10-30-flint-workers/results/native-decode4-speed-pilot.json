@@ -1,0 +1,561 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-30T19:41:09.734988168Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@0.5.7+flint-9c453e9de85f77b398e9ad57eba13e305db96f72 com.integrallis:vectors-core@0.1.32",
+  "modelId" : "ggml_org_flint_gguf_q4_k_m",
+  "model" : "/work/flint/Flint-Q4_K_M.gguf",
+  "artifactSha256" : "c3c4d93f9db92627a2fc47ea8fe8c64a094cabd3549db544bcdd2c00e9a9a347",
+  "artifactSizeBytes" : 23387911136,
+  "settings" : {
+    "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+    "workload" : "general",
+    "caseIds" : [ "auto-glass-deadline" ],
+    "promptTemplate" : "flint",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 512,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v24",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "promptCache" : "longest-common-prefix",
+      "seed" : "42",
+      "topK" : "1",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "ip-172-31-1-147",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 65971654656,
+    "maxHeapBytes" : 8589934592,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v14",
+    "environment" : {
+      "end-of-generation.150005" : "vocabulary-text,chat-template-end-of-turn",
+      "native-kernel-poll-millis" : "5",
+      "end-of-generation.150003" : "vocabulary-text",
+      "end-of-generation.150001" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+      "architecture-prefill-batch-size" : "1",
+      "flint-diagnostics-version" : "1",
+      "native-kernel-threads" : "16",
+      "native-kernel-abi" : "7",
+      "gguf-threads" : "16",
+      "q4-unsigned-pairwise-supported" : "true",
+      "java-feature" : "25",
+      "preferred-vector-bits" : "256",
+      "fast-vector-fma" : "true",
+      "vm-version" : "25.0.3+9-LTS",
+      "processors" : "16",
+      "tokenizer.pre.implemented" : "true",
+      "compiler" : "hotspot-c2",
+      "vm-vendor" : "Eclipse Adoptium",
+      "end-of-generation.chat-template" : "resolved:150005",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "q4-short-pairwise-supported" : "true",
+      "native-grouped-attention" : "true",
+      "end-of-generation-token-ids" : "150001,150003,150005,150018",
+      "vector-api" : "true",
+      "tokenizer.pre" : "flint",
+      "fast-scalar-fma" : "true",
+      "active-vector-bits" : "256",
+      "java-executor-poll-millis" : "0",
+      "gguf-chunks-per-thread" : "2",
+      "native-kernel-decode-threads" : "4",
+      "gguf-parallel" : "true",
+      "sve" : "false",
+      "native-gated-delta-net" : "true",
+      "end-of-generation.150018" : "vocabulary-text",
+      "model-architecture" : "flint",
+      "architecture" : "amd64",
+      "gguf-executor" : "persistent",
+      "native-q5-0-grouped" : "false",
+      "java-version" : "25.0.3",
+      "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+      "kernel-runtime" : "rust-ffm",
+      "transformer-runtime" : "java",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "os" : "Linux",
+      "kernel-implementation" : "rust-ffm-quantized-v15-ordered-q4-k",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "projection-layers" : "49",
+      "native-quantized-decode" : "true"
+    },
+    "optimizations" : [ {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25",
+        "active-vector-bits" : "256",
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64",
+        "compiler" : "hotspot-c2"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded projection topology has no Q6_K consumer",
+      "settings" : {
+        "requested-kernel" : "one-query-block",
+        "kernel" : "one-query-block",
+        "architecture" : "amd64",
+        "batch-size" : "1",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "stages" : "2",
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "stages" : "7",
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "1"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "requested-kernel" : "scattered",
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "16",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "chunks-per-thread" : "2",
+        "executor" : "persistent",
+        "threads" : "16"
+      }
+    }, {
+      "id" : "flint-injected-projection-groups",
+      "status" : "ENABLED",
+      "reason" : "Flint tests mapped QKV, dense/shared gate-up, and routed-expert shapes against the injected kernel; remaining projections use Java helpers. Counts describe eligibility, not measured invocations.",
+      "settings" : {
+        "q4-k-reduction" : "sequential-block-order",
+        "routed-expert-eligible-layers" : "47",
+        "implementation" : "rust-ffm-quantized-v15-ordered-q4-k",
+        "dense-shared-gate-up-eligible-layers" : "49",
+        "qkv-eligible-layers" : "49"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "Flint advances prompt tokens sequentially and skips only discarded vocabulary projections",
+      "settings" : {
+        "batch-size" : "1"
+      }
+    }, {
+      "id" : "flint-java-attention",
+      "status" : "ENABLED",
+      "reason" : "Flint uses pinned key scores, sink softmax, vectorized non-fused chronological values, and independent parallel heads above one million elements; generic batched/native attention switches do not apply",
+      "settings" : {
+        "implementation" : "java",
+        "key-score-rows" : "1",
+        "value-rows" : "1"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "Flint retains final-layer attention and FFN work for every prompt token",
+      "settings" : {
+        "output-rows" : "all"
+      }
+    }, {
+      "id" : "rust-ptq1-0-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+      "settings" : {
+        "activation" : "Q8_0",
+        "weight" : "PTQ1_0",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7",
+        "state" : "caller-owned-java-array"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "independent recurrent state slots share one native worker dispatch",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7",
+        "state" : "branch-major-caller-owned-java-array"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+      "settings" : {
+        "evidence" : "benchmark-results/2026-10-12-q5-production/"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 3,
+    "successfulAttempts" : 3,
+    "loadMillis" : 886.714135,
+    "retrievalMillis" : {
+      "p50" : 2.975578,
+      "p95" : 3.4232128
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 2.238563000000795,
+      "p95" : 7.603988599999684
+    },
+    "ttftMillis" : {
+      "p50" : 109.248894,
+      "p95" : 116.0509428
+    },
+    "tpotMillis" : {
+      "p50" : 93.52921892957747,
+      "p95" : 97.49127625985916
+    },
+    "endToEndMillis" : {
+      "p50" : 13402.071079,
+      "p95" : 13946.2673245
+    },
+    "p50PrefillTokensPerSecond" : 9.397430285844738,
+    "p50DecodeTokensPerSecond" : 10.691845943383179,
+    "peakRssBytes" : 21592281088,
+    "totalCpuMillis" : 221960.0,
+    "totalInputTokens" : 492,
+    "totalCacheReadInputTokens" : 489,
+    "totalCacheWriteInputTokens" : 3,
+    "totalOutputTokens" : 429,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 0.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 1.0,
+    "modelAnswerRate" : 1.0,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.0,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "FAILED_QUALITY",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c601f43e2071081b9e57fd99ded3af1992fb788afa1dfde06b787ece1e8c315",
+    "retrievalMillis" : 3.47295,
+    "frameworkOverheadMillis" : 8.20014699999956,
+    "endToEndMillis" : 13402.071079,
+    "generation" : {
+      "text" : "You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 163,
+      "cacheWriteInputTokens" : 1,
+      "outputTokens" : 143,
+      "ttftMillis" : 109.248894,
+      "totalMillis" : 13390.397982,
+      "prefillTokensPerSecond" : 9.397430285844738,
+      "loadMillis" : 886.714135,
+      "peakRssBytes" : 21581623296,
+      "cpuMillis" : 71120.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says within 30 calendar days. Deductible $75. Need one short sentence. Include citations exactly from square brackets start of CONTEXT entry. Only [claims-auto-glass]. End sentence. No extra. Should answer. Ensure if context contains answer yes. One short sentence. \"You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].\" Check citation format: source ID exactly from square brackets at start of CONTEXT entry, so [claims-auto-glass]. Put at end. Good.</think>You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+      "text" : "You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c601f43e2071081b9e57fd99ded3af1992fb788afa1dfde06b787ece1e8c315",
+    "retrievalMillis" : 2.975578,
+    "frameworkOverheadMillis" : 2.2175609999994776,
+    "endToEndMillis" : 14006.733574,
+    "generation" : {
+      "text" : "You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 163,
+      "cacheWriteInputTokens" : 1,
+      "outputTokens" : 143,
+      "ttftMillis" : 95.266746,
+      "totalMillis" : 14001.540435,
+      "prefillTokensPerSecond" : 10.731592284873724,
+      "loadMillis" : 886.714135,
+      "peakRssBytes" : 21582176256,
+      "cpuMillis" : 79960.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says within 30 calendar days. Deductible $75. Need one short sentence. Include citations exactly from square brackets start of CONTEXT entry. Only [claims-auto-glass]. End sentence. No extra. Should answer. Ensure if context contains answer yes. One short sentence. \"You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].\" Check citation format: source ID exactly from square brackets at start of CONTEXT entry, so [claims-auto-glass]. Put at end. Good.</think>You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+      "text" : "You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Flint",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4c601f43e2071081b9e57fd99ded3af1992fb788afa1dfde06b787ece1e8c315",
+    "retrievalMillis" : 2.64528,
+    "frameworkOverheadMillis" : 2.238563000000795,
+    "endToEndMillis" : 13398.805641,
+    "generation" : {
+      "text" : "You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+      "inputTokens" : 164,
+      "cacheReadInputTokens" : 163,
+      "cacheWriteInputTokens" : 1,
+      "outputTokens" : 143,
+      "ttftMillis" : 116.806726,
+      "totalMillis" : 13393.921798,
+      "prefillTokensPerSecond" : 8.708355696027912,
+      "loadMillis" : 886.714135,
+      "peakRssBytes" : 21592281088,
+      "cpuMillis" : 70880.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "<think>We need answer. Need follow rules. Context says within 30 calendar days. Deductible $75. Need one short sentence. Include citations exactly from square brackets start of CONTEXT entry. Only [claims-auto-glass]. End sentence. No extra. Should answer. Ensure if context contains answer yes. One short sentence. \"You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].\" Check citation format: source ID exactly from square brackets at start of CONTEXT entry, so [claims-auto-glass]. Put at end. Good.</think>You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+      "text" : "You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

@@ -1,0 +1,23 @@
+{
+  "kind" : "post-hoc-tool-follow-up-assessment",
+  "newInference" : false,
+  "sourceReportSha256" : "7a202734168486662cee79b66d6b88aaec443836c59251c967cd81c3eae78815",
+  "runtimeSourceRevision" : "7541b1a4676ffadcfd728aec39753258341f27f4",
+  "scorerSourceRevision" : "98b0f4c44c1fa1a74912b7e6bfd01d4c07010f0b",
+  "originalPolicyVersion" : "small-model-tool-conformance-v1",
+  "policyVersion" : "small-model-tool-conformance-v2",
+  "originalFollowUpPassed" : true,
+  "followUp" : {
+    "id" : "tool-result-follow-up",
+    "applicable" : true,
+    "endToEndMillis" : 40263,
+    "output" : "<think>The user asked for the weather in 88252. I called the weather function and got the result: conditions \"Raining cats and dogs\" and temperature 78°F.\n\nI should present this information clearly to the user. The conditions are unusual (\"Raining cats and dogs\" - which is an idiom meaning raining very heavily), and the temperature is 78°F.\n\nLet me respond helpfully with this information.</think>The weather for zip code 88252 shows some interesting",
+    "initialToolOutput" : "",
+    "postResultToolOutput" : "",
+    "conversational" : true,
+    "grounded" : false,
+    "repeatedToolCall" : false,
+    "passed" : false,
+    "diagnostics" : [ "follow-up did not preserve the temperature and conditions" ]
+  }
+}

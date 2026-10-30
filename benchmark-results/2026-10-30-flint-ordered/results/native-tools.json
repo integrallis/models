@@ -1,0 +1,583 @@
+{
+  "schemaVersion" : 2,
+  "createdAt" : "2026-10-30T16:00:58.967385352Z",
+  "policyVersion" : "small-model-tool-conformance-v2",
+  "modelsRevision" : "3336aed192786be17cca9360fdf65ee5ede731c7",
+  "modelId" : "ggml_org_flint_gguf_q4_k_m",
+  "model" : "Flint 40B-A2.5B GGUF Q4_K_M",
+  "backend" : "rust-ffm",
+  "backendVersion" : "models@3336aed192786be17cca9360fdf65ee5ede731c7",
+  "artifactSha256" : "c3c4d93f9db92627a2fc47ea8fe8c64a094cabd3549db544bcdd2c00e9a9a347",
+  "artifactSizeBytes" : 23387911136,
+  "suite" : {
+    "id" : "models-tool-conformance-v2",
+    "sha256" : "56931b0dba10c355c7372f773a05267aea48eec15dc2d98057349250da027f55",
+    "sourceRepository" : "https://github.com/cactus-compute/needle",
+    "sourceRevision" : "7bd8a635ebb977489703b3bb916c21412e8a9cdf",
+    "sourcePath" : "needle/playground/app.js"
+  },
+  "generation" : {
+    "temperature" : 0.0,
+    "maxTokens" : 512,
+    "followUpMaxTokens" : 512,
+    "promptTemplate" : "flint"
+  },
+  "environment" : {
+    "host" : "ip-172-31-5-169",
+    "osName" : "Linux",
+    "osVersion" : "7.0.0-1013-aws",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7R13 Processor",
+    "processors" : 16,
+    "physicalMemoryBytes" : 65971650560,
+    "maxHeapBytes" : 8589934592,
+    "javaVersion" : "25.0.3",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v14",
+    "environment" : {
+      "model-architecture" : "flint",
+      "vm-version" : "25.0.3+9-LTS",
+      "gguf-executor" : "persistent",
+      "end-of-generation.150003" : "vocabulary-text",
+      "gguf-chunks-per-thread" : "2",
+      "end-of-generation.150005" : "vocabulary-text,chat-template-end-of-turn",
+      "architecture" : "amd64",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "native-kernel-poll-millis" : "5",
+      "end-of-generation-token-ids" : "150001,150003,150005,150018",
+      "native-grouped-attention" : "true",
+      "end-of-generation.chat-template" : "resolved:150005",
+      "gguf-threads" : "16",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "os" : "Linux",
+      "active-vector-bits" : "256",
+      "tokenizer.pre" : "flint",
+      "fast-vector-fma" : "true",
+      "java-executor-poll-millis" : "0",
+      "q4-short-pairwise-supported" : "true",
+      "java-feature" : "25",
+      "tokenizer.pre.implemented" : "true",
+      "end-of-generation.150018" : "vocabulary-text",
+      "processors" : "16",
+      "native-gated-delta-net" : "true",
+      "preferred-vector-bits" : "256",
+      "q4-unsigned-pairwise-supported" : "true",
+      "transformer-runtime" : "java",
+      "native-kernel-abi" : "7",
+      "vm-vendor" : "Eclipse Adoptium",
+      "kernel-implementation" : "rust-ffm-quantized-v15-ordered-q4-k",
+      "native-q5-0-grouped" : "false",
+      "fast-scalar-fma" : "true",
+      "projection-layers" : "49",
+      "native-kernel-threads" : "16",
+      "java-version" : "25.0.3",
+      "sve" : "false",
+      "kernel-runtime" : "rust-ffm",
+      "compiler" : "hotspot-c2",
+      "native-kernel-decode-threads" : "16",
+      "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+      "native-quantized-decode" : "true",
+      "vector-api" : "true",
+      "gguf-parallel" : "true",
+      "end-of-generation.150001" : "tokenizer.ggml.eos_token_id,vocabulary-text"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded projection tensor types have no retained grouped kernel",
+      "settings" : {
+        "gate-up" : "independent",
+        "implementation" : "none",
+        "qkv" : "independent"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "eligible-layers" : "0",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2",
+        "architecture" : "amd64",
+        "os" : "Linux",
+        "unsigned-supported" : "true"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "at least one loaded projection tensor lacks a retained batched kernel",
+      "settings" : {
+        "batch-size" : "1"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded projection topology has no Q6_K consumer",
+      "settings" : {
+        "architecture" : "amd64",
+        "kernel" : "one-query-block",
+        "requested-kernel" : "one-query-block",
+        "active-vector-bits" : "256",
+        "batch-size" : "1"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "F32,F32,F32",
+        "output-rows" : "all"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "unused-rows" : "full-attention",
+        "formats" : "F32,F32,F32,F32"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "stages" : "2",
+        "parallel" : "true",
+        "eligible-layers" : "0",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "stages" : "7",
+        "parallel" : "true",
+        "eligible-layers" : "0",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "1"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered",
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "eligible-layers" : "0",
+        "partitions" : "16",
+        "partition" : "batch-rows",
+        "staged-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "16"
+      }
+    }, {
+      "id" : "rust-ptq1-0-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+      "settings" : {
+        "activation" : "Q8_0",
+        "transformer" : "java",
+        "weight" : "PTQ1_0"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+      "settings" : {
+        "state" : "caller-owned-java-array",
+        "abi" : "7",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "independent recurrent state slots share one native worker dispatch",
+      "settings" : {
+        "state" : "branch-major-caller-owned-java-array",
+        "abi" : "7",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+      "settings" : {
+        "evidence" : "benchmark-results/2026-10-12-q5-production/"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "activatedAdapter" : null,
+  "plannedAttempts" : 14,
+  "inapplicableCases" : [ ],
+  "complete" : true,
+  "summary" : {
+    "attempts" : 14,
+    "passed" : 10,
+    "structuredOutputRate" : 1.0,
+    "toolSelectionExactRate" : 0.8571428571428571,
+    "schemaValidityRate" : 1.0,
+    "declaredArgumentsOnlyRate" : 1.0,
+    "expectedArgumentAccuracy" : 0.8108108108108109,
+    "refusalAccuracy" : 1.0,
+    "p95EndToEndMillis" : 97574.0,
+    "qualified" : false,
+    "verdict" : "FAIL"
+  },
+  "followUp" : {
+    "id" : "tool-result-follow-up",
+    "applicable" : true,
+    "endToEndMillis" : 20737,
+    "output" : "<think>The user asked for the weather in 88252. I called the weather function and got the result: conditions \"Raining cats and dogs\" and temperature 78°F.\n\nI should present this information clearly to the user. The conditions are unusual (\"Raining cats and dogs\" - which is an idiom meaning raining very heavily), and the temperature is 78°F.\n\nLet me respond helpfully with this information.</think>The weather for zip code 88252 shows some interesting conditions:\n\n- **Conditions:** Raining cats and dogs ��️\n- **Temperature:** 78°F\n\nLooks like it's raining pretty heavily where you are! Stay dry out there. ��",
+    "initialToolOutput" : "",
+    "postResultToolOutput" : "",
+    "conversational" : true,
+    "grounded" : true,
+    "repeatedToolCall" : false,
+    "passed" : true,
+    "diagnostics" : [ ]
+  },
+  "qualified" : false,
+  "verdict" : "FAIL",
+  "cases" : [ {
+    "id" : "home",
+    "endToEndMillis" : 53693,
+    "output" : "<think>The user wants two actions: dim the bedroom lights to 20 percent and lock the front door. The lights tool requires room and state, with optional brightness. I'll set room to 'bedroom', state to 'on' (since dimming implies keeping them on at reduced brightness), and brightness to 20. The lock tool requires door, which I'll set to 'front'. These are independent calls, so I can make them in parallel.</think><tool_call>set_lights<arg_key>brightness</arg_key><arg_value>20</arg_value><arg_key>room</arg_key><arg_value>bedroom</arg_value><arg_key>state</arg_key><arg_value>on</arg_value></tool_call><tool_call>lock_door<arg_key>door</arg_key><arg_value>front</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 3,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected lock_door.door=\"front door\"" ]
+  }, {
+    "id" : "robot",
+    "endToEndMillis" : 35706,
+    "output" : "<think>The user wants a sequence of actions: move forward 2 meters, turn left 90 degrees, then close the gripper. I should call these tools in order. The first action is moving forward 2 meters, so I'll start with that.</think><tool_call>move<arg_key>direction</arg_key><arg_value>forward</arg_value><arg_key>distance_m</arg_key><arg_value>2</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : false,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 5,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected tool sequence [move, rotate, gripper] but received [move]" ]
+  }, {
+    "id" : "device",
+    "endToEndMillis" : 46252,
+    "output" : "<think>The user wants three things: make the accent green, open github.com, and say hello. The accent color tool is independent and can be called right away. Opening the website and speaking are also independent, so I can make all three calls in parallel. For the accent color, green can be specified as a color name like \"green\" or a hex like \"#00FF00\". I'll use \"green\" for simplicity. For the URL, I'll use \"https://github.com\". For the speech, I'll say \"Hello!\" or just \"Hello\". Let me make all three calls in parallel.</think>I'll help you with all three tasks! Let me make the accent green, open GitHub, and say hello.<tool_call>set_theme<arg_key>accent_color</arg_key><arg_value>green</arg_value></tool_call><tool_call>open_website<arg_key>url</arg_key><arg_value>https://github.com</arg_value></tool_call><tool_call>speak<arg_key>text</arg_key><arg_value>Hello!</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected speak.text=\"hello\"" ]
+  }, {
+    "id" : "gallery",
+    "endToEndMillis" : 44056,
+    "output" : "<think>The user wants to create an album called 'Summer 2026' and move photos from last weekend into it. I have a create_album tool and a move_photos tool. The move_photos tool requires an album name and a filter. The filter should be 'last weekend' based on the user's request.\n\nI should first create the album, then move the photos. Since these are dependent actions (moving photos into an album that needs to exist), I should call create_album first, then move_photos. However, I can make both calls in sequence since create_album doesn't depend on move_photos results.\n\nLet me make the create_album call first, then the move_photos call.</think>I'll create the album and move those photos for you.<tool_call>create_album<arg_key>name</arg_key><arg_value>Summer 2026</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : false,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : false,
+    "diagnostics" : [ "expected tool sequence [create_album, move_photos] but received [create_album]" ]
+  }, {
+    "id" : "email",
+    "endToEndMillis" : 24767,
+    "output" : "<think>The user wants me to send an email with the receipt details. I have the send_email tool available, and the recipient, subject, and body details are all provided in the request. I should use the tool to send this email.</think><tool_call>send_email<arg_key>to</arg_key><arg_value>finance@cactus.dev</arg_value><arg_key>subject</arg_key><arg_value>expenses: Blue Bottle Coffee, $14.50, August 4th</arg_value><arg_key>body</arg_key><arg_value>Please find the receipt for Blue Bottle Coffee, $14.50, August 4th attached or sent via email.</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 2,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "currency",
+    "endToEndMillis" : 22917,
+    "output" : "<think>The user asks how much 250 dollars is in euros. I don't have a live exchange rate, but I can use the convert_currency tool to get an accurate conversion. I'll call it with amount 250, from USD, to EUR.</think>I'll convert 250 dollars to euros for you.<tool_call>convert_currency<arg_key>amount</arg_key><arg_value>250</arg_value><arg_key>from_currency</arg_key><arg_value>USD</arg_value><arg_key>to_currency</arg_key><arg_value>EUR</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 3,
+    "expectedArguments" : 3,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "document",
+    "endToEndMillis" : 77979,
+    "output" : "<think>The user wants me to extract the booking details from the email. I have a record_booking tool available. The email contains: confirmation number HL-88213, guest name Mr Okafor, room type deluxe sea-view room, check-in 14 September 2026, check-out 18 September 2026, total 642.50 euros, currency euros.\n\nI should call record_booking with the required fields (confirmation_number, check_in, check_out, total) and can include optional details like hotel, guest_name, room_type, currency.\n\nCheck-in/check-out dates need to be in date format. The email says \"14 September 2026\" and \"18 September 2026\". The format is date, likely YYYY-MM-DD. So check_in: 2026-09-14, check_out: 2026-09-18.\n\nTotal: 642.50, currency: EUR (or euros). The parameter currency is a string, probably \"EUR\".\n\nLet me make the tool call.</think><tool_call>record_booking<arg_key>check_in</arg_key><arg_value>2026-09-14</arg_value><arg_key>check_out</arg_key><arg_value>2026-09-18</arg_value><arg_key>confirmation_number</arg_key><arg_value>HL-88213</arg_value><arg_key>currency</arg_key><arg_value>EUR</arg_value><arg_key>guest_name</arg_key><arg_value>Mr Okafor</arg_value><arg_key>hotel</arg_key><arg_value>Harbor Light Hotel</arg_value><arg_key>room_type</arg_key><arg_value>Deluxe sea-view room</arg_value><arg_key>total</arg_key><arg_value>642.5</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 4,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "sentiment",
+    "endToEndMillis" : 20317,
+    "output" : "<think>The user wants me to classify the sentiment of a message. The message expresses strong dissatisfaction: 'this is the worst purchase I have ever made, it broke in a day and support ignored me'. This clearly conveys negative sentiment. I should call the classify_sentiment tool with sentiment 'negative'.</think><tool_call>classify_sentiment<arg_key>sentiment</arg_key><arg_value>negative</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "crowded",
+    "endToEndMillis" : 97574,
+    "output" : "<think>The user wants to close the bedroom blinds halfway. The open_blinds tool accepts room and position ('open', 'closed', or 'half'). To close halfway, I should set position to 'half'. The room is 'bedroom'. This is a single independent action, so I can call it directly.</think><tool_call>open_blinds<arg_key>room</arg_key><arg_value>bedroom</arg_value><arg_key>position</arg_key><arg_value>half</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 2,
+    "expectedArguments" : 2,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "repeat",
+    "endToEndMillis" : 23514,
+    "output" : "<think>The user wants to add 2 milk and 6 eggs to the shopping list. The add_to_list tool accepts one item at a time with a quantity. I should make two separate tool calls: one for milk with quantity 2, and one for eggs with quantity 6. These are independent, so I can call them in parallel.</think><tool_call>add_to_list<arg_key>item</arg_key><arg_value>milk</arg_value><arg_key>quantity</arg_key><arg_value>2</arg_value></tool_call><tool_call>add_to_list<arg_key>item</arg_key><arg_value>eggs</arg_value><arg_key>quantity</arg_key><arg_value>6</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 4,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "array",
+    "endToEndMillis" : 18121,
+    "output" : "<think>The user wants to add milk, eggs, and bread to the shopping list. The add_items tool accepts an array of item strings, so I should call it with those three items. No prior context shows an existing list, but the user explicitly asked to add these items, so I'll proceed with the tool call.</think><tool_call>add_items<arg_key>items</arg_key><arg_value>[\"milk\", \"eggs\", \"bread\"]</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "flight",
+    "endToEndMillis" : 33344,
+    "output" : "<think>The user wants to find non-stop flights from Lagos to Nairobi on December 3rd for two passengers. I have a tool to search flights with required parameters from_city and to_city, optional date, direct_only, and passengers. I should call it with from_city \"Lagos\", to_city \"Nairobi\", date \"2024-12-03\" (or maybe just \"12-03\"? Better use ISO format \"2024-12-03\"), direct_only true, passengers 2. Let me make the tool call.</think><tool_call>search_flights<arg_key>from_city</arg_key><arg_value>Lagos</arg_value><arg_key>to_city</arg_key><arg_value>Nairobi</arg_value><arg_key>date</arg_key><arg_value>2024-12-03</arg_value><arg_key>direct_only</arg_key><arg_value>true</arg_value><arg_key>passengers</arg_key><arg_value>2</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 4,
+    "expectedArguments" : 4,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "refuse",
+    "endToEndMillis" : 38720,
+    "output" : "<think>The user wants a short poem about the moon. This is a creative writing task that doesn't require any of the available tools (move, rotate, gripper). I should just write the poem directly.</think>The moon, a silver coin,\nTossed into the velvet night;\nShe watches, pale and divine,\nWith her quiet, gentle light.\n\nA cratered face, a ghostly grin,\nShe pulls the tides with unseen thread;\nAnd though the night may dim or wane,\nShe hangs her halo overhead.",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 0,
+    "expectedArguments" : 0,
+    "refusalExpected" : true,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  }, {
+    "id" : "spring-weather-zipcode",
+    "endToEndMillis" : 16185,
+    "output" : "<think>The user is asking for the weather for a specific zipcode, 88252. I have a tool available to get weather for a given zipcode. I should call that tool with the zipcode '88252' to retrieve the weather information.</think>I'll get the weather for that area for you.<tool_call>get-weather-for-zipcode<arg_key>zipcode</arg_key><arg_value>88252</arg_value></tool_call>",
+    "structured" : true,
+    "selectionExact" : true,
+    "schemaValid" : true,
+    "declaredArgumentsOnly" : true,
+    "expectedArgumentMatches" : 1,
+    "expectedArguments" : 1,
+    "refusalExpected" : false,
+    "refusalCorrect" : true,
+    "passed" : true,
+    "diagnostics" : [ ]
+  } ]
+}
