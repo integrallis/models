@@ -206,21 +206,42 @@ and nothing from it is copied into our runtime; it is used only as an external o
 Same box (darwin, 12 logical / 6 physical cores), same model file
 (`EdgeRock-4B-Q4_K_M`), both arms at `--ctx-size 16384`, both near 850% CPU.
 
-| model | ours, `pure-java` | patched llama.cpp, `-t 8` | ratio |
-| --- | --- | --- | --- |
-| VibeThinker-1.5B Q4_K_M (control) | 3.10 tok/s | 22.9 tok/s | **0.135** |
-| EdgeRock-4B Q4_K_M | 1.06 tok/s | 7.2 tok/s | **0.147** |
+| model | `pure-java` | `rust-ffm` | patched llama.cpp, `-t 8` | ratio on `rust-ffm` |
+| --- | --- | --- | --- | --- |
+| VibeThinker-1.5B Q4_K_M (control) | 3.10 tok/s | 11.98 tok/s | 22.9 tok/s | 0.523 |
+| EdgeRock-4B Q4_K_M | 1.06 tok/s | **4.06 tok/s** | 7.2 tok/s | **0.564** |
 
-Ratio **~0.15**, against a relative decode floor of 0.80 with a pinned publisher reference and
-0.45 without one (`RagProductionQualificationPolicy:36-38`). EdgeRock cannot be listed on this arm.
+The `pure-java` column is not the route to the catalog and never was: 65 of 68 catalog entries
+qualify on `rust-ffm` and the three `pure-java` entries are all grandfathered from
+`certified-20260902`. The control is what established that -- EdgeRock's `pure-java` ratio of 0.147
+is slightly *better* than an unrelated model's 0.135, so that figure is what the Java decoder does
+against llama.cpp on this box and is not a cost of the memory layers.
 
-**The control is the finding.** EdgeRock scores slightly *better* than an unrelated model measured
-the same way, so ~0.15 is what `pure-java` does against llama.cpp on this box and not something
-EdgeRock's memory layers cost. No amount of EdgeRock-specific optimisation reaches 0.80 from here,
-because the gap is not EdgeRock's. Both numbers come from `:backend-java:decodeRateProbe`, which
-exists for exactly this control and runs on `PureJavaBackend.load(Path)` -- the route
-`InProcessGenerationClient` uses for the `pure-java` arm, so it is the route qualification
-measures.
+**EdgeRock first gained nothing from `rust-ffm`: 0.93 tok/s against 1.06 pure-Java, slightly worse,
+while the control gained 3.9x.** That isolated the cause exactly. `QuantizedProjection` called
+`TensorOps.ggufMatmul` directly instead of going through the `GgufBatchedMatrixKernel` seam, and
+for a K-quant that runs on the calling thread -- `packedProjectionThreads` only parallelises the
+MXFP4 and PTQ1_0 float-activation kernels. Nine projections on each of eight memory layers were
+single-threaded while the rest of the graph used the native kernels, so roughly a tenth of the
+arithmetic per token was setting the decode rate. Putting them on the seam gives **4.06 tok/s**.
+
+Worth being precise about what that did and did not need: no new Rust. ABI 7 already exposes the
+Q4_K/Q5_K/Q6_K projections, grouped dispatch, attention and Gated DeltaNet recurrence this model
+uses. The fix was Java plumbing.
+
+0.564 is **not a pass.** The gate measures a same-host comparator through the RAG harness, not a
+bare `llama-cli`, and the control's own bare ratio of 0.523 is likewise below 0.80 while models on
+that route do qualify -- so the harness-measured comparator is evidently slower than bare
+`llama-cli` by a margin that matters. 0.564 is suggestive of qualifying territory and the real
+number has not been measured.
+
+The two routes agree numerically, which is a precondition for calling any of this a speedup: layer
+3's contribution after one commit is 6.200681824 on the Java route and 6.200961286 on the native
+one, 4.5e-5 relative. Not bit-for-bit, because the kernels reduce in a different order.
+
+Both probes (`:backend-java:decodeRateProbe`, `:backend-native:nativeDecodeRateProbe`) require an
+explicit context, and the pure-Java one runs `PureJavaBackend.load(Path)` because that is what
+`InProcessGenerationClient` calls for the `pure-java` arm.
 
 Two corrections to earlier readings in this experiment, both from measuring instead of inferring:
 an earlier EdgeRock figure of 1.9 tok/s rested on a decode token count estimated from the output
@@ -228,16 +249,25 @@ text rather than counted, and the clean probe says 1.06; and a single CPU sample
 supported a parallelism explanation, where the sustained figure is ~850% on both arms, so the gap
 is per-core efficiency.
 
-### What this implies about the route
+### A correction to an earlier reading of "the shim"
 
-The catalog already answers this. Of 68 entries, 65 are `rust-ffm` and the 3 `pure-java` entries
-are all grandfathered from `certified-20260902`. The live qualification route is the Rust shim, and
-that is how EdgeRock reaches the catalog too -- not through the Java decoder. The licences allow
-it: the publisher's patch is Apache-2.0 and llama.cpp is MIT, both permissive, so the shim may
-carry an EdgeRock implementation where a GPL-derived one could not.
+`backend-native` does **not** embed llama.cpp, Ollama or any other engine (`backend-native
+/README.md:5-9`): it accelerates selected GGUF kernels behind a versioned C ABI, while the graph,
+tokenizer, KV-cache ownership, sampling and generation stay in Java. So the publisher's llama.cpp
+patch is an oracle and a reference, never something to be carried into the shim, and the Java
+decoder in this experiment is the production path rather than a stepping stone to one.
 
-The Java decoder built here is not wasted by that: it is the correctness reference the shim is
-checked against, and it is what made the architecture legible in the first place.
+### What is left before a listing
+
+1. **Prefill.** EdgeRock is still clamped to one token per step, because batched prefill has no
+   memory wiring and no windowed attention. This is the remaining large cost and it lands on TTFT,
+   which the relative end-to-end ceiling of 1.50 measures directly.
+2. **The real gate numbers**, from the RAG harness with a same-host comparator, not from these
+   probes.
+3. **The long cases.** Now affordable at 4.06 tok/s where they were hours.
+4. **Workload choice.** EdgeRock emits a `<think>` block, and reasoning models have failed the
+   grounding gate here before; the catalog's 49 `general` qualifications are the precedent to
+   follow rather than a RAG grounding workload.
 
 What has been recovered so far: `QuantizedProjection` was calling the short `ggufMatmul` overload,
 which allocates four arrays and re-quantizes the activation per call -- about 288 allocations per
