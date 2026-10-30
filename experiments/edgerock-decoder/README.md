@@ -201,6 +201,36 @@ and nothing from it is copied into our runtime; it is used only as an external o
    `rag-publisher-reference-gate.mjs` off its hard-coded Bonsai pair to a table of
    (model, pinned reference) pairs.
 
+## Where qualification stands: a measured relative-gate failure
+
+Same box (darwin, 12 logical / 6 physical cores), same model file
+(`EdgeRock-4B-Q4_K_M`), both arms at `--ctx-size 16384`, both near 850% CPU.
+
+| arm | decode | note |
+| --- | --- | --- |
+| ours, `pure-java` | ~1.9 tok/s | after the scratch fix below |
+| patched llama.cpp, `-t 8` | 7.2 tok/s | 7.1 at ctx 512, so context is not a factor |
+
+Ratio **~0.26**, against a relative decode floor of 0.80 with a pinned publisher reference and
+0.45 without one (`RagProductionQualificationPolicy:36-38`). **EdgeRock cannot be listed at this
+speed.** This is the same gate that rejected 20 quality-passing models on 2026-10-29, and
+EdgeRock fails it by much more than they did.
+
+The gap is **not** parallelism. Both arms sit near eight of twelve logical cores, so it is per-core
+efficiency: an optimisation project, not plumbing. One earlier CPU sample read 232% and would have
+supported the opposite conclusion; it was a startup transient, and the sustained figure is ~850%.
+
+What has been recovered so far: `QuantizedProjection` was calling the short `ggufMatmul` overload,
+which allocates four arrays and re-quantizes the activation per call -- about 288 allocations per
+token across nine projections on eight memory layers. Giving it reusable scratch, as
+`Qwen35ForwardPass` already does, took decode on the arithmetic case from 214.7s to 99.8s
+(**2.15x**) with an unchanged answer.
+
+Not a prefill rate: the 0.8 tok/s figure over 40 tokens is dominated by first-use session
+allocation, since the KV caches at ctx 16384 are ~1 GB. It is slower per token than decode, which
+is the tell. A real prefill number needs a long prompt, and EdgeRock is additionally clamped to one
+token per step.
+
 ## Still unverified
 
 - **mRoPE.** The file publishes `rope.dimension_sections [11, 11, 10, 0]` and the reference config
