@@ -388,3 +388,14 @@ The worker also accepts `diagnosticOnly: true` for a bounded, single-case, same-
 This mode omits admission entirely and is used to reject ineffective optimizations before
 spending a full campaign. It cannot qualify a model, replace default correctness, or
 replace the held-out workload.
+
+The first attention diagnostic measured 9.37 native versus 14.53 Ollama decode tokens/s
+(64.45%, below the 80% target), while native p95 end-to-end was 15.29 s versus 31.67 s.
+Both produced correct answers, but native emitted 143 tokens versus Ollama's 454; lower
+wall time does not waive the decode floor. This was one repeated question, not qualification.
+The next bounded diagnosis uses `diagnosticProfiles: "workers"`: native decode workers
+16 (default), 8, and 4, with the unchanged 16-thread Ollama control. CPU, artifact, prompt,
+sampling and budgets stay fixed. Smaller worker counts use the existing public native setting;
+no reduction order or grading rule changes. A selected profile still needs full fresh evidence.
+New hosts provision 500 MiB/s gp3 throughput (within the instance's 625 MB/s EBS baseline)
+to reduce artifact I/O outside the warmed measurements; each comparator shares that same volume.

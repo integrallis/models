@@ -170,6 +170,15 @@ if jq -e '.diagnosticOnly == true' "$INPUT" >/dev/null; then
   COMMON+=(--case auto-glass-deadline)
   idle
   benchmark native-speed-pilot 1200 rust-ffm "$CAP" 1 3 general
+  if jq -e '.diagnosticProfiles == "workers"' "$INPUT" >/dev/null; then
+    ORIGINAL_JAVA_OPTS=$JAVA_OPTS
+    for decode_threads in 8 4; do
+      export JAVA_OPTS="$ORIGINAL_JAVA_OPTS -Dmodels.native.kernels.decodeThreads=$decode_threads"
+      idle
+      benchmark "native-decode$decode_threads-speed-pilot" 1200 rust-ffm "$CAP" 1 3 general
+    done
+    export JAVA_OPTS=$ORIGINAL_JAVA_OPTS
+  fi
   idle
   start_ollama
   benchmark ollama-speed-pilot 1200 ollama "$CAP" 1 3 general
