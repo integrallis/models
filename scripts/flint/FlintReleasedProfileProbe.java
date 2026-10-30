@@ -32,7 +32,14 @@ public final class FlintReleasedProfileProbe {
       try (var backend = RustFfmBackend.load(Path.of(args[0]), configuration)) {
         var environment = backend.diagnostics().environment();
         boolean applied = Integer.toString(threads).equals(environment.get("native-kernel-threads"));
-        passed &= applied;
+        boolean routesPresent = backend.diagnostics().optimizations().stream().anyMatch(decision ->
+            decision.id().equals("flint-injected-projection-groups")
+            && decision.status() == OptimizationStatus.ENABLED
+            && "47".equals(decision.settings().get("routed-expert-eligible-layers"))
+            && "49".equals(decision.settings().get("qkv-eligible-layers"))
+            && "49".equals(decision.settings().get("dense-shared-gate-up-eligible-layers"))
+            && "sequential-block-order".equals(decision.settings().get("q4-k-reduction")));
+        passed &= applied && routesPresent;
         var loop = new GenerationLoop(backend);
         var options = SamplingOptions.builder().temperature(0).maxTokens(512).build();
         String warmup = loop.generate(prompt, options);
@@ -55,7 +62,7 @@ public final class FlintReleasedProfileProbe {
               "decodeTokensPerSecond", (sink.usage.completionTokens() - 1) * 1e9 / (end - sink.firstToken)));
         }
         arms.add(Map.of("nativeThreads", threads, "recommendations", configuration.recommendations(),
-            "configurationApplied", applied, "warmupMatchesSourceQualification", warmupMatches,
+            "configurationApplied", applied, "requiredProjectionRoutesAvailable", routesPresent, "warmupMatchesSourceQualification", warmupMatches,
             "backendDiagnostics", backend.diagnostics(), "runs", runs));
       }
     }

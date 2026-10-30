@@ -1,0 +1,66 @@
+{
+  "kind": "assistant-visible-answer-review",
+  "newInference": false,
+  "sourceReportSha256": "033118c1c62fd6dac04bd9dd90d966a043689f6ee28b79628e7807f09311a690",
+  "sourceAuditSha256": "259bd40461340d1d76730a259de56b7e976ddb42ac78fcfd538fda0f9386e06a",
+  "corpusSha256": "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+  "distinctQuestions": 9,
+  "completeCorrectVisibleAnswers": 9,
+  "limitation": "Nine grounded English questions; not general reasoning or frontier-equivalence evidence.",
+  "reviews": [
+    {
+      "caseId": "auto-glass-deadline",
+      "visibleText": "You have 30 calendar days to report an auto glass claim and the deductible is $75 [claims-auto-glass].",
+      "review": "30 calendar days and $75 deductible; correct citation.",
+      "passed": true
+    },
+    {
+      "caseId": "travel-limit",
+      "visibleText": "The trip interruption claim uses form T-19 and has a reimbursement limit of 3,500 dollars per covered traveler. [claims-travel]",
+      "review": "T-19 and $3,500 per covered traveler; correct citation.",
+      "passed": true
+    },
+    {
+      "caseId": "telemedicine-benefit",
+      "visibleText": "No, in-network behavioral health telemedicine does not require a referral, and the copay is $15 per visit [health-telemedicine].",
+      "review": "Explicit no referral and $15 copay; negation preserved.",
+      "passed": true
+    },
+    {
+      "caseId": "claim-payment-times",
+      "visibleText": "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days [payments-settlement].",
+      "review": "Domestic ACH 2 business days and international wires 5 business days; directions preserved.",
+      "passed": true
+    },
+    {
+      "caseId": "chargeback-evidence",
+      "visibleText": "The deadline is 7 calendar days from notification and the upload format is PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "review": "7 calendar days from notification, PDF under 10 MB, Disputes console.",
+      "passed": true
+    },
+    {
+      "caseId": "break-glass",
+      "visibleText": "The production break-glass code name is Cobalt-17 and it requires approval from two on-call managers [security-access].",
+      "review": "Cobalt-17 and approval from two on-call managers.",
+      "passed": true
+    },
+    {
+      "caseId": "idempotency",
+      "visibleText": "The Claims API uses the Idempotency-Key header, and keys remain valid for a 24-hour replay window. [api-idempotency]",
+      "review": "Idempotency-Key and 24-hour replay window.",
+      "passed": true
+    },
+    {
+      "caseId": "priority-one",
+      "visibleText": "A priority one incident must be acknowledged within 15 minutes, and if unresolved after 30 minutes, NORTHSTAR-P1 pages the incident commander [support-escalation].",
+      "review": "15-minute acknowledgement and conditional NORTHSTAR-P1 escalation after 30 unresolved minutes.",
+      "passed": true
+    },
+    {
+      "caseId": "unsupported-lunar-vehicle",
+      "visibleText": "INSUFFICIENT_CONTEXT",
+      "review": "INSUFFICIENT_CONTEXT; no invented coverage amount.",
+      "passed": true
+    }
+  ]
+}
