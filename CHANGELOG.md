@@ -6,36 +6,27 @@ All notable changes to models are documented here.
 
 ## [0.5.8] - 2026-10-30
 
-- Cache small Flint F32 routers once per loaded model under a 128 MiB bound, preserving pinned
-  row arithmetic and native eligibility. Shared sessions avoid repeated mapped-row copies.
-
-- Vectorize Flint attention values and parallelize independent heads without changing reduction
-  order. Correct Ollama runner discovery in the qualification worker; retain the incomplete
-  comparison and failed tool grammar evidence.
-
-- Add an opt-in Flint tool grammar prototype and an explicit qualification CLI profile. It
-  constrains declared argument structure while preserving refusal and multiple calls; real-model
-  accuracy and overhead remain unqualified. Default Flint generation is unchanged.
-
-- Flint requests ordered Q4_K native accumulation after a real-weight parity failure; older native libraries fall back to Java for that format.
-
-- Add experimental Flint GGUF execution to the pure Java backend: sigmoid MoE routing,
-  shared experts, Q/K normalization, attention sinks, and per-layer sliding/rotary patterns.
-  Includes Flint tokenization, schema-aware tool calls in both framework adapters, independent
-  numerical and Jinja fixtures, and a pinned Q4_K_M checkpoint test. Adds the tool and RAG
-  qualification candidates and a bounded remote worker. The first qualification failed;
-  see [Flint execution](docs/flint.md).
-- Correct tool-result follow-up scoring to exclude reasoning blocks. The v2 policy prevents
-  truncated visible answers from passing solely because their reasoning mentioned the facts;
-  includes a captured Flint regression. Historical v1 reports remain unchanged.
-- Connect Flint projections and grouped routed experts to the existing Rust FFM kernels, with
-  session-owned quantization scratch and Java fallback. Add invocation, numerical, isolation,
-  rewind, and resource-lifetime regressions; acceleration still requires real-weight evidence.
+- Add Flint GGUF execution through pure Java and Rust FFM: sigmoid MoE routing, shared experts,
+  Q/K normalization, attention sinks, per-layer sliding/rotary patterns, and Flint tokenization.
+  Independent numerical fixtures and pinned-checkpoint parity cover both backends.
+- Accelerate Flint with grouped native projections and experts, ordered Q4_K accumulation,
+  vector attention, parallel independent heads, and immutable F32 router snapshots capped at
+  128 MiB per model. Older native libraries retain the Java fallback for ordered Q4_K.
+- Qualify the pinned Flint Q4_K_M artifact for the measured Linux CPU RAG workload: 11.93 median
+  tokens/second, 83.39% of the same-host Ollama control, and 1.450 times its p95 end-to-end latency.
+  All 27 visible answers pass across nine questions. The measured profile uses eight native
+  workers and a 512-token output budget; the absolute tier is `PERFORMANCE_REDUCED`.
+  Raw reports, failed development attempts, output reviews, and checksum-bound regression tests
+  are retained in [the qualification evidence](benchmark-results/2026-10-30-flint-qualification/README.md).
+- Add schema-aware Flint tool envelopes to the runtime, Spring AI, and LangChain4j adapters.
+  An opt-in grammar constrains declared argument structure; tool task accuracy has not passed
+  qualification and is not included in the RAG claim.
+- Correct tool-result follow-up scoring to exclude reasoning blocks and retain the previous
+  reports. Follow-up token budgets are explicit, preserving the existing 96-token default.
 - Version grounding as v24: accept second-person address and redundant negative-answer prefixes,
-  reject unfinished conditionals, and check claim polarity against matching evidence clauses.
-  Add a separate visible-answer audit and a 16-question answer-reliability workload. Original
-  benchmark scoring and archived reports remain intact. Tool follow-up token budgets are now
-  explicit and recorded, retaining the previous 96-token default.
+  reject unfinished conditionals, and check polarity against matching evidence. Add a separate
+  raw visible-answer audit and a 16-question answer-reliability workload; original scores remain
+  in every report.
 
 ## [0.5.7] - 2026-10-27
 

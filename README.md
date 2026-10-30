@@ -61,10 +61,11 @@ for the exact boundary and migration policy.
 
 ## Capabilities
 
-Experimental [Flint GGUF execution](docs/flint.md) is available in the pure Java backend.
-Flint's schema-aware tool protocol is implemented, but tool qualification (9/14 cases) and the
-RAG model-contribution gate (11.1%, required 33.3%) failed. Flint remains outside the catalog.
-See the [qualification evidence](benchmark-results/2026-10-29-flint/README.md) for measured results.
+[Flint GGUF execution](docs/flint.md) supports pure Java and Rust FFM. The pinned Q4_K_M
+artifact passes the RAG qualification policy on the measured Linux CPU host at 11.93 tokens/second,
+with 27/27 complete visible answers across nine questions. Tool task qualification is separate
+and has not passed. See the [current evidence](benchmark-results/2026-10-30-flint-qualification/README.md)
+for the measured profile, latency limits, and remaining catalog-admission checks.
 
 Implemented functionality includes:
 

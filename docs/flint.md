@@ -1,7 +1,21 @@
 # Flint GGUF execution
 
-Flint is an experimental Models architecture. This is runtime work toward
-ModelJars admission, not a published or performance-qualified ModelJar.
+The pinned Flint Q4_K_M artifact passes `production-rag-model-contribution-v6` with Rust FFM
+on the measured Linux CPU host. The full 27-attempt run reaches 11.93 median tokens/second
+versus Ollama's 14.30 (83.39%); p95 end-to-end latency is 37.91 seconds versus 26.14 seconds
+(1.450 times). Its absolute tier is `PERFORMANCE_REDUCED`. The result qualifies this grounded
+RAG workload and hardware profile; it does not establish frontier-model equivalence.
+
+All 27 raw visible answers are complete and correct across nine distinct questions. The
+grounding layer accepts 18 model answers, uses six extractive fallbacks, and abstains three times.
+The profile uses a 512-token output budget, a 2,048-token context, and eight native workers on
+an m6a.4xlarge (16 vCPUs, 64 GiB RAM); Ollama retains 16 workers. The untuned 256-token smoke
+passes pipeline correctness but truncates four visible answers, so use the separately validated
+output budget for this workload. Fresh held-out accuracy and released-library checks are being
+completed before catalog admission. See the [immutable reports and review](../benchmark-results/2026-10-30-flint-qualification/README.md).
+
+Tool protocol support is implemented, but task accuracy has not passed qualification. Earlier
+failed runs below are retained as development history and do not replace the current verdict.
 
 The decoder reads `general.architecture=flint` and executes the leading dense layers, sigmoid
 top-k routed experts plus the shared expert, per-head Q/K RMS normalization, learned attention
