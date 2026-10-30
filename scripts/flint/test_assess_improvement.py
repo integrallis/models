@@ -60,6 +60,18 @@ class ImprovementAssessmentTest(unittest.TestCase):
             self.assertTrue(result["runtimeEvidencePassed"], result["checks"])
             self.assertFalse(result["catalogAdmitted"])
             self.assertTrue(result["releasedLibraryEvidenceRequired"])
+            # A selected public pool profile must match every native measurement.
+            selection = {"maxOutputTokens": 256, "pilotVisibleGatePassed": True,
+                         "heldOutConsulted": False, "pilotReportLabel": "native-default",
+                         "nativePoolThreads": 16}
+            put("selected-profile.json", selection)
+            result = assessment.assess(root)
+            self.assertIn("frozenBudgetPilot", result["failedChecks"])
+            # A pilot label may not redirect the gate to a different budget or arbitrary file.
+            selection["pilotReportLabel"] = "native-budget-1024"
+            put("selected-profile.json", selection)
+            result = assessment.assess(root)
+            self.assertIn("frozenBudgetPilot", result["failedChecks"])
             put("native-reliability.json", {"changed": True})
             result = assessment.assess(root)
             self.assertFalse(result["runtimeEvidencePassed"])

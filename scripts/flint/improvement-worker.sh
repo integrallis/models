@@ -225,13 +225,21 @@ else
   printf '%s\n' 'FAILED_OR_INCOMPLETE' >"$OUT/default-correctness/failed.txt"
 fi
 
+# The manifest freezes any measured public native-pool profile before this host starts.
+# Default correctness above always runs without it. The comparator retains 16 threads.
+CANDIDATE_THREADS=$(jq -er '.candidateNativeThreads // 16 | select(type == "number" and . == floor and . >= 1 and . <= 256)' "$INPUT")
+if ((CANDIDATE_THREADS != THREADS)); then
+  export JAVA_OPTS="$JAVA_OPTS -Dmodels.native.kernels.threads=$CANDIDATE_THREADS"
+  idle
+  stage parity-profile 900 "${JAVA[@]}" "-Dmodels.native.kernels.threads=$CANDIDATE_THREADS" -cp "$WORK/probe:$CP" com.integrallis.models.bench.FlintKernelParity "$MODEL" "$WORK/reference.properties" "$OUT/parity-profile.json"
+fi
 # Choose the smallest budget whose nine pilot responses all satisfy the visible-answer audit.
 # The held-out workload is never consulted when choosing the budget.
 CAP=1024
 PROFILE_PASSED=false
 for cap in 256 512 1024; do
   label=native-default
-  if ((cap != 256)); then
+  if ((cap != 256 || CANDIDATE_THREADS != THREADS)); then
     label=native-budget-$cap
     idle
     benchmark "$label" 2400 rust-ffm "$cap" 0 1 general
@@ -242,11 +250,19 @@ for cap in 256 512 1024; do
     break
   fi
 done
-jq -n --argjson cap "$CAP" --argjson passed "$PROFILE_PASSED" \
-  '{maxOutputTokens:$cap,pilotVisibleGatePassed:$passed,selectionRule:"smallest of 256/512/1024 with 9/9 complete visible fact/citation/polarity passes; 1024 diagnostic if none",heldOutConsulted:false}' >"$OUT/selected-profile.json"
+jq -n --argjson cap "$CAP" --argjson passed "$PROFILE_PASSED" --arg pilot "$label" --argjson nativeThreads "$CANDIDATE_THREADS" \
+  '{maxOutputTokens:$cap,pilotReportLabel:$pilot,nativePoolThreads:$nativeThreads,pilotVisibleGatePassed:$passed,selectionRule:"smallest of 256/512/1024 with 9/9 complete visible fact/citation/polarity passes; 1024 diagnostic if none",heldOutConsulted:false}' >"$OUT/selected-profile.json"
 sync_results
 idle
 benchmark native-candidate 4200 rust-ffm "$CAP" 1 3 general
+idle
+start_ollama
+benchmark ollama-candidate 2400 ollama "$CAP" 1 3 general
+if [[ -f "$OUT/native-candidate.json" && -f "$OUT/ollama-candidate.json" ]]; then
+  stage qualification 120 "$RAG" qualify --candidate "$OUT/native-candidate.json" --comparator "$OUT/ollama-candidate.json" --output "$OUT/qualification.json" || true
+fi
+benchmark ollama-reliability 1800 ollama "$CAP" 0 1 answer-reliability
+stop_ollama
 idle
 benchmark native-reliability 2400 rust-ffm "$CAP" 0 1 answer-reliability
 idle
@@ -256,13 +272,5 @@ stage native-profile 900 env "JAVA_OPTS=$JAVA_OPTS -XX:StartFlightRecording=file
 if [[ -f "$OUT/native-profile.jfr" ]]; then
   jfr summary "$OUT/native-profile.jfr" >"$OUT/native-profile-summary.txt"
   jfr print --json --events jdk.ExecutionSample,jdk.ObjectAllocationSample "$OUT/native-profile.jfr" >"$OUT/native-profile-samples.json"
-fi
-idle
-start_ollama
-benchmark ollama-candidate 2400 ollama "$CAP" 1 3 general
-benchmark ollama-reliability 1800 ollama "$CAP" 0 1 answer-reliability
-stop_ollama
-if [[ -f "$OUT/native-candidate.json" && -f "$OUT/ollama-candidate.json" ]]; then
-  stage qualification 120 "$RAG" qualify --candidate "$OUT/native-candidate.json" --comparator "$OUT/ollama-candidate.json" --output "$OUT/qualification.json"
 fi
 printf '%s\n' 'All planned stages attempted; consult reports, default smoke, selected profile, and held-out accuracy before admission.' >"$OUT/completed.txt"

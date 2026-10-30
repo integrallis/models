@@ -108,9 +108,22 @@ def assess(root):
         cap = selection['maxOutputTokens']
         require(cap in (256, 512, 1024) and selection['pilotVisibleGatePassed'] is True
                 and selection['heldOutConsulted'] is False, 'budget pilot did not pass')
-        label = 'native-default' if cap == 256 else 'native-budget-' + str(cap)
+        label = selection.get('pilotReportLabel', 'native-default' if cap == 256 else 'native-budget-' + str(cap))
+        require(label == 'native-budget-' + str(cap) or (cap == 256 and label == 'native-default'),
+                'invalid pilot report label')
         audit = load('visible/' + label + '.json')
         bind_audit(root, label, audit)
+        if 'nativePoolThreads' in selection:
+            threads = str(selection['nativePoolThreads'])
+            for native_label in (label, 'native-candidate', 'native-reliability'):
+                native_report = load(native_label + '.json')
+                require(native_report['backendDiagnostics']['environment']['native-kernel-threads'] == threads,
+                        'candidate native pool does not match frozen profile')
+            if int(threads) != 16:
+                parity_profile = load('parity-profile.json')
+                require(parity_profile['passed'] is True and len(parity_profile['cases']) == 4
+                        and all(row['passed'] is True for row in parity_profile['cases']),
+                        'selected native pool did not pass numerical parity')
         require(audit['attempts'] == 9 and audit['distinctQuestions'] == 9
                 and audit['requiredFactsAndCitationsPasses'] == 9, 'pilot was not 9/9')
         for label in ('native-candidate', 'ollama-candidate', 'native-reliability',

@@ -399,3 +399,19 @@ sampling and budgets stay fixed. Smaller worker counts use the existing public n
 no reduction order or grading rule changes. A selected profile still needs full fresh evidence.
 New hosts provision 500 MiB/s gp3 throughput (within the instance's 625 MB/s EBS baseline)
 to reduce artifact I/O outside the warmed measurements; each comparator shares that same volume.
+
+### Worker scheduling follow-up
+
+The worker-count diagnosis keeps the runtime payload at `9c453e9d` and varies only active native
+workers (16, 8, 4). A separate scheduling diagnosis compares the public pool setting
+`models.native.kernels.threads=8` and the existing experimental polling setting. The latter is
+not a supported ModelJars recommendation. `FlintKernelTiming.java` measures elapsed time around
+native matrix calls, including FFM, copies, scheduling, reflection and timer overhead; it is
+instrumented diagnosis, not qualification evidence.
+
+A full campaign may freeze `candidateNativeThreads` in its manifest after these development
+measurements. Library-default correctness stays untuned; a different candidate pool receives
+its own real-weight parity check and all budget pilots, candidate and held-out runs. The
+comparator retains 16 threads. The selected profile and diagnostics bind the actual pool size.
+The formal candidate/comparator verdict now runs before held-out and tool work, so those
+separate stages cannot delay discovering a performance failure. All original gates remain.
