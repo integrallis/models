@@ -175,6 +175,16 @@ and nothing from it is copied into our runtime; it is used only as an external o
 - The prebuilt `edgerock-native-linux-sm90.tar.gz` is Linux x86-64 + CUDA SM90 only, so any other
   platform must rebuild. Their published receipts are CUDA runs with `--n-gpu-layers 99`, so their
   numbers are GPU numbers and are **read, not ours**.
+- **`backend/ollama-runtime.patch` does not add EdgeRock support**, despite the name. It and
+  `backend/ollama-cluster-config.patch` are byte-identical (verified with `cmp`), 79 lines, and
+  they do one thing: replace `os.UserHomeDir()` with `os.UserConfigDir()` across `auth/auth.go`,
+  `cmd/cmd.go`, `cmd/config/config.go` and `envconfig/config.go`. That is an HPC convenience so
+  Ollama keeps its config under `XDG_CONFIG_HOME`, and it touches no inference code at all.
+  Ollama serves EdgeRock only because the shipped tarball bundles the patched llama.cpp as its
+  runner (`lib/ollama/llama-server`). Stock Ollama cannot serve the architecture, and rebuilding
+  the Ollama patch against `d1ed3fd1` as the README suggests buys nothing for EdgeRock on its own.
+  **Consequence for qualification:** there is no cheap stock-Ollama comparator. The comparator is
+  the patched llama.cpp, through the publisher-reference route the policy already supports.
 - `receipts/*.json` carry the exact server command, four cases with expected answers, outputs and
   timings. Two are long-memory cases at 9664 and 10462 input tokens. `Modelfile.Q4_K_M` gives the
   template: ChatML with a forced `<think>` opener, `temperature 0`.
