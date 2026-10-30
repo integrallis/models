@@ -16,14 +16,12 @@
 package com.integrallis.models.backend.purejava.flint;
 
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache;
-import com.integrallis.models.backend.purejava.cache.LayeredKvCache.AttentionSpan;
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache.AttentionView;
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache.LayerSpec;
 import com.integrallis.models.backend.purejava.flint.FlintWeights.LayerWeights;
 import com.integrallis.models.backend.purejava.flint.FlintWeights.Matrix;
 import com.integrallis.models.backend.purejava.flint.FlintWeights.MoeFeedForward;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
-import com.integrallis.models.backend.purejava.ops.PinnedReduction;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
@@ -53,7 +51,7 @@ public final class FlintForwardPass {
     private final float[] key;
     private final float[] value;
     private final float[] attentionOutput;
-    private final float[] attentionScores;
+    private final float[][] attentionScores;
     private final float[] projectedAttention;
     private final float[] routerLogits;
     private final int[] selectedExperts;
@@ -96,7 +94,7 @@ public final class FlintForwardPass {
       key = new float[config.keyValueDimension()];
       value = new float[config.keyValueDimension()];
       attentionOutput = new float[config.queryDimension()];
-      attentionScores = new float[owner.maxSequenceLength];
+      attentionScores = new float[config.numHeads()][owner.maxSequenceLength];
       projectedAttention = new float[config.hiddenSize()];
       routerLogits = new float[config.numExperts()];
       selectedExperts = new int[config.expertsPerToken()];
@@ -553,50 +551,19 @@ public final class FlintForwardPass {
   }
 
   private void computeAttention(Session session, LayerWeights parameters, int layer, int position) {
-    Arrays.fill(session.attentionOutput, 0.0f);
     int firstPosition = config.attentionStartPosition(layer, position);
     AttentionView view = session.cache.attentionView(layer, firstPosition, position + 1);
-    float[] cachedKeys = session.cache.keyBuffer(layer);
-    float[] cachedValues = session.cache.valueBuffer(layer);
-    int headsPerKv = config.numHeads() / config.numKvHeads();
-    float scale = (float) (1.0 / Math.sqrt(config.headDim()));
-
-    for (int head = 0; head < config.numHeads(); head++) {
-      int kvHead = head / headsPerKv;
-      int queryOffset = head * config.headDim();
-      int score = 0;
-      for (int spanIndex = 0; spanIndex < view.spanCount(); spanIndex++) {
-        AttentionSpan span = view.span(spanIndex);
-        int keyOffset = span.keyOffset() + kvHead * config.headDim();
-        for (int row = 0; row < span.positionCount(); row++) {
-          session.attentionScores[score++] =
-              scale
-                  * PinnedReduction.dot(
-                      session.query,
-                      queryOffset,
-                      cachedKeys,
-                      keyOffset + row * config.keyValueDimension(),
-                      config.headDim());
-        }
-      }
-      TensorOps.softmaxWithZeroValueSink(
-          session.attentionScores, 0, view.positionCount(), parameters.sinks()[head]);
-
-      int probability = 0;
-      int outputOffset = head * config.headDim();
-      for (int spanIndex = 0; spanIndex < view.spanCount(); spanIndex++) {
-        AttentionSpan span = view.span(spanIndex);
-        int valueOffset = span.valueOffset() + kvHead * config.headDim();
-        for (int row = 0; row < span.positionCount(); row++) {
-          float weight = session.attentionScores[probability++];
-          int rowOffset = valueOffset + row * config.keyValueDimension();
-          for (int dimension = 0; dimension < config.headDim(); dimension++) {
-            session.attentionOutput[outputOffset + dimension] +=
-                weight * cachedValues[rowOffset + dimension];
-          }
-        }
-      }
-    }
+    FlintAttention.compute(
+        session.query,
+        session.cache.keyBuffer(layer),
+        session.cache.valueBuffer(layer),
+        session.attentionScores,
+        session.attentionOutput,
+        parameters.sinks(),
+        view,
+        config.numHeads(),
+        config.numKvHeads(),
+        config.headDim());
   }
 
   private void embedToken(int token, float[] destination) {

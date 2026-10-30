@@ -151,8 +151,7 @@ The tool prompt fixture is independently rendered using Jinja 3.1.6 and the temp
 the pinned GGUF. Its provenance is in `models-runtime/src/test/resources/flint/README.md`.
 The scanner checks structural types, required fields, nested properties/items, enum/const and
 `additionalProperties: false`. It is not a full JSON Schema validator. `$ref`, `oneOf`, and `anyOf`
-are unsupported; ambiguous schemas or values degrade to plain text. Flint does not yet have a
-constrained-decoding grammar, so qualification measures the model's natural output.
+are unsupported; ambiguous schemas or values degrade to plain text. Default qualification measures natural output; the later opt-in grammar prototype is described below.
 
 For experimental tool use, supply the same declarations when rendering and scanning. For example,
 inside an open `InferencePipeline` scope:
@@ -358,3 +357,34 @@ Greedy constrained sampling also avoids grammar evaluation for scores that canno
 allowed token. Exhaustive-mask regressions preserve tie and non-finite-score behavior. A synthetic
 150,016-token vocabulary probe selected the same token five times while reducing predicate calls
 from 750,080 to 15. This is a sampler overhead diagnostic, not a real-model speed measurement.
+
+### Completed ordered-Q4_K and grammar campaigns
+
+The ordered-Q4_K campaign passed numerical parity (zero Java/Rust logit differences), the
+512-token pilot (9/9 complete visible answers), and held-out accuracy (16/16, including both
+abstentions). Native median decode was 7.74 tokens/s in the warmed arm. Its Ollama comparison
+was incomplete: the worker assumed an `ollama runner` process, but 0.40.9 launched a child
+`/usr/local/lib/ollama/llama-server`. Discovery now recognizes both forms and checks the parent
+PID. No runtime qualification is inferred from the incomplete comparison.
+
+The separate grammar campaign completed both arms: default and schema-constrained each passed
+10/14, with the same omitted actions and wrong literal arguments. Tool capability remains
+unqualified. Both disposable instances and their root volumes have been removed. Reports are
+retained under `benchmark-results/2026-10-30-flint-ordered` and `2026-10-30-flint-tools`.
+
+JFR recorded 566 Java execution samples inside attention, among 699 samples containing
+`FlintForwardPass.executeLayer`. Most other samples were artifact hashing. Java execution
+sampling does not attribute native-kernel CPU time and is not a wall-time breakdown. The next
+implementation vectorizes value columns with separate multiply/add and distributes independent
+heads once the work reaches 1,048,576 elements. Key reductions, sink softmax, chronological
+value order, and sliding spans remain unchanged. Per-head session scratch adds
+`numHeads * contextLength * 4` bytes (256 KiB at 32 heads and context 2048). Synthetic scalar
+comparisons cover short, full, and wrapped histories, grouped heads, vector tails, and the
+parallel threshold with bitwise equality. Real-weight parity and fresh same-host comparison
+remain mandatory before any speed claim or admission.
+
+The worker also accepts `diagnosticOnly: true` for a bounded, single-case, same-host
+512-token native/Ollama speed comparison (one warmup, three measured iterations).
+This mode omits admission entirely and is used to reject ineffective optimizations before
+spending a full campaign. It cannot qualify a model, replace default correctness, or
+replace the held-out workload.

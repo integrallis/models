@@ -89,7 +89,7 @@ final class FlintDecoderAdapter implements PureJavaDecoder {
         new OptimizationDecision(
             "flint-java-attention",
             OptimizationStatus.ENABLED,
-            "Flint computes per-head pinned key scores, sink softmax, and sequential value accumulation in Java; generic batched/native attention plan switches do not apply",
+            "Flint uses pinned key scores, sink softmax, vectorized non-fused chronological values, and independent parallel heads above one million elements; generic batched/native attention switches do not apply",
             Map.of("key-score-rows", "1", "value-rows", "1", "implementation", "java")));
     decisions.add(
         new OptimizationDecision(

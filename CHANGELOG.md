@@ -4,6 +4,10 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+- Vectorize Flint attention values and parallelize independent heads without changing reduction
+  order. Correct Ollama runner discovery in the qualification worker; retain the incomplete
+  comparison and failed tool grammar evidence.
+
 - Add an opt-in Flint tool grammar prototype and an explicit qualification CLI profile. It
   constrains declared argument structure while preserving refusal and multiple calls; real-model
   accuracy and overhead remain unqualified. Default Flint generation is unchanged.

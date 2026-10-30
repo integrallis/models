@@ -127,6 +127,57 @@ benchmark() {
   fi
 }
 
+start_ollama() {
+  ollama serve >"$OUT/ollama-server.log" 2>&1 &
+  OLLAMA_PID=$!
+  for ((i=0; i<60; i++)); do
+    curl -fsS http://127.0.0.1:11434/api/version >"$OUT/ollama-version.json" && break
+    sleep 1
+  done
+  jq -e '.version == "0.40.9"' "$OUT/ollama-version.json"
+  printf 'FROM %s\n' "$MODEL" >"$WORK/Modelfile"
+  stage ollama-import 900 ollama create flint-qualification -f "$WORK/Modelfile"
+  # Prime a single runner, then measure its PID rather than the small HTTP daemon.
+  stage ollama-prime 600 curl -fsS --max-time 590 http://127.0.0.1:11434/api/generate -H 'Content-Type: application/json' -d '{"model":"flint-qualification","prompt":"Warmup","raw":true,"stream":false,"keep_alive":-1,"options":{"num_predict":1,"num_ctx":2048,"num_thread":16,"temperature":0}}'
+  # Ollama 0.40.9 launches llama-server; older versions used an `ollama runner` command.
+  # Bind discovery to this daemon's children so unrelated inference can never be sampled.
+  mapfile -t runners < <(ps -eo pid=,ppid=,args= | awk -v parent="$OLLAMA_PID" \
+    '$2 == parent && ($3 == "/usr/local/lib/ollama/llama-server" || $3 == "/usr/local/bin/ollama" || $3 == "ollama") { if ($3 ~ /llama-server$/ || $4 == "runner") print $1 }')
+  if ((${#runners[@]} != 1)); then
+    ps -eo pid,ppid,args >"$OUT/runner-discovery-failure.txt"
+    echo 'Expected exactly one Ollama runner' >&2
+    exit 1
+  fi
+  RUNNER_PID=${runners[0]}
+  printf '%s\n' "$RUNNER_PID" >"$OUT/ollama-runner-pid.txt"
+  ps -p "$OLLAMA_PID,$RUNNER_PID" -o pid,ppid,rss,args >"$OUT/ollama-processes.txt"
+}
+stop_ollama() {
+  ollama stop flint-qualification
+  kill "$OLLAMA_PID"
+  wait "$OLLAMA_PID" || true
+  for ((i=0; i<60; i++)); do
+    if ! kill -0 "$RUNNER_PID" 2>/dev/null; then return; fi
+    sleep 1
+  done
+  echo 'Ollama runner did not stop' >&2
+  exit 1
+}
+
+# Short development comparison only. It cannot satisfy any catalog qualification gate.
+if jq -e '.diagnosticOnly == true' "$INPUT" >/dev/null; then
+  CAP=512
+  COMMON+=(--case auto-glass-deadline)
+  idle
+  benchmark native-speed-pilot 1200 rust-ffm "$CAP" 1 3 general
+  idle
+  start_ollama
+  benchmark ollama-speed-pilot 1200 ollama "$CAP" 1 3 general
+  stop_ollama
+  printf '%s\n' 'Single-case performance diagnosis only; no catalog qualification attempted.' >"$OUT/completed.txt"
+  exit 0
+fi
+
 idle
 benchmark java-default 1800 pure-java 256 0 1 general
 idle
@@ -179,31 +230,10 @@ if [[ -f "$OUT/native-profile.jfr" ]]; then
   jfr print --json --events jdk.ExecutionSample,jdk.ObjectAllocationSample "$OUT/native-profile.jfr" >"$OUT/native-profile-samples.json"
 fi
 idle
-ollama serve >"$OUT/ollama-server.log" 2>&1 &
-OLLAMA_PID=$!
-for ((i=0; i<60; i++)); do
-  curl -fsS http://127.0.0.1:11434/api/version >"$OUT/ollama-version.json" && break
-  sleep 1
-done
-jq -e '.version == "0.40.9"' "$OUT/ollama-version.json"
-printf 'FROM %s\n' "$MODEL" >"$WORK/Modelfile"
-stage ollama-import 900 ollama create flint-qualification -f "$WORK/Modelfile"
-# Prime a single runner, then measure its PID rather than the small HTTP daemon.
-stage ollama-prime 600 curl -fsS --max-time 590 http://127.0.0.1:11434/api/generate -H 'Content-Type: application/json' -d '{"model":"flint-qualification","prompt":"Warmup","raw":true,"stream":false,"keep_alive":-1,"options":{"num_predict":1,"num_ctx":2048,"num_thread":16,"temperature":0}}'
-mapfile -t runners < <(pgrep -f '^/usr/local/bin/ollama runner|^ollama runner')
-if ((${#runners[@]} != 1)); then
-  ps -eo pid,ppid,args >"$OUT/runner-discovery-failure.txt"
-  echo 'Expected exactly one Ollama runner' >&2
-  exit 1
-fi
-RUNNER_PID=${runners[0]}
-printf '%s\n' "$RUNNER_PID" >"$OUT/ollama-runner-pid.txt"
-ps -p "$OLLAMA_PID,$RUNNER_PID" -o pid,ppid,rss,args >"$OUT/ollama-processes.txt"
+start_ollama
 benchmark ollama-candidate 2400 ollama "$CAP" 1 3 general
 benchmark ollama-reliability 1800 ollama "$CAP" 0 1 answer-reliability
-ollama stop flint-qualification
-kill "$OLLAMA_PID"
-wait "$OLLAMA_PID" || true
+stop_ollama
 if [[ -f "$OUT/native-candidate.json" && -f "$OUT/ollama-candidate.json" ]]; then
   stage qualification 120 "$RAG" qualify --candidate "$OUT/native-candidate.json" --comparator "$OUT/ollama-candidate.json" --output "$OUT/qualification.json"
 fi
