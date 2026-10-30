@@ -179,6 +179,25 @@ if jq -e '.diagnosticOnly == true' "$INPUT" >/dev/null; then
     done
     export JAVA_OPTS=$ORIGINAL_JAVA_OPTS
   fi
+  if jq -e '.diagnosticProfiles == "scheduling"' "$INPUT" >/dev/null; then
+    ORIGINAL_JAVA_OPTS=$JAVA_OPTS
+    for profile in pool8 pool8-poll1 pool16-poll1; do
+      case "$profile" in
+        pool8) properties='-Dmodels.native.kernels.threads=8' ;;
+        pool8-poll1) properties='-Dmodels.native.kernels.threads=8 -Dmodels.native.kernels.pollMillis=1' ;;
+        pool16-poll1) properties='-Dmodels.native.kernels.threads=16 -Dmodels.native.kernels.pollMillis=1' ;;
+      esac
+      export JAVA_OPTS="$ORIGINAL_JAVA_OPTS $properties"
+      idle
+      benchmark "native-$profile-speed-pilot" 1200 rust-ffm "$CAP" 1 3 general
+    done
+    export JAVA_OPTS=$ORIGINAL_JAVA_OPTS
+    aws s3 cp "$(jq -er '.timingProbeUri' "$INPUT")" "$WORK/FlintKernelTiming.java" --only-show-errors
+    verify "$(jq -er '.timingProbeSha256' "$INPUT")" "$WORK/FlintKernelTiming.java"
+    javac --release 25 -cp "$CP" -d "$WORK/probe" "$WORK/FlintKernelTiming.java"
+    idle
+    stage kernel-timing 1200 "${JAVA[@]}" -Dmodels.native.kernels.decodeThreads=8 -cp "$WORK/probe:$CP" FlintKernelTiming "$MODEL" "$NATIVE" "$OUT/kernel-timing.json"
+  fi
   idle
   start_ollama
   benchmark ollama-speed-pilot 1200 ollama "$CAP" 1 3 general
