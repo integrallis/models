@@ -37,7 +37,7 @@ class MemoryBankTest {
     assertThat(committed).isFalse();
     assertThat(bank.staged()).isEqualTo(1);
     // The bank the read path sees is still empty: a token cannot attend to itself.
-    assertThat(bank.selection().occupancy()).isZero();
+    assertThat(bank.selection(0).occupancy()).isZero();
   }
 
   @Test
@@ -48,7 +48,7 @@ class MemoryBankTest {
     assertThat(bank.stage(keys(2f), values(2f), scores(0.5f))).isTrue();
 
     assertThat(bank.staged()).isZero();
-    assertThat(bank.selection().occupancy()).isEqualTo(2);
+    assertThat(bank.selection(0).occupancy()).isEqualTo(2);
     assertThat(bank.total()).isEqualTo(2);
   }
 
@@ -61,10 +61,10 @@ class MemoryBankTest {
     bank.stage(keys(3f), values(3f), scores(0.20f));
     bank.stage(keys(4f), values(4f), scores(0.80f));
 
-    assertThat(bank.selection().occupancy()).isEqualTo(4);
-    assertThat(bank.selection().scoresCopy()).containsExactly(0.9f, 0.8f, 0.2f, 0.1f);
+    assertThat(bank.selection(0).occupancy()).isEqualTo(4);
+    assertThat(bank.selection(0).scoresCopy()).containsExactly(0.9f, 0.8f, 0.2f, 0.1f);
     // Positions travel with their scores, so the bank still knows when each record was written.
-    assertThat(bank.selection().positionsCopy()).containsExactly(1, 3, 2, 0);
+    assertThat(bank.selection(0).positionsCopy()).containsExactly(1, 3, 2, 0);
   }
 
   @Test
@@ -73,17 +73,17 @@ class MemoryBankTest {
     for (int token = 0; token < CAPACITY; token++) {
       bank.stage(keys(token + 1f), values(token + 1f), scores(0.5f));
     }
-    assertThat(bank.selection().occupancy()).isEqualTo(CAPACITY);
+    assertThat(bank.selection(0).occupancy()).isEqualTo(CAPACITY);
 
     // Two more tokens, both better than everything held.
     bank.stage(keys(99f), values(99f), scores(0.95f));
     bank.stage(keys(98f), values(98f), scores(0.96f));
 
-    assertThat(bank.selection().occupancy()).isEqualTo(CAPACITY);
-    assertThat(bank.selection().score(0)).isEqualTo(0.96f);
-    assertThat(bank.selection().score(1)).isEqualTo(0.95f);
+    assertThat(bank.selection(0).occupancy()).isEqualTo(CAPACITY);
+    assertThat(bank.selection(0).score(0)).isEqualTo(0.96f);
+    assertThat(bank.selection(0).score(1)).isEqualTo(0.95f);
     // The survivors of the earlier ties are the earliest positions, which is the tie-break rule.
-    assertThat(bank.selection().positionsCopy()).containsExactly(5, 4, 0, 1);
+    assertThat(bank.selection(0).positionsCopy()).containsExactly(5, 4, 0, 1);
   }
 
   @Test
@@ -94,7 +94,7 @@ class MemoryBankTest {
     }
 
     // Four tokens seen, so positions 0..3 -- not 0..1 twice, which a chunk-local counter gives.
-    assertThat(bank.selection().positionsCopy()).containsExactly(0, 1, 2, 3);
+    assertThat(bank.selection(0).positionsCopy()).containsExactly(0, 1, 2, 3);
     assertThat(bank.total()).isEqualTo(4);
   }
 
@@ -106,7 +106,7 @@ class MemoryBankTest {
 
     bank.reset();
 
-    assertThat(bank.selection().occupancy()).isZero();
+    assertThat(bank.selection(0).occupancy()).isZero();
     assertThat(bank.staged()).isZero();
     assertThat(bank.total()).isZero();
   }

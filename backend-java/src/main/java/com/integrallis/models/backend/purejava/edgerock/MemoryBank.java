@@ -40,8 +40,20 @@ public final class MemoryBank {
 
   private final float[][][] values;
 
-  /** Which records are committed, and their admission scores and positions. */
-  private MemoryAnchors.Selection selection;
+  /**
+   * Which records are committed, per group, with their admission scores and positions.
+   *
+   * <p>One selection per group, not one shared. {@code admission_up} is stored {@code [rank,
+   * groups]} and emits a score per key/value group, so each group ranks the same tokens differently
+   * and keeps a different set. This was a single field, with a comment claiming "scores and
+   * positions agree across groups by construction" -- they do not, and the claim was only ever true
+   * of fixtures that gave every group the same score. The records were gathered per group while the
+   * surviving selection was whichever group happened to be last, so for every other group the
+   * slot-to-position mapping described a different group's bank. A read then masked occupancy with
+   * one group's selection while taking keys and values from another's, which retrieves a real
+   * anchor with the wrong contents: a confident answer from the wrong record, never a crash.
+   */
+  private final MemoryAnchors.Selection[] selections;
 
   private final float[][][] pendingKeys;
   private final float[][][] pendingValues;
@@ -76,7 +88,10 @@ public final class MemoryBank {
     this.dim = dim;
     this.keys = new float[groups][capacity][dim];
     this.values = new float[groups][capacity][dim];
-    this.selection = MemoryAnchors.empty(capacity);
+    this.selections = new MemoryAnchors.Selection[groups];
+    for (int group = 0; group < groups; group++) {
+      this.selections[group] = MemoryAnchors.empty(capacity);
+    }
     this.pendingKeys = new float[groups][commitChunk][dim];
     this.pendingValues = new float[groups][commitChunk][dim];
     this.pendingScores = new float[groups][commitChunk];
@@ -107,8 +122,12 @@ public final class MemoryBank {
     return total;
   }
 
-  MemoryAnchors.Selection selection() {
-    return selection;
+  /** The committed selection for one group. */
+  MemoryAnchors.Selection selection(int group) {
+    if (group < 0 || group >= groups) {
+      throw new IllegalArgumentException("group out of range: " + group);
+    }
+    return selections[group];
   }
 
   /** A committed record's key, for the read path. */
@@ -165,7 +184,7 @@ public final class MemoryBank {
     int[] pendingReferenceRow = new int[count];
     float[][][] nextKeys = new float[groups][capacity][dim];
     float[][][] nextValues = new float[groups][capacity][dim];
-    MemoryAnchors.Selection merged = null;
+    MemoryAnchors.Selection[] nextSelections = new MemoryAnchors.Selection[groups];
 
     for (int group = 0; group < groups; group++) {
       for (int i = 0; i < count; i++) {
@@ -175,10 +194,9 @@ public final class MemoryBank {
       }
       MemoryAnchors.Selection pending =
           MemoryAnchors.select(pendingScoreRow, pendingPositionRow, pendingReferenceRow, count);
-      MemoryAnchors.Selection kept = MemoryAnchors.merge(selection, pending, capacity);
-      // Every group admits independently -- the reference calls this independent memory -- but the
-      // selection object is shared because scores and positions agree across groups by
-      // construction; only the records differ. Gather this group's records by the kept references.
+      // Merged against this group's own committed selection, which is the whole point of
+      // "independent" memory: the groups do not agree on what is worth keeping.
+      MemoryAnchors.Selection kept = MemoryAnchors.merge(selections[group], pending, capacity);
       for (int slot = 0; slot < capacity; slot++) {
         int reference = kept.reference(slot);
         if (reference < 0) {
@@ -195,7 +213,7 @@ public final class MemoryBank {
         System.arraycopy(sourceKey, 0, nextKeys[group][slot], 0, dim);
         System.arraycopy(sourceValue, 0, nextValues[group][slot], 0, dim);
       }
-      merged = kept;
+      nextSelections[group] = kept;
     }
 
     for (int group = 0; group < groups; group++) {
@@ -205,19 +223,24 @@ public final class MemoryBank {
       }
     }
     // After a commit the references describe slot order, not provenance.
-    float[] scores = merged.scoresCopy();
-    int[] positions = merged.positionsCopy();
-    int[] references = new int[capacity];
-    for (int slot = 0; slot < capacity; slot++) {
-      references[slot] = merged.reference(slot) < 0 ? MemoryAnchors.EMPTY : slot;
+    for (int group = 0; group < groups; group++) {
+      MemoryAnchors.Selection kept = nextSelections[group];
+      float[] scores = kept.scoresCopy();
+      int[] positions = kept.positionsCopy();
+      int[] references = new int[capacity];
+      for (int slot = 0; slot < capacity; slot++) {
+        references[slot] = kept.reference(slot) < 0 ? MemoryAnchors.EMPTY : slot;
+      }
+      selections[group] = MemoryAnchors.select(scores, positions, references, capacity);
     }
-    selection = MemoryAnchors.select(scores, positions, references, capacity);
     count = 0;
   }
 
   /** Clears the bank, as a new sequence requires. */
   public void reset() {
-    selection = MemoryAnchors.empty(capacity);
+    for (int group = 0; group < groups; group++) {
+      selections[group] = MemoryAnchors.empty(capacity);
+    }
     count = 0;
     total = 0;
     for (int group = 0; group < groups; group++) {

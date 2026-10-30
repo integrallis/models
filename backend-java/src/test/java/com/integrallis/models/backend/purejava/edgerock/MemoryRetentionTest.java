@@ -55,7 +55,7 @@ class MemoryRetentionTest {
     bank.commit();
 
     assertThat(bank.total()).isEqualTo(10_400);
-    int[] kept = bank.selection().positionsCopy();
+    int[] kept = bank.selection(0).positionsCopy();
     assertThat(kept)
         .as("the position-0 needle must still be in a bank of %d slots", CAPACITY)
         .contains(0);
@@ -73,7 +73,7 @@ class MemoryRetentionTest {
     }
     bank.commit();
 
-    int[] kept = bank.selection().positionsCopy();
+    int[] kept = bank.selection(0).positionsCopy();
     int needleSlot = -1;
     for (int slot = 0; slot < kept.length; slot++) {
       if (kept[slot] == 0) {
@@ -85,6 +85,48 @@ class MemoryRetentionTest {
     // Its stored key must still be the needle's key, not overwritten by a later record.
     assertThat(bank.key(0, needleSlot)[0]).isEqualTo(1.0f);
     assertThat(bank.value(0, needleSlot)[0]).isEqualTo(1.0f);
+  }
+
+  @Test
+  void eachGroupKeepsItsOwnAnchorsBecauseTheyScoreThemDifferently() {
+    // The test that was missing. admission_up is [rank, groups] and emits a score per key/value
+    // group, so the groups disagree about what is worth keeping -- that disagreement is what
+    // "independent" memory means. Every fixture above hands all groups the same score, and a
+    // uniform fixture cannot fail on the axis it holds constant: with equal scores a bank that
+    // collapses the groups into one shared selection looks perfectly correct.
+    int groups = 2;
+    int capacity = 2;
+    // The chunk cannot exceed the capacity, so this is two commits of two rather than one of four.
+    int chunk = 2;
+    MemoryBank bank = new MemoryBank(groups, capacity, chunk, 1);
+
+    // Group 0 prefers the first two tokens, group 1 the last two.
+    float[][] perGroupScores = {{9f, 1f}, {8f, 2f}, {1f, 8f}, {2f, 9f}};
+    for (int token = 0; token < 4; token++) {
+      float[][] keys = new float[groups][1];
+      float[][] values = new float[groups][1];
+      float[] scores = new float[groups];
+      for (int group = 0; group < groups; group++) {
+        // Distinct per group as well as per token, so a record taken from the wrong group shows up.
+        keys[group][0] = (token + 1) * 10f + group;
+        values[group][0] = (token + 1) * 10f + group;
+        scores[group] = perGroupScores[token][group];
+      }
+      bank.stage(keys, values, scores);
+    }
+
+    assertThat(bank.selection(0).positionsCopy())
+        .as("group 0 ranked tokens 0 and 1 highest")
+        .containsExactly(0, 1);
+    assertThat(bank.selection(1).positionsCopy())
+        .as("group 1 ranked tokens 3 and 2 highest")
+        .containsExactly(3, 2);
+
+    // And each group's records must be its own, in its own slot order.
+    assertThat(bank.key(0, 0)[0]).isEqualTo(10f);
+    assertThat(bank.key(0, 1)[0]).isEqualTo(20f);
+    assertThat(bank.key(1, 0)[0]).isEqualTo(41f);
+    assertThat(bank.key(1, 1)[0]).isEqualTo(31f);
   }
 
   private static void stage(MemoryBank bank, float score, float payload) {

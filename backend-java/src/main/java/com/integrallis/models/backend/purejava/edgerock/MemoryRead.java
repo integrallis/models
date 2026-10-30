@@ -75,11 +75,13 @@ final class MemoryRead {
     int dim = bank.dim();
     int capacity = bank.capacity();
     float scale = (float) (1.0 / Math.sqrt(dim));
-    MemoryAnchors.Selection selection = bank.selection();
     float[] logits = new float[capacity];
 
     for (int head = 0; head < heads; head++) {
       int group = head / headsPerGroup;
+      // This group's selection, not a shared one. Each group commits its own set, so masking
+      // occupancy with another group's would pair one group's slots with another's records.
+      MemoryAnchors.Selection selection = bank.selection(group);
       float[] query = queries[head];
       java.util.Arrays.fill(out[head], 0f);
 

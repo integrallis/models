@@ -51,7 +51,7 @@ class EdgeRockMemoryLayerTest {
 
     assertThat(out).usingComparatorWithPrecision(TOLERANCE).containsOnly(0f);
     // ...and the token did land in the bank, so the read being zero is order, not a no-op.
-    assertThat(bank.selection().occupancy()).isEqualTo(1);
+    assertThat(bank.selection(0).occupancy()).isEqualTo(1);
   }
 
   @Test
@@ -68,7 +68,7 @@ class EdgeRockMemoryLayerTest {
     // output projection passes it through. The exact magnitude depends on the norms; the point
     // is that it is no longer zero.
     assertThat(maxMagnitude(out)).isGreaterThan(TOLERANCE);
-    assertThat(bank.selection().occupancy()).isEqualTo(2);
+    assertThat(bank.selection(0).occupancy()).isEqualTo(2);
   }
 
   @Test
@@ -117,7 +117,7 @@ class EdgeRockMemoryLayerTest {
 
     // Identical inputs give identical scores, so the bank fills in position order and the
     // tie-break keeps the earliest -- which is what makes a full bank stable rather than churning.
-    assertThat(bank.selection().positionsCopy()).containsExactly(0, 1, 2, 3);
+    assertThat(bank.selection(0).positionsCopy()).containsExactly(0, 1, 2, 3);
   }
 
   private static EdgeRockConfig config() {
