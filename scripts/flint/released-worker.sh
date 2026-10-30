@@ -118,6 +118,8 @@ sync_results
 # It runs after all required release checks and performs simulated tool actions only.
 if jq -e '.toolDiagnostic == true' "$INPUT" >/dev/null; then
   javac --release 25 -cp "$CP" -d "$WORK/probe" "$WORK/FlintToolTaskProbe.java"
+  stage tools-harness-selftest 60 "${JAVA[@]}" -cp "$WORK/probe:$CP" \
+    com.integrallis.models.bench.FlintToolTaskProbe --self-test
   stage tools-diagnostic 2700 "${JAVA[@]}" -cp "$WORK/probe:$CP" \
     com.integrallis.models.bench.FlintToolTaskProbe "$MODEL" \
     "$WORK/tool-task-held-out-v1.json" "$OUT/tools-diagnostic.json" || \
