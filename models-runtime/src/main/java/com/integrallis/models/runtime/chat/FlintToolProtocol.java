@@ -193,7 +193,7 @@ final class FlintToolProtocol {
 
   // Type recovery and the structural/enum subset needed by the tool protocol, not a full JSON
   // Schema validator.
-  private static boolean matches(Object value, Map<String, Object> schema) {
+  static boolean matches(Object value, Map<String, Object> schema) {
     if (schema.containsKey("$ref") || schema.containsKey("oneOf") || schema.containsKey("anyOf"))
       return false;
     Object declared = schema.get("type");
@@ -252,7 +252,7 @@ final class FlintToolProtocol {
     return new IllegalArgumentException("Malformed or unsupported Flint tool call");
   }
 
-  private static String json(Object value, boolean spaced) {
+  static String json(Object value, boolean spaced) {
     if (value == null) return "null";
     if (value instanceof JsonNumber n) return n.text();
     if (value instanceof Boolean b) return b.toString();
@@ -291,6 +291,10 @@ final class FlintToolProtocol {
   }
 
   private record JsonNumber(String text) {}
+
+  static Object parseJson(String json) {
+    return Json.parse(json);
+  }
 
   private static final class Json {
     private static final int MAX_DEPTH = 128;

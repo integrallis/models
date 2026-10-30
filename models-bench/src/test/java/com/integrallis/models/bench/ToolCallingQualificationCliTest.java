@@ -37,6 +37,28 @@ import org.junit.jupiter.api.io.TempDir;
 class ToolCallingQualificationCliTest {
 
   @Test
+  void flintSchemaGrammarIsExplicitAndCannotBeUsedWithAnotherProtocol() throws Exception {
+    Path artifact = Files.writeString(temporary.resolve("flint.gguf"), "fixture");
+    var args =
+        new java.util.ArrayList<>(
+            List.of(
+                "--candidate",
+                "flint-40b-a2.5b",
+                "--model",
+                artifact.toString(),
+                "--models-revision",
+                REVISION));
+    assertThat(ToolCallingQualificationCli.parse(args.toArray(String[]::new)).toolConstraints())
+        .isEqualTo("default");
+    args.addAll(List.of("--tool-constraints", "flint-schema"));
+    assertThat(ToolCallingQualificationCli.parse(args.toArray(String[]::new)).toolConstraints())
+        .isEqualTo("flint-schema");
+    args.set(1, "qwen3-8b");
+    assertThatIllegalArgumentException()
+        .isThrownBy(() -> ToolCallingQualificationCli.parse(args.toArray(String[]::new)));
+  }
+
+  @Test
   void recordsAnExplicitFollowUpBudgetWithoutChangingTheDefault() throws Exception {
     Path artifact = Files.writeString(temporary.resolve("flint.gguf"), "fixture");
     String[] defaults = {

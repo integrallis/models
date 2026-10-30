@@ -314,3 +314,26 @@ the first weather result supplies the backup city for the second call, and both 
 the final answer prompt. They assert exact recovered arguments, observation envelopes, ordering,
 and retained reasoning. These use scripted model outputs and prove adapter behavior only;
 they do not change the real-model tool qualification or its deployed runtime.
+
+### Opt-in tool grammar prototype
+
+`FlintToolCallConstraint.compile(tokenizer, tools)` builds a request-scoped grammar from declared
+tool schemas alone. The benchmark exposes it with `--tool-constraints flint-schema` and records
+`flint-schema-v1` in generation controls. The default remains unconstrained Flint generation;
+the tool-result follow-up remains unconstrained in either mode. The ordered-Q4_K campaign at
+revision `3336aed192786be17cca9360fdf65ee5ede731c7` does not contain this later prototype.
+
+The grammar permits reasoning, ordinary answers and refusal before the first call. It ignores
+call examples inside reasoning, prevents EOS inside an unfinished call, and permits multiple
+calls before EOS. It enforces declared names, required/optional fields, primitive types, nested
+objects/arrays, and enum/const values. Strings are raw only at Flint's argument boundary; nested
+strings remain JSON-quoted. Objects use declaration order and only declared properties. Literal
+`<` in string output is excluded by this prototype; `format` is annotation-only. Unsupported
+validation keywords such as numeric bounds, string patterns, references and union types fail
+compilation. It is a bounded schema subset, not a full JSON Schema validator.
+
+Fixture tests cover refusal, parallel calls, partial and multi-marker token fragments, wrong
+types, missing/duplicate keys, nested JSON, and protocol injection. Every declaration in the
+shared tool suite compiles. These checks do not establish real-model accuracy or decoding speed.
+The prototype must earn separate remote evidence before becoming a recommended profile, and
+cannot fix a semantically wrong value or guarantee completion within the output budget.

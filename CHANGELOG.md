@@ -4,6 +4,10 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+- Add an opt-in Flint tool grammar prototype and an explicit qualification CLI profile. It
+  constrains declared argument structure while preserving refusal and multiple calls; real-model
+  accuracy and overhead remain unqualified. Default Flint generation is unchanged.
+
 - Flint requests ordered Q4_K native accumulation after a real-weight parity failure; older native libraries fall back to Java for that format.
 
 - Add experimental Flint GGUF execution to the pure Java backend: sigmoid MoE routing,

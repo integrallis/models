@@ -33,6 +33,7 @@ import com.integrallis.models.runtime.SharedToolTurn;
 import com.integrallis.models.runtime.TokenConstraint;
 import com.integrallis.models.runtime.ToolCallTokenConstraints;
 import com.integrallis.models.runtime.chat.ChatMessage;
+import com.integrallis.models.runtime.chat.FlintToolCallConstraint;
 import com.integrallis.models.runtime.chat.ToolCallScanner;
 import com.integrallis.models.runtime.chat.ToolSpecRetriever;
 import com.integrallis.models.runtime.chat.ToolSyntax;
@@ -68,6 +69,7 @@ final class ToolCallingQualificationCli {
           "report",
           "max-tokens",
           "follow-up-max-tokens",
+          "tool-constraints",
           "models-revision",
           "case",
           "backend");
@@ -83,10 +85,15 @@ final class ToolCallingQualificationCli {
       int followUpMaxTokens,
       String modelsRevision,
       String caseId,
-      String backend) {}
+      String backend,
+      String toolConstraints) {}
 
   record GenerationControls(
-      double temperature, int maxTokens, int followUpMaxTokens, String promptTemplate) {}
+      double temperature,
+      int maxTokens,
+      int followUpMaxTokens,
+      String promptTemplate,
+      String toolConstraints) {}
 
   record SuiteIdentity(
       String id,
@@ -151,6 +158,13 @@ final class ToolCallingQualificationCli {
       throw new IllegalArgumentException("--candidate is required");
     }
     ToolCallingCandidate candidate = ToolCallingCandidate.parse(candidateValue);
+    String constraints = values.getOrDefault("tool-constraints", "default");
+    if (!Set.of("default", "flint-schema").contains(constraints)
+        || (constraints.equals("flint-schema")
+            && candidate != ToolCallingCandidate.FLINT_40B_A2_5B)) {
+      throw new IllegalArgumentException(
+          "--tool-constraints must be default, or flint-schema with the Flint candidate");
+    }
     String backend = values.getOrDefault("backend", "pure-java");
     if (!Set.of("pure-java", "rust-ffm").contains(backend)) {
       throw new IllegalArgumentException("--backend must be pure-java or rust-ffm");
@@ -208,7 +222,16 @@ final class ToolCallingQualificationCli {
           "Needle 2 tool retrieval qualification requires --backend pure-java");
     }
     return new Configuration(
-        candidate, model, adapter, report, maxTokens, followUpMaxTokens, revision, caseId, backend);
+        candidate,
+        model,
+        adapter,
+        report,
+        maxTokens,
+        followUpMaxTokens,
+        revision,
+        caseId,
+        backend,
+        constraints);
   }
 
   private static InferenceBackend loadBackend(Configuration configuration) {
@@ -293,7 +316,14 @@ final class ToolCallingQualificationCli {
         long start = System.nanoTime();
         String output =
             activatedModel == null
-                ? generate(candidate, backend, generation, prompt, options, tools)
+                ? generate(
+                    candidate,
+                    backend,
+                    generation,
+                    prompt,
+                    options,
+                    tools,
+                    configuration.toolConstraints())
                 : generateActivated(activatedModel, prompt, options);
         long elapsedMillis = (System.nanoTime() - start) / 1_000_000L;
         Needle2ToolQualification.CaseResult result =
@@ -580,7 +610,12 @@ final class ToolCallingQualificationCli {
       GenerationLoop generation,
       ModelPrompt prompt,
       SamplingOptions options,
-      List<ToolSpec> tools) {
+      List<ToolSpec> tools,
+      String constraints) {
+    if (constraints.equals("flint-schema")) {
+      return generation.generate(
+          prompt, options, FlintToolCallConstraint.compile(backend.tokenizer(), tools));
+    }
     if (candidate == ToolCallingCandidate.NEEDLE2) {
       return generation.generate(
           prompt,
@@ -689,7 +724,10 @@ final class ToolCallingQualificationCli {
                 0.0,
                 configuration.maxTokens(),
                 configuration.followUpMaxTokens(),
-                candidate.template().id()),
+                candidate.template().id(),
+                configuration.toolConstraints().equals("flint-schema")
+                    ? "flint-schema-v1"
+                    : "default"),
             environment,
             diagnostics,
             activatedAdapter,
