@@ -31,3 +31,10 @@ separately when available. The host has an independent 90-minute shutdown bound.
 Validation logs describe the catalog candidate at checkpoint time. The expected
 publication timestamp guard failure confirms that SDK/site publication cannot
 advertise a marker before its actual publication time is recorded.
+
+The tool probe source is referenced by immutable worker revision and SHA-256 in
+`deployment/tool-probe-source.json`. It is the exact source used by the remote
+worker. A redundant Java copy was removed because the evidence-writer literal
+guard interpreted its negative scorer input (`extra: true`) as an asserted
+measurement. The canonical source, guard, measured reports, and frozen remote
+inputs are unchanged.
