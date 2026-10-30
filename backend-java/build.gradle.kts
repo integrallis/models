@@ -256,6 +256,7 @@ val configuredMobileMoeQatDirectory =
     providers.systemProperty("models.fixtures.mobileMoeQatDirectory")
 val configuredHammer21GgufPath = providers.systemProperty("models.fixtures.hammer21Gguf")
 val configuredEdgeRock4bGgufPath = providers.systemProperty("models.fixtures.edgeRock4bGguf")
+val configuredEdgeRockCases = providers.systemProperty("models.fixtures.edgeRockCases")
 val configuredTinyBertRerankerPath =
     providers.systemProperty("models.fixtures.tinyBertReranker")
 val configuredMxbaiRerankerDirectory =
@@ -306,6 +307,9 @@ tasks.withType<Test>().configureEach {
     }
     configuredEdgeRock4bGgufPath.orNull?.let {
         systemProperty("models.fixtures.edgeRock4bGguf", it)
+    }
+    configuredEdgeRockCases.orNull?.let {
+        systemProperty("models.fixtures.edgeRockCases", it)
     }
     configuredTinyBertRerankerPath.orNull?.let {
         systemProperty("models.fixtures.tinyBertReranker", it)
@@ -530,6 +534,12 @@ tasks.register<Test>("edgeRockCompatibilityTest") {
         includeTestsMatching(
             "com.integrallis.models.backend.purejava.EdgeRockModelIntegrationTest",
         )
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.EdgeRockPublisherCaseTest",
+        )
+    }
+    configuredEdgeRockCases.orNull?.let {
+        systemProperty("models.fixtures.edgeRockCases", it)
     }
     val configuredArtifact = configuredEdgeRock4bGgufPath.orNull
     onlyIf("-Dmodels.fixtures.edgeRock4bGguf points to the EdgeRock-4B GGUF") {
