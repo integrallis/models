@@ -52,17 +52,18 @@ public record Qwen35Config(
     int numExperts,
     int numExpertsUsed,
     int expertHiddenDim,
-    int sharedExpertHiddenDim) {
+    int sharedExpertHiddenDim,
+    int attentionWindow) {
 
   /**
    * The architectures this contract covers.
    *
-   * <p>One decoder, three names. They publish the same hybrid keys under their own prefix and
-   * differ only in the feed-forward half and, for Qwen3-Next, in how the Gated DeltaNet packs beta
-   * and alpha. Verified from the published GGUF headers of all three rather than assumed from the
+   * <p>One decoder, four names. They publish the same hybrid keys under their own prefix and differ
+   * only in the feed-forward half and, for Qwen3-Next, in how the Gated DeltaNet packs beta and
+   * alpha. Verified from the published GGUF headers of all three rather than assumed from the
    * naming.
    */
-  static final List<String> ARCHITECTURES = List.of("qwen35", "qwen35moe", "qwen3next");
+  static final List<String> ARCHITECTURES = List.of("qwen35", "qwen35moe", "qwen3next", "edgerock");
 
   public Qwen35Config {
     if (!ARCHITECTURES.contains(architecture)) {
@@ -109,6 +110,12 @@ public record Qwen35Config(
             "numExpertsUsed must not exceed numExperts: " + numExpertsUsed + " > " + numExperts);
       }
     }
+    // 0 means "attend to everything", which is what the Qwen3.5 files describe by publishing no
+    // window at all. A negative width is a malformed header, not a shape.
+    if (attentionWindow < 0) {
+      throw new IllegalArgumentException(
+          "attentionWindow must not be negative, was " + attentionWindow);
+    }
     if (numHeads % numKvHeads != 0) {
       throw new IllegalArgumentException("numHeads must be divisible by numKvHeads");
     }
@@ -122,6 +129,20 @@ public record Qwen35Config(
     if (gdnInnerDim % gdnValueHeads != 0 || valueHeadDimension != gdnHeadDim) {
       throw new IllegalArgumentException("Gated DeltaNet key and value head dimensions must match");
     }
+  }
+
+  /**
+   * Whether this model carries Rock Memory Anchors on its full-attention layers.
+   *
+   * <p>EdgeRock is a Qwen3.5 hybrid in every shape this record describes -- its GGUF publishes a
+   * complete {@code qwen35.*} key set alongside its own, and every tensor name it carries is one
+   * {@link Qwen35Weights} already resolves. What it adds is a memory module on each full-attention
+   * layer, and that module contributes to the residual. Serving it through the plain path would
+   * therefore run to completion and return fluent, wrong logits, so the forward pass asks this and
+   * refuses rather than treating the memory half as optional.
+   */
+  public boolean usesMemoryAnchors() {
+    return "edgerock".equals(architecture);
   }
 
   /** Whether the feed-forward is routed to experts rather than dense. */
@@ -174,7 +195,8 @@ public record Qwen35Config(
         metadata.getUint32(prefix + "expert_count").orElse(0),
         metadata.getUint32(prefix + "expert_used_count").orElse(0),
         metadata.getUint32(prefix + "expert_feed_forward_length").orElse(0),
-        metadata.getUint32(prefix + "expert_shared_feed_forward_length").orElse(0));
+        metadata.getUint32(prefix + "expert_shared_feed_forward_length").orElse(0),
+        attentionWindow(metadata, prefix + "attention.window"));
   }
 
   public int attentionQueryDim() {
@@ -216,6 +238,26 @@ public record Qwen35Config(
     if (layer < 0 || layer >= numLayers) {
       throw new IllegalArgumentException("layer out of range: " + layer);
     }
+  }
+
+  /**
+   * The sliding-window width, or 0 when the file publishes none.
+   *
+   * <p>Absence and an unreadable value are different answers. Absence means unwindowed, which is
+   * what the three older architectures declare by omitting the key. A key that is present but not
+   * an integer this reader understands is a header this decoder cannot honour, and defaulting it to
+   * 0 would serve the model with full attention instead of its window -- a wrong answer that
+   * nothing reports. GGUF writers differ on whether a count is signed, so both widths are read.
+   */
+  private static int attentionWindow(GgufMetadata metadata, String key) {
+    if (metadata.get(key).isEmpty()) {
+      return 0;
+    }
+    return metadata
+        .getUint32(key)
+        .or(() -> metadata.getInt32(key))
+        .orElseThrow(
+            () -> new IllegalArgumentException(key + " is present but is not an integer width"));
   }
 
   private static int requiredInt(GgufMetadata metadata, String key) {

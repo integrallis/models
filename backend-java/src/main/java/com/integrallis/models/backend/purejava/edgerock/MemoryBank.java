@@ -28,7 +28,7 @@ import java.util.Objects;
  * <p>Laid out group-major -- {@code [group][slot][dim]} -- because the read is grouped-query: every
  * head in a group scores against the same keys, so a group's records want to be contiguous.
  */
-final class MemoryBank {
+public final class MemoryBank {
 
   private final int groups;
   private final int capacity;
@@ -54,7 +54,7 @@ final class MemoryBank {
   /** Valid tokens seen in the whole sequence, which is what positions are derived from. */
   private int total;
 
-  MemoryBank(int groups, int capacity, int commitChunk, int dim) {
+  public MemoryBank(int groups, int capacity, int commitChunk, int dim) {
     if (groups <= 0 || capacity <= 0 || commitChunk <= 0 || dim <= 0) {
       throw new IllegalArgumentException(
           "groups, capacity, commitChunk and dim must be positive: "
@@ -103,7 +103,7 @@ final class MemoryBank {
     return count;
   }
 
-  int total() {
+  public int total() {
     return total;
   }
 
@@ -156,7 +156,7 @@ final class MemoryBank {
    * <p>References below {@code capacity} point into the committed bank; the rest point into the
    * pending chunk. That is how one merge can choose from both without copying first.
    */
-  void commit() {
+  public void commit() {
     if (count == 0) {
       return;
     }
@@ -216,7 +216,7 @@ final class MemoryBank {
   }
 
   /** Clears the bank, as a new sequence requires. */
-  void reset() {
+  public void reset() {
     selection = MemoryAnchors.empty(capacity);
     count = 0;
     total = 0;

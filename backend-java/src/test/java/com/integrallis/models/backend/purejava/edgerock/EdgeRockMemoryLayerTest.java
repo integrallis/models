@@ -47,7 +47,7 @@ class EdgeRockMemoryLayerTest {
     MemoryBank bank = new MemoryBank(GROUPS, CAPACITY, CHUNK, DIM);
     float[] out = new float[EMBEDDING];
 
-    layer.forward(ones(EMBEDDING), 0, cos(), sin(), bank, out);
+    layer.forward(ones(EMBEDDING), 0, EdgeRockMemoryLayer.rotation(cos(), sin()), bank, out);
 
     assertThat(out).usingComparatorWithPrecision(TOLERANCE).containsOnly(0f);
     // ...and the token did land in the bank, so the read being zero is order, not a no-op.
@@ -60,9 +60,9 @@ class EdgeRockMemoryLayerTest {
     MemoryBank bank = new MemoryBank(GROUPS, CAPACITY, CHUNK, DIM);
     float[] out = new float[EMBEDDING];
 
-    layer.forward(ones(EMBEDDING), 0, cos(), sin(), bank, out);
+    layer.forward(ones(EMBEDDING), 0, EdgeRockMemoryLayer.rotation(cos(), sin()), bank, out);
     Arrays.fill(out, 0f);
-    layer.forward(ones(EMBEDDING), 1, cos(), sin(), bank, out);
+    layer.forward(ones(EMBEDDING), 1, EdgeRockMemoryLayer.rotation(cos(), sin()), bank, out);
 
     // One committed record, tied against the sink, so the read is half the stored value and the
     // output projection passes it through. The exact magnitude depends on the norms; the point
@@ -97,9 +97,9 @@ class EdgeRockMemoryLayerTest {
     MemoryBank bank = new MemoryBank(GROUPS, CAPACITY, CHUNK, DIM);
     float[] out = new float[EMBEDDING];
 
-    layer.forward(ones(EMBEDDING), 0, cos(), sin(), bank, out);
+    layer.forward(ones(EMBEDDING), 0, EdgeRockMemoryLayer.rotation(cos(), sin()), bank, out);
     Arrays.fill(out, 0f);
-    layer.forward(ones(EMBEDDING), 1, cos(), sin(), bank, out);
+    layer.forward(ones(EMBEDDING), 1, EdgeRockMemoryLayer.rotation(cos(), sin()), bank, out);
 
     assertThat(out).usingComparatorWithPrecision(TOLERANCE).containsOnly(0f);
   }
@@ -111,7 +111,8 @@ class EdgeRockMemoryLayerTest {
     float[] out = new float[EMBEDDING];
 
     for (int position = 0; position < CAPACITY; position++) {
-      layer.forward(ones(EMBEDDING), position, cos(), sin(), bank, out);
+      layer.forward(
+          ones(EMBEDDING), position, EdgeRockMemoryLayer.rotation(cos(), sin()), bank, out);
     }
 
     // Identical inputs give identical scores, so the bank fills in position order and the

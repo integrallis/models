@@ -37,7 +37,7 @@ import java.util.Objects;
  * full_attention_interval}. A file that carried them elsewhere -- or omitted them -- would
  * otherwise load into a decoder that silently skipped a layer's memory.
  */
-final class EdgeRockWeights {
+public final class EdgeRockWeights {
 
   private final GgufFile file;
   private final EdgeRockConfig config;
@@ -47,7 +47,7 @@ final class EdgeRockWeights {
     this.config = Objects.requireNonNull(config, "config");
   }
 
-  static EdgeRockWeights load(GgufFile file, EdgeRockConfig config) {
+  public static EdgeRockWeights load(GgufFile file, EdgeRockConfig config) {
     Objects.requireNonNull(file, "file");
     Objects.requireNonNull(config, "config");
     QuantizedProjection.requireNoHadamard(
@@ -87,7 +87,7 @@ final class EdgeRockWeights {
   }
 
   /** The memory layer weights for one full-attention layer. */
-  EdgeRockMemoryLayer.Weights memoryLayer(int layer) {
+  public EdgeRockMemoryLayer.Weights memoryLayer(int layer) {
     if (!config.isFullAttentionLayer(layer)) {
       throw new IllegalArgumentException("layer " + layer + " carries no memory bank");
     }

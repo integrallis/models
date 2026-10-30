@@ -36,11 +36,11 @@ import java.util.Objects;
  * to undo; a checkpoint that did carry one would need that lookup here, and {@link
  * #requireNoHadamard} exists so such a file fails rather than decoding into noise.
  */
-record QuantizedProjection(
+public record QuantizedProjection(
     MemorySegment data, GgufTensorType type, int rows, int columns, String name)
     implements Projection {
 
-  QuantizedProjection {
+  public QuantizedProjection {
     Objects.requireNonNull(data, "data");
     Objects.requireNonNull(type, "type");
     Objects.requireNonNull(name, "name");

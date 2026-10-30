@@ -31,7 +31,7 @@ import java.util.Objects;
  * keeps this layer's arithmetic verifiable without duplicating those kernels or cutting into that
  * path. Wiring the seam is one change when the layer loop lands.
  */
-final class EdgeRockMemoryLayer {
+public final class EdgeRockMemoryLayer {
 
   /** A linear projection, {@code out = W x}. Implemented over quantized weights in production. */
   @FunctionalInterface
@@ -40,7 +40,7 @@ final class EdgeRockMemoryLayer {
   }
 
   /** The weights of one memory layer, in the order the GGUF names them. */
-  record Weights(
+  public record Weights(
       float[] inputNorm,
       Projection queryProjection,
       float[] queryNorm,
@@ -76,7 +76,7 @@ final class EdgeRockMemoryLayer {
   private final float[] admissionHidden;
   private final float[] scores;
 
-  EdgeRockMemoryLayer(EdgeRockConfig config, Weights weights) {
+  public EdgeRockMemoryLayer(EdgeRockConfig config, Weights weights) {
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     int embedding = config.embeddingLength();
@@ -102,17 +102,44 @@ final class EdgeRockMemoryLayer {
   }
 
   /**
+   * One head's rotary embedding, supplied by the caller.
+   *
+   * <p>Injected rather than computed here so that the decoder's own {@code RotaryTable} is the only
+   * source of rope factors in the model. The memory layer rotates its queries and its written keys
+   * with exactly the rotation the attention half uses; a second table initialised independently
+   * would be a setting that means two different things on two code paths.
+   */
+  @FunctionalInterface
+  public interface Rotation {
+    /** Rotates one head in place. */
+    void rotate(float[] head);
+  }
+
+  /**
+   * The rotation for one position, from precomputed NeoX pair factors.
+   *
+   * <p>{@code cos} is {@code rope.dimension_count / 2} wide, which is the number of rotated pairs
+   * and not half the head: EdgeRock's heads are 256 wide against a rope dimension of 64, so this
+   * rotates the leading 64 lanes and leaves the remaining 192 untouched.
+   */
+  public static Rotation rotation(float[] cos, float[] sin) {
+    Objects.requireNonNull(cos, "cos");
+    Objects.requireNonNull(sin, "sin");
+    return head -> TensorOps.ropeNeox(head, 0, cos, sin);
+  }
+
+  /**
    * Runs the layer for one token.
    *
-   * @param hidden the block's hidden state
+   * @param hidden the block's hidden state, before the block's input norm -- this layer applies its
+   *     own {@code memory.input_norm}, and the reference feeds it the pre-norm residual
    * @param position the token's sequence position
-   * @param cos cosine table for this position, {@code rope.dimension_count / 2} wide
-   * @param sin sine table for this position
+   * @param rotation the rotary embedding for this position
    * @param bank this layer's state, mutated
    * @param out the layer's contribution, overwritten
    */
-  void forward(
-      float[] hidden, int position, float[] cos, float[] sin, MemoryBank bank, float[] out) {
+  public void forward(
+      float[] hidden, int position, Rotation rotation, MemoryBank bank, float[] out) {
     int heads = config.headCount();
     int groups = config.headCountKv();
     int dim = config.headDim();
@@ -149,7 +176,7 @@ final class EdgeRockMemoryLayer {
     MemoryRead.gates(
         queries, weights.readGateWeight(), weights.readGateBias(), weights.readScale(), gates);
     for (int head = 0; head < heads; head++) {
-      rope(queries[head], cos, sin);
+      rotation.rotate(queries[head]);
     }
     MemoryRead.read(bank, queries, gates, config.headsPerGroup(), readOut);
     for (int head = 0; head < heads; head++) {
@@ -182,7 +209,7 @@ final class EdgeRockMemoryLayer {
           dim,
           config.rmsNormEpsilon());
       groupKeys[group] = slice(keyFlat, group * dim, dim);
-      rope(groupKeys[group], cos, sin);
+      rotation.rotate(groupKeys[group]);
       groupValues[group] = slice(valueFlat, group * dim, dim);
     }
 
@@ -201,21 +228,6 @@ final class EdgeRockMemoryLayer {
     float[] out = new float[length];
     System.arraycopy(source, offset, out, 0, length);
     return out;
-  }
-
-  /**
-   * Partial rotary embedding: rotates the leading {@code 2 * cos.length} lanes and leaves the rest
-   * untouched. EdgeRock's head width is 256 against a rope dimension of 64, so most of each head is
-   * never rotated.
-   */
-  private static void rope(float[] values, float[] cos, float[] sin) {
-    int half = cos.length;
-    for (int i = 0; i < half; i++) {
-      float even = values[i];
-      float odd = values[i + half];
-      values[i] = even * cos[i] - odd * sin[i];
-      values[i + half] = odd * cos[i] + even * sin[i];
-    }
   }
 
   private static float silu(float value) {

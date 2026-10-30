@@ -80,7 +80,7 @@ class EdgeRockMemoryLayerParityTest {
       float[] cos = fixture.slice("cos", token * ropeWidth, ropeWidth);
       float[] sin = fixture.slice("sin", token * ropeWidth, ropeWidth);
 
-      layer.forward(hiddenState, token, cos, sin, bank, out);
+      layer.forward(hiddenState, token, EdgeRockMemoryLayer.rotation(cos, sin), bank, out);
 
       float[] expected = fixture.slice("output", token * hidden, hidden);
       assertThat(out)

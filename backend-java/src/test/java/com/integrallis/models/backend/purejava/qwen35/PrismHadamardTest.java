@@ -90,7 +90,7 @@ class PrismHadamardTest {
 
   private static Qwen35Config config() {
     return new Qwen35Config(
-        "qwen35", 4, 2, 2, 1, 2, 8, 32, 8, 10000, 2, 1e-6f, 4, 2, 2, 4, 8, 2, 0, 0, 0, 0);
+        "qwen35", 4, 2, 2, 1, 2, 8, 32, 8, 10000, 2, 1e-6f, 4, 2, 2, 4, 8, 2, 0, 0, 0, 0, 0);
   }
 
   private static Map<String, GgufMetadataValue> metadata() {
