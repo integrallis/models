@@ -16,6 +16,7 @@
 package com.integrallis.models.backend.purejava.edgerock;
 
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.util.Objects;
 
 /**
@@ -44,9 +45,22 @@ public final class EdgeRockMemory {
 
   /** Resolves every memory module this file declares. */
   public static EdgeRockMemory load(GgufFile file) {
+    return load(file, GgufBatchedMatrixKernel.none());
+  }
+
+  /**
+   * Resolves every memory module, projecting through {@code kernel} where it is eligible.
+   *
+   * <p>The kernel matters more here than its nine projections per layer suggest. They are about a
+   * tenth of the model's arithmetic per token but they ran on the calling thread, so before this
+   * they set the decode rate: EdgeRock gained nothing from the native kernels while a control model
+   * gained 3.9x.
+   */
+  public static EdgeRockMemory load(GgufFile file, GgufBatchedMatrixKernel kernel) {
     Objects.requireNonNull(file, "file");
+    Objects.requireNonNull(kernel, "kernel");
     EdgeRockConfig config = EdgeRockConfig.fromMetadata(file.metadata());
-    EdgeRockWeights weights = EdgeRockWeights.load(file, config);
+    EdgeRockWeights weights = EdgeRockWeights.load(file, config, kernel);
     EdgeRockMemoryLayer[] layers = new EdgeRockMemoryLayer[config.blockCount()];
     for (int layer : config.fullAttentionLayers()) {
       layers[layer] = new EdgeRockMemoryLayer(config, weights.memoryLayer(layer));

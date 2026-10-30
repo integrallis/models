@@ -202,7 +202,7 @@ public final class Qwen35ForwardPass {
     return new Qwen35ForwardPass(
         config,
         Qwen35Weights.fromGgufFile(file, config),
-        config.usesMemoryAnchors() ? EdgeRockMemory.load(file) : null,
+        config.usesMemoryAnchors() ? EdgeRockMemory.load(file, batchedMatrixKernel) : null,
         prefillBatchSize,
         GgufQ4Kernel.WIDENED,
         GgufQ6BatchedKernel.ONE_QUERY_BLOCK,

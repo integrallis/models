@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.edgerock;
 import com.integrallis.models.backend.purejava.edgerock.EdgeRockMemoryLayer.Projection;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.lang.foreign.MemorySegment;
 import java.util.Objects;
 
@@ -60,8 +61,33 @@ public final class QuantizedProjection implements Projection {
 
   private final float[] quantizedActivationScales;
 
+  /**
+   * The accelerated projection route, or {@link GgufBatchedMatrixKernel#none()}.
+   *
+   * <p>Without this the memory layer called {@code TensorOps.ggufMatmul} directly, which for a
+   * K-quant runs on the calling thread -- {@code packedProjectionThreads} only parallelises the
+   * MXFP4 and PTQ1_0 float-activation kernels. That made the nine projections on each of the eight
+   * memory layers single-threaded while the rest of the graph was free to use the Rust kernels, and
+   * it dominated decode: EdgeRock measured 0.93 tok/s on the native route against 1.06 pure-Java,
+   * i.e. the native kernels bought nothing, where an unrelated control model gained 3.9x. Routing
+   * through the same seam {@code Qwen35ForwardPass.project} uses is what makes the memory layer
+   * benefit from the kernels the rest of the model already uses.
+   */
+  private final GgufBatchedMatrixKernel kernel;
+
   public QuantizedProjection(
       MemorySegment data, GgufTensorType type, int rows, int columns, String name) {
+    this(data, type, rows, columns, name, GgufBatchedMatrixKernel.none());
+  }
+
+  public QuantizedProjection(
+      MemorySegment data,
+      GgufTensorType type,
+      int rows,
+      int columns,
+      String name,
+      GgufBatchedMatrixKernel kernel) {
+    this.kernel = Objects.requireNonNull(kernel, "kernel");
     Objects.requireNonNull(data, "data");
     Objects.requireNonNull(type, "type");
     Objects.requireNonNull(name, "name");
@@ -116,6 +142,12 @@ public final class QuantizedProjection implements Projection {
     if (output.length != rows) {
       throw new IllegalArgumentException(
           name + " produces " + rows + " but was given " + output.length);
+    }
+    // Batch size 1: the memory layer is sequential by construction, because each token reads the
+    // bank before writing to it.
+    if (kernel.isEligible(type, 1, rows, columns)) {
+      kernel.multiply(output, input, data, type, 1, rows, columns);
+      return;
     }
     if (quantizedActivation == null) {
       TensorOps.ggufMatmul(output, input, data, type, rows, columns);

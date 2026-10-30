@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.edgerock;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorData;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.util.Objects;
@@ -41,18 +42,26 @@ public final class EdgeRockWeights {
 
   private final GgufFile file;
   private final EdgeRockConfig config;
+  private final GgufBatchedMatrixKernel kernel;
 
-  private EdgeRockWeights(GgufFile file, EdgeRockConfig config) {
+  private EdgeRockWeights(GgufFile file, EdgeRockConfig config, GgufBatchedMatrixKernel kernel) {
     this.file = Objects.requireNonNull(file, "file");
     this.config = Objects.requireNonNull(config, "config");
+    this.kernel = Objects.requireNonNull(kernel, "kernel");
   }
 
   public static EdgeRockWeights load(GgufFile file, EdgeRockConfig config) {
+    return load(file, config, GgufBatchedMatrixKernel.none());
+  }
+
+  /** Resolves the memory tensors, projecting through {@code kernel} where it is eligible. */
+  public static EdgeRockWeights load(
+      GgufFile file, EdgeRockConfig config, GgufBatchedMatrixKernel kernel) {
     Objects.requireNonNull(file, "file");
     Objects.requireNonNull(config, "config");
     QuantizedProjection.requireNoHadamard(
         file.metadata().get("prism.hadamard.version").isPresent());
-    EdgeRockWeights weights = new EdgeRockWeights(file, config);
+    EdgeRockWeights weights = new EdgeRockWeights(file, config, kernel);
     weights.verifyLayerLayout();
     return weights;
   }
@@ -135,7 +144,8 @@ public final class EdgeRockWeights {
               + rows
               + "]");
     }
-    return new QuantizedProjection(tensor.dataSegment(), tensor.type(), rows, columns, name);
+    return new QuantizedProjection(
+        tensor.dataSegment(), tensor.type(), rows, columns, name, kernel);
   }
 
   /** An F32 vector such as a norm weight or a per-head scale. */
