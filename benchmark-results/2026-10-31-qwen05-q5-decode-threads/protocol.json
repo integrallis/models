@@ -1,0 +1,47 @@
+{
+  "registeredAt": "2026-10-31T18:42:56.511421+00:00",
+  "purpose": "Qualify Qwen2.5 0.5B Q5_K_M by measuring decode thread overhead without changing arithmetic, prompts or thresholds.",
+  "job": {
+    "id": "qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m",
+    "uri": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/9217f5db79a29953eb74d5343926648285ec7e67/qwen2.5-0.5b-instruct-q5_k_m.gguf",
+    "sha256": "041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55",
+    "sizeBytes": 522186592,
+    "architecture": "qwen2",
+    "workload": "general",
+    "template": "chatml",
+    "maxTokens": 256,
+    "contextLength": 2048,
+    "threads": 16,
+    "decodeThreads": null,
+    "comparator": "ollama",
+    "requiresBaseComparison": false,
+    "expectedCases": 9
+  },
+  "modelsVersion": "0.5.9",
+  "vectorsVersion": "0.1.32",
+  "screenOrder": [
+    16,
+    8,
+    4
+  ],
+  "confirmationReferenceFirst": [
+    true,
+    false
+  ],
+  "selection": "Highest decode ratio among configurations preserving all 27 raw answers, token counts, prompts and evaluations and passing model contribution gates. Freeze winner before confirmations; no alternative selected from confirmation results.",
+  "success": "Selected screening pair and both fresh confirmation pairs must independently pass unchanged production-rag-model-contribution-v6 and preserve the 16-thread outputs. Report >=0.85 throughput ratio separately as desirable margin, not a changed gate.",
+  "hypothesis": "Fewer decode workers reduce synchronization and SMT contention on this small model. Not measured yet.",
+  "controls": "16 pool/prefill threads, same pinned model and released product JARs, greedy settings, 9 cases, 1 warmup and 3 measured iterations; only decodeThreads changes. Each pair unloads the reference before candidate generation.",
+  "limitations": "One catalog RAG corpus tests this admission gate; it is not a broad quality benchmark. RAG report records output text and token counts, not token IDs. One host cannot establish cross-host performance.",
+  "fleet": {
+    "provider": "AWS",
+    "region": "us-east-1",
+    "instanceType": "m6a.4xlarge",
+    "instances": 1,
+    "hourlyUSD": 0.6912,
+    "maximumHours": 2.5,
+    "maximumSpendUSD": 3,
+    "stopCondition": "Exit on completion or error, terminate-on-shutdown, 150 minute hard shutdown",
+    "evidenceDestination": "benchmark-results/2026-10-31-qwen05-q5-decode-threads"
+  }
+}
