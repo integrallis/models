@@ -1,0 +1,54 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 31, 2026 6:58:27 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 31, 2026 6:58:27 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Oct 31, 2026 6:58:28 PM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256; FMA enabled
+iteration 1/5 case=auto-glass-deadline correct=true retrieval=1.4ms ttft=91.0ms decode=57.50 tok/s e2e=598.3ms
+iteration 1/5 case=travel-limit correct=true retrieval=1.2ms ttft=246.8ms decode=57.34 tok/s e2e=668.0ms
+iteration 1/5 case=telemedicine-benefit correct=true retrieval=1.3ms ttft=246.8ms decode=55.60 tok/s e2e=627.3ms
+iteration 1/5 case=claim-payment-times correct=true retrieval=1.1ms ttft=252.8ms decode=51.15 tok/s e2e=431.4ms
+iteration 1/5 case=chargeback-evidence correct=true retrieval=1.2ms ttft=269.0ms decode=57.70 tok/s e2e=704.9ms
+iteration 1/5 case=break-glass correct=true retrieval=1.2ms ttft=277.9ms decode=57.30 tok/s e2e=839.1ms
+iteration 1/5 case=idempotency correct=true retrieval=0.9ms ttft=334.9ms decode=56.92 tok/s e2e=794.1ms
+iteration 1/5 case=priority-one correct=true retrieval=0.8ms ttft=276.3ms decode=57.35 tok/s e2e=801.7ms
+iteration 1/5 case=unsupported-lunar-vehicle correct=true retrieval=0.7ms ttft=261.0ms decode=39.25 tok/s e2e=314.2ms
+iteration 2/5 case=auto-glass-deadline correct=true retrieval=1.0ms ttft=122.2ms decode=57.27 tok/s e2e=631.0ms
+iteration 2/5 case=travel-limit correct=true retrieval=0.9ms ttft=246.6ms decode=57.37 tok/s e2e=667.2ms
+iteration 2/5 case=telemedicine-benefit correct=true retrieval=0.9ms ttft=273.1ms decode=55.42 tok/s e2e=654.4ms
+iteration 2/5 case=claim-payment-times correct=true retrieval=0.9ms ttft=239.8ms decode=52.99 tok/s e2e=412.1ms
+iteration 2/5 case=chargeback-evidence correct=true retrieval=0.8ms ttft=213.9ms decode=57.70 tok/s e2e=649.5ms
+iteration 2/5 case=break-glass correct=true retrieval=0.8ms ttft=742.7ms decode=50.35 tok/s e2e=1380.5ms
+iteration 2/5 case=idempotency correct=true retrieval=0.8ms ttft=311.0ms decode=57.35 tok/s e2e=766.6ms
+iteration 2/5 case=priority-one correct=true retrieval=0.8ms ttft=246.4ms decode=58.31 tok/s e2e=763.3ms
+iteration 2/5 case=unsupported-lunar-vehicle correct=true retrieval=0.7ms ttft=258.4ms decode=39.83 tok/s e2e=310.7ms
+iteration 3/5 case=auto-glass-deadline correct=true retrieval=0.9ms ttft=105.2ms decode=58.34 tok/s e2e=604.6ms
+iteration 3/5 case=travel-limit correct=true retrieval=0.8ms ttft=251.4ms decode=57.78 tok/s e2e=669.1ms
+iteration 3/5 case=telemedicine-benefit correct=true retrieval=0.9ms ttft=267.8ms decode=56.08 tok/s e2e=644.7ms
+iteration 3/5 case=claim-payment-times correct=true retrieval=0.9ms ttft=226.9ms decode=46.91 tok/s e2e=421.2ms
+iteration 3/5 case=chargeback-evidence correct=true retrieval=1.0ms ttft=197.7ms decode=63.13 tok/s e2e=596.6ms
+iteration 3/5 case=break-glass correct=true retrieval=0.7ms ttft=255.8ms decode=63.73 tok/s e2e=760.1ms
+iteration 3/5 case=idempotency correct=true retrieval=0.7ms ttft=271.1ms decode=62.34 tok/s e2e=690.3ms
+iteration 3/5 case=priority-one correct=true retrieval=0.7ms ttft=240.0ms decode=62.33 tok/s e2e=723.5ms
+iteration 3/5 case=unsupported-lunar-vehicle correct=true retrieval=0.6ms ttft=221.5ms decode=43.13 tok/s e2e=270.0ms
+iteration 4/5 case=auto-glass-deadline correct=true retrieval=0.8ms ttft=102.9ms decode=62.42 tok/s e2e=569.7ms
+iteration 4/5 case=travel-limit correct=true retrieval=0.8ms ttft=255.1ms decode=59.56 tok/s e2e=660.3ms
+iteration 4/5 case=telemedicine-benefit correct=true retrieval=0.7ms ttft=222.7ms decode=62.12 tok/s e2e=562.8ms
+iteration 4/5 case=claim-payment-times correct=true retrieval=0.7ms ttft=199.8ms decode=58.31 tok/s e2e=356.3ms
+iteration 4/5 case=chargeback-evidence correct=true retrieval=0.7ms ttft=197.5ms decode=62.03 tok/s e2e=602.7ms
+iteration 4/5 case=break-glass correct=true retrieval=0.7ms ttft=260.4ms decode=60.85 tok/s e2e=788.4ms
+iteration 4/5 case=idempotency correct=true retrieval=0.7ms ttft=271.9ms decode=61.73 tok/s e2e=695.2ms
+iteration 4/5 case=priority-one correct=true retrieval=0.7ms ttft=306.1ms decode=61.89 tok/s e2e=792.9ms
+iteration 4/5 case=unsupported-lunar-vehicle correct=true retrieval=0.7ms ttft=245.7ms decode=34.53 tok/s e2e=305.9ms
+iteration 5/5 case=auto-glass-deadline correct=true retrieval=1.4ms ttft=98.6ms decode=60.57 tok/s e2e=580.6ms
+iteration 5/5 case=travel-limit correct=true retrieval=1.2ms ttft=258.4ms decode=62.49 tok/s e2e=645.5ms
+iteration 5/5 case=telemedicine-benefit correct=true retrieval=0.7ms ttft=236.9ms decode=61.63 tok/s e2e=579.6ms
+iteration 5/5 case=claim-payment-times correct=true retrieval=0.7ms ttft=199.9ms decode=59.56 tok/s e2e=353.0ms
+iteration 5/5 case=chargeback-evidence correct=true retrieval=0.7ms ttft=197.1ms decode=62.91 tok/s e2e=596.4ms
+iteration 5/5 case=break-glass correct=true retrieval=0.7ms ttft=236.9ms decode=62.78 tok/s e2e=748.7ms
+iteration 5/5 case=idempotency correct=true retrieval=0.6ms ttft=272.7ms decode=62.36 tok/s e2e=691.7ms
+iteration 5/5 case=priority-one correct=true retrieval=0.7ms ttft=253.0ms decode=62.82 tok/s e2e=732.6ms
+iteration 5/5 case=unsupported-lunar-vehicle correct=true retrieval=0.6ms ttft=249.6ms decode=42.86 tok/s e2e=298.3ms
+plain-java/rust-ffm/qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m: tier=PRODUCTION_READY success=45/45 p95-retrieval=1.3ms p95-ttft=310.0ms p50-decode=57.78 tok/s p95-e2e=800.2ms correct=100.0% model-answered=66.7% of-those-correct=100.0% extractive-fallback=22.2% truncated=0.0%
+report: /work/released-pair/results/native-16/instrumented-rag.json
