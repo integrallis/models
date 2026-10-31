@@ -121,4 +121,79 @@ public final class ExpertRouting {
     }
     TensorOps.softmax(routingWeights, 0, used);
   }
+
+  /**
+   * Picks the highest-scoring experts under <b>sigmoid</b> gating, with a selection-only bias.
+   *
+   * <p>Three things distinguish this from {@link #selectExperts}, and each of them is a way a port
+   * goes subtly wrong rather than visibly wrong.
+   *
+   * <p><b>Sigmoid, not softmax.</b> The gate is per-expert: {@code 1/(1+exp(-logit))}, computed
+   * independently for every expert rather than normalised across the width. Both gatings are
+   * monotone in the logit, so they usually pick the <b>same</b> experts and differ only in the
+   * weights -- which is why substituting one for the other produces a model that reads as
+   * plausible. llama.cpp branches on {@code expert_gating_func}; 1 is softmax and 2 is sigmoid.
+   *
+   * <p><b>The bias affects selection only.</b> {@code exp_probs_b.bias} is added to the gate value
+   * to rank the experts, and then the mixture weights are taken from the <b>unbiased</b> gates. A
+   * bias folded into the weights as well would shift every routed contribution.
+   *
+   * <p><b>The normalising denominator is guarded at the smallest F16 normal</b> ({@code 2^-14}),
+   * matching the reference. Unguarded, a token whose every selected gate underflows divides by
+   * zero; guarded, its routed branch contributes nothing, which is a bounded wrong answer instead
+   * of a NaN that poisons the residual and surfaces hundreds of tokens downstream.
+   *
+   * <p>Shared here rather than per-architecture because four ports in the queue need it -- {@code
+   * flint} today, and {@code lfm2moe}, {@code laguna} and {@code bailingmoe3} next. {@code
+   * bailingmoe3} additionally restricts selection to a subset of expert <b>groups</b> ({@code
+   * expert_group_count} / {@code expert_group_used_count}); that is deliberately <b>not</b> added
+   * here, because nothing reads those keys yet and an unexercised parameter is a parameter whose
+   * ablation silently does nothing.
+   *
+   * @param routerLogits one logit per expert. <b>Overwritten</b> with the per-expert sigmoid
+   * @param selectionBias added to each gate for ranking only; pass zeros when the tensor is absent
+   * @param selected receives the chosen expert indices, highest-scoring first; its length is how
+   *     many experts a token selects
+   * @param routingWeights receives their weights, same length as {@code selected}
+   * @param normalize whether to renormalise the chosen weights, per {@code expert_weights_norm}
+   * @param scale the post-normalisation factor, per {@code expert_weights_scale}
+   */
+  public static void selectExpertsWithSigmoidGating(
+      float[] routerLogits,
+      float[] selectionBias,
+      int[] selected,
+      float[] routingWeights,
+      boolean normalize,
+      float scale) {
+    int used = selected.length;
+    int filled = 0;
+    for (int expert = 0; expert < routerLogits.length; expert++) {
+      routerLogits[expert] = 1f / (1f + (float) Math.exp(-routerLogits[expert]));
+      float score = routerLogits[expert] + selectionBias[expert];
+      if (filled == used && score <= routingWeights[used - 1]) {
+        continue;
+      }
+      int slot = Math.min(filled, used - 1);
+      while (slot > 0 && routingWeights[slot - 1] < score) {
+        routingWeights[slot] = routingWeights[slot - 1];
+        selected[slot] = selected[slot - 1];
+        slot--;
+      }
+      routingWeights[slot] = score;
+      selected[slot] = expert;
+      if (filled < used) {
+        filled++;
+      }
+    }
+    // The ranking above used the biased scores; the weights below must not.
+    float sum = 0f;
+    for (int i = 0; i < used; i++) {
+      routingWeights[i] = routerLogits[selected[i]];
+      sum += routingWeights[i];
+    }
+    float denominator = normalize ? Math.max(sum, 0x1.0p-14f) : 1f;
+    for (int i = 0; i < used; i++) {
+      routingWeights[i] = routingWeights[i] / denominator * scale;
+    }
+  }
 }
