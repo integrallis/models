@@ -33,3 +33,11 @@ from an artifact. MLA plus Q-LoRA is confirmed — `attn_q_a` [1536, 256] with `
 `ssm_f_a`, `ssm_g_a` and `ssm_norm`, with `kda.head_dim`, `kda.safe_gate` and
 `kda.gate_lower_bound` in the metadata. So it is a hybrid on a 4-layer interval, and a feasibility
 estimate taken from the MLA reading alone would have described a third of it.
+
+Two further details the header settles, both of which a codec reading gets backwards. The MLA form
+shipped is the **absorbed** one — `attn_k_b`/`attn_v_b` with no unsplit `attn_kv_b` — which is
+exactly the form our DeepSeek-V2 decoder documents that it does *not* read
+(`Deepseek2Weights.java:32-34`), so this file cannot be loaded by the existing MLA path at all. And
+the hybrid interval is not a `full_attention_interval` key; it is a per-layer
+`attention.head_count_kv` array, `[0,0,0,1]` repeated six times, where `Qwen35Config.java:177`
+reads that key as a single `requiredInt`.
