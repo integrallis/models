@@ -1,0 +1,54 @@
+{
+  "registeredAt": "2026-10-31T18:51:45.644917+00:00",
+  "purpose": "Follow-up: isolate native prefill pool size at the selected eight decode threads after decode-only confirmation failed.",
+  "job": {
+    "id": "qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m",
+    "uri": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/9217f5db79a29953eb74d5343926648285ec7e67/qwen2.5-0.5b-instruct-q5_k_m.gguf",
+    "sha256": "041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55",
+    "sizeBytes": 522186592,
+    "architecture": "qwen2",
+    "workload": "general",
+    "template": "chatml",
+    "maxTokens": 256,
+    "contextLength": 2048,
+    "threads": 16,
+    "decodeThreads": null,
+    "comparator": "ollama",
+    "requiresBaseComparison": false,
+    "expectedCases": 9
+  },
+  "modelsVersion": "0.5.9",
+  "vectorsVersion": "0.1.32",
+  "confirmationReferenceFirst": [
+    true,
+    false
+  ],
+  "selection": "Among answer-stable quality-passing configurations, prioritize complete qualification passes, then highest decode ratio, then lower latency. Freeze the selected pair before two independent confirmations.",
+  "success": "Selected screening pair and both fresh confirmation pairs must independently pass unchanged production-rag-model-contribution-v6 and preserve the 16-thread outputs. Report >=0.85 throughput ratio separately as desirable margin, not a changed gate.",
+  "hypothesis": "Eight native prefill workers may reduce SMT contention and remove 16-to-8 active-pool transitions. The previous experiment did not measure this setting.",
+  "controls": "16 declared workload/Java threads and 16 reference threads, eight native decode workers, same artifacts and sampling. Only native prefill/pool size changes between 16 and 8. Default smoke continues to use no tuning properties.",
+  "limitations": "One catalog RAG corpus tests this admission gate; it is not a broad quality benchmark. RAG report records output text and token counts, not token IDs. One host cannot establish cross-host performance.",
+  "fleet": {
+    "provider": "AWS",
+    "region": "us-east-1",
+    "instanceType": "m6a.4xlarge",
+    "instances": 1,
+    "hourlyUSD": 0.6912,
+    "maximumHours": 2.5,
+    "maximumSpendUSD": 3,
+    "stopCondition": "Exit on completion or error, terminate-on-shutdown, 150 minute hard shutdown",
+    "evidenceDestination": "benchmark-results/2026-10-31-qwen05-q5-decode-threads/pool-followup"
+  },
+  "screenConfigurations": [
+    {
+      "name": "pool16-decode8",
+      "nativeThreads": 16,
+      "decodeThreads": 8
+    },
+    {
+      "name": "pool8-decode8",
+      "nativeThreads": 8,
+      "decodeThreads": 8
+    }
+  ]
+}
