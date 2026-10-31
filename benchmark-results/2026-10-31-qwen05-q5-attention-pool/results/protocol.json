@@ -1,0 +1,56 @@
+{
+  "registeredAt": "2026-10-31T19:24:14.976029+00:00",
+  "purpose": "Combine the released fused attention route with the separately measured smaller native prefill pool, then freeze the selected configuration for two confirmations.",
+  "job": {
+    "id": "qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m",
+    "uri": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/9217f5db79a29953eb74d5343926648285ec7e67/qwen2.5-0.5b-instruct-q5_k_m.gguf",
+    "sha256": "041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55",
+    "sizeBytes": 522186592,
+    "architecture": "qwen2",
+    "workload": "general",
+    "template": "chatml",
+    "maxTokens": 256,
+    "contextLength": 2048,
+    "threads": 16,
+    "decodeThreads": null,
+    "comparator": "ollama",
+    "requiresBaseComparison": false,
+    "expectedCases": 9
+  },
+  "modelsVersion": "0.5.9",
+  "vectorsVersion": "0.1.32",
+  "confirmationReferenceFirst": [
+    true,
+    false
+  ],
+  "selection": "Highest decode ratio among configurations preserving all 27 raw answers, token counts, prompts and evaluations and passing model contribution gates. Freeze winner before confirmations; no alternative selected from confirmation results.",
+  "success": "The selected screen and two fresh confirmations all meet unchanged qualification gates and preserve raw answers and counts. Target decode margin >=0.85.",
+  "hypothesis": "Fused attention supplies decode headroom; eight native pool workers reduce the p95 prefill/latency cost seen in the prior independent pool sweep. Neither gate is relaxed.",
+  "controls": "Released Models0.5.9/Vectors0.1.32 only. Fused grouped attention and eight decode workers fixed; declared workload/reference threads16. Only native pool size16 versus8 changes. Default correctness smoke has no tuning properties.",
+  "limitations": "One catalog RAG corpus tests this admission gate; it is not a broad quality benchmark. RAG report records output text and token counts, not token IDs. One host cannot establish cross-host performance.",
+  "fleet": {
+    "provider": "AWS",
+    "region": "us-east-1",
+    "instanceType": "m6a.4xlarge",
+    "instances": 1,
+    "hourlyUSD": 0.6912,
+    "maximumHours": 2.5,
+    "maximumSpendUSD": 3,
+    "stopCondition": "Exit on completion or error, terminate-on-shutdown, 150 minute hard shutdown",
+    "evidenceDestination": "benchmark-results/2026-10-31-qwen05-q5-attention-pool/results"
+  },
+  "screenConfigurations": [
+    {
+      "name": "pool16-fused",
+      "decodeThreads": 8,
+      "nativeThreads": 16,
+      "fusedGroupedAttention": true
+    },
+    {
+      "name": "pool8-fused",
+      "decodeThreads": 8,
+      "nativeThreads": 8,
+      "fusedGroupedAttention": true
+    }
+  ]
+}
