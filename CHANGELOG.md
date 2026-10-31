@@ -4,6 +4,19 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.10] - 2026-10-31
+
+- Restore the publisher's default beginning-of-sequence token for GGUF Llama 3 BPE
+  tokenizers when the optional `add_bos_token` flag is absent. Explicit flags still win.
+  Paired Linux CPU checks on Llama 3.2 1B Q5_K_M and Q6_K now have matching input-token
+  counts; both stop inventing facts on the two unsupported-context diagnostic questions.
+- Add the publisher conversation envelopes for Mistral 7B Instruct v0.3, Mathstral 7B
+  v0.1, and DeepSeek R1 Distill. These text templates do not claim tool qualification.
+  Existing RAG template identifiers and qualification records remain reproducible.
+- `backend-cuda` is unchanged. Its last recorded G1 result is exact token parity on
+  RTX 4090 at 31.26 tok/s, and G4 is 6.184x against the 3.00x gate. No fresh device
+  measurement is claimed for this release.
+
 ## [0.5.9] - 2026-10-31
 
 - Serve EdgeRock-4B GGUF through the Qwen3.5 hybrid decoder as a fourth architecture name. The
