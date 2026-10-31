@@ -498,17 +498,36 @@ public record LlamaConfig(
     // ship today reach this method with slidingWindowLayers unset and must not change behaviour.
     //
     // NOT A GENERAL RULE, and the next port must not read it as one. Upstream decides this per
-    // architecture, and there is a third case neither branch below covers: mellum declares a
-    // window and NO pattern, and makes every layer local on that basis
-    // (src/models/mellum.cpp:13-14 at 3f03b1772, swa_type = STANDARD whenever n_swa > 0). Falling
-    // through to the Gemma stride would answer false for all of its layers -- the same silent
-    // full-attention defect this method just stopped doing to maple. mellum and laguna are #281
-    // and are not in DecoderArchitecture yet, so the case is named here rather than written as
-    // code for an architecture that cannot reach it.
+    // architecture, and the stride it uses when a file declares no pattern is an argument to
+    // load_swa_pattern rather than a constant -- see
+    // DecoderArchitecture.slidingWindowPatternDefault().
+    //
+    // CORRECTION 2026-10-31 (#281), twice over. An earlier version of this comment said mellum
+    // "declares a window and NO pattern, and makes every layer local on that basis", citing
+    // src/models/mellum.cpp:13-14. BOTH halves are wrong.
+    //
+    // The second half: lines 13-14 are `if (hparams.n_swa > 0) { hparams.swa_type =
+    // LLAMA_SWA_TYPE_STANDARD;`, and line 16 -- two lines further on, at the pinned 3f03b1772 and
+    // unchanged on origin/master -- is `load_swa_pattern(ml, 4)`. So upstream makes mellum three
+    // layers in four local, not all of them. That reading stopped two lines early.
+    //
+    // The first half: the published artifact DOES declare the pattern, as arr[bool,28] at
+    // [true,true,true,false] x 7, so mellum reaches the branch below rather than the stride at all.
+    // The "no pattern" claim was a probe artefact: inspectGguf skips every array-typed key not
+    // named in retainMetadataArrays and that option defaults to empty, so the first read of the
+    // header surfaced no arrays and the key looked absent. Re-probed with arrays retained and the
+    // surfaced key count reconciled against kv_count (43 of 43), it is there.
+    //
+    // The stride is kept per-architecture anyway, because it is what upstream uses for a file that
+    // declares no pattern, and 4 is not the generic 6.
     if (slidingWindowLayers != null) {
       return slidingWindowLayers[layer];
     }
-    return isGemmaFamily() && layer % slidingWindowPattern < slidingWindowPattern - 1;
+    // Upstream's set_swa_pattern(n, dense_first = false) is is_swa[il] = il % n < (n - 1)
+    // (src/llama-hparams.cpp:14-16), which is this expression. Architectures that reach here with
+    // no declared pattern are the ones whose stride is a default rather than a key.
+    return (isGemmaFamily() || architecture == DecoderArchitecture.MELLUM)
+        && layer % slidingWindowPattern < slidingWindowPattern - 1;
   }
 
   /**
@@ -691,11 +710,14 @@ public record LlamaConfig(
     float rmsNormEps =
         getArchFloatKey(metadata, arch, "attention.layer_norm_rms_epsilon").orElse(1e-5f);
     int slidingWindow = getArchKey(metadata, arch, "attention.sliding_window").orElse(0);
-    // Gemma 2 alternates local and global attention every other layer and publishes no
+    // The stride to use when a model declares a window but no pattern, which is the case where
+    // nothing can fail. Gemma 2 alternates every other layer and publishes no
     // sliding_window_pattern key, so the generic default of 6 would make five layers in six local
     // instead of one in two -- wrong attention spans on 26 of 26 layers, with no error. Gemma 3
-    // publishes the key or uses the 6 default.
-    int defaultSlidingWindowPattern = architecture == DecoderArchitecture.GEMMA2 ? 2 : 6;
+    // publishes the key or uses the 6 default. mellum publishes no key either and upstream
+    // hard-codes 4. The per-architecture values live on the enum; see
+    // DecoderArchitecture.slidingWindowPatternDefault().
+    int defaultSlidingWindowPattern = architecture.slidingWindowPatternDefault();
     int slidingWindowPattern =
         getArchKey(metadata, arch, "attention.sliding_window_pattern")
             .orElse(defaultSlidingWindowPattern);

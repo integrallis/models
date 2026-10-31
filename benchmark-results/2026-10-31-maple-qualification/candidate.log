@@ -1,0 +1,18 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 31, 2026 9:11:42 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 31, 2026 9:11:42 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Oct 31, 2026 9:11:42 PM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256; FMA enabled
+iteration 1/1 case=auto-glass-deadline correct=true retrieval=39.9ms ttft=106604.8ms decode=18.32 tok/s e2e=108143.1ms
+iteration 1/1 case=travel-limit correct=true retrieval=8.4ms ttft=9322.6ms decode=19.67 tok/s e2e=10713.5ms
+iteration 1/1 case=telemedicine-benefit correct=true retrieval=3.8ms ttft=16977.5ms decode=1.73 tok/s e2e=30301.1ms
+iteration 1/1 case=claim-payment-times correct=true retrieval=4.3ms ttft=17587.7ms decode=2.13 tok/s e2e=28401.7ms
+iteration 1/1 case=chargeback-evidence correct=true retrieval=3.5ms ttft=27811.0ms decode=13.02 tok/s e2e=30201.7ms
+iteration 1/1 case=break-glass correct=true retrieval=3.7ms ttft=21617.9ms decode=20.02 tok/s e2e=22728.0ms
+iteration 1/1 case=idempotency correct=true retrieval=4.2ms ttft=49488.1ms decode=1.01 tok/s e2e=75294.0ms
+iteration 1/1 case=priority-one correct=true retrieval=3.8ms ttft=24564.6ms decode=1.30 tok/s e2e=49141.8ms
+iteration 1/1 case=unsupported-lunar-vehicle correct=true retrieval=3.1ms ttft=2943.6ms decode=19.85 tok/s e2e=3958.5ms
+plain-java/rust-ffm/maple_preview_tq1_0: tier=PERFORMANCE_REDUCED success=9/9 p95-retrieval=27.3ms p95-ttft=83758.1ms p50-decode=13.02 tok/s p95-e2e=95003.5ms correct=100.0% model-answered=77.8% of-those-correct=100.0% extractive-fallback=11.1% truncated=0.0%
+report: /root/out/maple/candidate.json
