@@ -69,7 +69,9 @@ public enum RagPromptTemplate {
     return switch (this) {
       case RAW -> result.text(prompt).build();
       case FLINT -> ChatTemplate.FLINT.render(List.of(ChatMessage.user(prompt)));
-      case MISTRAL -> ChatTemplate.MISTRAL.render(List.of(ChatMessage.user(prompt)));
+      // Keep this measurement-only envelope compatible with released 0.5.9 products.
+      // The tokenizer supplies BOS; the text matches the publisher's single-user template.
+      case MISTRAL -> result.control("[INST] ").text(prompt).control("[/INST]").build();
       case CHATML ->
           result
               .control("<|im_start|>user\n")
@@ -197,8 +199,13 @@ public enum RagPromptTemplate {
           ChatTemplate.FLINT.render(
               List.of(ChatMessage.system(systemPrompt), ChatMessage.user(userPrompt)));
       case MISTRAL ->
-          ChatTemplate.MISTRAL.render(
-              List.of(ChatMessage.system(systemPrompt), ChatMessage.user(userPrompt)));
+          result
+              .control("[INST] ")
+              .text(systemPrompt)
+              .control("\n\n")
+              .text(userPrompt)
+              .control("[/INST]")
+              .build();
       case RAW -> result.text(systemPrompt).text(userPrompt).build();
       case CHATML, CHATML_DIRECT, CHATML_ANSWER, CHATML_NO_THINK, EDGEROCK -> {
         result

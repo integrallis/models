@@ -1,7 +1,7 @@
 {
   "status": "PREPARED_NOT_RUN",
   "order": "Published-model fixes and diagnostics first; Phi4, Mathstral, four Qwen/Gemma siblings, Bonsai next.",
-  "runtimeRule": "Use downloaded released product JARs; source-built measurement harness identified independently. If the tokenizer repair releases first, rebuild and hash the released payload before launch.",
+  "runtimeRule": "Register candidate pairs on currently released Models0.5.9/Vectors0.1.32 while the tokenizer repair release proceeds. Download every product JAR from Central. The measurement harness implements the publisher Mistral envelope itself so it does not require the new runtime enum. On0.5.10 publication, repeat default smokes and bind their separate revision; never relabel the0.5.9 pairs.",
   "gate": "Paired same-host same-workload unchanged policy, model answer rate >= 1/3, model answer correctness >= .90, decode ratio >= .80, end-to-end ratio <= 1.5; separate library-default smoke. No candidate-only success.",
   "predictions": {
     "Phi4": "Prior dev-runtime pass; expect repeat, throughput margin modest.",
@@ -11,5 +11,6 @@
   },
   "killRule": "Stop a broken arm promptly; retain every null. Do not tune settings after seeing verdicts within this experiment.",
   "fineTuneRule": "Mathstral must beat matched-size Mistral base at Q4_K_S on the math workload; paired runtime pass alone is insufficient admission.",
-  "templateCorrectionBeforeLaunch": "Mathstral and its Mistral comparison both use the publisher [INST] single-user envelope, added as mistral to the measurement harness. No results existed at this amendment."
+  "templateCorrectionBeforeLaunch": "Mathstral and its Mistral comparison both use the publisher [INST] single-user envelope, added as mistral to the measurement harness. No results existed at this amendment.",
+  "publishedRegression": "All eight published Llama3-family variants get their own0.5.10 default RAG regression before SDK publication. Their output budgets and thread counts come from their recorded qualification settings."
 }
