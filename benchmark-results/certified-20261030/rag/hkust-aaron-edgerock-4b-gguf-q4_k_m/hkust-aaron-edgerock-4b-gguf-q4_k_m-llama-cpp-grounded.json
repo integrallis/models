@@ -1,0 +1,1588 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-10-31T03:19:12.538677684Z",
+  "framework" : "plain-java",
+  "backend" : "llama.cpp",
+  "backendVersion" : "ggml-org/llama.cpp@62318cd57dc63900ecb153272c0b10f78550855d+edgerock-rma@6a4c32359d88c84a8cee2a6920847220da61d7931d406dc2c0970f0da9dbf20f",
+  "modelId" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+  "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+  "artifactSha256" : "67c354bcb2abe0cba407fbfe8e7f7cc100dd44458b6fbdfee95ae22f3aaa2c6a",
+  "artifactSizeBytes" : 2936478592,
+  "settings" : {
+    "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+    "workload" : "general",
+    "caseIds" : [ "auto-glass-deadline", "travel-limit", "telemedicine-benefit", "claim-payment-times", "chargeback-evidence", "break-glass", "idempotency", "priority-one", "unsupported-lunar-vehicle" ],
+    "promptTemplate" : "edgerock",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 1024,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 8,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v24",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "promptCache" : "false",
+      "topP" : "1.0",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0",
+      "topK" : "1",
+      "seed" : "42"
+    }
+  },
+  "environment" : {
+    "hostname" : "edgerock-qual",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-138-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC-Milan Processor",
+    "availableProcessors" : 8,
+    "totalMemoryBytes" : 32857436160,
+    "maxHeapBytes" : 8216641536,
+    "javaVersion" : "25.0.5",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "llama.cpp",
+    "planVersion" : "unavailable",
+    "environment" : { },
+    "optimizations" : [ ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 0.0,
+    "retrievalMillis" : {
+      "p50" : 1.727291,
+      "p95" : 5.3887674
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 0.3444049999998242,
+      "p95" : 2.5149351000001823
+    },
+    "ttftMillis" : {
+      "p50" : 3695.237615,
+      "p95" : 3982.4273019
+    },
+    "tpotMillis" : {
+      "p50" : 71.23007463128491,
+      "p95" : 73.73491503922078
+    },
+    "endToEndMillis" : {
+      "p50" : 16362.846286,
+      "p95" : 32419.7286099
+    },
+    "p50PrefillTokensPerSecond" : 51.23868804641936,
+    "p50DecodeTokensPerSecond" : 14.039013789840826,
+    "peakRssBytes" : 0,
+    "totalCpuMillis" : 0.0,
+    "totalInputTokens" : 4863,
+    "totalCacheReadInputTokens" : 0,
+    "totalCacheWriteInputTokens" : 0,
+    "totalOutputTokens" : 5406,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.8888888888888888,
+    "modelAnswerRate" : 0.6666666666666666,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.2222222222222222,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "72a0c46ebfe3f2b4fda8929db0352fed58d6af8fbc3fa9d9aa7abc2923188479",
+    "retrievalMillis" : 5.469525,
+    "frameworkOverheadMillis" : 0.39912599999661325,
+    "endToEndMillis" : 16527.463738,
+    "generation" : {
+      "text" : "You must report within 30 calendar days, and the deductible is $75. [claims-auto-glass]",
+      "inputTokens" : 185,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 180,
+      "ttftMillis" : 3580.92735,
+      "totalMillis" : 16521.595087,
+      "prefillTokensPerSecond" : 51.78852366315625,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question using only supplied context. Need produce one short sentence, copy citations exactly from brackets at start of context entry. Context: [claims-auto-glass] Auto glass claims\nNorthstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required.\nQuestion: How long to report and what deductible? Answer: Must report within 30 calendar days and deductible is $75. Need cite [claims-auto-glass]. Sentence: You must report within 30 calendar days, and the deductible is $75. Cite [claims-auto-glass]. Ensure only ID present. final one short sentence.\n</think>\nYou must report within 30 calendar days, and the deductible is $75. [claims-auto-glass]",
+      "text" : "You must report within 30 calendar days, and the deductible is $75. [claims-auto-glass]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0292d6466b2b7eaa6e56dcf4219e674eede57a6053100d059723d90096645fbf",
+    "retrievalMillis" : 2.881252,
+    "frameworkOverheadMillis" : 0.35595200000170735,
+    "endToEndMillis" : 14312.361289,
+    "generation" : {
+      "text" : "Trip interruption claims use form T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "inputTokens" : 179,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 151,
+      "ttftMillis" : 3729.361034,
+      "totalMillis" : 14309.124085,
+      "prefillTokensPerSecond" : 51.06624318772036,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer in one short sentence. Need copy supporting source IDs exactly from start of entry. Context [claims-travel] Travel interruption claims... The question asks which form used for trip interruption and reimbursement limit. Answer: Trip interruption claims use form T-19 and reimbursement limit is 3,500 dollars per covered traveler. Need include citation [claims-travel] at end. Ensure only ID present. So final: Trip interruption claims use form T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].\n</think>\nTrip interruption claims use form T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "text" : "Trip interruption claims use form T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7ff3dfde5146e01ecefa5dd3bc4e9d5787d4f76b6b19d9798840aecdb04fe059",
+    "retrievalMillis" : 1.716593,
+    "frameworkOverheadMillis" : 0.3882310000008147,
+    "endToEndMillis" : 16843.556798,
+    "generation" : {
+      "text" : "Behavioral health telemedicine visits do not require a referral, the copay is 15 dollars per visit, and the annual visit count is unlimited [health-telemedicine].",
+      "inputTokens" : 178,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 185,
+      "ttftMillis" : 3733.141554,
+      "totalMillis" : 16841.451974,
+      "prefillTokensPerSecond" : 50.675983455714885,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question. Need follow rules. Context: [health-telemedicine] Behavioral health telemedicine. In-network behavioral health telemedicine visits do not require a referral. Member copay 15 dollars per visit, annual visit count unlimited. Question: Does behavioral health telemedicine need a referral and what is copay? Answer: No referral, $15 copay per visit, unlimited annual visits. Need cite source ID exactly [health-telemedicine]. One short sentence. Include citation at end. Ensure only IDs present. final: Behavioral health telemedicine visits do not require a referral, the copay is 15 dollars per visit with an unlimited annual visit count [health-telemedicine].\n</think>\nBehavioral health telemedicine visits do not require a referral, the copay is 15 dollars per visit, and the annual visit count is unlimited [health-telemedicine].",
+      "text" : "Behavioral health telemedicine visits do not require a referral, the copay is 15 dollars per visit, and the annual visit count is unlimited [health-telemedicine].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8ff5a77366fba9f532bc31e800daec7f42213f77919978e0af4eb564ebceb83e",
+    "retrievalMillis" : 4.748228,
+    "frameworkOverheadMillis" : 0.3142569999981788,
+    "endToEndMillis" : 16389.42039,
+    "generation" : {
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days ([payments-settlement]).",
+      "inputTokens" : 174,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 181,
+      "ttftMillis" : 3622.881807,
+      "totalMillis" : 16384.357905,
+      "prefillTokensPerSecond" : 51.22174156865112,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question using only supplied context. Need concise sentence. Context: [payments-settlement] Approved claim settlement: Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. Question: When do approved domestic ACH claims and international claim wires settle? Answer: domestic ACH claims within 2 business days, international claim wires within 5 business days. Need cite source ID exactly. Could be [payments-settlement] both. Need one short sentence. Ensure copy ID. Final: Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days ([payments-settlement]).\n</think>\nApproved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days ([payments-settlement]).",
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days ([payments-settlement]).",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b9801a61bce9f6d982bc44e647401302f0ed698128a87020966ca016b67f823c",
+    "retrievalMillis" : 2.879324,
+    "frameworkOverheadMillis" : 0.29096300000128394,
+    "endToEndMillis" : 13805.873179,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "inputTokens" : 177,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 144,
+      "ttftMillis" : 3683.710433,
+      "totalMillis" : 13802.702892,
+      "prefillTokensPerSecond" : 51.23868804641936,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer. Need use context. Context says merchants must submit chargeback evidence within 7 calendar days of notification. Evidence uploaded as PDF under 10 MB in Disputes console. Need answer one short sentence with citations. Need include [payments-chargeback] maybe. Let's craft: The deadline is 7 calendar days after notification, and evidence must be uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback]. Ensure citation ID exactly.\n</think>\nMerchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fd6ea923497748681336b5a3aa523bdbe47e4e1c40c1115aead4599727517681",
+    "retrievalMillis" : 2.874578,
+    "frameworkOverheadMillis" : 0.35467099999914353,
+    "endToEndMillis" : 14840.969787,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "inputTokens" : 179,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 155,
+      "ttftMillis" : 3718.832678,
+      "totalMillis" : 14837.740538,
+      "prefillTokensPerSecond" : 51.19339233443299,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The user asks: \"What is the production break-glass code name and how many managers approve it?\" The context says: \"The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers...\" So answer: code name Cobalt-17, approved by two managers. Must be one short sentence, include citations: [security-access] is the source ID. So answer: The production break-glass code name is Cobalt-17, and it requires approval from two managers. [security-access] Should be placed at end. Ensure only that ID.\n</think>\nThe production break‑glass code name is Cobalt‑17, and it requires approval from two managers. [security-access]",
+      "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fcba3a8b25a054c41ba0499406157272571cbc756d93b41722b83c9606dd9109",
+    "retrievalMillis" : 1.727291,
+    "frameworkOverheadMillis" : 0.33078500000192435,
+    "endToEndMillis" : 32577.333706,
+    "generation" : {
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "inputTokens" : 195,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 386,
+      "ttftMillis" : 4197.37774,
+      "totalMillis" : 32575.27563,
+      "prefillTokensPerSecond" : 49.12905522559306,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question. Need use only supplied context. Context: [api-idempotency] Claims API idempotency. Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409.\n\nQuestion: Which header makes Claims API creates idempotent and how long can a key be replayed? Answer should be one short sentence. Need copy supporting source ID exactly at start. So: The Idempotency-Key header makes Claims API creates idempotent, and keys can be replayed for 24 hours [api-idempotency]. Ensure final boxed? User says answer in one short sentence. No boxed needed? The initial system says place final answer in \\boxed{} at end. But user rules: answer in one short sentence, copy IDs. We should probably output sentence with boxed? The developer: \"Follow the answer format requested in the task exactly; do not replace it with a boxed answer.\" The task says answer in one short sentence. But system says final answer in \\boxed{} at end. Conflict? Usually system higher priority? It says place final answer in \\boxed{} at end. But user says answer in one short sentence. We can put boxed sentence. But \"one short sentence\" inside box. Need include citation. Maybe: \\boxed{The Idempotency-Key header makes Claims API creates idempotent, and keys can be replayed for 24 hours. [api-idempotency]} But if boxed, still one sentence. Need ensure ID present. Yes.\n\nLet's final.\n</think>\n\\boxed{The Idempotency-Key header makes Claims API creates idempotent, and keys can be replayed for 24 hours. [api-idempotency]}",
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4568bceb9ad51417df0db1c55e261db37412b58bebcb273dbc3b481db061d3c1",
+    "retrievalMillis" : 1.542531,
+    "frameworkOverheadMillis" : 0.33399999999892316,
+    "endToEndMillis" : 25031.926298,
+    "generation" : {
+      "text" : "A priority one incident is acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated by NORTHSTAR-P1 [support-escalation].",
+      "inputTokens" : 176,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 298,
+      "ttftMillis" : 3665.120868,
+      "totalMillis" : 25030.049767,
+      "prefillTokensPerSecond" : 51.111931354352926,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question. Need use only supplied context. Context: [support-escalation] Priority one support: \"A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander.\" Question: How quickly is a priority one incident acknowledged and which route escalates it? Need answer in one short sentence, copy supporting source ID exactly at start, citations at end. Source ID is [support-escalation]. Need sentence: A priority one incident is acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated via NORTHSTAR-P1 to the incident commander [support-escalation]. Ensure only ID present. Could be \"A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander [support-escalation].\" The question asks how quickly acknowledged and which route escalates. One short sentence. Need include citations at end. Maybe: \"A priority one incident is acknowledged within 15 minutes and escalated by NORTHSTAR-P1 if unresolved after 30 minutes [support-escalation].\" That's one sentence. Need ensure exact source ID. Final only sentence.\n</think>\nA priority one incident is acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated by NORTHSTAR-P1 [support-escalation].",
+      "text" : "A priority one incident is acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated by NORTHSTAR-P1 [support-escalation].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "398f735c1029a04f4ec72b97e8e867dc0142f6349ac728b2769d159308fd07f0",
+    "retrievalMillis" : 1.168041,
+    "frameworkOverheadMillis" : 3.361606999998912,
+    "endToEndMillis" : 12478.358885,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 178,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 122,
+      "ttftMillis" : 3711.0421,
+      "totalMillis" : 12473.829237,
+      "prefillTokensPerSecond" : 51.01800993074162,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The user asks: \"What deductible applies to damage to a lunar rover?\" The context provided is about auto glass claims: \"Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required.\"\n\nThe question is unrelated: lunar rover damage. The context does not contain any info about lunar rover deductible. According to rules, if context does not contain answer, reply exactly \"INSUFFICIENT_CONTEXT\". No extra text. Must be exactly that phrase.\n</think>\nINSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "72a0c46ebfe3f2b4fda8929db0352fed58d6af8fbc3fa9d9aa7abc2923188479",
+    "retrievalMillis" : 1.538356,
+    "frameworkOverheadMillis" : 0.326018000001568,
+    "endToEndMillis" : 16333.734983,
+    "generation" : {
+      "text" : "You must report within 30 calendar days, and the deductible is $75. [claims-auto-glass]",
+      "inputTokens" : 185,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 180,
+      "ttftMillis" : 3581.68725,
+      "totalMillis" : 16331.870609,
+      "prefillTokensPerSecond" : 51.80141521466366,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question using only supplied context. Need produce one short sentence, copy citations exactly from brackets at start of context entry. Context: [claims-auto-glass] Auto glass claims\nNorthstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required.\nQuestion: How long to report and what deductible? Answer: Must report within 30 calendar days and deductible is $75. Need cite [claims-auto-glass]. Sentence: You must report within 30 calendar days, and the deductible is $75. Cite [claims-auto-glass]. Ensure only ID present. final one short sentence.\n</think>\nYou must report within 30 calendar days, and the deductible is $75. [claims-auto-glass]",
+      "text" : "You must report within 30 calendar days, and the deductible is $75. [claims-auto-glass]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0292d6466b2b7eaa6e56dcf4219e674eede57a6053100d059723d90096645fbf",
+    "retrievalMillis" : 5.200333,
+    "frameworkOverheadMillis" : 0.3444049999998242,
+    "endToEndMillis" : 14291.351849,
+    "generation" : {
+      "text" : "Trip interruption claims use form T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "inputTokens" : 179,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 151,
+      "ttftMillis" : 3711.607485,
+      "totalMillis" : 14285.807111,
+      "prefillTokensPerSecond" : 51.30751027296742,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer in one short sentence. Need copy supporting source IDs exactly from start of entry. Context [claims-travel] Travel interruption claims... The question asks which form used for trip interruption and reimbursement limit. Answer: Trip interruption claims use form T-19 and reimbursement limit is 3,500 dollars per covered traveler. Need include citation [claims-travel] at end. Ensure only ID present. So final: Trip interruption claims use form T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].\n</think>\nTrip interruption claims use form T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "text" : "Trip interruption claims use form T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7ff3dfde5146e01ecefa5dd3bc4e9d5787d4f76b6b19d9798840aecdb04fe059",
+    "retrievalMillis" : 1.531316,
+    "frameworkOverheadMillis" : 0.29782499999782885,
+    "endToEndMillis" : 16751.999363,
+    "generation" : {
+      "text" : "Behavioral health telemedicine visits do not require a referral, the copay is 15 dollars per visit, and the annual visit count is unlimited [health-telemedicine].",
+      "inputTokens" : 178,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 185,
+      "ttftMillis" : 3695.237615,
+      "totalMillis" : 16750.170222,
+      "prefillTokensPerSecond" : 51.2718737191033,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question. Need follow rules. Context: [health-telemedicine] Behavioral health telemedicine. In-network behavioral health telemedicine visits do not require a referral. Member copay 15 dollars per visit, annual visit count unlimited. Question: Does behavioral health telemedicine need a referral and what is copay? Answer: No referral, $15 copay per visit, unlimited annual visits. Need cite source ID exactly [health-telemedicine]. One short sentence. Include citation at end. Ensure only IDs present. final: Behavioral health telemedicine visits do not require a referral, the copay is 15 dollars per visit with an unlimited annual visit count [health-telemedicine].\n</think>\nBehavioral health telemedicine visits do not require a referral, the copay is 15 dollars per visit, and the annual visit count is unlimited [health-telemedicine].",
+      "text" : "Behavioral health telemedicine visits do not require a referral, the copay is 15 dollars per visit, and the annual visit count is unlimited [health-telemedicine].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8ff5a77366fba9f532bc31e800daec7f42213f77919978e0af4eb564ebceb83e",
+    "retrievalMillis" : 2.399622,
+    "frameworkOverheadMillis" : 0.5445099999997183,
+    "endToEndMillis" : 16728.388845,
+    "generation" : {
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days ([payments-settlement]).",
+      "inputTokens" : 174,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 181,
+      "ttftMillis" : 3619.513806,
+      "totalMillis" : 16725.444713,
+      "prefillTokensPerSecond" : 51.312009752820614,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question using only supplied context. Need concise sentence. Context: [payments-settlement] Approved claim settlement: Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. Question: When do approved domestic ACH claims and international claim wires settle? Answer: domestic ACH claims within 2 business days, international claim wires within 5 business days. Need cite source ID exactly. Could be [payments-settlement] both. Need one short sentence. Ensure copy ID. Final: Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days ([payments-settlement]).\n</think>\nApproved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days ([payments-settlement]).",
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days ([payments-settlement]).",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b9801a61bce9f6d982bc44e647401302f0ed698128a87020966ca016b67f823c",
+    "retrievalMillis" : 1.745123,
+    "frameworkOverheadMillis" : 0.42952599999989616,
+    "endToEndMillis" : 13795.725409,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "inputTokens" : 177,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 144,
+      "ttftMillis" : 3683.601425,
+      "totalMillis" : 13793.55076,
+      "prefillTokensPerSecond" : 51.201662520874805,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer. Need use context. Context says merchants must submit chargeback evidence within 7 calendar days of notification. Evidence uploaded as PDF under 10 MB in Disputes console. Need answer one short sentence with citations. Need include [payments-chargeback] maybe. Let's craft: The deadline is 7 calendar days after notification, and evidence must be uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback]. Ensure citation ID exactly.\n</think>\nMerchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fd6ea923497748681336b5a3aa523bdbe47e4e1c40c1115aead4599727517681",
+    "retrievalMillis" : 5.670897,
+    "frameworkOverheadMillis" : 0.34864199999901757,
+    "endToEndMillis" : 14628.546718,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "inputTokens" : 179,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 155,
+      "ttftMillis" : 3713.182378,
+      "totalMillis" : 14622.527179,
+      "prefillTokensPerSecond" : 51.317954001911666,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The user asks: \"What is the production break-glass code name and how many managers approve it?\" The context says: \"The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers...\" So answer: code name Cobalt-17, approved by two managers. Must be one short sentence, include citations: [security-access] is the source ID. So answer: The production break-glass code name is Cobalt-17, and it requires approval from two managers. [security-access] Should be placed at end. Ensure only that ID.\n</think>\nThe production break‑glass code name is Cobalt‑17, and it requires approval from two managers. [security-access]",
+      "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fcba3a8b25a054c41ba0499406157272571cbc756d93b41722b83c9606dd9109",
+    "retrievalMillis" : 1.301226,
+    "frameworkOverheadMillis" : 0.309744000001956,
+    "endToEndMillis" : 32436.987018,
+    "generation" : {
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "inputTokens" : 195,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 386,
+      "ttftMillis" : 3975.313827,
+      "totalMillis" : 32435.376048,
+      "prefillTokensPerSecond" : 52.01474444622569,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question. Need use only supplied context. Context: [api-idempotency] Claims API idempotency. Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409.\n\nQuestion: Which header makes Claims API creates idempotent and how long can a key be replayed? Answer should be one short sentence. Need copy supporting source ID exactly at start. So: The Idempotency-Key header makes Claims API creates idempotent, and keys can be replayed for 24 hours [api-idempotency]. Ensure final boxed? User says answer in one short sentence. No boxed needed? The initial system says place final answer in \\boxed{} at end. But user rules: answer in one short sentence, copy IDs. We should probably output sentence with boxed? The developer: \"Follow the answer format requested in the task exactly; do not replace it with a boxed answer.\" The task says answer in one short sentence. But system says final answer in \\boxed{} at end. Conflict? Usually system higher priority? It says place final answer in \\boxed{} at end. But user says answer in one short sentence. We can put boxed sentence. But \"one short sentence\" inside box. Need include citation. Maybe: \\boxed{The Idempotency-Key header makes Claims API creates idempotent, and keys can be replayed for 24 hours. [api-idempotency]} But if boxed, still one sentence. Need ensure ID present. Yes.\n\nLet's final.\n</think>\n\\boxed{The Idempotency-Key header makes Claims API creates idempotent, and keys can be replayed for 24 hours. [api-idempotency]}",
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4568bceb9ad51417df0db1c55e261db37412b58bebcb273dbc3b481db061d3c1",
+    "retrievalMillis" : 1.282378,
+    "frameworkOverheadMillis" : 0.3165630000003148,
+    "endToEndMillis" : 25155.602996,
+    "generation" : {
+      "text" : "A priority one incident is acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated by NORTHSTAR-P1 [support-escalation].",
+      "inputTokens" : 176,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 298,
+      "ttftMillis" : 3681.431715,
+      "totalMillis" : 25154.004055,
+      "prefillTokensPerSecond" : 51.048303006484005,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question. Need use only supplied context. Context: [support-escalation] Priority one support: \"A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander.\" Question: How quickly is a priority one incident acknowledged and which route escalates it? Need answer in one short sentence, copy supporting source ID exactly at start, citations at end. Source ID is [support-escalation]. Need sentence: A priority one incident is acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated via NORTHSTAR-P1 to the incident commander [support-escalation]. Ensure only ID present. Could be \"A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander [support-escalation].\" The question asks how quickly acknowledged and which route escalates. One short sentence. Need include citations at end. Maybe: \"A priority one incident is acknowledged within 15 minutes and escalated by NORTHSTAR-P1 if unresolved after 30 minutes [support-escalation].\" That's one sentence. Need ensure exact source ID. Final only sentence.\n</think>\nA priority one incident is acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated by NORTHSTAR-P1 [support-escalation].",
+      "text" : "A priority one incident is acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated by NORTHSTAR-P1 [support-escalation].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "398f735c1029a04f4ec72b97e8e867dc0142f6349ac728b2769d159308fd07f0",
+    "retrievalMillis" : 0.964392,
+    "frameworkOverheadMillis" : 3.359403000000384,
+    "endToEndMillis" : 12189.911932,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 178,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 122,
+      "ttftMillis" : 3686.696097,
+      "totalMillis" : 12185.588137,
+      "prefillTokensPerSecond" : 51.37406873677226,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The user asks: \"What deductible applies to damage to a lunar rover?\" The context provided is about auto glass claims: \"Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required.\"\n\nThe question is unrelated: lunar rover damage. The context does not contain any info about lunar rover deductible. According to rules, if context does not contain answer, reply exactly \"INSUFFICIENT_CONTEXT\". No extra text. Must be exactly that phrase.\n</think>\nINSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    } ],
+    "promptSha256" : "72a0c46ebfe3f2b4fda8929db0352fed58d6af8fbc3fa9d9aa7abc2923188479",
+    "retrievalMillis" : 2.70988,
+    "frameworkOverheadMillis" : 0.3004690000016126,
+    "endToEndMillis" : 16440.255561,
+    "generation" : {
+      "text" : "You must report within 30 calendar days, and the deductible is $75. [claims-auto-glass]",
+      "inputTokens" : 185,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 180,
+      "ttftMillis" : 3569.561761,
+      "totalMillis" : 16437.245212,
+      "prefillTokensPerSecond" : 51.95248678300654,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question using only supplied context. Need produce one short sentence, copy citations exactly from brackets at start of context entry. Context: [claims-auto-glass] Auto glass claims\nNorthstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required.\nQuestion: How long to report and what deductible? Answer: Must report within 30 calendar days and deductible is $75. Need cite [claims-auto-glass]. Sentence: You must report within 30 calendar days, and the deductible is $75. Cite [claims-auto-glass]. Ensure only ID present. final one short sentence.\n</think>\nYou must report within 30 calendar days, and the deductible is $75. [claims-auto-glass]",
+      "text" : "You must report within 30 calendar days, and the deductible is $75. [claims-auto-glass]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0292d6466b2b7eaa6e56dcf4219e674eede57a6053100d059723d90096645fbf",
+    "retrievalMillis" : 2.088651,
+    "frameworkOverheadMillis" : 0.3046549999999115,
+    "endToEndMillis" : 14265.037192,
+    "generation" : {
+      "text" : "Trip interruption claims use form T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "inputTokens" : 179,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 151,
+      "ttftMillis" : 3720.691015,
+      "totalMillis" : 14262.643886,
+      "prefillTokensPerSecond" : 51.32641506782972,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer in one short sentence. Need copy supporting source IDs exactly from start of entry. Context [claims-travel] Travel interruption claims... The question asks which form used for trip interruption and reimbursement limit. Answer: Trip interruption claims use form T-19 and reimbursement limit is 3,500 dollars per covered traveler. Need include citation [claims-travel] at end. Ensure only ID present. So final: Trip interruption claims use form T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].\n</think>\nTrip interruption claims use form T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "text" : "Trip interruption claims use form T-19, with a reimbursement limit of 3,500 dollars per covered traveler [claims-travel].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    } ],
+    "promptSha256" : "7ff3dfde5146e01ecefa5dd3bc4e9d5787d4f76b6b19d9798840aecdb04fe059",
+    "retrievalMillis" : 2.864025,
+    "frameworkOverheadMillis" : 0.32838300000003073,
+    "endToEndMillis" : 16760.194127,
+    "generation" : {
+      "text" : "Behavioral health telemedicine visits do not require a referral, the copay is 15 dollars per visit, and the annual visit count is unlimited [health-telemedicine].",
+      "inputTokens" : 178,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 185,
+      "ttftMillis" : 3706.972038,
+      "totalMillis" : 16757.001719,
+      "prefillTokensPerSecond" : 51.04686216658943,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question. Need follow rules. Context: [health-telemedicine] Behavioral health telemedicine. In-network behavioral health telemedicine visits do not require a referral. Member copay 15 dollars per visit, annual visit count unlimited. Question: Does behavioral health telemedicine need a referral and what is copay? Answer: No referral, $15 copay per visit, unlimited annual visits. Need cite source ID exactly [health-telemedicine]. One short sentence. Include citation at end. Ensure only IDs present. final: Behavioral health telemedicine visits do not require a referral, the copay is 15 dollars per visit with an unlimited annual visit count [health-telemedicine].\n</think>\nBehavioral health telemedicine visits do not require a referral, the copay is 15 dollars per visit, and the annual visit count is unlimited [health-telemedicine].",
+      "text" : "Behavioral health telemedicine visits do not require a referral, the copay is 15 dollars per visit, and the annual visit count is unlimited [health-telemedicine].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "8ff5a77366fba9f532bc31e800daec7f42213f77919978e0af4eb564ebceb83e",
+    "retrievalMillis" : 1.129096,
+    "frameworkOverheadMillis" : 0.3475899999993999,
+    "endToEndMillis" : 16362.846286,
+    "generation" : {
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days ([payments-settlement]).",
+      "inputTokens" : 174,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 181,
+      "ttftMillis" : 3622.579592,
+      "totalMillis" : 16361.3696,
+      "prefillTokensPerSecond" : 51.22949311360787,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question using only supplied context. Need concise sentence. Context: [payments-settlement] Approved claim settlement: Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. Question: When do approved domestic ACH claims and international claim wires settle? Answer: domestic ACH claims within 2 business days, international claim wires within 5 business days. Need cite source ID exactly. Could be [payments-settlement] both. Need one short sentence. Ensure copy ID. Final: Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days ([payments-settlement]).\n</think>\nApproved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days ([payments-settlement]).",
+      "text" : "Approved domestic ACH claims settle within 2 business days, and international claim wires settle within 5 business days ([payments-settlement]).",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    } ],
+    "promptSha256" : "b9801a61bce9f6d982bc44e647401302f0ed698128a87020966ca016b67f823c",
+    "retrievalMillis" : 1.175106,
+    "frameworkOverheadMillis" : 0.3316979999999603,
+    "endToEndMillis" : 14073.660586,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "inputTokens" : 177,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 144,
+      "ttftMillis" : 3675.881053,
+      "totalMillis" : 14072.153782,
+      "prefillTokensPerSecond" : 51.26779166159782,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer. Need use context. Context says merchants must submit chargeback evidence within 7 calendar days of notification. Evidence uploaded as PDF under 10 MB in Disputes console. Need answer one short sentence with citations. Need include [payments-chargeback] maybe. Let's craft: The deadline is 7 calendar days after notification, and evidence must be uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback]. Ensure citation ID exactly.\n</think>\nMerchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification, uploaded as a PDF under 10 MB in the Disputes console [payments-chargeback].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fd6ea923497748681336b5a3aa523bdbe47e4e1c40c1115aead4599727517681",
+    "retrievalMillis" : 3.256868,
+    "frameworkOverheadMillis" : 0.29094400000030873,
+    "endToEndMillis" : 14577.821785,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "inputTokens" : 179,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 155,
+      "ttftMillis" : 3712.496772,
+      "totalMillis" : 14574.273973,
+      "prefillTokensPerSecond" : 51.31286399167069,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The user asks: \"What is the production break-glass code name and how many managers approve it?\" The context says: \"The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers...\" So answer: code name Cobalt-17, approved by two managers. Must be one short sentence, include citations: [security-access] is the source ID. So answer: The production break-glass code name is Cobalt-17, and it requires approval from two managers. [security-access] Should be placed at end. Ensure only that ID.\n</think>\nThe production break‑glass code name is Cobalt‑17, and it requires approval from two managers. [security-access]",
+      "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    } ],
+    "promptSha256" : "fcba3a8b25a054c41ba0499406157272571cbc756d93b41722b83c9606dd9109",
+    "retrievalMillis" : 1.390826,
+    "frameworkOverheadMillis" : 0.34519799999907264,
+    "endToEndMillis" : 32379.458991,
+    "generation" : {
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "inputTokens" : 195,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 386,
+      "ttftMillis" : 3985.475934,
+      "totalMillis" : 32377.722967,
+      "prefillTokensPerSecond" : 51.794424476291965,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question. Need use only supplied context. Context: [api-idempotency] Claims API idempotency. Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409.\n\nQuestion: Which header makes Claims API creates idempotent and how long can a key be replayed? Answer should be one short sentence. Need copy supporting source ID exactly at start. So: The Idempotency-Key header makes Claims API creates idempotent, and keys can be replayed for 24 hours [api-idempotency]. Ensure final boxed? User says answer in one short sentence. No boxed needed? The initial system says place final answer in \\boxed{} at end. But user rules: answer in one short sentence, copy IDs. We should probably output sentence with boxed? The developer: \"Follow the answer format requested in the task exactly; do not replace it with a boxed answer.\" The task says answer in one short sentence. But system says final answer in \\boxed{} at end. Conflict? Usually system higher priority? It says place final answer in \\boxed{} at end. But user says answer in one short sentence. We can put boxed sentence. But \"one short sentence\" inside box. Need include citation. Maybe: \\boxed{The Idempotency-Key header makes Claims API creates idempotent, and keys can be replayed for 24 hours. [api-idempotency]} But if boxed, still one sentence. Need ensure ID present. Yes.\n\nLet's final.\n</think>\n\\boxed{The Idempotency-Key header makes Claims API creates idempotent, and keys can be replayed for 24 hours. [api-idempotency]}",
+      "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409. [api-idempotency]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    } ],
+    "promptSha256" : "4568bceb9ad51417df0db1c55e261db37412b58bebcb273dbc3b481db061d3c1",
+    "retrievalMillis" : 1.286897,
+    "frameworkOverheadMillis" : 0.35955899999680696,
+    "endToEndMillis" : 25385.195891,
+    "generation" : {
+      "text" : "A priority one incident is acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated by NORTHSTAR-P1 [support-escalation].",
+      "inputTokens" : 176,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 298,
+      "ttftMillis" : 3666.539622,
+      "totalMillis" : 25383.549435,
+      "prefillTokensPerSecond" : 51.14193251996352,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "We need answer user's question. Need use only supplied context. Context: [support-escalation] Priority one support: \"A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander.\" Question: How quickly is a priority one incident acknowledged and which route escalates it? Need answer in one short sentence, copy supporting source ID exactly at start, citations at end. Source ID is [support-escalation]. Need sentence: A priority one incident is acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated via NORTHSTAR-P1 to the incident commander [support-escalation]. Ensure only ID present. Could be \"A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander [support-escalation].\" The question asks how quickly acknowledged and which route escalates. One short sentence. Need include citations at end. Maybe: \"A priority one incident is acknowledged within 15 minutes and escalated by NORTHSTAR-P1 if unresolved after 30 minutes [support-escalation].\" That's one sentence. Need ensure exact source ID. Final only sentence.\n</think>\nA priority one incident is acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated by NORTHSTAR-P1 [support-escalation].",
+      "text" : "A priority one incident is acknowledged within 15 minutes, and if unresolved after 30 minutes, it is escalated by NORTHSTAR-P1 [support-escalation].",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "llama.cpp",
+    "model" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    } ],
+    "promptSha256" : "398f735c1029a04f4ec72b97e8e867dc0142f6349ac728b2769d159308fd07f0",
+    "retrievalMillis" : 1.360891,
+    "frameworkOverheadMillis" : 0.3525899999985995,
+    "endToEndMillis" : 12193.388081,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 178,
+      "cacheReadInputTokens" : 0,
+      "cacheWriteInputTokens" : 0,
+      "outputTokens" : 122,
+      "ttftMillis" : 3732.005647,
+      "totalMillis" : 12191.6746,
+      "prefillTokensPerSecond" : 50.84984953586657,
+      "loadMillis" : 0.0,
+      "peakRssBytes" : 0,
+      "cpuMillis" : 0.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The user asks: \"What deductible applies to damage to a lunar rover?\" The context provided is about auto glass claims: \"Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required.\"\n\nThe question is unrelated: lunar rover damage. The context does not contain any info about lunar rover deductible. According to rules, if context does not contain answer, reply exactly \"INSUFFICIENT_CONTEXT\". No extra text. Must be exactly that phrase.\n</think>\nINSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

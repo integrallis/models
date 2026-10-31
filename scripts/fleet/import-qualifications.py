@@ -135,6 +135,10 @@ def main():
     # is drift. An optional key is neither.
     qualified_entries = [e for e in qualifications["entries"] if e.get("qualified")]
     known = set().union(*(set(e) for e in qualified_entries))
+    # Legitimate on a publisher-reference entry and absent from every other, so they are optional
+    # rather than drift. Listed explicitly: the guard's whole job is to refuse a key nobody
+    # intended, and that only works if intent is written down.
+    known |= {"policyVersion", "qualificationEvidence", "contextLength"}
     # Named required_keys: line 148 reuses `required` as a loop variable over paths.
     required_keys = set(qualified_entries[0]).intersection(*(set(e) for e in qualified_entries))
 
@@ -175,13 +179,57 @@ def main():
         destination = args.models_repo / f"benchmark-results/certified-{args.date}/rag/{slug}"
         relative = f"benchmark-results/certified-{args.date}/rag/{slug}/{slug}-rust-ffm-grounded.json"
         print(f"  + {model_id} -> {relative}  decode={report['summary']['p50DecodeTokensPerSecond']:.2f} tok/s")
+        # Named by the comparator's actual backend. This was hard-coded "ollama", which filed a
+        # patched-llama.cpp publisher comparator under a backend it was not, in the one place a
+        # reader goes to see which implementation the ratio was measured against.
+        comparator_backend = read(comparator_path)["backend"].replace(".", "-")
+        comparator_name = f"{slug}-{comparator_backend}-grounded.json"
+        receipt_relative = (
+            f"benchmark-results/certified-{args.date}/rag/{slug}/qualification.json"
+        )
         if args.apply:
             destination.mkdir(parents=True, exist_ok=True)
+            # The library-defaults smoke travels with the run it describes. entry_for() resolves
+            # the sidecar beside the report it is given, which under --apply is the destination,
+            # so a smoke left in the results directory is silently not found and the entry lands
+            # without it -- and ModelJars then refuses the publish for exactly that omission.
+            smoke_source = candidate_path.parent / "default-correctness"
+            if smoke_source.is_dir():
+                shutil.copytree(
+                    smoke_source, destination / "default-correctness", dirs_exist_ok=True
+                )
             shutil.copy(candidate_path, destination / f"{slug}-rust-ffm-grounded.json")
-            shutil.copy(comparator_path, destination / f"{slug}-ollama-grounded.json")
-            shutil.copy(verdict_path, destination / "qualification.json")
+            shutil.copy(comparator_path, destination / comparator_name)
+            # The receipt the ModelJars publisher gate verifies, with the arm paths rewritten from
+            # wherever the run wrote them to where this repository stores them. The gate requires
+            # candidate.path to equal the catalog's report path exactly, so an absolute /root path
+            # from a bench host fails it.
+            receipt = read(verdict_path)
+            receipt["candidate"]["path"] = relative
+            receipt["comparators"][0]["path"] = (
+                f"benchmark-results/certified-{args.date}/rag/{slug}/{comparator_name}"
+            )
+            (destination / "qualification.json").write_text(
+                json.dumps(receipt, indent=2) + "\n"
+            )
         written = destination / f"{slug}-rust-ffm-grounded.json"
         entry = entry_for(written if args.apply else candidate_path, report, verdict, catalogued, relative)
+        # A publisher-reference verdict has to say so in the catalog. Without policyVersion the
+        # ModelJars gate that binds the artifact to its reviewed reference returns early and never
+        # runs, so the one route that admits a non-stock comparator would go unverified.
+        policy_id = read(verdict_path).get("policyId")
+        if policy_id == "production-rag-publisher-reference-v1":
+            entry["policyVersion"] = policy_id
+            # The gate requires the catalogued context to equal the context the run actually
+            # used, so that a ratio measured at one window cannot be published as another.
+            entry["contextLength"] = report["settings"]["contextLength"]
+            if args.apply:
+                entry["qualificationEvidence"] = {
+                    "report": receipt_relative,
+                    "reportSha256": hashlib.sha256(
+                        (destination / "qualification.json").read_bytes()
+                    ).hexdigest(),
+                }
         drift = (set(entry) - known) | (required_keys - set(entry))
         if drift:
             raise SystemExit(f"{model_id}: catalog entry schema drift: {sorted(drift)}")
