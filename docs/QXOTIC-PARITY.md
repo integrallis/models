@@ -16,7 +16,10 @@ produces has to be measured on our own harness regardless of what their benchmar
 > independent of the `exp_probs_b` stage, the `minicpm` stage has no artifact and is deleted, and the
 > size evidence inverts the speech-last ordering. **Read the feasibility document for anything about
 > ordering, effort or artifacts.** What stands here is the coverage comparison in §1-§3 and the
-> per-architecture reading in §4, which the headers confirmed.
+> per-architecture reading in §4 — with one exception, added 2026-10-31 (#288): §4's `bailingmoe3`
+> row was read from their codec and not from an artifact, because no artifact existed then. One does
+> now, and it shows the row described about a third of the model. The corrected reading is §5.4 of
+> the feasibility document; the row below is marked and Stage 4 is rewritten accordingly.
 
 ## 1. What qxotic loads
 
@@ -112,7 +115,13 @@ for all but one the missing piece is named. None is "cannot be done".**
 | `lfm2moe` | LFM2 short-conv blocks plus expert tensors | `lfm2/Lfm2ShortConv.java`, `Lfm2ForwardPass.java`; MoE from `qwen35` | the MoE branch inside the LFM2 block dispatch |
 | `laguna` | `attn_gate`, `ffn_{gate,up,down}_shexp`, `exp_probs_b.bias`, mixed dense+MoE blocks | `attn_gate` (`qwen35/Qwen35Weights.java`), `ffn_gate_shexp` (`qwen35`, `deepseek2/Deepseek2Weights.java`) | **`exp_probs_b` — bias-corrected sigmoid expert routing. We implement it nowhere: 0 occurrences across every `*/src/main`.** |
 | `nemotron_h`, `nemotron_h_moe` | `ssm_in`, `ssm_out`, `ssm_conv1d`, `ssm_dt.bias`, `ssm_norm`; shared experts; `exp_probs_b.bias` | a **different** SSM: ours is GatedDeltaNet for Qwen3-Next (`ssm_a`, `ssm_alpha`, `ssm_ba`, `ssm_beta`, `ssm_conv`, `ssm_dt`, `ssm_norm`, `ssm_out` in `qwen35/Qwen35Weights.java`), plus the hybrid per-layer dispatch and recurrent-state cache it needs | **Mamba-2 selective scan.** `ssm_in` and `ssm_conv1d` appear in no source of ours. The *scaffolding* for a hybrid recurrent/attention stack is already proven by Qwen3-Next and LFM2; the recurrence itself is new |
-| `bailingmoe3` | MLA: `attn_kv_a_mqa`, `attn_kv_a_norm`, `attn_q_a`, `attn_q_b`, `attn_k_b`, `attn_v_b`; `attn_gate`; shared experts; `exp_probs_b.bias` | MLA (`deepseek2/Deepseek2Config.java`, `Deepseek2ForwardPass.java`, `Deepseek2Weights.java`), `attn_gate`, shared experts | **Q-LoRA (`attn_q_a`/`attn_q_b`)** — our MLA reads a full `attn_q.weight` (`Deepseek2Weights.java:131`), i.e. the DeepSeek-V2-Lite shape — **plus `exp_probs_b`** |
+| `bailingmoe3` ⚠ | MLA: `attn_kv_a_mqa`, `attn_kv_a_norm`, `attn_q_a`, `attn_q_b`, `attn_k_b`, `attn_v_b`; `attn_gate`; shared experts; `exp_probs_b.bias` | MLA (`deepseek2/Deepseek2Config.java`, `Deepseek2ForwardPass.java`, `Deepseek2Weights.java`), `attn_gate`, shared experts | **Q-LoRA (`attn_q_a`/`attn_q_b`)** — our MLA reads a full `attn_q.weight` (`Deepseek2Weights.java:131`), i.e. the DeepSeek-V2-Lite shape — **plus `exp_probs_b`** |
+
+⚠ **This row is incomplete and was read from their codec, not an artifact.** It describes 6 of the
+model's 24 layers. The real header (`headers.json` entry 11) shows the other 18 are **KDA** linear
+attention, the MLA form shipped is the **absorbed** one our decoder does not read, grouped expert
+top-k is also required, and the hybrid interval is a per-layer `head_count_kv` array. Full reading:
+`docs/QXOTIC-PARITY-FEASIBILITY.md` §5.4 and §6 Tier C.
 | `kokoro` (+ `kokoro-voice`), `inflect-v2` | TTS stacks: PL-BERT text encoder, prosody predictor, vocoder decoder, G2P (`jinfer-kokoro`, 3029 LOC; `jinfer-inflect2`, 2802 LOC incl. `TextNormalizer`, `Lexicon`, `LetterToSound`) | **the model class exists**: `models-api/.../TextToSpeechModel.java:21`, `PcmAudio`, `AudioStream`, `WavEncoder`, and a shipping TTS backend in `soprano/` with its own ISTFT (`SopranoIstft.java`) and FFT (`audio/Radix2Fft.java`) | the two stacks themselves, and for both a grapheme-to-phoneme front end we have no equivalent of |
 | `parakeet` | FastConformer encoder + TDT decoder (`ParakeetEncoder.java`, `ParakeetTdt.java`, 1533 LOC) | FFT (`audio/Radix2Fft.java`) for the mel front end | **the whole model class.** No transcription SPI exists: 0 matches for a transcription/speech-recognition interface across every `*/src/main`, where TTS has `TextToSpeechModel`. Conformer appears in no source of ours |
 
@@ -186,11 +195,22 @@ nothing failure is already written down in `CLAUDE.md` §1.
 
 ### Stage 4 — `laguna`, then `bailingmoe3`
 
-- `laguna` first: it needs Stage 3 and `attn_gate`, both then in hand.
-- `bailingmoe3` second: it needs Stage 3 *and* Q-LoRA on the MLA path
-  (`attn_q_a`/`attn_q_b` against our full-`attn_q` reader at `Deepseek2Weights.java:131`).
-- **Gate per port:** oracle parity, then qualification. Q-LoRA lands as a shape branch in the
-  existing MLA forward pass, not as a second MLA implementation.
+**Rewritten 2026-10-31 (#288).** The original staged `bailingmoe3` as "Stage 3 plus Q-LoRA", a
+one-branch job. That estimate was made against the attention third of the model.
+
+- `laguna` first: it needs Stage 3 and `attn_gate`, both then in hand. The feasibility document
+  recommends **not** porting it at all — 20.27 GB is its smallest published artifact, so it cannot
+  be qualified on our own terms.
+- `bailingmoe3` second, and it is **four pieces, not one**: the KDA recurrence on 18 of 24 layers,
+  the absorbed MLA form (`attn_k_b`/`attn_v_b`, which `Deepseek2Weights.java:32-34` documents we
+  deliberately do not read), query-side Q-LoRA, and grouped expert top-k. It is **Tier C** in the
+  feasibility document, alongside `nemotron_h_moe`, and ranked ahead of it because its artifact is
+  4.82 GB and therefore qualifiable. Read §6 Tier C there for the per-piece breakdown and the gate;
+  it supersedes this bullet.
+- **Gate per port:** the recurrence alone against an oracle state trajectory *first*, then oracle
+  parity on the full model, then qualification. Q-LoRA lands as a shape branch in the existing MLA
+  forward pass, not as a second MLA implementation; the absorbed MLA form does not — that is a
+  second decompression path and must be written.
 
 ### Stage 5 — `lfm2moe`
 

@@ -17,5 +17,27 @@ reads a few hundred KB of it.
 
 Three results are absences, which is why the manifest is committed next to the probe: no artifact in
 qxotic's own manifest declares `minicpm` (`openbmb/MiniCPM5-1B-GGUF` reports `llama`), none declares
-plain `nemotron_h` (the Nemotron artifact reports `nemotron_h_moe`), and `bailingmoe3` has no
+plain `nemotron_h` (the Nemotron artifact reports `nemotron_h_moe`), and `bailingmoe3` had no
 artifact in the manifest at all.
+
+**`bailingmoe3` is no longer an absence (2026-10-31, #288).** A first-party MIT artifact exists
+outside qxotic's manifest — `inclusionAI/Ling-3.0-tiny-GGUF`, revision `01b850e29ed5` — and its
+header is now the eleventh entry here, read the same way as the other ten. Its
+`general.architecture` is `bailingmoe3`, so this is the architecture and not a near neighbour.
+
+The header also settles a reading that `docs/QXOTIC-PARITY.md` §4 took from their codec rather than
+from an artifact. MLA plus Q-LoRA is confirmed — `attn_q_a` [1536, 256] with `attn_q_a_norm` and
+`attn_q_b` [256, 3072] at `q_lora_rank` 256, and `attn_kv_a_mqa` [1536, 576] with `attn_k_b` and
+`attn_v_b` at `kv_lora_rank` 512 — but it is **only half the model**. Those tensors appear on 6 of
+24 layers. The other 18 carry `ssm_conv1d_q`, `ssm_conv1d_k`, `ssm_conv1d_v`, `ssm_a`, `ssm_beta`,
+`ssm_f_a`, `ssm_g_a` and `ssm_norm`, with `kda.head_dim`, `kda.safe_gate` and
+`kda.gate_lower_bound` in the metadata. So it is a hybrid on a 4-layer interval, and a feasibility
+estimate taken from the MLA reading alone would have described a third of it.
+
+Two further details the header settles, both of which a codec reading gets backwards. The MLA form
+shipped is the **absorbed** one — `attn_k_b`/`attn_v_b` with no unsplit `attn_kv_b` — which is
+exactly the form our DeepSeek-V2 decoder documents that it does *not* read
+(`Deepseek2Weights.java:32-34`), so this file cannot be loaded by the existing MLA path at all. And
+the hybrid interval is not a `full_attention_interval` key; it is a per-layer
+`attention.head_count_kv` array, `[0,0,0,1]` repeated six times, where `Qwen35Config.java:177`
+reads that key as a single `requiredInt`.
