@@ -1,0 +1,52 @@
+   Compiling jmodels-kernels v0.5.10 (/work/released-pair/baseline)
+    Finished `release` profile [optimized + debuginfo] target(s) in 10.46s
+     Running unittests src/lib.rs (work/released-pair/baseline/target/release/deps/jmodels_kernels-b96c23beb48df932)
+
+running 44 tests
+test bfloat16::tests::bf16_invalid_abi_arguments_do_not_write_output ... ok
+test tests::avx2_k_quantized_rows_match_scalar_kernels ... ok
+test tests::avx2_q5_0_bit_plane_matches_scalar_kernel ... ok
+test ptq::tests::packed_scalar_and_vector_q8_reductions_are_bit_identical ... ok
+test tests::avx2_q5_0_row_reduces_simd_lanes_once ... ok
+test tests::avx2_q8_0_quantization_matches_scalar_exactly ... ok
+test tests::batch_scratch_uses_stack_capacity_and_heap_fallback ... ok
+test tests::a_published_job_partitions_across_the_active_pool_and_leaves_the_gate_alone ... ok
+test tests::avx2_q8_0_row_matches_scalar_ordered_accumulation ... ok
+test tests::batched_k_quantized_rows_decode_each_weight_block_once ... ok
+test tests::exports_stable_abi_and_capabilities ... ok
+test tests::completion_poll_observes_finished_workers_without_parking ... ok
+test tests::half_conversion_preserves_subnormal_boundaries ... ok
+test tests::active_count_changes_keep_every_generation_completing ... ok
+test tests::half_round_trip_matches_known_values ... ok
+test tests::grouped_projection_uses_one_worker_generation ... ok
+test tests::gated_delta_net_prefix_matches_token_steps_exactly ... ok
+test tests::prefill_budget ... ignored
+test tests::q4_k_ordered_avx2_matches_scalar_block_fold_bit_for_bit ... ok
+test tests::q4_k_avx2_preserves_single_row_rounding_across_batch_sizes ... ok
+test tests::grouped_gated_delta_net_rejects_an_out_of_range_slot ... ok
+test tests::q5_1_grouping_is_refused_rather_than_given_empty_activations ... ok
+test tests::gated_delta_net_matches_pinned_freetoken_recurrence ... ok
+test tests::creates_and_joins_persistent_worker_context ... ok
+test tests::rejects_invalid_dimensions_without_dereferencing_buffers ... ok
+test tests::q5_1_unpack_matches_the_block_layout ... ok
+test tests::q5_1_scalar_and_avx2_rows_agree_exactly ... ok
+test tests::q8f32_avx2_row_matches_the_scalar_parity_oracle_exactly ... ok
+test tests::persistent_context_reuses_activation_workspace ... ok
+test tests::partition_count_bounds_the_rows_a_worker_takes ... ok
+test tests::grouped_attention_matches_a_naive_reference_across_two_spans_and_workers ... ok
+test tests::grouped_gated_delta_net_matches_each_row_stepped_alone ... ok
+test tests::tq1_0_declares_q8_k_activations_and_its_own_block_geometry ... ok
+test tests::tq1_0_q8_k_avx2_is_bit_identical_to_the_scalar_kernel ... ok
+test tests::tq1_0_q8_k_capability_is_advertised ... ok
+test tests::independent_projections_use_one_worker_generation ... ok
+test tests::tq1_0_q8_k_row_is_sensitive_to_activation_order ... ok
+test tests::tq1_0_q8_k_row_matches_the_reference_bit_for_bit ... ok
+test tests::worker_poll_observes_a_published_generation_without_parking ... ok
+test tests::persistent_workers_complete_repeated_generations ... ok
+test tests::worker_accounts_for_a_published_generation_without_a_job ... ok
+test tests::q5_1_reuse_matches_scalar_through_real_worker_dispatch ... ok
+test tests::q8f32_reuse_matches_scalar_through_real_worker_dispatch ... ok
+test bfloat16::tests::exported_bf16_matches_selected_lane_and_fma_contract ... ok
+
+test result: ok. 43 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
