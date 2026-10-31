@@ -121,6 +121,15 @@ def main():
     parser.add_argument("--modeljars-repo", type=pathlib.Path, required=True)
     parser.add_argument("--date", default=datetime.date.today().isoformat().replace("-", ""))
     parser.add_argument("--apply", action="store_true", help="write; otherwise report only")
+    parser.add_argument(
+        "--models-revision",
+        help="models commit holding the copied evidence, recorded per entry. Required for a "
+        "publisher-reference import, because ModelJars fetches the receipt and the arm reports "
+        "from the models repository at that revision. It goes on the ENTRY, never on the "
+        "document: moving the document revision revalidates every entry, and the grandfathered "
+        "ones predate defaultConfigurationSmoke, so they fail a rule they were never published "
+        "under. That mistake rejected an untouched entry once already.",
+    )
     args = parser.parse_args()
 
     catalog = args.modeljars_repo / "catalog"
@@ -138,7 +147,7 @@ def main():
     # Legitimate on a publisher-reference entry and absent from every other, so they are optional
     # rather than drift. Listed explicitly: the guard's whole job is to refuse a key nobody
     # intended, and that only works if intent is written down.
-    known |= {"policyVersion", "qualificationEvidence", "contextLength"}
+    known |= {"policyVersion", "qualificationEvidence", "contextLength", "modelsRevision"}
     # Named required_keys: line 148 reuses `required` as a loop variable over paths.
     required_keys = set(qualified_entries[0]).intersection(*(set(e) for e in qualified_entries))
 
@@ -223,6 +232,13 @@ def main():
             # The gate requires the catalogued context to equal the context the run actually
             # used, so that a ratio measured at one window cannot be published as another.
             entry["contextLength"] = report["settings"]["contextLength"]
+            if args.models_revision:
+                entry["modelsRevision"] = args.models_revision
+            elif args.apply:
+                raise SystemExit(
+                    "a publisher-reference import needs --models-revision: the gate fetches the "
+                    "receipt and both arm reports from the models repository at that commit"
+                )
             if args.apply:
                 entry["qualificationEvidence"] = {
                     "report": receipt_relative,
