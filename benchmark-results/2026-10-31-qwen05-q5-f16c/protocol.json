@@ -1,0 +1,57 @@
+{
+  "registeredAt": "2026-10-31T19:07:40.515660+00:00",
+  "purpose": "Measure replacing two software half conversions per Q5_1 decode block with F16C, preserving arithmetic order.",
+  "job": {
+    "id": "qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m",
+    "uri": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/9217f5db79a29953eb74d5343926648285ec7e67/qwen2.5-0.5b-instruct-q5_k_m.gguf",
+    "sha256": "041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55",
+    "sizeBytes": 522186592,
+    "architecture": "qwen2",
+    "workload": "general",
+    "template": "chatml",
+    "maxTokens": 256,
+    "contextLength": 2048,
+    "threads": 16,
+    "decodeThreads": null,
+    "comparator": "ollama",
+    "requiresBaseComparison": false,
+    "expectedCases": 9
+  },
+  "modelsVersion": "0.5.9",
+  "vectorsVersion": "0.1.32",
+  "success": "All three experimental candidate/reference pairs meet the unchanged qualification gates and match baseline answers; target decode margin >=0.85. No released qualification is claimed.",
+  "hypothesis": "Hardware conversion reduces Q5_1 decode overhead without altering finite weights or answers.",
+  "controls": "Same Java Models0.5.9/Vectors0.1.32 released JARs, pinned compiler and source tree except two decode conversions and tests; native16/decode8, workload/reference16. Native binaries retain debug symbols in both variants. Separate released-default and source-native correctness smokes. Three orders frozen before launch.",
+  "limitations": "One catalog RAG corpus tests this admission gate; it is not a broad quality benchmark. RAG report records output text and token counts, not token IDs. One host cannot establish cross-host performance.",
+  "fleet": {
+    "provider": "AWS",
+    "region": "us-east-1",
+    "instanceType": "m6a.4xlarge",
+    "instances": 1,
+    "hourlyUSD": 0.6912,
+    "maximumHours": 2.5,
+    "maximumSpendUSD": 3,
+    "stopCondition": "Exit on completion or error, terminate-on-shutdown, 150 minute hard shutdown",
+    "evidenceDestination": "benchmark-results/2026-10-31-qwen05-q5-f16c/results"
+  },
+  "orders": [
+    [
+      "baseline",
+      "candidate",
+      "reference"
+    ],
+    [
+      "reference",
+      "candidate",
+      "baseline"
+    ],
+    [
+      "baseline",
+      "reference",
+      "candidate"
+    ]
+  ],
+  "rustSha256": "c295047583a56238ea06b43f849f4b877fa12bfd4c7103f8d9a74c94c9c4e108",
+  "sourceBaseline": "ccf24a24efb8e99535d8f5ee9191b1c2133a6ce1",
+  "nativeSourceComparison": "Baseline native source matches v0.5.9 except package version metadata; candidate differs by F16C conversions and tests."
+}

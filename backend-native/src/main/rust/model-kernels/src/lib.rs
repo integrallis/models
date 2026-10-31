@@ -5446,11 +5446,11 @@ unsafe fn dot_q5_1_f32_row_avx2(
     let mut accumulators = [_mm256_setzero_ps(); 4];
     for block in 0..blocks_per_row {
         let weight_offset = (row * blocks_per_row + block) * Q5_1_BLOCK_BYTES;
-        let scale = _mm256_set1_ps(f16_to_f32(u16::from_le_bytes([
+        let scale = _mm256_set1_ps(f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset],
             weights[weight_offset + 1],
         ])));
-        let minimum = _mm256_set1_ps(f16_to_f32(u16::from_le_bytes([
+        let minimum = _mm256_set1_ps(f16_to_f32_f16c(u16::from_le_bytes([
             weights[weight_offset + 2],
             weights[weight_offset + 3],
         ])));
@@ -9147,6 +9147,27 @@ mod tests {
         }
     }
 
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn q5_1_f16c_preserves_every_finite_half_and_infinity() {
+        if !std::arch::is_x86_feature_detected!("f16c") {
+            return;
+        }
+        for bits in 0..=u16::MAX {
+            // Hardware quiets signaling NaNs; model scales and minima are finite.
+            if bits & 0x7c00 == 0x7c00 && bits & 0x03ff != 0 {
+                continue;
+            }
+            // SAFETY: F16C was detected above, including for signed zero/subnormals.
+            let actual = unsafe { f16_to_f32_f16c(bits) };
+            assert_eq!(
+                actual.to_bits(),
+                f16_to_f32(bits).to_bits(),
+                "half {bits:04x}"
+            );
+        }
+    }
+
     #[test]
     fn q5_1_scalar_and_avx2_rows_agree_exactly() {
         // Exactly, not closely. The shim and the Java kernel are only interchangeable if every
@@ -9189,8 +9210,14 @@ mod tests {
             for batch in 0..batch_size {
                 for row in 0..rows {
                     // SAFETY: the features above were just detected.
+                    F16C_CONVERSIONS.with(|count| count.set(0));
                     let vector =
                         unsafe { dot_q5_1_f32_row_avx2(&weights, &activations, batch, row, cols) };
+                    assert_eq!(
+                        F16C_CONVERSIONS.with(|count| count.get()),
+                        2 * blocks_per_row,
+                        "Q5_1 decode must convert scale and minimum with F16C"
+                    );
                     assert_eq!(
                         scalars[index].to_bits(),
                         vector.to_bits(),
