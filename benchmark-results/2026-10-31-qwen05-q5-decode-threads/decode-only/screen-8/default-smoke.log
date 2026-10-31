@@ -1,0 +1,41 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 31, 2026 6:46:04 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 31, 2026 6:46:04 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Oct 31, 2026 6:46:05 PM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256; FMA enabled
+iteration 1/1 case=auto-glass-deadline correct=true retrieval=34.4ms ttft=1578.2ms decode=47.35 tok/s e2e=2246.9ms
+iteration 1/1 case=travel-limit correct=true retrieval=4.4ms ttft=408.3ms decode=54.07 tok/s e2e=859.9ms
+iteration 1/1 case=telemedicine-benefit correct=true retrieval=2.5ms ttft=358.0ms decode=53.91 tok/s e2e=752.8ms
+iteration 1/1 case=claim-payment-times correct=true retrieval=2.3ms ttft=412.1ms decode=51.95 tok/s e2e=590.0ms
+iteration 1/1 case=chargeback-evidence correct=true retrieval=2.0ms ttft=262.4ms decode=53.71 tok/s e2e=732.4ms
+iteration 1/1 case=break-glass correct=true retrieval=4.3ms ttft=358.0ms decode=54.99 tok/s e2e=946.2ms
+iteration 1/1 case=idempotency correct=true retrieval=1.9ms ttft=324.2ms decode=55.19 tok/s e2e=799.0ms
+iteration 1/1 case=priority-one correct=true retrieval=2.6ms ttft=257.0ms decode=50.33 tok/s e2e=857.8ms
+iteration 1/1 case=unsupported-lunar-vehicle correct=true retrieval=1.6ms ttft=367.1ms decode=38.88 tok/s e2e=422.2ms
+plain-java/rust-ffm/qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m: tier=USABLE success=9/9 p95-retrieval=22.4ms p95-ttft=1111.8ms p50-decode=53.71 tok/s p95-e2e=1726.6ms correct=100.0% model-answered=66.7% of-those-correct=100.0% extractive-fallback=22.2% truncated=0.0%
+report: /work/released-pair/results/screen-8/default-correctness/models-rust-ffm.json
+	Command being timed: "/work/released-pair/jdk/bin/java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx16g -cp /work/released-pair/released/lib/* com.integrallis.models.rag.RagBenchmarkCli --framework plain-java --model-id qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m --workload general --prompt-template chatml --top-k 1 --max-tokens 256 --context 2048 --threads 16 --backend rust-ffm --backend-version models@0.5.9+345ec7890e23cd43589c62b9e2ece68eb3c81df8 --model /work/released-pair/model.gguf --warmups 0 --iterations 1 --output /work/released-pair/results/screen-8/default-correctness/models-rust-ffm.json"
+	User time (seconds): 121.79
+	System time (seconds): 4.48
+	Percent of CPU this job got: 1294%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:09.75
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 837132
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 131088
+	Voluntary context switches: 144946
+	Involuntary context switches: 10658
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 144
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

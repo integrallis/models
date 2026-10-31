@@ -20,6 +20,12 @@ class SelectionTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             experiment.select_winner(rows)
 
+    def test_a_latency_failure_cannot_outrank_a_complete_pass(self):
+        base = dict(answersStable=True, qualityPassed=True, decodeThreads=8)
+        rows = [dict(base, decodeRatio=.95, latencyRatio=1.6, qualified=False),
+                dict(base, decodeRatio=.90, latencyRatio=1.2, qualified=True)]
+        self.assertEqual(1.2, experiment.select_winner(rows)['latencyRatio'])
+
 
 if __name__ == '__main__':
     unittest.main()
