@@ -1,17 +1,21 @@
 """Launch one bounded, disposable native experiment from a frozen payload."""
-import argparse, base64, datetime, hashlib, json, pathlib, subprocess
+import argparse, base64, datetime, hashlib, json, pathlib, re, subprocess
 parser=argparse.ArgumentParser()
 parser.add_argument('--payload-directory',type=pathlib.Path,required=True)
 parser.add_argument('--launch-template',type=pathlib.Path,required=True)
+parser.add_argument('--worker', default='qwen-native-worker.sh')
+parser.add_argument('--campaign-prefix', default='qwen05-q5-f16c')
 a=parser.parse_args()
+assert re.fullmatch(r'[a-z0-9-]+', a.campaign_prefix)
+assert pathlib.Path(a.worker).name == a.worker
 root=pathlib.Path(__file__).resolve().parents[2]
 out=a.payload_directory.resolve()
 assert not (out/'deployment.json').exists(), 'refusing to replace deployment ownership receipt'
 payload=out/'payload.tar.gz'
-worker=root/'scripts/fleet/qwen-native-worker.sh'
+worker=root/'scripts/fleet'/a.worker
 assert payload.is_file()
 now=datetime.datetime.now(datetime.timezone.utc)
-campaign='qwen05-q5-f16c-'+now.strftime('%Y%m%dT%H%M%SZ')
+campaign=a.campaign_prefix+'-'+now.strftime('%Y%m%dT%H%M%SZ')
 prefix='s3://models-qual-077051030817/payload/'+campaign
 results='s3://models-qual-077051030817/results/'+campaign
 aws=lambda *args:json.loads(subprocess.check_output(['aws',*args,'--region','us-east-1','--output','json']))
