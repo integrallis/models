@@ -4,6 +4,46 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-10-31
+
+- Serve EdgeRock-4B GGUF through the Qwen3.5 hybrid decoder as a fourth architecture name. The
+  published artifact is dual-keyed -- it carries a complete `qwen35.*` metadata set beside its own
+  `edgerock.*` -- and every one of its 546 tensor names is one the Qwen3.5 weight loader already
+  resolves, so what is new is a memory module on each of the eight full-attention layers rather
+  than a decoder. Rock Memory Anchors are implemented as a fixed-capacity learned memory read
+  alongside a 1024-token sliding window: a residual SwiGLU writer, a rank-256 detached admission
+  scorer, a bounded read gate, a stable top-k selection per key/value group, and an
+  all-or-nothing commit every 256 tokens.
+- Qualify the pinned EdgeRock-4B Q4_K_M artifact on the measured Linux CPU RAG `general` workload
+  through the publisher-reference policy, against the publisher's own patched llama.cpp serving the
+  identical file on the same host in the same session: 13.02 median tokens/second, 92.7% of that
+  control's decode and 0.774 times its p95 end-to-end latency, with a time-to-first-token ratio of
+  1.265. Model-answered 66.7% of questions with 100% of those correct, over 27 attempts with no
+  failures; the absolute tier is `PERFORMANCE_REDUCED`. `correctAnswerRate` of 1.0 scores the
+  pipeline rather than the model, because screened generations fall back to extracted text on 22.2%
+  of answers, and the raw visible-answer rate is 0.889.
+- Pass the publisher's own functional cases, including the two that cannot be answered without
+  working memory: the asked-for identifier appears once, roughly ten thousand tokens before the
+  question and far outside the sliding window, with a competing key updated in between.
+- Fix independent per-group memory selection. `admission_up` emits one admission score per
+  key/value group, so the groups keep different anchor sets; a single shared selection left the
+  records of one group addressed by another group's slots, which retrieved a real anchor holding
+  the wrong contents. Reads and commits are now per group.
+- Read `attention.window` as either integer width and refuse a present-but-unreadable value. It
+  was read as uint32 with a zero default, so a width stored as int32 was silently served as full
+  attention.
+- Refuse rather than mis-serve: the graph will not construct for an architecture that declares
+  memory anchors unless they are present, `captureLinearState` refuses on such a model because the
+  snapshot cannot carry the bank, and grouped decisions are refused because the bank is not
+  branch-scoped.
+- Batch EdgeRock's prefill, with the memory contribution wired into the batched path and the
+  sliding window applied per row, proved against one-token-at-a-time decoding across a commit
+  boundary on real weights.
+- `backend-cuda` is unchanged in this release. Its numeric state is as recorded: on the RTX
+  4090 comparison it reached exact token parity (G1) and 31.26 tok/s decode, and G4 passes at
+  6.184x against a 3.00x gate from `benchmark-results/2026-10-07-g4-dualpath`. No device run was
+  made for this release, so that remains the last recorded result rather than a fresh one.
+
 ## [0.5.8] - 2026-10-30
 
 - Add Flint GGUF execution through pure Java and Rust FFM: sigmoid MoE routing, shared experts,
