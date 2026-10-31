@@ -36,7 +36,7 @@ def verify_payload(payload):
 def require_default_smoke(report, job):
     summary = report['summary']
     if not (report['modelId'] == job['id'] and report['artifactSha256'] == job['sha256']
-            and summary['totalAttempts'] > 0
+            and summary['totalAttempts'] == job['expectedCases']
             and summary['totalAttempts'] == summary['successfulAttempts']
             and summary['correctAnswerRate'] == 1 and summary['abstentionAccuracy'] == 1
             and not report['failures'] and report['settings']['warmups'] == 0

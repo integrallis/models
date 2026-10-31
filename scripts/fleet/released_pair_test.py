@@ -34,7 +34,7 @@ class ReleaseEvidenceTest(unittest.TestCase):
             successfulAttempts=9, correctAnswerRate=1, abstentionAccuracy=1), failures=[],
             settings=dict(warmups=0, iterations=1, generationControls=dict(promptCache='longest-common-prefix')),
             backendDiagnostics=dict(environment={'native-quantized-decode': 'true'}))
-        job = dict(id='model', sha256='digest')
+        job = dict(id='model', sha256='digest', expectedCases=9)
         runner.require_default_smoke(report, job)
         report['summary']['successfulAttempts'] = 8
         with self.assertRaisesRegex(ValueError, 'smoke failed'):
