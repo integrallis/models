@@ -196,6 +196,9 @@ public enum RagPromptTemplate {
       case FLINT ->
           ChatTemplate.FLINT.render(
               List.of(ChatMessage.system(systemPrompt), ChatMessage.user(userPrompt)));
+      case MISTRAL ->
+          ChatTemplate.MISTRAL.render(
+              List.of(ChatMessage.system(systemPrompt), ChatMessage.user(userPrompt)));
       case RAW -> result.text(systemPrompt).text(userPrompt).build();
       case CHATML, CHATML_DIRECT, CHATML_ANSWER, CHATML_NO_THINK, EDGEROCK -> {
         result
