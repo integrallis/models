@@ -21,8 +21,9 @@ corpus. This is not broad accuracy evidence.
 Native release unit tests passed on Intel macOS and AMD Linux. Finite half values
 and infinities retain their exact bits, as do scalar/AVX2 test rows. Source native
 overrides are experimental; these results cannot admit a released catalog model.
-The unproven runtime change was removed from the working branch. PR 319 will be
-closed after its existing CI finishes; no competing runtime path is retained.
+The unproven runtime change was removed from the working branch. PR 319 was
+closed without canceling its existing CI; the focused branch was also reverted.
+No competing runtime path is retained.
 
 The next separate experiment tests released fused grouped attention. It uses no
 F16C override and will not alter any qualification thresholds or existing model
