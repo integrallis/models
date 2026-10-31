@@ -971,6 +971,101 @@ class NativeKernelLibraryTest {
         .isLessThan(quantizedWorst);
   }
 
+  @Test
+  void theExactActivationQ8_0RouteMatchesTheShippedJavaPathBitForBit() {
+    // #292's acceptance criterion, and what the kernel's own javadoc claims: this route folds
+    // "exactly as Java's PinnedReduction.dot folds", so the assertion is EQUALITY and not a
+    // tolerance. The reference is TensorOps.ggufExactBatchedMatmul -- the real shipped Java path a
+    // typed-decision model runs, not a reducer written for this test. A tolerance here would pass
+    // for a kernel that merely folds *closely*, which is the failure this test exists to catch:
+    // Laya's output is an argmax, so a last-bit difference in fold order is a flipped answer.
+    //
+    // The Rust tests compare the AVX2 variant against the Rust scalar one; nothing there asserts
+    // that the Rust scalar matches JAVA, which is the claim the route rests on. That is this test.
+    // Which variant runs is the library's choice, pinned on the Rust side by
+    // q8f32_reuse_matches_scalar_through_real_worker_dispatch: AVX2+FMA hosts get
+    // Q8F32ActivationAvx2 and everything else the scalar kernel, so across hosts both are checked
+    // against Java and neither can drift from it unnoticed.
+    //
+    // Shapes vary the axis fold order actually depends on. One Q8_0 block is thirty-two elements,
+    // which is exactly one PinnedReduction step, so 32 columns never exercises a second round of
+    // the four accumulators and could not fail on fold order at all. 64, 96, 160 and 256 do, and
+    // 96 and 160 are deliberately not powers of two.
+    int[] columnCounts = {32, 64, 96, 160, 256};
+    int[] batchSizes = {1, 2, 5};
+
+    try (RustGgufBatchedMatrixKernel kernel =
+        RustGgufBatchedMatrixKernel.openExactActivations(libraryPath(), 1)) {
+      for (int cols : columnCounts) {
+        for (int batchSize : batchSizes) {
+          int rows = 7;
+          float[] input = inputs(batchSize, cols);
+          float[] fromKernel = new float[batchSize * rows];
+          float[] fromJava = new float[batchSize * rows];
+
+          try (Arena arena = Arena.ofConfined()) {
+            MemorySegment weights = arena.allocate(rows * cols / 32L * 34L);
+            fillQ8_0Weights(weights, rows, cols);
+            kernel.multiply(
+                fromKernel, input, weights, GgufTensorType.Q8_0, batchSize, rows, cols);
+            TensorOps.ggufExactBatchedMatmul(
+                fromJava,
+                input,
+                weights,
+                GgufTensorType.Q8_0,
+                batchSize,
+                rows,
+                cols,
+                new float[cols]);
+          }
+
+          assertThat(fromKernel)
+              .as("Q8_0 F32-activation kernel vs TensorOps.ggufExactBatchedMatmul at %d"
+                  + " columns, batch %d", cols, batchSize)
+              .containsExactly(fromJava);
+        }
+      }
+    }
+  }
+
+  @Test
+  void theQ8_0FixturesDoNotHoldTheFoldOrderAxisConstant() {
+    // A negative control for the test above. If every row reduced to the same value, or if widening
+    // the column count did not change the result, the parity assertion would hold for a kernel that
+    // got fold order wrong -- the fixture would be hiding the axis under test. Assert the fixture
+    // varies along both axes before trusting an equality that depends on them.
+    int rows = 7;
+    float[] narrow = new float[rows];
+    float[] wide = new float[rows];
+
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment narrowWeights = arena.allocate(rows * 64 / 32L * 34L);
+      MemorySegment wideWeights = arena.allocate(rows * 256 / 32L * 34L);
+      fillQ8_0Weights(narrowWeights, rows, 64);
+      fillQ8_0Weights(wideWeights, rows, 256);
+      TensorOps.ggufExactBatchedMatmul(
+          narrow, inputs(1, 64), narrowWeights, GgufTensorType.Q8_0, 1, rows, 64, new float[64]);
+      TensorOps.ggufExactBatchedMatmul(
+          wide, inputs(1, 256), wideWeights, GgufTensorType.Q8_0, 1, rows, 256, new float[256]);
+    }
+
+    assertThat(distinctCount(narrow))
+        .as("rows must not all reduce to the same value, or row indexing is untested")
+        .isGreaterThan(1);
+    assertThat(distinctCount(wide)).isGreaterThan(1);
+    assertThat(wide[0])
+        .as("widening the reduction must change the result, or the fold-order axis is held constant")
+        .isNotEqualTo(narrow[0]);
+  }
+
+  private static long distinctCount(float[] values) {
+    return new java.util.HashSet<>(
+            java.util.stream.IntStream.range(0, values.length)
+                .mapToObj(index -> values[index])
+                .toList())
+        .size();
+  }
+
   /** Dequantizes Q8_0 weights and reduces in F32, which is what the activations are spared. */
   private static void referenceQ8_0F32ActivationBatchedMatmul(
       MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
