@@ -111,6 +111,8 @@ def main():
         status.write_text('RUNNING_PAIRED_RAG\n')
         trials = ['--warmups', '1', '--iterations', '3']
         tuned = [] if job.get('decodeThreads') is None else ['-Dmodels.native.kernels.decodeThreads=' + str(job['decodeThreads'])]
+        if job.get('nativeThreads') is not None:
+            tuned.append('-Dmodels.native.kernels.threads=' + str(job['nativeThreads']))
         candidate_command = java + tuned + classpath + common + candidate + trials + ['--output', str(out / 'models-rag.json')]
         if job['comparator'] == 'ollama':
             reference = ['--backend', 'ollama', '--endpoint', 'http://127.0.0.1:11434']
