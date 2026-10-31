@@ -63,6 +63,10 @@ def main():
             decodeTokensPerSecond=report['summary']['p50DecodeTokensPerSecond'],
             decodeRatio=comparison['decodeThroughputRatio'], latencyRatio=comparison['endToEndLatencyRatio'],
             modelAnswerRate=q['modelAnswerRate'], modelAnswerCorrectRate=q['modelAnswerCorrectRate'])
+        if 'fusedGroupedAttention' in job:
+            decision = next(d for d in report['backendDiagnostics']['optimizations'] if d['id'] == 'fused-grouped-attention')
+            assert (decision['status'] == 'ENABLED') == job['fusedGroupedAttention']
+            row['fusedGroupedAttention'] = job['fusedGroupedAttention']
         rows.append(row)
         (a.output / 'summary.json').write_text(json.dumps(dict(trials=rows, complete=False), indent=2) + '\n')
         print(json.dumps(row), flush=True)
@@ -76,6 +80,8 @@ def main():
     winner = select_winner(rows)
     (a.output / 'selection.json').write_text(json.dumps(winner, indent=2) + '\n')
     chosen = dict(decodeThreads=winner['decodeThreads'], nativeThreads=winner['nativeThreads'])
+    if 'fusedGroupedAttention' in winner:
+        chosen['fusedGroupedAttention'] = winner['fusedGroupedAttention']
     confirmations = [trial('confirm-' + str(i + 1), chosen, first)
                      for i, first in enumerate(protocol['confirmationReferenceFirst'])]
     confirmed = all(r['qualified'] and r['answersStable'] for r in [winner, *confirmations])

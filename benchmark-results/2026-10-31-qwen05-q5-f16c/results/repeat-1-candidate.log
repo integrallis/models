@@ -1,0 +1,59 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 31, 2026 7:12:00 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 31, 2026 7:12:00 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Oct 31, 2026 7:12:00 PM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256; FMA enabled
+iteration 1/3 case=auto-glass-deadline correct=true retrieval=2.0ms ttft=99.6ms decode=60.21 tok/s e2e=585.0ms
+iteration 1/3 case=travel-limit correct=true retrieval=1.7ms ttft=361.4ms decode=61.49 tok/s e2e=755.2ms
+iteration 1/3 case=telemedicine-benefit correct=true retrieval=1.7ms ttft=246.0ms decode=61.92 tok/s e2e=588.6ms
+iteration 1/3 case=claim-payment-times correct=true retrieval=2.0ms ttft=201.1ms decode=60.52 tok/s e2e=354.0ms
+iteration 1/3 case=chargeback-evidence correct=true retrieval=1.5ms ttft=210.3ms decode=62.52 tok/s e2e=613.4ms
+iteration 1/3 case=break-glass correct=true retrieval=1.4ms ttft=241.3ms decode=64.68 tok/s e2e=739.1ms
+iteration 1/3 case=idempotency correct=true retrieval=1.6ms ttft=291.6ms decode=63.86 tok/s e2e=702.0ms
+iteration 1/3 case=priority-one correct=true retrieval=1.4ms ttft=294.5ms decode=64.69 tok/s e2e=761.2ms
+iteration 1/3 case=unsupported-lunar-vehicle correct=true retrieval=1.0ms ttft=282.2ms decode=36.16 tok/s e2e=340.1ms
+iteration 2/3 case=auto-glass-deadline correct=true retrieval=1.4ms ttft=117.3ms decode=63.33 tok/s e2e=578.2ms
+iteration 2/3 case=travel-limit correct=true retrieval=1.4ms ttft=366.3ms decode=57.82 tok/s e2e=784.3ms
+iteration 2/3 case=telemedicine-benefit correct=true retrieval=1.2ms ttft=259.9ms decode=58.34 tok/s e2e=622.5ms
+iteration 2/3 case=claim-payment-times correct=true retrieval=1.1ms ttft=402.5ms decode=57.70 tok/s e2e=561.1ms
+iteration 2/3 case=chargeback-evidence correct=true retrieval=1.0ms ttft=239.9ms decode=64.19 tok/s e2e=631.8ms
+iteration 2/3 case=break-glass correct=true retrieval=1.1ms ttft=487.8ms decode=62.14 tok/s e2e=1005.4ms
+iteration 2/3 case=idempotency correct=true retrieval=1.1ms ttft=522.2ms decode=59.99 tok/s e2e=958.2ms
+iteration 2/3 case=priority-one correct=true retrieval=1.2ms ttft=223.7ms decode=64.25 tok/s e2e=693.3ms
+iteration 2/3 case=unsupported-lunar-vehicle correct=true retrieval=0.8ms ttft=226.6ms decode=44.72 tok/s e2e=273.5ms
+iteration 3/3 case=auto-glass-deadline correct=true retrieval=1.2ms ttft=106.1ms decode=64.22 tok/s e2e=560.3ms
+iteration 3/3 case=travel-limit correct=true retrieval=1.1ms ttft=222.6ms decode=63.93 tok/s e2e=600.5ms
+iteration 3/3 case=telemedicine-benefit correct=true retrieval=1.1ms ttft=223.8ms decode=63.44 tok/s e2e=557.2ms
+iteration 3/3 case=claim-payment-times correct=true retrieval=1.3ms ttft=210.1ms decode=60.38 tok/s e2e=361.9ms
+iteration 3/3 case=chargeback-evidence correct=true retrieval=1.2ms ttft=205.2ms decode=64.41 tok/s e2e=596.0ms
+iteration 3/3 case=break-glass correct=true retrieval=1.1ms ttft=232.2ms decode=64.61 tok/s e2e=730.1ms
+iteration 3/3 case=idempotency correct=true retrieval=0.8ms ttft=268.5ms decode=64.03 tok/s e2e=676.8ms
+iteration 3/3 case=priority-one correct=true retrieval=0.9ms ttft=234.1ms decode=59.95 tok/s e2e=736.7ms
+iteration 3/3 case=unsupported-lunar-vehicle correct=true retrieval=0.7ms ttft=692.4ms decode=36.05 tok/s e2e=750.1ms
+plain-java/rust-ffm/qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m: tier=PRODUCTION_READY success=27/27 p95-retrieval=1.9ms p95-ttft=511.9ms p50-decode=62.14 tok/s p95-e2e=906.0ms correct=100.0% model-answered=66.7% of-those-correct=100.0% extractive-fallback=22.2% truncated=0.0%
+report: /work/released-pair/results/repeat-1-candidate.json
+	Command being timed: "/work/released-pair/jdk/bin/java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx16g -Dmodels.native.kernels.library=/work/released-pair/candidate/target/release/libjmodels_kernels.so -Dmodels.native.kernels.threads=16 -Dmodels.native.kernels.decodeThreads=8 -cp /work/released-pair/released/lib/* com.integrallis.models.rag.RagBenchmarkCli --framework plain-java --model-id qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m --workload general --prompt-template chatml --threads 16 --context 2048 --max-tokens 256 --top-k 1 --backend rust-ffm --model /work/released-pair/model.gguf --backend-version models@0.5.9+EXPERIMENTAL-native-candidate-3345410dcd088b63a42b88a47e2370e3397541e80a25e4e6e3077e15132707a2 --warmups 1 --iterations 3 --output /work/released-pair/results/repeat-1-candidate.json"
+	User time (seconds): 280.35
+	System time (seconds): 3.96
+	Percent of CPU this job got: 1085%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:26.20
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 867060
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 146814
+	Voluntary context switches: 247880
+	Involuntary context switches: 35582
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 224
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
