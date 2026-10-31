@@ -1,0 +1,51 @@
+{
+  "ImageId": "ami-0045d7fc2ad003464",
+  "InstanceType": "m6a.4xlarge",
+  "MinCount": 1,
+  "MaxCount": 1,
+  "IamInstanceProfile": {
+    "Name": "models-qual-worker"
+  },
+  "SubnetId": "subnet-08fcc910aba0d5b23",
+  "SecurityGroupIds": [
+    "sg-0e9ff523da4140d55"
+  ],
+  "InstanceInitiatedShutdownBehavior": "terminate",
+  "BlockDeviceMappings": [
+    {
+      "DeviceName": "/dev/sda1",
+      "Ebs": {
+        "VolumeSize": 80,
+        "VolumeType": "gp3",
+        "DeleteOnTermination": true,
+        "Throughput": 500,
+        "Iops": 3000
+      }
+    }
+  ],
+  "MetadataOptions": {
+    "HttpTokens": "required",
+    "HttpEndpoint": "enabled"
+  },
+  "TagSpecifications": [
+    {
+      "ResourceType": "instance",
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "qwen05-q5-attention-pool-20261031T192432Z-0"
+        },
+        {
+          "Key": "project",
+          "Value": "models-qualification"
+        },
+        {
+          "Key": "campaign",
+          "Value": "qwen05-q5-attention-pool-20261031T192432Z-0"
+        }
+      ]
+    }
+  ],
+  "ClientToken": "qwen05-q5-attention-pool-20261031T192432Z-0",
+  "UserData": "IyEvYmluL2Jhc2gKc2V0IC1ldW8gcGlwZWZhaWwKZXhlYyA+ID4odGVlIC1hIC92YXIvbG9nL2NhbXBhaWduLWJvb3RzdHJhcC5sb2cgL2Rldi9jb25zb2xlKSAyPiYxCnNodXRkb3duIC1oICsxNTAKZmluaXNoKCkgeyByYz0kPzsgdHJhcCAtIEVYSVQ7IGlmIGNvbW1hbmQgLXYgYXdzID4vZGV2L251bGw7IHRoZW4gYXdzIHMzIGNwIC92YXIvbG9nL2NhbXBhaWduLWJvb3RzdHJhcC5sb2cgJ3MzOi8vbW9kZWxzLXF1YWwtMDc3MDUxMDMwODE3L3Jlc3VsdHMvcXdlbjA1LXE1LWF0dGVudGlvbi1wb29sLTIwMjYxMDMxVDE5MjQzMlovc2hhcmQtMC9ib290c3RyYXAubG9nJyAtLXJlZ2lvbiB1cy1lYXN0LTEgLS1vbmx5LXNob3ctZXJyb3JzIHx8IHRydWU7IGZpOyBzaHV0ZG93biAtaCBub3c7IGV4aXQgIiRyYyI7IH0KdHJhcCBmaW5pc2ggRVhJVApleHBvcnQgREVCSUFOX0ZST05URU5EPW5vbmludGVyYWN0aXZlCmFwdC1nZXQgdXBkYXRlIC1xcQphcHQtZ2V0IGluc3RhbGwgLXkgLXFxIGN1cmwgdW56aXAganEgcHl0aG9uMyB6c3RkCm1rZGlyIC1wIC93b3JrCmN1cmwgLWZMIC0tcmV0cnkgMyAtLW1heC10aW1lIDMwMCBodHRwczovL2F3c2NsaS5hbWF6b25hd3MuY29tL2F3c2NsaS1leGUtbGludXgteDg2XzY0LnppcCAtbyAvd29yay9hd3NjbGkuemlwCnVuemlwIC1xIC93b3JrL2F3c2NsaS56aXAgLWQgL3dvcmsKL3dvcmsvYXdzL2luc3RhbGwKYXdzIHMzIGNwICdzMzovL21vZGVscy1xdWFsLTA3NzA1MTAzMDgxNy9wYXlsb2FkL3F3ZW4wNS1xNS1hdHRlbnRpb24tcG9vbC0yMDI2MTAzMVQxOTI0MzJaL21hbmlmZXN0LTAuanNvbicgL3dvcmsvbWFuaWZlc3QuanNvbiAtLXJlZ2lvbiB1cy1lYXN0LTEgLS1vbmx5LXNob3ctZXJyb3JzCmF3cyBzMyBjcCAnczM6Ly9tb2RlbHMtcXVhbC0wNzcwNTEwMzA4MTcvcGF5bG9hZC9xd2VuMDUtcTUtYXR0ZW50aW9uLXBvb2wtMjAyNjEwMzFUMTkyNDMyWi93b3JrZXIuc2gnIC93b3JrL3dvcmtlci5zaCAtLXJlZ2lvbiB1cy1lYXN0LTEgLS1vbmx5LXNob3ctZXJyb3JzCnByaW50ZiAnJXMgICVzXG4nICdkOTlmZGUzMjZjZWVkMzVhMTAwNWM0ZmY4MzRlYjA5OGQ4YjY0MzdkYmI2NDNiMjEzNDU4YmEzZmM4NWE0Y2ZiJyAvd29yay93b3JrZXIuc2ggfCBzaGEyNTZzdW0gLWMgLQp0aW1lb3V0IC0tc2lnbmFsPVRFUk0gLS1raWxsLWFmdGVyPTMwIDg1MDAgYmFzaCAvd29yay93b3JrZXIuc2ggL3dvcmsvbWFuaWZlc3QuanNvbgo="
+}
