@@ -120,6 +120,25 @@ class GgufTokenizerTest {
     }
   }
 
+  @Test
+  void llama3BpeUsesItsBosDefaultOnlyWhenMetadataDoesNotOverrideIt() {
+    for (String pre : List.of("llama3", "llama-v3", "llama-bpe")) {
+      Map<String, GgufMetadataValue> entries =
+          new LinkedHashMap<>(createByteLevelMetadata().entries());
+      entries.put("tokenizer.ggml.pre", new GgufMetadataValue.StringValue(pre));
+      entries.remove("tokenizer.ggml.add_bos_token");
+      assertThat(GgufTokenizer.fromMetadata(new GgufMetadata(entries)).encode("hi"))
+          .containsExactly(8, 4);
+      entries.put("tokenizer.ggml.add_bos_token", new GgufMetadataValue.BoolValue(false));
+      assertThat(GgufTokenizer.fromMetadata(new GgufMetadata(entries)).encode("hi"))
+          .containsExactly(4);
+    }
+    Map<String, GgufMetadataValue> qwen = new LinkedHashMap<>(createByteLevelMetadata().entries());
+    qwen.put("tokenizer.ggml.pre", new GgufMetadataValue.StringValue("qwen2"));
+    qwen.remove("tokenizer.ggml.add_bos_token");
+    assertThat(GgufTokenizer.fromMetadata(new GgufMetadata(qwen)).encode("hi")).containsExactly(4);
+  }
+
   private GgufMetadata createByteLevelMetadata() {
     return createByteLevelMetadata(false, false);
   }
@@ -337,6 +356,8 @@ class GgufTokenizerTest {
     }
     entries.put("tokenizer.ggml.model", new GgufMetadataValue.StringValue("gpt2"));
     entries.put("tokenizer.ggml.pre", new GgufMetadataValue.StringValue(preTokenizer));
+    // This fixture isolates piece splitting; boundary defaults are tested separately.
+    entries.put("tokenizer.ggml.add_bos_token", new GgufMetadataValue.BoolValue(false));
     return new GgufMetadata(entries);
   }
 

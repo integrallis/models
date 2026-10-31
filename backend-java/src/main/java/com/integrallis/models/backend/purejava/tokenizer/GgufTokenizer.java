@@ -318,8 +318,17 @@ public final class GgufTokenizer implements Tokenizer {
             && !useWordPiece
             && !useUnigram
             && detectByteLevel(tokenizerModel, vocab, tokenToId);
+    // Llama-3 BPE defaults to a leading BOS even when the optional GGUF flag is absent.
+    // The chat envelope does not own BOS: omitting it here changes every subsequent position.
+    String preTokenizer = metadata.getString("tokenizer.ggml.pre").orElse("");
+    boolean llama3Bos =
+        "llama3".equals(preTokenizer)
+            || "llama-v3".equals(preTokenizer)
+            || "llama-bpe".equals(preTokenizer);
     boolean addBosToken =
-        metadata.getBool("tokenizer.ggml.add_bos_token").orElse(useSentencePiece || useWordPiece);
+        metadata
+            .getBool("tokenizer.ggml.add_bos_token")
+            .orElse(useSentencePiece || useWordPiece || llama3Bos);
     boolean addEosToken =
         metadata.getBool("tokenizer.ggml.add_eos_token").orElse(useWordPiece || useUnigram);
     boolean addSpacePrefix =
@@ -336,7 +345,6 @@ public final class GgufTokenizer implements Tokenizer {
                 metadata.getBool("tokenizer.ggml.remove_extra_whitespaces").orElse(false),
                 unknownTokenId)
             : null;
-    String preTokenizer = metadata.getString("tokenizer.ggml.pre").orElse("");
     BpePreTokenizer bpePreTokenizer = BpePreTokenizer.forName(preTokenizer);
 
     return new GgufTokenizer(
