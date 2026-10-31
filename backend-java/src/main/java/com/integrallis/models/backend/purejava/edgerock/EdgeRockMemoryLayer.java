@@ -85,7 +85,10 @@ public final class EdgeRockMemoryLayer {
     int dim = config.headDim();
     this.normed = new float[embedding];
     this.queryFlat = new float[heads * dim];
-    this.queries = new float[heads][];
+    // Preallocated rather than filled by a fresh copy per call. These are rotated in place, so a
+    // copy is needed, but the array holding it does not have to be new: at 16 heads and 4 groups
+    // over 8 memory layers this was 160 short-lived arrays per token.
+    this.queries = new float[heads][dim];
     this.gates = new float[heads];
     this.readOut = new float[heads][dim];
     this.readFlat = new float[heads * dim];
@@ -95,8 +98,8 @@ public final class EdgeRockMemoryLayer {
     this.writeDownOut = new float[embedding];
     this.keyFlat = new float[groups * dim];
     this.valueFlat = new float[groups * dim];
-    this.groupKeys = new float[groups][];
-    this.groupValues = new float[groups][];
+    this.groupKeys = new float[groups][dim];
+    this.groupValues = new float[groups][dim];
     this.admissionHidden = new float[config.memoryAdmissionRank()];
     this.scores = new float[groups];
   }
@@ -167,7 +170,7 @@ public final class EdgeRockMemoryLayer {
           weights.queryNorm(),
           dim,
           config.rmsNormEpsilon());
-      queries[head] = slice(queryFlat, head * dim, dim);
+      System.arraycopy(queryFlat, head * dim, queries[head], 0, dim);
     }
     // The gate is read off the normed query *before* rope, and only then is the query rotated.
     // The reference is explicit about the order and it matters from the second token onward: at
@@ -208,9 +211,9 @@ public final class EdgeRockMemoryLayer {
           weights.keyNorm(),
           dim,
           config.rmsNormEpsilon());
-      groupKeys[group] = slice(keyFlat, group * dim, dim);
+      System.arraycopy(keyFlat, group * dim, groupKeys[group], 0, dim);
       rotation.rotate(groupKeys[group]);
-      groupValues[group] = slice(valueFlat, group * dim, dim);
+      System.arraycopy(valueFlat, group * dim, groupValues[group], 0, dim);
     }
 
     // Admission reads the normed state, not the written one, and the reference detaches it: the
@@ -222,12 +225,6 @@ public final class EdgeRockMemoryLayer {
     weights.admissionUp().apply(admissionHidden, scores);
 
     bank.stage(groupKeys, groupValues, scores);
-  }
-
-  private static float[] slice(float[] source, int offset, int length) {
-    float[] out = new float[length];
-    System.arraycopy(source, offset, out, 0, length);
-    return out;
   }
 
   private static float silu(float value) {
