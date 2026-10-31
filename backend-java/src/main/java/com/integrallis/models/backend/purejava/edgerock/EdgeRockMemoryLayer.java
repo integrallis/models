@@ -156,24 +156,8 @@ public final class EdgeRockMemoryLayer {
         config.embeddingLength(),
         config.rmsNormEpsilon());
 
-    // q_proj, write_gate and write_up all read the normed state and nothing else, so they are
-    // computed together, before the read, through one activation preparation. Hoisting the two
-    // write projections above the read is safe precisely because of that: neither depends on the
-    // bank, and nothing is staged until the end.
-    if (!QuantizedProjection.fusedTriple(
-        weights.queryProjection(),
-        queryFlat,
-        weights.writeGate(),
-        writeGateOut,
-        weights.writeUp(),
-        writeUpOut,
-        normed)) {
-      weights.queryProjection().apply(normed, queryFlat);
-      weights.writeGate().apply(normed, writeGateOut);
-      weights.writeUp().apply(normed, writeUpOut);
-    }
-
     // --- read, from committed records only ------------------------------------------------
+    weights.queryProjection().apply(normed, queryFlat);
     for (int head = 0; head < heads; head++) {
       // In place at this head's offset. Elementwise, so aliasing out and x at the same offset is
       // safe, and it keeps the shared pinned reduction rather than a local sum that would not be
@@ -206,7 +190,8 @@ public final class EdgeRockMemoryLayer {
     // --- write, staged -------------------------------------------------------------------
     // Residual: the writer refines the normed state rather than replacing it, and write_down is
     // zero-initialised in the reference, so an untrained writer is exactly the identity.
-    // writeGateOut and writeUpOut were produced with the query above.
+    weights.writeGate().apply(normed, writeGateOut);
+    weights.writeUp().apply(normed, writeUpOut);
     for (int i = 0; i < writeGateOut.length; i++) {
       writeGateOut[i] = silu(writeGateOut[i]) * writeUpOut[i];
     }
@@ -215,11 +200,8 @@ public final class EdgeRockMemoryLayer {
       written[i] = normed[i] + writeDownOut[i];
     }
 
-    if (!QuantizedProjection.fusedDual(
-        weights.keyProjection(), keyFlat, weights.valueProjection(), valueFlat, written)) {
-      weights.keyProjection().apply(written, keyFlat);
-      weights.valueProjection().apply(written, valueFlat);
-    }
+    weights.keyProjection().apply(written, keyFlat);
+    weights.valueProjection().apply(written, valueFlat);
     for (int group = 0; group < groups; group++) {
       TensorOps.rmsNorm(
           keyFlat,
