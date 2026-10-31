@@ -20,7 +20,7 @@ def main():
     job = protocol['job']
     model = a.work / 'model.gguf'
     assert model.stat().st_size == job['sizeBytes'] and pair.digest(model) == job['sha256']
-    for native in [16, 8]:
+    for native in protocol.get('nativePools', [16, 8]):
         out = a.output / ('native-' + str(native))
         out.mkdir()
         command = [str(a.work / 'jdk/bin/java'), '--add-modules', 'jdk.incubator.vector',
@@ -33,6 +33,12 @@ def main():
             '--prompt-template', job['template'], '--threads', '16', '--context', '2048',
             '--max-tokens', '256', '--top-k', '1', '--warmups', '3', '--iterations', '5',
             '--output', str(out / 'instrumented-rag.json')]
+        if protocol.get('nativeLibrary'):
+            library = a.work / protocol['nativeLibrary']
+            digest = pair.digest(library)
+            command.insert(1, '-Dmodels.native.kernels.library=' + str(library))
+            command[command.index('--backend-version') + 1] = 'models@0.5.9+SYMBOLIZED-source-native-' + digest
+            (out / 'native-library.json').write_text(json.dumps(dict(path=str(library), sha256=digest), indent=2) + '\n')
         (out / 'command.json').write_text(json.dumps(command, indent=2) + '\n')
         with (out / 'java.log').open('w') as log:
             process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)

@@ -1,0 +1,57 @@
+{
+  "registeredAt": "2026-10-31T19:22:28.516948+00:00",
+  "purpose": "Resolve native hotspot functions after the F16C change failed to produce repeatable gains. Diagnostic sampling only.",
+  "job": {
+    "id": "qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m",
+    "uri": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/9217f5db79a29953eb74d5343926648285ec7e67/qwen2.5-0.5b-instruct-q5_k_m.gguf",
+    "sha256": "041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55",
+    "sizeBytes": 522186592,
+    "architecture": "qwen2",
+    "workload": "general",
+    "template": "chatml",
+    "maxTokens": 256,
+    "contextLength": 2048,
+    "threads": 16,
+    "decodeThreads": null,
+    "comparator": "ollama",
+    "requiresBaseComparison": false,
+    "expectedCases": 9
+  },
+  "modelsVersion": "0.5.9",
+  "vectorsVersion": "0.1.32",
+  "success": "Two readable native/Java CPU profiles with complete benchmark reports. No qualification verdict is generated.",
+  "hypothesis": "Native Q5_1 arithmetic, synchronization, or native grouped attention dominates decode. The Java fused attention flag does not select the primary native decode path.",
+  "controls": "Same released Java artifacts; native source matches v0.5.9 except version metadata and is rebuilt with Rust1.96.0 and debug symbols, no F16C change. Eight decode workers, sixteen native pool and declared threads. Instrumented timings cannot qualify a model.",
+  "limitations": "One catalog RAG corpus tests this admission gate; it is not a broad quality benchmark. RAG report records output text and token counts, not token IDs. One host cannot establish cross-host performance.",
+  "fleet": {
+    "provider": "AWS",
+    "region": "us-east-1",
+    "instanceType": "m6a.4xlarge",
+    "instances": 1,
+    "hourlyUSD": 0.6912,
+    "maximumHours": 2.5,
+    "maximumSpendUSD": 3,
+    "stopCondition": "Exit on completion or error, terminate-on-shutdown, 150 minute hard shutdown",
+    "evidenceDestination": "benchmark-results/2026-10-31-qwen05-q5-symbolized/results"
+  },
+  "profile": {
+    "nativePools": [
+      16
+    ],
+    "decodeThreads": 8,
+    "profiler": "async-profiler 4.2",
+    "profilerSha256": "1d8faf6cfcbf63efdbdbc1d324f1822515987c455ac377fcfcd53b5ce6243d2b",
+    "event": "cpu",
+    "intervalNanos": 1000000,
+    "delaySeconds": 15,
+    "durationSeconds": 20,
+    "warmups": 3,
+    "iterations": 5
+  },
+  "nativePools": [
+    16
+  ],
+  "nativeLibrary": "baseline/target/release/libjmodels_kernels.so",
+  "rustSha256": "c295047583a56238ea06b43f849f4b877fa12bfd4c7103f8d9a74c94c9c4e108",
+  "nativeSourceRevision": "ccf24a24efb8e99535d8f5ee9191b1c2133a6ce1"
+}
