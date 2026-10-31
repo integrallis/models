@@ -1,0 +1,52 @@
+{
+  "registeredAt": "2026-10-31T18:56:50.046603+00:00",
+  "purpose": "Identify CPU hotspots after the thread sweeps missed qualification; instrumented runs are diagnostic only.",
+  "job": {
+    "id": "qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m",
+    "uri": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/9217f5db79a29953eb74d5343926648285ec7e67/qwen2.5-0.5b-instruct-q5_k_m.gguf",
+    "sha256": "041474553fcabfc2a2d67903f9d2c2e50bd92528e670da4f33b5d0ce6e59fd55",
+    "sizeBytes": 522186592,
+    "architecture": "qwen2",
+    "workload": "general",
+    "template": "chatml",
+    "maxTokens": 256,
+    "contextLength": 2048,
+    "threads": 16,
+    "decodeThreads": null,
+    "comparator": "ollama",
+    "requiresBaseComparison": false,
+    "expectedCases": 9
+  },
+  "modelsVersion": "0.5.9",
+  "vectorsVersion": "0.1.32",
+  "success": "Two readable native/Java CPU profiles with complete benchmark reports. No qualification verdict is generated.",
+  "hypothesis": "Q5_1 arithmetic, worker coordination, or Java attention accounts for material remaining cost; no CPU hotspot is asserted before measurement.",
+  "controls": "16 declared workload/Java threads and 16 reference threads, eight native decode workers, same artifacts and sampling. Only native prefill/pool size changes between 16 and 8. Default smoke continues to use no tuning properties.",
+  "limitations": "One catalog RAG corpus tests this admission gate; it is not a broad quality benchmark. RAG report records output text and token counts, not token IDs. One host cannot establish cross-host performance.",
+  "fleet": {
+    "provider": "AWS",
+    "region": "us-east-1",
+    "instanceType": "m6a.4xlarge",
+    "instances": 1,
+    "hourlyUSD": 0.6912,
+    "maximumHours": 2.5,
+    "maximumSpendUSD": 3,
+    "stopCondition": "Exit on completion or error, terminate-on-shutdown, 150 minute hard shutdown",
+    "evidenceDestination": "benchmark-results/2026-10-31-qwen05-q5-decode-threads/cpu-profiles"
+  },
+  "profile": {
+    "nativePools": [
+      16,
+      8
+    ],
+    "decodeThreads": 8,
+    "profiler": "async-profiler 4.2",
+    "profilerSha256": "1d8faf6cfcbf63efdbdbc1d324f1822515987c455ac377fcfcd53b5ce6243d2b",
+    "event": "cpu",
+    "intervalNanos": 1000000,
+    "delaySeconds": 15,
+    "durationSeconds": 20,
+    "warmups": 3,
+    "iterations": 5
+  }
+}
