@@ -134,6 +134,56 @@ class NativeDecodeRateProbe {
         .isCloseTo(javaRoute, org.assertj.core.api.Assertions.withinPercentage(1.0));
   }
 
+  @Test
+  void theFusedProjectionRouteIsActuallyTakenOnRealWeights() throws java.io.IOException {
+    // Without this the fusion is unobservable. If isTripleEligible says no at batch size 1, the
+    // layer falls back to individual projections, nothing changes, and an A/B would report "no
+    // effect" when the truth is "the fast path never ran".
+    Path model = Path.of(System.getProperty(MODEL_PROPERTY));
+    Path library = Path.of(System.getProperty("models.native.kernels.library"));
+    try (java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofShared();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(library, 8)) {
+      var file = com.integrallis.models.backend.purejava.gguf.GgufParser.parse(model, arena);
+      var memory =
+          com.integrallis.models.backend.purejava.edgerock.EdgeRockMemory.load(file, kernel);
+      var weights =
+          com.integrallis.models.backend.purejava.edgerock.EdgeRockWeights.load(
+                  file, memory.config(), kernel)
+              .memoryLayer(memory.config().fullAttentionLayers()[0]);
+
+      int embedding = memory.config().embeddingLength();
+      int heads = memory.config().headCount();
+      int groups = memory.config().headCountKv();
+      int dim = memory.config().headDim();
+      int writer = memory.config().memoryWriterIntermediate();
+      float[] input = new float[embedding];
+      java.util.Arrays.fill(input, 0.01f);
+
+      boolean triple =
+          com.integrallis.models.backend.purejava.edgerock.QuantizedProjection.fusedTriple(
+              weights.queryProjection(),
+              new float[heads * dim],
+              weights.writeGate(),
+              new float[writer],
+              weights.writeUp(),
+              new float[writer],
+              input);
+      boolean dual =
+          com.integrallis.models.backend.purejava.edgerock.QuantizedProjection.fusedDual(
+              weights.keyProjection(),
+              new float[groups * dim],
+              weights.valueProjection(),
+              new float[groups * dim],
+              input);
+
+      System.out.printf("[fusion] triple=%s dual=%s%n", triple, dual);
+      assertThat(triple)
+          .as("q_proj + write_gate + write_up must fuse on the real kernel, or the port is inert")
+          .isTrue();
+      assertThat(dual).as("k_proj + v_proj must fuse").isTrue();
+    }
+  }
+
   private static double memoryL1(
       com.integrallis.models.backend.purejava.edgerock.EdgeRockMemory memory, String label) {
     var banks = memory.newBanks();

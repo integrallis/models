@@ -158,6 +158,91 @@ public final class QuantizedProjection implements Projection {
   }
 
   /**
+   * Runs three projections of one shared input through a single activation preparation.
+   *
+   * <p>Borrowed from uzu, which projects the whole Gated DeltaNet input as one {@code in_proj} of
+   * width {@code conv_dim + value_dim + 2 * num_v_heads} rather than as separate calls. The memory
+   * layer has the same shape of opportunity: {@code q_proj}, {@code write_gate_proj} and {@code
+   * write_up_proj} all read the normed state, all carry 2560 columns and all are Q4_K, so one
+   * activation quantization can serve all three.
+   *
+   * @return whether the fused route ran; false means the caller must project individually, which is
+   *     a capability fallback for an ineligible kernel and not a slower alternative to choose
+   */
+  public static boolean fusedTriple(
+      Projection first,
+      float[] firstOutput,
+      Projection second,
+      float[] secondOutput,
+      Projection third,
+      float[] thirdOutput,
+      float[] input) {
+    if (!(first instanceof QuantizedProjection a)
+        || !(second instanceof QuantizedProjection b)
+        || !(third instanceof QuantizedProjection c)) {
+      return false;
+    }
+    // One shared activation means one shared input width, and one kernel to prepare it.
+    if (a.columns != input.length || b.columns != input.length || c.columns != input.length) {
+      return false;
+    }
+    if (a.kernel != b.kernel || a.kernel != c.kernel) {
+      return false;
+    }
+    if (!a.kernel.isTripleEligible(a.type, a.rows, b.type, b.rows, c.type, c.rows, 1, a.columns)) {
+      return false;
+    }
+    a.kernel.multiplyTriple(
+        firstOutput,
+        a.data,
+        a.type,
+        a.rows,
+        secondOutput,
+        b.data,
+        b.type,
+        b.rows,
+        thirdOutput,
+        c.data,
+        c.type,
+        c.rows,
+        input,
+        1,
+        a.columns);
+    return true;
+  }
+
+  /** Runs two projections of one shared input through a single activation preparation. */
+  public static boolean fusedDual(
+      Projection first,
+      float[] firstOutput,
+      Projection second,
+      float[] secondOutput,
+      float[] input) {
+    if (!(first instanceof QuantizedProjection a) || !(second instanceof QuantizedProjection b)) {
+      return false;
+    }
+    if (a.columns != input.length || b.columns != input.length || a.kernel != b.kernel) {
+      return false;
+    }
+    if (!a.kernel.isDualEligible(a.type, a.rows, b.type, b.rows, 1, a.columns)) {
+      return false;
+    }
+    a.kernel.multiplyDual(
+        firstOutput,
+        a.data,
+        a.type,
+        a.rows,
+        secondOutput,
+        b.data,
+        b.type,
+        b.rows,
+        input,
+        1,
+        a.columns);
+    return true;
+  }
+
+  /**
    * Refuses a checkpoint whose weights are Hadamard-rotated.
    *
    * <p>Called at load time rather than per projection. A rotated weight projected without its
