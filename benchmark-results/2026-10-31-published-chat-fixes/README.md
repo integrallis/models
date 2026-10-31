@@ -2,7 +2,7 @@
 
 Measured 2026-10-31 on one m6a.4xlarge Linux CPU worker. Raw prompts, token IDs,
 answers, sampling controls, host and classpath hashes are retained alongside this file.
-Product candidates are source-built Models b4c724a1 and ModelJars fe61f10, combined
+Product candidates are source-built Models b4c724a1 and ModelJars 385300e, combined
 with the released unchanged dependencies listed in classpath.json. This is not a
 released-runtime qualification or a general accuracy benchmark.
 
