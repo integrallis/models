@@ -1,0 +1,32 @@
+### load before: { 25.22 139.32 149.24 }
+### ARM A: Rust Q8_0 x F32-activation kernel (exact activations)
+  "kernel": "rust-ffm-quantized-v14",
+{
+  "model": "laya-q8_0",
+  "readout": "typed-decision single pass",
+  "decisions": 120,
+  "load_s": 0.2452,
+  "marginal_ms_mean": 2087.25,
+  "marginal_ms_p50": 2065.54,
+  "marginal_ms_p95": 3113.03,
+  "marginal_ms_min": 924.43,
+  "marginal_ms_max": 3395.62,
+  "processors": 12
+}
+### load between: { 24.76 69.21 114.31 }
+### ARM B: pure-Java exact path (the shipped default)
+  "kernel": "vector-api",
+{
+  "model": "laya-q8_0",
+  "readout": "typed-decision single pass",
+  "decisions": 120,
+  "load_s": 0.3828,
+  "marginal_ms_mean": 6215.70,
+  "marginal_ms_p50": 5989.88,
+  "marginal_ms_p95": 9987.05,
+  "marginal_ms_min": 3215.04,
+  "marginal_ms_max": 11254.93,
+  "processors": 12
+}
+### load after: { 17.31 16.89 51.23 }
+[exited with code 0]

@@ -34,7 +34,6 @@ final class FlintRouting {
       float[] weights,
       boolean normalize,
       float scale) {
-    ExpertRouting.selectExpertsWithSigmoidGating(
-        logits, bias, selected, weights, normalize, scale);
+    ExpertRouting.selectExpertsWithSigmoidGating(logits, bias, selected, weights, normalize, scale);
   }
 }

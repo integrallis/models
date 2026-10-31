@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.integrallis.models.backend.purejava.fixture.MapleTestHeaders;
+import com.integrallis.models.backend.purejava.fixture.MellumTestHeaders;
 import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
 import com.integrallis.models.backend.purejava.gguf.GgufMetadataValue;
 import com.integrallis.models.backend.purejava.gguf.GgufValueType;
@@ -831,6 +832,140 @@ class LlamaConfigTest {
       entries.put("llama.attention.head_count", new GgufMetadataValue.Uint32Value(8));
       entries.put("llama.attention.head_count_kv", new GgufMetadataValue.Uint32Value(2));
       return entries;
+    }
+  }
+
+  /**
+   * mellum's sliding window, its hard-coded stride, and the per-layer split between YaRN and plain
+   * RoPE.
+   *
+   * <p>The header is {@link MellumTestHeaders}, range-fetched from the 8.07 GB Q4_K_M Thinking
+   * artifact #281 names — <b>not</b> the 12.9 GB Q8_0 Instruct file the 2026-10-22 intake probed.
+   *
+   * <p>The artifact <b>does</b> declare {@code attention.sliding_window_pattern}, as {@code
+   * arr[bool,28]}. An earlier version of these tests said it did not and exercised the stride
+   * default instead; that was a probe artefact, not a property of the file. Both paths are tested
+   * here, with the declared one marked as the artifact's own.
+   */
+  @Nested
+  class MellumSlidingWindowAndRope {
+
+    private static final int LAYERS = MellumTestHeaders.LAYERS;
+
+    @Test
+    void honoursTheDeclaredPatternWhichIsWhatTheArtifactCarries() {
+      // The artifact's own shape: arr[bool,28] at [true,true,true,false] x 7. A declared array wins
+      // over any stride, so this is the path mellum actually takes.
+      LlamaConfig config = LlamaConfig.fromMetadata(MellumTestHeaders.metadata(true, true));
+
+      assertThat(config.slidingWindow()).isEqualTo(1024);
+      for (int layer = 0; layer < LAYERS; layer++) {
+        assertThat(config.usesSlidingWindow(layer))
+            .describedAs("layer %d", layer)
+            .isEqualTo(MellumTestHeaders.isLocal(layer));
+      }
+      assertThat(MellumTestHeaders.localLayers())
+          .as("three in four of 28 layers, which is 21 -- not the 23 a stride of 6 would give")
+          .isEqualTo(21);
+    }
+
+    @Test
+    void fallsBackToUpstreamsStrideOfFourRatherThanTheGenericSixWhenNoPatternIsDeclared() {
+      // The safety net, for a mellum checkpoint that declares a window and no pattern. Upstream
+      // hard-codes load_swa_pattern(ml, 4) in src/models/mellum.cpp; the generic default in
+      // LlamaConfig is 6, which would make the layers local 23 in 28 instead of 21 -- a wrong
+      // attention span with nothing to fail on. This artifact never reaches this path, which is
+      // exactly why it needs a test: an untaken branch is where a wrong default survives.
+      LlamaConfig config = LlamaConfig.fromMetadata(MellumTestHeaders.metadata(true, false));
+
+      for (int layer = 0; layer < LAYERS; layer++) {
+        assertThat(config.usesSlidingWindow(layer))
+            .describedAs("layer %d with no declared pattern", layer)
+            .isEqualTo(MellumTestHeaders.isLocal(layer));
+      }
+    }
+
+    @Test
+    void theDeclaredPatternAndTheStrideFallbackAgreeForThisArtifact() {
+      // They must, because upstream's hard-coded stride is how the published pattern was generated.
+      // If they ever disagree, one of the two readings is wrong and this says so before a model
+      // runs -- which is better than discovering it as a quality regression.
+      LlamaConfig declared = LlamaConfig.fromMetadata(MellumTestHeaders.metadata(true, true));
+      LlamaConfig strided = LlamaConfig.fromMetadata(MellumTestHeaders.metadata(true, false));
+
+      for (int layer = 0; layer < LAYERS; layer++) {
+        assertThat(declared.usesSlidingWindow(layer))
+            .describedAs("layer %d: declared vs stride", layer)
+            .isEqualTo(strided.usesSlidingWindow(layer));
+      }
+    }
+
+    @Test
+    void appliesYarnToTheFullAttentionLayersAndPlainRopeToTheSlidingOnes() {
+      // upstream: rope_freq_scale_train_swa = 1.0f, commented "SWA layers use plain RoPE, no
+      // YaRN". So a single rope configuration for the whole model is wrong for 21 of 28 layers.
+      // This is the one thing #281 says is "already implemented", and it is -- asserted here
+      // rather than assumed, because the assertion is cheap and the claim decides the port.
+      LlamaConfig config = LlamaConfig.fromMetadata(MellumTestHeaders.metadata(true));
+
+      for (int layer = 0; layer < LAYERS; layer++) {
+        if (MellumTestHeaders.isLocal(layer)) {
+          assertThat(config.ropeFrequencyScale(layer))
+              .describedAs("sliding layer %d must not be YaRN-scaled", layer)
+              .isEqualTo(1.0f);
+        } else {
+          assertThat(config.ropeFrequencyScale(layer))
+              .describedAs("full-attention layer %d must carry the declared scale", layer)
+              .isNotEqualTo(1.0f);
+        }
+      }
+    }
+
+    @Test
+    void theStrideIsNotTheGenericDefaultAndNotTheGemmaOne() {
+      // A negative control for the stride fallback. If it silently fell back to 6, or to Gemma's 2,
+      // the per-layer assertions would still pass for SOME layers and the suite would read as green
+      // on a wrong pattern. Pin the three candidate strides apart explicitly, with no declared
+      // pattern present so the stride is what decides.
+      LlamaConfig config = LlamaConfig.fromMetadata(MellumTestHeaders.metadata(true, false));
+
+      int local = 0;
+      for (int layer = 0; layer < LAYERS; layer++) {
+        if (config.usesSlidingWindow(layer)) {
+          local++;
+        }
+      }
+      assertThat(local).as("stride 4 over 28 layers").isEqualTo(21);
+      assertThat(local).as("stride 6 would give 24").isNotEqualTo(24);
+      assertThat(local).as("Gemma's stride 2 would give 14").isNotEqualTo(14);
+    }
+
+    @Test
+    void bothRopeBasesComeFromTheArtifactRatherThanADefault() {
+      // mellum is in the group that seeds rope.freq_base_swa from the model's own rope.freq_base
+      // when the key is absent (src/models/mellum.cpp: rope_freq_base_train_swa =
+      // rope_freq_base_train, then an optional read). This artifact declares both at 500000, so
+      // the seeding rule is not exercised by it -- assert the values that ARE declared, and leave
+      // the rule to the architecture flag it belongs to.
+      LlamaConfig config = LlamaConfig.fromMetadata(MellumTestHeaders.metadata(true));
+
+      assertThat(config.ropeTheta(3)).as("full-attention layer").isEqualTo(500000.0f);
+      assertThat(config.ropeTheta(0)).as("sliding layer").isEqualTo(500000.0f);
+    }
+
+    @Test
+    void routesExpertsWithRenormalisedSoftmaxWeights() {
+      // mellum declares neither expert_gating_func nor expert_weights_norm. Upstream sets
+      // expert_weights_norm = TRUE for mellum before the optional read, where
+      // llama-hparams.h's default is false, and gating to SOFTMAX. The Llama path here always
+      // renormalises (LlamaForwardPass:2342 -> ExpertRouting.selectExperts), so mellum's absent
+      // keys land on the correct behaviour -- which is worth a test precisely because it is a
+      // coincidence of defaults and not an expressed decision.
+      LlamaConfig config = LlamaConfig.fromMetadata(MellumTestHeaders.metadata(true));
+
+      assertThat(config.numExperts()).isEqualTo(64);
+      assertThat(config.numExpertsUsed()).isEqualTo(8);
+      assertThat(config.expertHiddenDim()).isEqualTo(896);
     }
   }
 }

@@ -1006,8 +1006,7 @@ class NativeKernelLibraryTest {
           try (Arena arena = Arena.ofConfined()) {
             MemorySegment weights = arena.allocate(rows * cols / 32L * 34L);
             fillQ8_0Weights(weights, rows, cols);
-            kernel.multiply(
-                fromKernel, input, weights, GgufTensorType.Q8_0, batchSize, rows, cols);
+            kernel.multiply(fromKernel, input, weights, GgufTensorType.Q8_0, batchSize, rows, cols);
             TensorOps.ggufExactBatchedMatmul(
                 fromJava,
                 input,
@@ -1020,8 +1019,10 @@ class NativeKernelLibraryTest {
           }
 
           assertThat(fromKernel)
-              .as("Q8_0 F32-activation kernel vs TensorOps.ggufExactBatchedMatmul at %d"
-                  + " columns, batch %d", cols, batchSize)
+              .as(
+                  "Q8_0 F32-activation kernel vs TensorOps.ggufExactBatchedMatmul at %d"
+                      + " columns, batch %d",
+                  cols, batchSize)
               .containsExactly(fromJava);
         }
       }
@@ -1054,7 +1055,8 @@ class NativeKernelLibraryTest {
         .isGreaterThan(1);
     assertThat(distinctCount(wide)).isGreaterThan(1);
     assertThat(wide[0])
-        .as("widening the reduction must change the result, or the fold-order axis is held constant")
+        .as(
+            "widening the reduction must change the result, or the fold-order axis is held constant")
         .isNotEqualTo(narrow[0]);
   }
 

@@ -46,8 +46,8 @@ Read from `headers.json` and `arch-keys-and-dtypes.txt`:
 | arch | artifact | size | tensors | dtypes present | shape of the thing |
 | --- | --- | --- | --- | --- | --- |
 | `maple` | `deepgrove/maple-preview-GGUF/maple-preview-TQ1_0-head-Q4_K.gguf` | **4.98 GB** | 291 | TQ1_0, Q4_K, F32, F16 | 24 blocks, 2048 dim, **256 experts / 8 used**, sliding window 512 |
-| `mellum` | `JetBrains/Mellum2-...-Thinking-GGUF-Q4_K_M` | **8.07 GB** | 339 | Q8_0/Q4_K, F32 | 28 blocks, 2304 dim, 64 experts / 8 used, **YaRN** ×16, SWA 1024 |
-| `lfm2moe` | `LiquidAI/LFM2.5-8B-A1B-GGUF/...-Q4_0.gguf` | **4.84 GB** | 256 | Q4_0/Q8_0, F32 | 24 blocks, short-conv + 32 experts / 4 used, 2 leading dense blocks |
+| `mellum` ‡ | `JetBrains/Mellum2-...-Thinking-GGUF-Q4_K_M` | **8.07 GB** | 339 | Q8_0/Q4_K, F32 | 28 blocks, 2304 dim, 64 experts / 8 used, **YaRN** ×16 over an 8192 trained context, SWA 1024 with a **declared** `sliding_window_pattern` `arr[bool,28]` = `[t,t,t,f]`×7; `apache-2.0`; no MTP block (339 = 12×28+3) |
+| `lfm2moe` ‡ | `LiquidAI/LFM2.5-8B-A1B-GGUF/...-Q4_0.gguf` | **4.84 GB** | 256 | Q4_0/Q8_0, F32 | 24 blocks, 2048 dim, 32 experts / 4 used, 2 leading dense blocks, `l_cache` 3; **`head_count_kv` `arr[int32,24]` = `[0,0,8,0,…]`** so 6 layers attend and 18 convolve; tied head with `token_embd_norm`; licence `lfm1.0`, **not** permissive |
 | `laguna` | `poolside/Laguna-XS-2.1-GGUF/...-Q4_K_M.gguf` | **20.27 GB** | 678 | Q4_K, Q6_K, F32 | 40 blocks, 256 experts / 8 used, shared experts, **two rope dims** (64 global / 128 SWA) |
 | `nemotron_h_moe` | `bartowski/nvidia_Nemotron-Cascade-2-30B-A3B-GGUF` | **18.09 GB** smallest | 401 | Q8_0, F32 | 52 blocks, **Mamba-2** (`ssm.state_size=128`, `conv_kernel=4`, `group_count=8`, `inner_size=4096`, `time_step_rank=64`) + 128 experts / 6 used + 1 shared |
 | `bailingmoe3` | `inclusionAI/Ling-3.0-tiny-GGUF/Ling-3.0-tiny-Q4_K_M.gguf` | **4.82 GB** | 526 | Q4_K, Q5_0, Q6_K, F32 | 24 blocks, 1536 dim, **hybrid on a 4-layer interval**: 6 layers MLA with `q_lora_rank` 256 / `kv_lora_rank` 512, 18 layers **KDA** (`kda.head_dim` 128, `kda.safe_gate` 1, `kda.gate_lower_bound` -5.0); 128 experts / 8 used in **8 groups / 4 used**, 1 shared, 1 leading dense block, `expert_gating_func` 2 with `exp_probs_b` |
@@ -55,6 +55,20 @@ Read from `headers.json` and `arch-keys-and-dtypes.txt`:
 | `kokoro` | `simonfxr/kokoro.cpp-GGUF/kokoro-82m-f16.gguf` | **0.16 GB** | 459 | F16, F32 | PL-BERT (12 layers) + text encoder + prosody predictor + ISTFT decoder; **178-token phoneme vocabulary** |
 | `kokoro-voice` | `simonfxr/kokoro.cpp-GGUF/voices/kokoro-voice-af_heart.gguf` | **<0.01 GB** | **1** | — | a one-tensor companion artifact; 25+ voices in the repo |
 | `inflect-v2` | `remixerdec/Inflect-Nano-v2-GGUF/inflect_nano_v2_q8_0.gguf` | **<0.01 GB** | 302 | Q8_0, F16 | VITS-shaped (`enc_p`, `dp`, `flow`, `dec`) and **no `inflect-v2.*` metadata keys at all** |
+
+‡ **Re-read on 2026-10-31 (#281, #283), because neither row described the artifact its port issue
+names.** The 2026-10-22 probe read `Mellum2-12B-A2.5B-Instruct-Q8_0.gguf` (12.9 GB, a different
+quantisation, a different finetune and a different repository) and `LFM2.5-8B-A1B-Q8_0.gguf` (9.01
+GB). The 8.07 GB and 4.84 GB files above had only ever been **sized**. Both are now read with array
+keys retained and the surfaced key count reconciled against `kv_count` (43 of 43 and 39 of 39);
+raw output in `benchmark-results/2026-10-31-tier-d-header-intake/`.
+
+**The array keys in those two rows could not have been seen by the original probe at all.**
+`inspectGguf` skips every array-typed key not named in `retainMetadataArrays`, and that option
+defaults to empty (`gguf-inspector.mjs:88-93`). So **no absence claim anywhere in this document is
+sound unless it was re-read that way** — including the `<arch>.*` sweep in §6 that reported
+`inflect-v2` as publishing no keys, which it does, 27 of them, under `inflect.v2.*`. Presence
+findings stand; absences do not.
 
 ### The one structural split that matters
 
