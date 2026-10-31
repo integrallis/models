@@ -1,0 +1,55 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Oct 31, 2026 7:21:33 PM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256; FMA enabled
+iteration 1/3 case=auto-glass-deadline correct=true retrieval=4.0ms ttft=82.1ms decode=72.60 tok/s e2e=485.8ms
+iteration 1/3 case=travel-limit correct=true retrieval=2.2ms ttft=202.5ms decode=74.27 tok/s e2e=541.6ms
+iteration 1/3 case=telemedicine-benefit correct=true retrieval=3.6ms ttft=194.7ms decode=78.14 tok/s e2e=480.2ms
+iteration 1/3 case=claim-payment-times correct=true retrieval=2.0ms ttft=184.6ms decode=76.60 tok/s e2e=317.4ms
+iteration 1/3 case=chargeback-evidence correct=true retrieval=5.2ms ttft=209.2ms decode=76.89 tok/s e2e=553.1ms
+iteration 1/3 case=break-glass correct=true retrieval=4.0ms ttft=196.8ms decode=75.46 tok/s e2e=639.2ms
+iteration 1/3 case=idempotency correct=true retrieval=2.0ms ttft=242.3ms decode=73.79 tok/s e2e=610.5ms
+iteration 1/3 case=priority-one correct=true retrieval=1.6ms ttft=190.7ms decode=77.92 tok/s e2e=590.5ms
+iteration 1/3 case=unsupported-lunar-vehicle correct=true retrieval=1.4ms ttft=193.2ms decode=76.52 tok/s e2e=235.2ms
+iteration 2/3 case=auto-glass-deadline correct=true retrieval=6.4ms ttft=85.9ms decode=77.01 tok/s e2e=469.2ms
+iteration 2/3 case=travel-limit correct=true retrieval=4.5ms ttft=193.2ms decode=77.31 tok/s e2e=521.9ms
+iteration 2/3 case=telemedicine-benefit correct=true retrieval=3.4ms ttft=210.0ms decode=78.23 tok/s e2e=495.0ms
+iteration 2/3 case=claim-payment-times correct=true retrieval=2.6ms ttft=181.5ms decode=68.83 tok/s e2e=329.8ms
+iteration 2/3 case=chargeback-evidence correct=true retrieval=21.2ms ttft=194.8ms decode=78.90 tok/s e2e=546.2ms
+iteration 2/3 case=break-glass correct=true retrieval=1.4ms ttft=194.8ms decode=77.90 tok/s e2e=620.0ms
+iteration 2/3 case=idempotency correct=true retrieval=1.6ms ttft=224.5ms decode=78.15 tok/s e2e=571.9ms
+iteration 2/3 case=priority-one correct=true retrieval=1.2ms ttft=188.2ms decode=78.88 tok/s e2e=583.0ms
+iteration 2/3 case=unsupported-lunar-vehicle correct=true retrieval=1.0ms ttft=192.2ms decode=78.39 tok/s e2e=231.8ms
+iteration 3/3 case=auto-glass-deadline correct=true retrieval=1.5ms ttft=80.2ms decode=78.09 tok/s e2e=453.3ms
+iteration 3/3 case=travel-limit correct=true retrieval=2.2ms ttft=193.4ms decode=78.37 tok/s e2e=514.8ms
+iteration 3/3 case=telemedicine-benefit correct=true retrieval=2.6ms ttft=190.2ms decode=77.67 tok/s e2e=476.3ms
+iteration 3/3 case=claim-payment-times correct=true retrieval=8.6ms ttft=180.3ms decode=77.35 tok/s e2e=318.5ms
+iteration 3/3 case=chargeback-evidence correct=true retrieval=1.3ms ttft=184.4ms decode=78.71 tok/s e2e=516.4ms
+iteration 3/3 case=break-glass correct=true retrieval=8.4ms ttft=194.7ms decode=78.55 tok/s e2e=623.5ms
+iteration 3/3 case=idempotency correct=true retrieval=1.2ms ttft=227.6ms decode=78.41 tok/s e2e=576.7ms
+iteration 3/3 case=priority-one correct=true retrieval=1.2ms ttft=191.7ms decode=77.32 tok/s e2e=594.0ms
+iteration 3/3 case=unsupported-lunar-vehicle correct=true retrieval=1.3ms ttft=207.7ms decode=76.83 tok/s e2e=248.3ms
+plain-java/ollama/qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m: tier=PRODUCTION_READY success=27/27 p95-retrieval=8.6ms p95-ttft=226.7ms p50-decode=77.67 tok/s p95-e2e=622.5ms correct=100.0% model-answered=66.7% of-those-correct=100.0% extractive-fallback=22.2% truncated=0.0%
+report: /work/released-pair/results/confirm-1/reference-rag.json
+	Command being timed: "/work/released-pair/jdk/bin/java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx16g -cp /work/released-pair/released/lib/* com.integrallis.models.rag.RagBenchmarkCli --framework plain-java --model-id qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m --workload general --prompt-template chatml --top-k 1 --max-tokens 256 --context 2048 --threads 16 --backend ollama --endpoint http://127.0.0.1:11434 --backend-version ollama@0.40.13 --model qualification --artifact /work/released-pair/model.gguf --warmups 1 --iterations 3 --output /work/released-pair/results/confirm-1/reference-rag.json"
+	User time (seconds): 3.88
+	System time (seconds): 0.35
+	Percent of CPU this job got: 20%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:20.43
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 175376
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 47539
+	Voluntary context switches: 18899
+	Involuntary context switches: 1263
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 192
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
