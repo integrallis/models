@@ -352,13 +352,69 @@ cap there before this moved.
 | ours, `rust-ffm` | **7.14 tok/s** | 16 threads |
 | patched llama.cpp | 9.0 tok/s | 16 threads, prompt 20.6 tok/s |
 
-Decode ratio **0.79** against the 0.80 floor, before any prefill work. The earlier 0.147 in this
-document came from the laptop's `pure-java` arm and was the wrong arm on the wrong hardware.
+Decode ratio **0.79** against the 0.80 floor -- but see the instrument finding below: these are
+single samples from a shared, unthrottled 128-thread host whose own A/B spread was 2.5x, so this
+ratio is **not trustworthy to two significant figures** and is not evidence of near-passing. The
+earlier 0.147 in this document came from the laptop's `pure-java` arm and was the wrong arm on the
+wrong hardware.
 
 Still not a pass, for the reason that has not changed: the gate measures both arms through the RAG
 harness with `sameWorkload` matching -- workload, corpus, cases, template, topK, max tokens,
 context, **threads**, grounding policy -- and `--publisher-reference` is what admits the llama.cpp
 arm. These are probe numbers, not gate numbers.
+
+## Null: porting uzu's fused `in_proj` to the memory layer
+
+**Hypothesis.** uzu projects the whole Gated DeltaNet input as one `in_proj` of width
+`conv_dim + value_dim + 2 * num_v_heads` instead of separate calls. Our memory layer issues nine
+projections per token per layer, and three of them (`q_proj`, `write_gate_proj`, `write_up_proj`)
+share the normed input, share 2560 columns and are all Q4_K, so one activation quantization could
+serve all three; `k_proj`/`v_proj` share `written` and pair likewise. Expressed through the
+existing `multiplyTriple`/`multiplyDual`, nine calls become six.
+
+**Decision rule, fixed before the bench numbers were read.** Keep only if the median decode
+improves by 5% or more on the bench box, since the standing rule is that the default must be the
+fastest path and the slow branch is deleted rather than kept as a toggle.
+
+**It was implemented and it ran.** `theFusedProjectionRouteIsActuallyTakenOnRealWeights` asserted
+`isTripleEligible` on real weights at batch size 1, because a fusion that silently fell back would
+have produced a null indistinguishable from "no effect". Numerically it changed nothing: the
+java-vs-native memory contribution stayed at `6.200681824` / `6.200961286`, the same digits as
+before fusion.
+
+**Result: no measured improvement. Reverted.** Three runs per arm on the quieter host:
+
+| arm | runs (tok/s) | median |
+| --- | --- | --- |
+| unfused | 5.87, 5.59, 5.58 | 5.59 |
+| fused | 5.61, 5.64, 5.51 | 5.61 |
+
+A single sample each had read 5.41 against 5.73 and looked like a 6% win; it was noise. The
+mechanism explains the null: fusion saves per-call overhead, which dominates a GPU kernel launch --
+uzu's setting -- and is small behind one FFM call amortised over 9216x2560 of Q4_K work.
+
+### What that attempt established about the instrument
+
+The bench-box arm of the same A/B was unusable, and finding out why matters more than the fusion
+did:
+
+| arm | runs (tok/s) on the RunPod pod |
+| --- | --- |
+| fused | 7.58, 11.90, 7.39 |
+| unfused | 5.71, 14.28, 8.87 |
+
+A 2.5x spread within one arm. The pod reports `nproc` 16 while `/proc/cpuinfo` lists **128**
+processors and `cpu.max` is **`max`** -- no quota at all. The container is unthrottled on a
+128-thread host shared with other tenants, and idle swung between 75% and 89% while sampling.
+Steal time reads 0 because co-tenancy on a shared kernel appears as scheduling latency, not steal.
+
+**A RunPod CPU pod is a valid instrument for correctness and for work that does not care about
+throughput, and not for a ratio measured against a 0.80 floor.** The long-memory cases it settled
+stand; they were pass/fail. Every throughput figure taken on it is a single sample from a noisy
+shared host, which includes the `rust-ffm` 7.14, `pure-java` 3.20, prefill 10.0 and reference 9.0
+recorded above -- so **the 0.79 decode ratio is not trustworthy to two significant figures** and
+must not be quoted as near-passing. The catalog's own entries were measured on dedicated vCPU
+(`vectors-bench`), which is the shape of host a gate number needs.
 
 ## Still unverified
 
