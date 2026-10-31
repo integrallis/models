@@ -23,6 +23,14 @@
         <Package name="com.integrallis.models.backend.purejava"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
+    <!-- Decoder-internal weight holders, same reason as the packages above: a Weights record hands
+         the forward pass the mapped weight arrays by reference, because copying a norm vector per
+         token is the cost these classes exist to avoid. <Package> does not match subpackages, so
+         the purejava entry above does not cover this one. -->
+    <Match>
+        <Package name="com.integrallis.models.backend.purejava.edgerock"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
     <!-- JFR reads event fields reflectively when the event is committed; nothing in Java reads them. -->
     <Match>
         <Class name="com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffEvent"/>
