@@ -1,0 +1,14 @@
+{
+  "status": "PREPARED_NOT_RUN",
+  "order": "Published-model fixes and diagnostics first; Phi4, Mathstral, four Qwen/Gemma siblings, Bonsai next.",
+  "runtimeRule": "Use downloaded released product JARs; source-built measurement harness identified independently. If the tokenizer repair releases first, rebuild and hash the released payload before launch.",
+  "gate": "Paired same-host same-workload unchanged policy, model answer rate >= 1/3, model answer correctness >= .90, decode ratio >= .80, end-to-end ratio <= 1.5; separate library-default smoke. No candidate-only success.",
+  "predictions": {
+    "Phi4": "Prior dev-runtime pass; expect repeat, throughput margin modest.",
+    "Mathstral": "Prior paired pass but current specialist/base comparison remains required.",
+    "Qwen/Gemma": "Sibling support reduces engineering risk; exact quality and throughput unknown.",
+    "Bonsai": "Source pass before BF16 repair; released repeat may lose throughput margin."
+  },
+  "killRule": "Stop a broken arm promptly; retain every null. Do not tune settings after seeing verdicts within this experiment.",
+  "fineTuneRule": "Mathstral must beat matched-size Mistral base at Q4_K_S on the math workload; paired runtime pass alone is insufficient admission."
+}
