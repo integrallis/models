@@ -29,8 +29,8 @@ not published.
 | --- | --- | --- |
 | **QUALIFIED** | 101 | a manifest row with `qualified` true |
 | **REJECTED** | 1 | a manifest row with `qualified` false; the verdict is the finding |
-| **EVALUATED_NOT_LANDED** | 31 | committed evidence names it, no manifest row claims it |
-| **NOT_EVALUATED** | 324 | no manifest row or matching committed JSON artifact found |
+| **EVALUATED_NOT_LANDED** | 32 | committed evidence names it, no manifest row claims it |
+| **NOT_EVALUATED** | 323 | no manifest row or matching committed JSON artifact found |
 | | **457** | catalog candidates |
 
 A model that appears in several manifests is counted once, and **qualified anywhere wins**: four
@@ -63,7 +63,7 @@ whether a run passed. The reports distinguish these findings:
   admission; changing the runtime version label cannot repair those results.
 
 ```
-EVALUATED_NOT_LANDED (31):
+EVALUATED_NOT_LANDED (32):
   bartowski_google_gemma_3_1b_it_gguf_q4_k_s               evidence: certified-20261029/rag/bartowski-google-gemma-3-1b-it-gguf-q4_k_s/bartowski-google-gemma-3-1b-it-gguf-q4_k_s-ollama-grounded.json, certified-20261029/rag/bartowski-google-gemma-3-1b-it-gguf-q4_k_s/bartowski-google-gemma-3-1b-it-gguf-q4_k_s-rust-ffm-grounded.json
   bartowski_google_gemma_3_1b_it_gguf_q6_k                 evidence: certified-20261029/rag/bartowski-google-gemma-3-1b-it-gguf-q6_k/bartowski-google-gemma-3-1b-it-gguf-q6_k-ollama-grounded.json, certified-20261029/rag/bartowski-google-gemma-3-1b-it-gguf-q6_k/bartowski-google-gemma-3-1b-it-gguf-q6_k-rust-ffm-grounded.json
   bartowski_llama_3_2_1b_instruct_gguf_q6_k                evidence: certified-20261029/rag/bartowski-llama-3-2-1b-instruct-gguf-q6_k/bartowski-llama-3-2-1b-instruct-gguf-q6_k-ollama-grounded.json, certified-20261029/rag/bartowski-llama-3-2-1b-instruct-gguf-q6_k/bartowski-llama-3-2-1b-instruct-gguf-q6_k-rust-ffm-grounded.json
@@ -83,6 +83,7 @@ EVALUATED_NOT_LANDED (31):
   qwen2_5_coder_1_5b_instruct_q5_k_m                       evidence: certified-20261029/rag/qwen-qwen2-5-coder-1-5b-instruct-gguf-q5_k_m/qualification.json, certified-20261029/rag/qwen-qwen2-5-coder-1-5b-instruct-gguf-q5_k_m/qwen-qwen2-5-coder-1-5b-instruct-gguf-q5_k_m-ollama-grounded.json
   qwen2_5_math_1_5b_instruct_q4_0                          evidence: 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/qwen2_5_math_1_5b_instruct_q4_0.comparator.json, 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/qwen2_5_math_1_5b_instruct_q4_0.json
   qwen2_5_math_1_5b_instruct_q4_k_s                        evidence: 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/qwen2_5_math_1_5b_instruct_q4_k_s.comparator.json, 2026-10-09-max-tokens-sweep/raw/mt256-math-shard624/qwen2_5_math_1_5b_instruct_q4_k_s.json
+  qwen_qwen2_5_0_5b_instruct_gguf_q5_k_m                   evidence: certified-20261031/rag/qwen-qwen2-5-0-5b-instruct-gguf-q5_k_m/default-correctness/models-rust-ffm.json, certified-20261031/rag/qwen-qwen2-5-0-5b-instruct-gguf-q5_k_m/qualification.json
   qwen_qwen2_5_0_5b_instruct_gguf_q8_0                     evidence: certified-20261029/rag/qwen-qwen2-5-0-5b-instruct-gguf-q8_0/qualification.json, certified-20261029/rag/qwen-qwen2-5-0-5b-instruct-gguf-q8_0/qwen-qwen2-5-0-5b-instruct-gguf-q8_0-ollama-grounded.json
   qwen_qwen2_5_1_5b_instruct_gguf_q5_0                     evidence: certified-20261029/rag/qwen-qwen2-5-1-5b-instruct-gguf-q5_0/qualification.json, certified-20261029/rag/qwen-qwen2-5-1-5b-instruct-gguf-q5_0/qwen-qwen2-5-1-5b-instruct-gguf-q5_0-ollama-grounded.json
   qwen_qwen3_embedding_4b_gguf_q4_k_m                      evidence: embedding/qwen-qwen3-embedding-4b-gguf-q4-k-m.json

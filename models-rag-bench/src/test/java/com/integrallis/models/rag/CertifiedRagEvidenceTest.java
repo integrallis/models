@@ -37,6 +37,11 @@ class CertifiedRagEvidenceTest {
   private static final Path TWO_ARM_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260930/rag");
+  private static final Path TWO_ARM_EVIDENCE_20261031 =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20261031/rag");
+  private static final Path QWEN_QWEN2_5_0_5B_INSTRUCT_GGUF_Q5_K_M_EVIDENCE =
+      TWO_ARM_EVIDENCE_20261031.resolve("qwen-qwen2-5-0-5b-instruct-gguf-q5_k_m");
   private static final Path TWO_ARM_EVIDENCE_20261029 =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20261029/rag");
@@ -3989,6 +3994,52 @@ class CertifiedRagEvidenceTest {
   private static String evidenceSha256(Path file) throws Exception {
     return HexFormat.of()
         .formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
+  }
+
+  @Test
+  void qwenQwen2505bInstructGgufQ5KMQualifiesAgainstItsSameHostOllamaComparator() throws Exception {
+    RagBenchmarkReport candidate =
+        report(
+            QWEN_QWEN2_5_0_5B_INSTRUCT_GGUF_Q5_K_M_EVIDENCE,
+            "qwen-qwen2-5-0-5b-instruct-gguf-q5_k_m-rust-ffm-grounded.json");
+    RagBenchmarkReport ollama =
+        report(
+            QWEN_QWEN2_5_0_5B_INSTRUCT_GGUF_Q5_K_M_EVIDENCE,
+            "qwen-qwen2-5-0-5b-instruct-gguf-q5_k_m-ollama-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_RATE);
+    assertThat(qualification.modelAnswerCorrectRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_CORRECT_RATE);
+    assertThat(qualification.comparisons())
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.816, 0.826);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(1.08, 1.1);
+            });
+  }
+
+  @Test
+  void qwen05Q5SelectedConfigurationPassesEveryRegisteredConfirmation() throws Exception {
+    Path root =
+        TWO_ARM_EVIDENCE_20261031.resolve("qwen-qwen2-5-0-5b-instruct-gguf-q5_k_m/repeatability");
+    for (String trial : List.of("screen-pool8-fused", "confirm-1", "confirm-2")) {
+      Path directory = root.resolve(trial);
+      RagBenchmarkReport candidate = report(directory, "models-rag.json");
+      RagBenchmarkReport reference = report(directory, "reference-rag.json");
+      RagProductionQualification result =
+          RagProductionQualificationPolicy.assess(candidate, List.of(reference));
+      assertThat(result.qualified()).as(trial).isTrue();
+      assertThat(result.exclusions()).as(trial).isEmpty();
+    }
   }
 
   private RagBenchmarkReport report(Path directory, String filename) throws IOException {
