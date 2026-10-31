@@ -30,5 +30,19 @@ curl -fL --retry 3 --max-time 1800 "$(jq -er .job.uri "$WORK/protocol.json")" -o
 printf '%s  %s\n' "$(jq -er .job.sha256 "$WORK/protocol.json")" "$WORK/model.gguf" | sha256sum -c -
 cp "$WORK/profile-qwen-thread-configurations.py" "$OUT/"
 cp "$WORK/released/classpath.json" "$WORK/released/provenance.json" "$OUT/"
+if jq -e '.nativeLibrary != null' "$WORK/protocol.json" >/dev/null; then
+  apt-get install -y -qq build-essential
+  curl -fL --retry 3 --max-time 600 https://static.rust-lang.org/dist/rust-1.96.0-x86_64-unknown-linux-gnu.tar.xz -o "$WORK/rust.tar.xz"
+  printf '%s  %s\n' "$(jq -er .rustSha256 "$WORK/protocol.json")" "$WORK/rust.tar.xz" | sha256sum -c -
+  tar -xJf "$WORK/rust.tar.xz" -C "$WORK"
+  "$WORK/rust-1.96.0-x86_64-unknown-linux-gnu/install.sh" --prefix="$WORK/rust" --without=rust-docs
+  export PATH="$WORK/rust/bin:$PATH"
+  rustc --version --verbose >"$OUT/compiler.txt"
+  export CARGO_PROFILE_RELEASE_DEBUG=1
+  export CARGO_PROFILE_RELEASE_STRIP=none
+  cargo build --locked --manifest-path "$WORK/baseline/Cargo.toml" --release >"$OUT/native-build.log" 2>&1
+  cp "$WORK/baseline/target/release/libjmodels_kernels.so" "$OUT/"
+  cp "$WORK/payload-files.json" "$OUT/"
+fi
 python3 -u "$WORK/profile-qwen-thread-configurations.py" --work "$WORK" --output "$OUT"
 printf '%s\n' complete >"$OUT/shard.complete"
