@@ -1,0 +1,631 @@
+{
+  "job" : {
+    "id" : "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "sha256" : "67c354bcb2abe0cba407fbfe8e7f7cc100dd44458b6fbdfee95ae22f3aaa2c6a",
+    "sizeBytes" : 2936478592,
+    "uri" : "https://huggingface.co/hkust-aaron/EdgeRock-4B-GGUF/resolve/a5e045c646b70303156394d52c2ca1e415ec1544/EdgeRock-4B-Q4_K_M.gguf",
+    "maxTokens" : 512,
+    "modes" : [ {
+      "name" : "candidate-default-chat",
+      "template" : "default-chat"
+    } ],
+    "cases" : [ {
+      "id" : "capital",
+      "input" : "What is the capital of France? Reply with only the city name.",
+      "expected" : "Paris"
+    }, {
+      "id" : "sum",
+      "input" : "What is 17 + 25? Reply with only the number.",
+      "expected" : "42"
+    }, {
+      "id" : "missing-price",
+      "input" : "Context: The museum closes at 6 PM on Fridays. What is the admission price? Reply UNKNOWN if the context does not say.",
+      "expected" : "UNKNOWN"
+    }, {
+      "id" : "capital-holdout",
+      "input" : "What is the capital of Japan? Reply with only the city name.",
+      "expected" : "Tokyo"
+    }, {
+      "id" : "sum-holdout",
+      "input" : "What is 23 + 19? Reply with only the number.",
+      "expected" : "42"
+    }, {
+      "id" : "subtract-holdout",
+      "input" : "What is 81 - 36? Reply with only the number.",
+      "expected" : "45"
+    }, {
+      "id" : "supported-price",
+      "input" : "Context: Museum admission costs 12 dollars. How much does admission cost? Reply with only the number.",
+      "expected" : "12"
+    }, {
+      "id" : "missing-time",
+      "input" : "Context: The library has four floors. What time does it open? Reply UNKNOWN if the context does not say.",
+      "expected" : "UNKNOWN"
+    } ],
+    "reference" : "published-edgerock-demo-only"
+  },
+  "java" : "25.0.3+9-LTS",
+  "scope" : "Paired chat diagnosis; not a RAG admission verdict",
+  "cases" : [ {
+    "mode" : "candidate-default-chat",
+    "caseId" : "capital",
+    "prompt" : "<|im_start|>user\nWhat is the capital of France? Reply with only the city name.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+    "expected" : "Paris",
+    "promptTokenIds" : [ 248045, 846, 198, 3710, 369, 279, 6511, 314, 9338, 30, 17308, 440, 1132, 279, 3177, 803, 13, 248046, 198, 248045, 74455, 198, 248068, 198 ],
+    "template" : "EDGEROCK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 24,
+      "completionTokens" : 73
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 7766.091774,
+    "raw" : "We need to answer the question: \"What is the capital of France? Reply with only the city name.\"\n\nWe must output only the city name, presumably \"Paris\". The instruction says \"Reply with only the city name.\" So we must output exactly \"Paris\". No extra punctuation, no extra text.\n\nThus final answer: Paris.\n</think>\nParis",
+    "visible" : "Paris",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "sum",
+    "prompt" : "<|im_start|>user\nWhat is 17 + 25? Reply with only the number.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+    "expected" : "42",
+    "promptTokenIds" : [ 248045, 846, 198, 3710, 369, 220, 16, 22, 478, 220, 17, 20, 30, 17308, 440, 1132, 279, 1324, 13, 248046, 198, 248045, 74455, 198, 248068, 198 ],
+    "template" : "EDGEROCK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 26,
+      "completionTokens" : 52
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 5046.796367,
+    "raw" : "We need answer simple arithmetic. User asks \"What is 17 + 25? Reply with only the number.\" Need final just number. 17+25=42. Ensure final only 42.\n</think>\n42",
+    "visible" : "42",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "missing-price",
+    "prompt" : "<|im_start|>user\nContext: The museum closes at 6 PM on Fridays. What is the admission price? Reply UNKNOWN if the context does not say.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+    "expected" : "UNKNOWN",
+    "promptTokenIds" : [ 248045, 846, 198, 1905, 25, 561, 23223, 32147, 506, 220, 21, 5670, 383, 76692, 13, 3437, 369, 279, 24490, 3240, 30, 17308, 59322, 413, 279, 2193, 1503, 524, 1910, 13, 248046, 198, 248045, 74455, 198, 248068, 198 ],
+    "template" : "EDGEROCK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 37,
+      "completionTokens" : 512
+    },
+    "stopReason" : "MAX_TOKENS",
+    "elapsedMillis" : 48871.9142,
+    "raw" : "We need to parse the user's request. The user says: \"Context: The museum closes at 6 PM on Fridays. What is the admission price? Reply UNKNOWN if the context does not say.\"\n\nThe user wants a concise, logically rigorous derivation, with each step from previous steps, no logical leaps, no repetition, no contradictions, no repeated reasoning, etc. The answer must be placed in \\boxed{} at the end.\n\nWe need to answer the question: \"What is the admission price?\" The context only says the museum closes at 6 PM on Fridays. It does not provide any information about admission price. So the answer is \"UNKNOWN\". According to the instruction: \"Reply UNKNOWN if the context does not say.\"\n\nThus we must answer \"UNKNOWN\". But we need to follow the format: Provide a concise, logically rigorous derivation, step-by-step, and then final answer in \\boxed{}.\n\nWe need to produce a short logical derivation:\n\n1. The context provides only one piece of information: the museum closes at 6 PM on Fridays.\n2. The question asks for the admission price.\n3. The context does not contain any information about admission price.\n4. Therefore, based on the given context, we cannot determine the admission price.\n5. According to the instruction, if the context does not say, we must reply \"UNKNOWN\".\n\nThus final answer: \\boxed{UNKNOWN}.\n\nWe must ensure we don't add extraneous info. The answer must be exactly \"UNKNOWN inside the box.\n\nWe need to ensure we follow the instruction: \"Make each step follow from the previous steps.\" So we need to number steps or use bullet points.\n\nWe must not repeat same reasoning, avoid loops.\n\nWe must not introduce contradictions.\n\nWe must not reject earlier conclusions.\n\nWe must correct any necessary errors only once.\n\nThus we produce a short derivation.\n\nPotential answer:\n\nStep 1: Identify the given information: The museum closes at 6 PM on Fridays.\n\nStep 2: Identify the requested information: The admission price.\n\nStep 3: Check if the given information includes the admission price. It does not.\n\nStep 4: Conclude that the admission price cannot be determined from the context.\n\nStep 5: According to the instruction, reply \"UNKNOWN when the context does not provide the information.\n\nThus final answer: \\boxed{UNKNOWN}.\n\nWe need to ensure we don't add extra text beyond that.",
+    "visible" : "",
+    "exactAnswer" : false
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "capital-holdout",
+    "prompt" : "<|im_start|>user\nWhat is the capital of Japan? Reply with only the city name.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+    "expected" : "Tokyo",
+    "promptTokenIds" : [ 248045, 846, 198, 3710, 369, 279, 6511, 314, 6124, 30, 17308, 440, 1132, 279, 3177, 803, 13, 248046, 198, 248045, 74455, 198, 248068, 198 ],
+    "template" : "EDGEROCK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 24,
+      "completionTokens" : 39
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 3968.864734,
+    "raw" : "The user is asking for the capital of Japan, which is a simple factual question. The capital is Tokyo. I need to reply with only the city name as instructed.\n</think>\nTokyo",
+    "visible" : "Tokyo",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "sum-holdout",
+    "prompt" : "<|im_start|>user\nWhat is 23 + 19? Reply with only the number.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+    "expected" : "42",
+    "promptTokenIds" : [ 248045, 846, 198, 3710, 369, 220, 17, 18, 478, 220, 16, 24, 30, 17308, 440, 1132, 279, 1324, 13, 248046, 198, 248045, 74455, 198, 248068, 198 ],
+    "template" : "EDGEROCK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 26,
+      "completionTokens" : 45
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 4340.420995,
+    "raw" : "We need answer simple arithmetic. User asks \"What is 23 + 19? Reply with only the number.\" Need final just number. 23+19=42.\n</think>\n42",
+    "visible" : "42",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "subtract-holdout",
+    "prompt" : "<|im_start|>user\nWhat is 81 - 36? Reply with only the number.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+    "expected" : "45",
+    "promptTokenIds" : [ 248045, 846, 198, 3710, 369, 220, 23, 16, 471, 220, 18, 21, 30, 17308, 440, 1132, 279, 1324, 13, 248046, 198, 248045, 74455, 198, 248068, 198 ],
+    "template" : "EDGEROCK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 26,
+      "completionTokens" : 26
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 2722.800635,
+    "raw" : "We need answer simple arithmetic. Need final only number. 81-36=45.\n</think>\n45",
+    "visible" : "45",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "supported-price",
+    "prompt" : "<|im_start|>user\nContext: Museum admission costs 12 dollars. How much does admission cost? Reply with only the number.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+    "expected" : "12",
+    "promptTokenIds" : [ 248045, 846, 198, 1905, 25, 15849, 24490, 6829, 220, 16, 17, 10867, 13, 2500, 1691, 1503, 24490, 2695, 30, 17308, 440, 1132, 279, 1324, 13, 248046, 198, 248045, 74455, 198, 248068, 198 ],
+    "template" : "EDGEROCK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 32,
+      "completionTokens" : 512
+    },
+    "stopReason" : "MAX_TOKENS",
+    "elapsedMillis" : 48381.425139,
+    "raw" : "We need to parse the user's request. The user says: \"Context: Museum admission costs 12 dollars. How much does admission cost? Reply with only the number.\"\n\nThe user wants a response that is only the number. The context says museum admission costs 12 dollars. The question: \"How much does admission cost?\" The answer is 12. The user wants only the number. So we must output just \"12\". However, we need to consider the instruction: \"Make sure to include every step needed to justify the conclusion, with no logical leaps. Each step follow from previous steps. Avoid repeating same reasoning, repeatedly rejecting earlier conclusions, or introducing contradictions. If a correction is necessary, make it once and use the corrected result consistently. Ensure the final answer agrees with the derivation, and place it in \\boxed{} at the end.\"\n\nThe user says \"Reply with only the number.\" So we need to output only the number, but also they want the final answer in \\boxed{}? The instruction says \"Ensure the final answer agrees with the derivation, and place it in \\boxed{} at the end.\" However the user says \"Reply with only the number.\" There's a conflict: The user wants only the number, but the system instruction says to put final answer in \\boxed{}.\n\nWe need to interpret the priority. The user is the one giving a direct instruction: \"Reply with only the number.\" The system instruction says \"Ensure the final answer agrees with the derivation, and place it in \\boxed{} at the end.\" The user request is more specific about format: only the number. The system instruction is more general: place final answer in \\boxed{}.\n\nWe need to reconcile. Usually the higher-level instruction is system or developer messages. There's no developer message. The system message says \"You are an AI assistant...\". The user says \"Reply with only the number.\" The instruction \"Ensure the final answer agrees with the derivation, and place it in \\boxed{} at the end.\" is part of the user request? Actually the user request includes: \"Context: Museum admission costs 12 dollars. How much does admission cost? Reply with only the number.\" The earlier part of the conversation: The user says \"Solve the problem independently with a concise, logically rigorous derivation... etc.\" That is the instruction for the assistant. Then the user says \"Context: Museum admission costs 12 dollars. How much does admission cost? Reply with only the number.\"\n\nThus",
+    "visible" : "",
+    "exactAnswer" : false
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "missing-time",
+    "prompt" : "<|im_start|>user\nContext: The library has four floors. What time does it open? Reply UNKNOWN if the context does not say.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+    "expected" : "UNKNOWN",
+    "promptTokenIds" : [ 248045, 846, 198, 1905, 25, 561, 6522, 682, 2943, 25115, 13, 3437, 854, 1503, 424, 1724, 30, 17308, 59322, 413, 279, 2193, 1503, 524, 1910, 13, 248046, 198, 248045, 74455, 198, 248068, 198 ],
+    "template" : "EDGEROCK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 33,
+      "completionTokens" : 54
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 5420.205203,
+    "raw" : "We need answer user's question. Context: \"The library has four floors. What time does it open?\" Only info: four floors. No opening time. Need reply UNKNOWN if context does not say. So final: UNKNOWN. Need maybe concise.\n</think>\nUNKNOWN",
+    "visible" : "UNKNOWN",
+    "exactAnswer" : true
+  } ],
+  "artifactSha256" : "67c354bcb2abe0cba407fbfe8e7f7cc100dd44458b6fbdfee95ae22f3aaa2c6a",
+  "diagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v14",
+    "environment" : {
+      "native-grouped-attention" : "true",
+      "kernel-implementation" : "rust-ffm-quantized-v14",
+      "fast-scalar-fma" : "true",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "q4-short-pairwise-supported" : "true",
+      "compiler" : "hotspot-c2",
+      "modeljars-artifact-sha256" : "67c354bcb2abe0cba407fbfe8e7f7cc100dd44458b6fbdfee95ae22f3aaa2c6a",
+      "gguf-parallel" : "true",
+      "vm-vendor" : "Eclipse Adoptium",
+      "java-feature" : "25",
+      "modeljars-qualification-workload" : "general",
+      "end-of-generation-token-ids" : "248044,248046",
+      "native-kernel-decode-threads" : "8",
+      "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+      "gguf-executor" : "persistent",
+      "native-kernel-poll-millis" : "5",
+      "vector-api" : "true",
+      "end-of-generation.248046" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+      "java-version" : "25.0.3",
+      "end-of-generation.248044" : "vocabulary-text",
+      "architecture" : "amd64",
+      "gguf-chunks-per-thread" : "2",
+      "native-kernel-abi" : "7",
+      "java-executor-poll-millis" : "0",
+      "modeljars-marker" : "org.modeljars.huggingface:hkust-aaron.edgerock-4b-gguf.q4_k_m:1.0.0-q4_k_m.1",
+      "tokenizer.pre.implemented" : "true",
+      "kernel-runtime" : "rust-ffm",
+      "native-quantized-decode" : "true",
+      "end-of-generation.chat-template" : "absent",
+      "native-q5-0-grouped" : "false",
+      "projection-layers" : "32",
+      "preferred-vector-bits" : "256",
+      "q4-unsigned-pairwise-supported" : "true",
+      "model-architecture" : "edgerock",
+      "tokenizer.pre" : "qwen35",
+      "native-kernel-threads" : "8",
+      "native-gated-delta-net" : "true",
+      "os" : "Linux",
+      "vm-version" : "25.0.3+9-LTS",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "fast-vector-fma" : "true",
+      "active-vector-bits" : "256",
+      "sve" : "false",
+      "transformer-runtime" : "java",
+      "gguf-threads" : "16",
+      "processors" : "16"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "grouped",
+        "implementation" : "rust-ffm-quantized-v14",
+        "gate-up" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "4"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64",
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "batch-size" : "32",
+        "active-vector-bits" : "256",
+        "requested-kernel" : "one-query-block",
+        "kernel" : "one-query-block",
+        "architecture" : "amd64"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "2"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "7"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256",
+        "requested-kernel" : "scattered",
+        "kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "16",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment",
+        "artifact-format" : "gguf"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "16",
+        "chunks-per-thread" : "2",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "qualified-session-context",
+      "status" : "ENABLED",
+      "reason" : "size the session for its tested context; an explicit deployment setting takes precedence",
+      "settings" : {
+        "contextLength" : "2048"
+      }
+    }, {
+      "id" : "modeljars.performance-profile",
+      "status" : "DISABLED",
+      "reason" : "no exact artifact, backend, and runtime profile matched",
+      "settings" : {
+        "backend" : "rust-ffm"
+      }
+    }, {
+      "id" : "rust-ptq1-0-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+      "settings" : {
+        "weight" : "PTQ1_0",
+        "transformer" : "java",
+        "activation" : "Q8_0"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7",
+        "state" : "caller-owned-java-array"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "independent recurrent state slots share one native worker dispatch",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7",
+        "state" : "branch-major-caller-owned-java-array"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+      "settings" : {
+        "evidence" : "benchmark-results/2026-10-12-q5-production/"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "complete" : true
+}

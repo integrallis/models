@@ -1,0 +1,640 @@
+{
+  "job" : {
+    "id" : "bartowski_deepseek_r1_distill_qwen_1_5b_gguf_q4_k_m",
+    "sha256" : "1741e5b2d062b07acf048bf0d2c514dadf2a48f94e2b4aa0cfe069af3838ee2f",
+    "sizeBytes" : 1117320800,
+    "uri" : "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/9cc28b17e86fa2415fcb070f8ee5ec27c965aa61/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
+    "maxTokens" : 512,
+    "modes" : [ {
+      "name" : "candidate-default-chat",
+      "template" : "default-chat"
+    } ],
+    "cases" : [ {
+      "id" : "capital",
+      "input" : "What is the capital of France? Reply with only the city name.",
+      "expected" : "Paris"
+    }, {
+      "id" : "sum",
+      "input" : "What is 17 + 25? Reply with only the number.",
+      "expected" : "42"
+    }, {
+      "id" : "missing-price",
+      "input" : "Context: The museum closes at 6 PM on Fridays. What is the admission price? Reply UNKNOWN if the context does not say.",
+      "expected" : "UNKNOWN"
+    }, {
+      "id" : "capital-holdout",
+      "input" : "What is the capital of Japan? Reply with only the city name.",
+      "expected" : "Tokyo"
+    }, {
+      "id" : "sum-holdout",
+      "input" : "What is 23 + 19? Reply with only the number.",
+      "expected" : "42"
+    }, {
+      "id" : "subtract-holdout",
+      "input" : "What is 81 - 36? Reply with only the number.",
+      "expected" : "45"
+    }, {
+      "id" : "supported-price",
+      "input" : "Context: Museum admission costs 12 dollars. How much does admission cost? Reply with only the number.",
+      "expected" : "12"
+    }, {
+      "id" : "missing-time",
+      "input" : "Context: The library has four floors. What time does it open? Reply UNKNOWN if the context does not say.",
+      "expected" : "UNKNOWN"
+    } ]
+  },
+  "java" : "25.0.3+9-LTS",
+  "scope" : "Paired chat diagnosis; not a RAG admission verdict",
+  "cases" : [ {
+    "mode" : "candidate-default-chat",
+    "caseId" : "capital",
+    "prompt" : "<｜User｜>What is the capital of France? Reply with only the city name.<｜Assistant｜><think>\n",
+    "expected" : "Paris",
+    "promptTokenIds" : [ 151646, 151644, 3838, 374, 279, 6722, 315, 9625, 30, 17841, 448, 1172, 279, 3283, 829, 13, 151645, 151648, 198 ],
+    "template" : "DEEPSEEK_R1",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 19,
+      "completionTokens" : 367
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 13299.345364,
+    "raw" : "Okay, so I need to figure out the capital of France. I remember that France is a country in Europe, and it's pretty big. I think the capital is a major city, maybe in the south of France. I've heard of Paris before, but I'm not entirely sure if it's the capital. Let me think about the history of France. I know that France was once a kingdom, and it gained independence from England in the 1700s. So, the capital should have been a significant city during that time.\n\nI remember that during the French Revolution, the capital was the capital of the monarchy, which was Paris. So, Paris must have been the capital before the revolution. But I also know that the French Revolution led to the establishment of the People's Republic of China, but that's a different country. So, France's capital should still be Paris, even after the revolution.\n\nI think Paris is the most famous city in France, and it's located in the south of the country. It's a major city with lots of attractions, like the Eiffel Tower and the Louvre. I've heard that Paris is the capital of many countries, but France itself is the capital of France. So, the answer should be Paris.\n\nWait, but I should make sure. Maybe I'm confusing it with another city. Let me think about other cities in France. There's also a city called Toulouse, but that's in the north. Then there's a city called Amiens, but that's also in the north. So, Paris is definitely the capital. I don't think there's any other city that's the capital of France. It's a well-known city, so I'm pretty confident that's the answer.\n</think>\n\nThe capital of France is Paris.",
+    "visible" : "The capital of France is Paris.",
+    "exactAnswer" : false
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "sum",
+    "prompt" : "<｜User｜>What is 17 + 25? Reply with only the number.<｜Assistant｜><think>\n",
+    "expected" : "42",
+    "promptTokenIds" : [ 151646, 151644, 3838, 374, 220, 16, 22, 488, 220, 17, 20, 30, 17841, 448, 1172, 279, 1372, 13, 151645, 151648, 198 ],
+    "template" : "DEEPSEEK_R1",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 21,
+      "completionTokens" : 206
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 6821.087445,
+    "raw" : "First, I identify the two numbers to be added: 17 and 25.\n\nNext, I add them together by starting with the tens place: 10 + 20 equals 30.\n\nThen, I add the ones place: 7 + 5 equals 12.\n\nFinally, I combine the results from the tens and ones places: 30 + 12 equals 42.\n</think>\n\n**Solution:**\n\nTo find the sum of 17 and 25, follow these steps:\n\n1. **Add the tens place:**\n   \\[\n   10 + 20 = 30\n   \\]\n\n2. **Add the ones place:**\n   \\[\n   7 + 5 = 12\n   \\]\n\n3. **Combine the results:**\n   \\[\n   30 + 12 = 42\n   \\]\n\n**Final Answer:**\n\\[\n\\boxed{42}\n\\]",
+    "visible" : "**Solution:**\n\nTo find the sum of 17 and 25, follow these steps:\n\n1. **Add the tens place:**\n   \\[\n   10 + 20 = 30\n   \\]\n\n2. **Add the ones place:**\n   \\[\n   7 + 5 = 12\n   \\]\n\n3. **Combine the results:**\n   \\[\n   30 + 12 = 42\n   \\]\n\n**Final Answer:**\n\\[\n\\boxed{42}\n\\]",
+    "exactAnswer" : false
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "missing-price",
+    "prompt" : "<｜User｜>Context: The museum closes at 6 PM on Fridays. What is the admission price? Reply UNKNOWN if the context does not say.<｜Assistant｜><think>\n",
+    "expected" : "UNKNOWN",
+    "promptTokenIds" : [ 151646, 151644, 1972, 25, 576, 23971, 33250, 518, 220, 21, 5851, 389, 79423, 13, 3555, 374, 279, 25293, 3349, 30, 17841, 61395, 421, 279, 2266, 1558, 537, 1977, 13, 151645, 151648, 198 ],
+    "template" : "DEEPSEEK_R1",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 32,
+      "completionTokens" : 313
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 10915.273699,
+    "raw" : "Okay, so I need to figure out the admission price for the museum based on the given context. The context says, \"The museum closes at 6 PM on Fridays. What is the admission price?\" Hmm, that's a bit vague. I don't have any other information about the museum's pricing or any specific details about the admission price. \n\nI remember that when a question is asking for an admission price, it usually provides some context that includes pricing information. But in this case, the context only mentions the museum closing at 6 PM on Fridays. There's no mention of ticket prices, pricing tiers, or any other details that would help determine the admission price. \n\nI wonder if the museum is a well-known one, but without knowing that, it's hard to say. Maybe it's a smaller museum, but even then, without specific pricing, I can't give an exact number. The user also asked to reply \"UNKNOWN\" if the context doesn't provide enough information. So, in this case, since the context doesn't include any pricing details, I should respond with \"UNKNOWN.\"\n\nI should make sure I'm not missing any other clues. The museum closes at 6 PM on Fridays, but that's about the operating hours, not the pricing. Unless there's a specific pricing structure mentioned elsewhere, which there isn't, I can't assume anything about the admission price. \n\nSo, my conclusion is that the context doesn't provide enough information to determine the admission price, so I should reply with \"UNKNOWN.\"\n</think>\n\nUNKNOWN",
+    "visible" : "UNKNOWN",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "capital-holdout",
+    "prompt" : "<｜User｜>What is the capital of Japan? Reply with only the city name.<｜Assistant｜><think>\n",
+    "expected" : "Tokyo",
+    "promptTokenIds" : [ 151646, 151644, 3838, 374, 279, 6722, 315, 6323, 30, 17841, 448, 1172, 279, 3283, 829, 13, 151645, 151648, 198 ],
+    "template" : "DEEPSEEK_R1",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 19,
+      "completionTokens" : 308
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 10174.473839,
+    "raw" : "Okay, so I need to figure out the capital of Japan. I remember that Japan is a big country, and it's known for its history and culture. I think the capital is a place that's both iconic and has a lot of significance. \n\nFirst, I'll try to recall any famous cities in Japan. I know that Tokyo is a big city, but I'm not sure if it's the capital. Maybe it's another city. I think there's a city called Kyoto, but I'm not certain. I remember hearing about Kyoto being the capital of a neighboring country, but that's not Japan. \n\nWait, I think the capital is actually a city in the north. I've heard of cities like Osaka, Fukuoka, and Nara. Maybe one of these is the capital. I'm trying to remember which one. I think Osaka is a major city, but I'm not sure if it's the capital. \n\nI think the capital is actually Osaka. I remember that Osaka is the capital of the prefecture of Osaka, which is part of Japan. So, the capital would be Osaka. I should double-check that. \n\nI think I've heard that Osaka is the capital because it's the largest city in Japan, and it's known for its rich history and culture. It's also the capital of the prefecture, which means it's the administrative center of that area. So, putting it all together, the capital of Japan is Osaka.\n</think>\n\nThe capital of Japan is Osaka.",
+    "visible" : "The capital of Japan is Osaka.",
+    "exactAnswer" : false
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "sum-holdout",
+    "prompt" : "<｜User｜>What is 23 + 19? Reply with only the number.<｜Assistant｜><think>\n",
+    "expected" : "42",
+    "promptTokenIds" : [ 151646, 151644, 3838, 374, 220, 17, 18, 488, 220, 16, 24, 30, 17841, 448, 1172, 279, 1372, 13, 151645, 151648, 198 ],
+    "template" : "DEEPSEEK_R1",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 21,
+      "completionTokens" : 179
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 5723.706242,
+    "raw" : "First, I identify the two numbers to be added: 23 and 19.\n\nNext, I add these two numbers together by performing the addition step by step.\n\nFinally, I arrive at the sum of 42.\n</think>\n\n**Solution:**\n\nTo find the sum of 23 and 19, follow these steps:\n\n1. **Add the units place:**\n   \\[\n   3 + 9 = 12\n   \\]\n   Write down 2 and carry over 1 to the tens place.\n\n2. **Add the tens place along with the carried over value:**\n   \\[\n   2 + 1 + 1 = 4\n   \\]\n\n3. **Combine the results:**\n   \\[\n   42\n   \\]\n\n**Final Answer:**\n\\[\n\\boxed{42}\n\\]",
+    "visible" : "**Solution:**\n\nTo find the sum of 23 and 19, follow these steps:\n\n1. **Add the units place:**\n   \\[\n   3 + 9 = 12\n   \\]\n   Write down 2 and carry over 1 to the tens place.\n\n2. **Add the tens place along with the carried over value:**\n   \\[\n   2 + 1 + 1 = 4\n   \\]\n\n3. **Combine the results:**\n   \\[\n   42\n   \\]\n\n**Final Answer:**\n\\[\n\\boxed{42}\n\\]",
+    "exactAnswer" : false
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "subtract-holdout",
+    "prompt" : "<｜User｜>What is 81 - 36? Reply with only the number.<｜Assistant｜><think>\n",
+    "expected" : "45",
+    "promptTokenIds" : [ 151646, 151644, 3838, 374, 220, 23, 16, 481, 220, 18, 21, 30, 17841, 448, 1172, 279, 1372, 13, 151645, 151648, 198 ],
+    "template" : "DEEPSEEK_R1",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 21,
+      "completionTokens" : 335
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 11599.026424,
+    "raw" : "First, I need to subtract 36 from 81. I'll start by subtracting the units place: 1 minus 6. Since 1 is smaller than 6, I'll borrow 1 from the tens place, making it 11 minus 6, which equals 5.\n\nNext, I'll subtract the tens place: 7 (after borrowing) minus 3, which equals 4.\n\nFinally, I'll combine the results from the units and tens places to get the final answer.\n</think>\n\n**Solution:**\n\nTo find the result of \\(81 - 36\\), follow these steps:\n\n1. **Subtract the units place:**\n   \\[\n   1 - 6\n   \\]\n   Since \\(1\\) is smaller than \\(6\\), we need to borrow \\(1\\) from the tens place.\n\n2. **Borrow from the tens place:**\n   - The tens place becomes \\(7\\) (since we borrowed \\(1\\)).\n   - The units place becomes \\(11\\) (since we added \\(10\\) to it).\n\n3. **Subtract the units place:**\n   \\[\n   11 - 6 = 5\n   \\]\n\n4. **Subtract the tens place:**\n   \\[\n   7 - 3 = 4\n   \\]\n\n5. **Combine the results:**\n   \\[\n   4 \\text{ (tens place)} \\, 5 \\text{ (units place)} = 45\n   \\]\n\n**Final Answer:**\n\\[\n\\boxed{45}\n\\]",
+    "visible" : "**Solution:**\n\nTo find the result of \\(81 - 36\\), follow these steps:\n\n1. **Subtract the units place:**\n   \\[\n   1 - 6\n   \\]\n   Since \\(1\\) is smaller than \\(6\\), we need to borrow \\(1\\) from the tens place.\n\n2. **Borrow from the tens place:**\n   - The tens place becomes \\(7\\) (since we borrowed \\(1\\)).\n   - The units place becomes \\(11\\) (since we added \\(10\\) to it).\n\n3. **Subtract the units place:**\n   \\[\n   11 - 6 = 5\n   \\]\n\n4. **Subtract the tens place:**\n   \\[\n   7 - 3 = 4\n   \\]\n\n5. **Combine the results:**\n   \\[\n   4 \\text{ (tens place)} \\, 5 \\text{ (units place)} = 45\n   \\]\n\n**Final Answer:**\n\\[\n\\boxed{45}\n\\]",
+    "exactAnswer" : false
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "supported-price",
+    "prompt" : "<｜User｜>Context: Museum admission costs 12 dollars. How much does admission cost? Reply with only the number.<｜Assistant｜><think>\n",
+    "expected" : "12",
+    "promptTokenIds" : [ 151646, 151644, 1972, 25, 16328, 25293, 7049, 220, 16, 17, 11192, 13, 2585, 1753, 1558, 25293, 2783, 30, 17841, 448, 1172, 279, 1372, 13, 151645, 151648, 198 ],
+    "template" : "DEEPSEEK_R1",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 27,
+      "completionTokens" : 65
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 2091.260722,
+    "raw" : "Okay, so I need to figure out the museum admission cost. The context says it's 12 dollars. The user wants just the number, so I should focus on that. I don't need any extra information or explanations. Just the number 12.\n</think>\n\nThe museum admission costs 12 dollars.",
+    "visible" : "The museum admission costs 12 dollars.",
+    "exactAnswer" : false
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "missing-time",
+    "prompt" : "<｜User｜>Context: The library has four floors. What time does it open? Reply UNKNOWN if the context does not say.<｜Assistant｜><think>\n",
+    "expected" : "UNKNOWN",
+    "promptTokenIds" : [ 151646, 151644, 1972, 25, 576, 6733, 702, 3040, 25945, 13, 3555, 882, 1558, 432, 1787, 30, 17841, 61395, 421, 279, 2266, 1558, 537, 1977, 13, 151645, 151648, 198 ],
+    "template" : "DEEPSEEK_R1",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 28,
+      "completionTokens" : 512
+    },
+    "stopReason" : "MAX_TOKENS",
+    "elapsedMillis" : 18952.606475,
+    "raw" : "Okay, so I need to figure out when the library opens based on the given context. The context says, \"The library has four floors. What time does it open?\" Hmm, that's a bit confusing. I know that libraries usually open at a specific time, but here it's just asking for the time it opens, which is a bit vague.\n\nWait, maybe the context is incomplete. It mentions four floors but doesn't specify any other details. So, without more information, I can't determine the exact opening time. Libraries typically open at a certain hour, maybe in the morning, but without knowing the specific time, I can't say for sure.\n\nI should consider that the user might be trying to get a specific answer, but the context provided isn't enough. Maybe they're looking for a general answer, but since it's not given, I should respond that I can't determine the opening time with the provided information.\n\nAlternatively, perhaps the user is referring to a specific library or a particular building within the library. If they had more details about the building or its location, that could help narrow down the opening time. But as it stands, I don't have enough data to answer the question accurately.\n\nI should also think about whether there's any standard assumption I can make. Libraries often open at 8 AM or 9 AM, but again, without knowing the exact time, I can't confirm that. So, my best bet is to inform the user that the context is insufficient to provide an accurate answer.\n\nMaybe I should phrase it in a way that's helpful. I can say that the context doesn't provide enough information to determine the opening time, so I can't answer the question. That way, the user knows that I'm acknowledging the lack of information and offering to provide more details if needed.\n\nI should also make sure my response is clear and concise. It's important to communicate that I can't help with the specific question based on the given context. That way, the user understands that I'm willing to assist with additional information if they provide it.\n\nIn summary, the key points are:\n1. The context only mentions four floors but doesn't specify the opening time.\n2. Libraries typically open at a specific time, but without that information, I can't determine it.\n3. The user needs more details to answer accurately.\n4. My response should acknowledge the lack of information and offer further assistance if needed.\n\nI think that covers it. I'll structure my response to clearly state that the context is",
+    "visible" : "",
+    "exactAnswer" : false
+  } ],
+  "artifactSha256" : "1741e5b2d062b07acf048bf0d2c514dadf2a48f94e2b4aa0cfe069af3838ee2f",
+  "diagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v14",
+    "environment" : {
+      "modeljars-qualification-workload" : "general",
+      "vm-version" : "25.0.3+9-LTS",
+      "fast-vector-fma" : "true",
+      "tokenizer.pre.implemented" : "true",
+      "compiler" : "hotspot-c2",
+      "vm-vendor" : "Eclipse Adoptium",
+      "end-of-generation.chat-template" : "resolved:151643",
+      "q4-short-pairwise-supported" : "true",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "end-of-generation.151643" : "tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn",
+      "native-grouped-attention" : "true",
+      "end-of-generation-token-ids" : "151643",
+      "vector-api" : "true",
+      "tokenizer.pre" : "deepseek-r1-qwen",
+      "fast-scalar-fma" : "true",
+      "active-vector-bits" : "256",
+      "gguf-chunks-per-thread" : "2",
+      "modeljars-marker" : "org.modeljars.huggingface:bartowski.deepseek-r1-distill-qwen-1.5b-gguf.q4_k_m:1.0.0-q4_k_m.1",
+      "java-executor-poll-millis" : "0",
+      "native-kernel-decode-threads" : "8",
+      "gguf-parallel" : "true",
+      "sve" : "false",
+      "native-gated-delta-net" : "true",
+      "model-architecture" : "qwen2",
+      "architecture" : "amd64",
+      "gguf-executor" : "persistent",
+      "native-q5-0-grouped" : "false",
+      "java-version" : "25.0.3",
+      "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+      "kernel-runtime" : "rust-ffm",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "os" : "Linux",
+      "transformer-runtime" : "java",
+      "kernel-implementation" : "rust-ffm-quantized-v14",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "projection-layers" : "28",
+      "native-quantized-decode" : "true",
+      "native-kernel-poll-millis" : "5",
+      "modeljars-artifact-sha256" : "1741e5b2d062b07acf048bf0d2c514dadf2a48f94e2b4aa0cfe069af3838ee2f",
+      "gguf-threads" : "16",
+      "performance-cliff.fused-grouped-attention-disabled" : "architecture=qwen2, group-size=6",
+      "performance-cliffs" : "fused-grouped-attention-disabled",
+      "native-kernel-threads" : "8",
+      "native-kernel-abi" : "7",
+      "q4-unsigned-pairwise-supported" : "true",
+      "java-feature" : "25",
+      "processors" : "16",
+      "preferred-vector-bits" : "256"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "gate-up" : "grouped",
+        "qkv" : "grouped",
+        "implementation" : "rust-ffm-quantized-v14"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "14"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64",
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "kernel" : "one-query-block",
+        "architecture" : "amd64",
+        "batch-size" : "32",
+        "active-vector-bits" : "256",
+        "requested-kernel" : "one-query-block"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "2"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "7"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "requested-kernel" : "scattered",
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "16",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment",
+        "artifact-format" : "gguf"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "threads" : "16",
+        "chunks-per-thread" : "2"
+      }
+    }, {
+      "id" : "sliding-window-attention",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no sliding window, so every layer attends to the full context",
+      "settings" : {
+        "pattern-source" : "none",
+        "declared-window" : "0",
+        "local-layers" : "0/28"
+      }
+    }, {
+      "id" : "expert-swiglu-clamp",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no expert SwiGLU clamp",
+      "settings" : {
+        "clamped-layers" : "0/28"
+      }
+    }, {
+      "id" : "modeljars.performance-profile",
+      "status" : "DISABLED",
+      "reason" : "no exact artifact, backend, and runtime profile matched",
+      "settings" : {
+        "backend" : "rust-ffm"
+      }
+    }, {
+      "id" : "rust-ptq1-0-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+      "settings" : {
+        "weight" : "PTQ1_0",
+        "transformer" : "java",
+        "activation" : "Q8_0"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7",
+        "state" : "caller-owned-java-array"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "independent recurrent state slots share one native worker dispatch",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7",
+        "state" : "branch-major-caller-owned-java-array"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+      "settings" : {
+        "evidence" : "benchmark-results/2026-10-12-q5-production/"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "complete" : true
+}
