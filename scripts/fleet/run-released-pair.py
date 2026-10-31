@@ -53,9 +53,12 @@ def main():
     parser.add_argument('--model', type=Path, required=True)
     parser.add_argument('--java', required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--reference-version', required=True)
-    parser.add_argument('--reference-model', required=True)
+    parser.add_argument('--reference-version')
+    parser.add_argument('--reference-model')
+    parser.add_argument('--smoke-only', action='store_true', help='default regression only; never emits a qualification verdict')
     args = parser.parse_args()
+    if not args.smoke_only and not (args.reference_version and args.reference_model):
+        parser.error('paired qualification requires both reference inputs')
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
     job = json.loads(args.job.read_text())
@@ -102,6 +105,9 @@ def main():
         require_default_smoke(json.loads(smoke_path.read_text()), job)
         (smoke_dir / 'configuration.json').write_text(json.dumps(dict(configuration='library-defaults',
             tuningSystemProperties=[], backendVersion=label, reportSha256=digest(smoke_path)), indent=2) + '\n')
+        if args.smoke_only:
+            status.write_text('COMPLETE_DEFAULT_SMOKE_ONLY\n')
+            return
         status.write_text('RUNNING_PAIRED_RAG\n')
         trials = ['--warmups', '1', '--iterations', '3']
         tuned = [] if job.get('decodeThreads') is None else ['-Dmodels.native.kernels.decodeThreads=' + str(job['decodeThreads'])]

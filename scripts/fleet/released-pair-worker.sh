@@ -51,7 +51,10 @@ while IFS= read -r job; do
   model="$WORK/models/$id.gguf"
   curl -fL --retry 3 --max-time 1800 "$(jq -er .uri <<<"$job")" -o "$model"
   printf '%s  %s\n' "$(jq -er .sha256 <<<"$job")" "$model" | sha256sum -c -
-  if [[ "$(jq -er .comparator <<<"$job")" == ollama ]]; then
+  if jq -e '.smokeOnly == true' <<<"$job" >/dev/null; then
+    python3 "$WORK/run-released-pair.py" --payload "$WORK/released" --job "$WORK/job.json" \
+      --model "$model" --java "$WORK/jdk/bin/java" --output "$OUT/$id" --smoke-only
+  elif [[ "$(jq -er .comparator <<<"$job")" == ollama ]]; then
     printf 'FROM %s\n' "$model" >"$OUT/$id.Modelfile"
     runuser -u root -- ollama create qualification -f "$OUT/$id.Modelfile" >"$OUT/$id.import.log" 2>&1
     python3 "$WORK/run-released-pair.py" --payload "$WORK/released" --job "$WORK/job.json" \
