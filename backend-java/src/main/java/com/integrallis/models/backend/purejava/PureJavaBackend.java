@@ -482,6 +482,19 @@ public final class PureJavaBackend
           throw new UnsupportedOperationException(
               "Prism Hadamard execution is not supported for " + modelFamily);
         }
+        // EdgeRock is served by the Qwen3.5 decoder: its published GGUF carries a complete
+        // qwen35.* key set beside its own, every tensor name in it is one Qwen35Weights resolves,
+        // and the memory module its earlier refusal named is now implemented and wired, with the
+        // graph refusing to construct unless the anchors are present.
+        //
+        // One header key is still unaccounted for. The file publishes rope.dimension_sections
+        // [11, 11, 10, 0] and the reference config sets mrope_interleaved, which is the
+        // multimodal rope split. This decoder applies plain NeoX rope over
+        // rope.dimension_count. For text-only decoding the three sections carry the same
+        // position and the split is expected to collapse to exactly that, which is why the model
+        // loads here rather than being refused -- but it is an expectation read off the config,
+        // not a measurement, and it is settled by full-model parity against the reference and not
+        // by this comment. See experiments/edgerock-decoder/IMPLEMENTATION.md.
         if ("gemma-embedding2".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded =
@@ -499,7 +512,8 @@ public final class PureJavaBackend
                   batchedMatrixKernel);
         } else if ("qwen35".equals(modelFamily)
             || "qwen35moe".equals(modelFamily)
-            || "qwen3next".equals(modelFamily)) {
+            || "qwen3next".equals(modelFamily)
+            || "edgerock".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded =
               loadQwen35(

@@ -17,6 +17,9 @@ package com.integrallis.models.backend.purejava.qwen35;
 
 import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliff;
 import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
+import com.integrallis.models.backend.purejava.edgerock.EdgeRockMemory;
+import com.integrallis.models.backend.purejava.edgerock.EdgeRockMemoryLayer;
+import com.integrallis.models.backend.purejava.edgerock.MemoryBank;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.ExpertRouting;
@@ -64,6 +67,7 @@ public final class Qwen35ForwardPass {
           new SessionState(
               owner.config,
               owner.weights,
+              owner.memory,
               capacity,
               owner.prefillBatchSize,
               owner.batchedMatrixKernel);
@@ -103,6 +107,10 @@ public final class Qwen35ForwardPass {
 
   private final Qwen35Config config;
   private final Qwen35Weights weights;
+
+  /** EdgeRock's per-layer memory modules, or null for the three memory-free architectures. */
+  private final EdgeRockMemory memory;
+
   private final RotaryTable rotary;
   private final int prefillBatchSize;
   private final GgufQ4Kernel q4Kernel;
@@ -116,12 +124,24 @@ public final class Qwen35ForwardPass {
   private Qwen35ForwardPass(
       Qwen35Config config,
       Qwen35Weights weights,
+      EdgeRockMemory memory,
       int prefillBatchSize,
       GgufQ4Kernel q4Kernel,
       GgufQ6BatchedKernel q6BatchedKernel,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
     this.config = config;
     this.weights = weights;
+    // All or nothing, in both directions. EdgeRock's memory module adds to the residual of every
+    // full-attention layer, so a model that declares anchors and is served without them runs to
+    // completion and returns fluent, wrong logits -- the failure that is expensive precisely
+    // because nothing throws. The reverse pairing is equally a wiring bug, so it is refused too.
+    if (config.usesMemoryAnchors() == (memory == null)) {
+      throw new IllegalArgumentException(
+          config.usesMemoryAnchors()
+              ? "architecture " + config.architecture() + " requires its memory anchors"
+              : "memory anchors supplied for " + config.architecture() + ", which declares none");
+    }
+    this.memory = memory;
     this.rotary = new RotaryTable(config.ropeDimension(), config.ropeTheta(), 1.0f);
     if (prefillBatchSize < 1) {
       throw new IllegalArgumentException("prefillBatchSize must be >= 1: " + prefillBatchSize);
@@ -176,6 +196,7 @@ public final class Qwen35ForwardPass {
     return new Qwen35ForwardPass(
         config,
         Qwen35Weights.fromGgufFile(file, config),
+        config.usesMemoryAnchors() ? EdgeRockMemory.load(file, batchedMatrixKernel) : null,
         prefillBatchSize,
         GgufQ4Kernel.WIDENED,
         GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
@@ -185,7 +206,7 @@ public final class Qwen35ForwardPass {
   /** Returns a graph sharing the same mapped weights with the requested prefill batch size. */
   public Qwen35ForwardPass withPrefillBatchSize(int batchSize) {
     return new Qwen35ForwardPass(
-        config, weights, batchSize, q4Kernel, q6BatchedKernel, batchedMatrixKernel);
+        config, weights, memory, batchSize, q4Kernel, q6BatchedKernel, batchedMatrixKernel);
   }
 
   /** Returns a graph sharing the same weights and honoring the selected execution plan. */
@@ -200,6 +221,7 @@ public final class Qwen35ForwardPass {
     return new Qwen35ForwardPass(
         config,
         weights,
+        memory,
         plan.prefillBatchSize(),
         plan.q4Kernel(),
         plan.q6BatchedKernel(),
@@ -357,6 +379,22 @@ public final class Qwen35ForwardPass {
 
   /** Captures the Gated DeltaNet state needed to resume this session's retained token prefix. */
   public LinearStateSnapshot captureLinearState(Session session) {
+    // The snapshot carries the convolution and recurrent state only. Restoring one on a model with
+    // memory anchors would rewind the recurrence while leaving the bank holding anchors written
+    // past the restore point, and the first commit afterwards would merge against a bank the
+    // prefix never built -- wrong, and silent. rewind() stays available because it clears the
+    // banks and replays the prefix through the path that rebuilds them.
+    //
+    // Snapshotting the banks instead is the fix; it is not free, which is why this refuses rather
+    // than pretending. EdgeRock-4B carries 8 banks of 4 groups x 1024 slots x 256 lanes of keys
+    // and values, so a snapshot is on the order of 64 MB. The cost of refusing is the prompt-cache
+    // resumption, and therefore TTFT, on EdgeRock only.
+    if (memory != null) {
+      throw new UnsupportedOperationException(
+          "linear state snapshots do not carry memory anchors; "
+              + config.architecture()
+              + " must rewind and replay instead");
+    }
     return new LinearStateSnapshot(requireSession(session));
   }
 
@@ -437,6 +475,15 @@ public final class Qwen35ForwardPass {
   public float[][] decideGrouped(Session session, int[][] suffixes) {
     Session checked = requireSession(session);
     Objects.requireNonNull(suffixes, "suffixes");
+    // The grouped path keeps per-branch attention and recurrence but has no per-branch memory
+    // bank, so every branch would read anchors the others wrote and the answers would be wrong
+    // in a way that still looks like an answer. Refused until the bank is branch-scoped.
+    if (memory != null) {
+      throw new UnsupportedOperationException(
+          "grouped decisions are not implemented for "
+              + config.architecture()
+              + ": memory anchors are not branch-scoped");
+    }
     if (suffixes.length == 0) {
       throw new IllegalArgumentException("suffixes must not be empty");
     }
@@ -972,6 +1019,7 @@ public final class Qwen35ForwardPass {
     float[] state = new float[embeddingDimension];
     float[] normalized = new float[embeddingDimension];
     float[] projected = new float[embeddingDimension];
+    float[] memoryContribution = memory == null ? null : new float[embeddingDimension];
     float[] ffnGate = new float[config.hiddenDim()];
     FloatArrayView ffnGateView = batchedMatrixKernel.prepareFloatArray(ffnGate);
     float[] ffnUp = new float[config.hiddenDim()];
@@ -995,6 +1043,23 @@ public final class Qwen35ForwardPass {
             session.keys[layerIndex],
             session.values[layerIndex],
             session.scratch);
+        if (memory != null) {
+          // Two details the tensor names do not show, both taken from the reference decoder.
+          // The memory module reads the *pre-norm* residual, not the block's normed input: it
+          // owns a memory.input_norm and applies it itself, so feeding it `normalized` would
+          // normalise twice. And its output joins the attention output before the residual add,
+          // not after, so the two share one residual rather than stacking.
+          rotary.prepare(position);
+          memory
+              .layer(layerIndex)
+              .forward(
+                  state,
+                  position,
+                  head -> rotary.apply(head, 0, true),
+                  session.memoryBanks[layerIndex],
+                  memoryContribution);
+          add(projected, memoryContribution);
+        }
       } else {
         gatedDeltaNet(projected, normalized, layer.gatedDeltaNet(), layerIndex, session);
       }
@@ -1173,6 +1238,9 @@ public final class Qwen35ForwardPass {
             batchSize,
             sessionState,
             batch);
+        if (memory != null) {
+          memoryBatched(layerIndex, startPosition, batchSize, dimension, sessionState, batch);
+        }
       } else {
         gatedDeltaNetBatched(
             batch.projected,
@@ -1224,6 +1292,45 @@ public final class Qwen35ForwardPass {
       session.tokenHistory[startPosition + index] = tokens[tokenOffset + index];
     }
     session.checkpoint += batchSize;
+  }
+
+  /**
+   * Adds each row's memory contribution to the batch's attention output.
+   *
+   * <p>Row by row, and that is not a missed optimisation. Each token reads the bank before writing
+   * to it, and a write can trigger the commit that changes what later tokens read, so the rows of
+   * one batch are ordered with respect to each other. What batching buys here is the backbone: the
+   * projections, the feed-forward and the recurrence all run over the whole batch, and only this
+   * part stays sequential.
+   *
+   * <p>Reads {@code batch.state}, the pre-norm residual, not {@code batch.normalized}: the memory
+   * module applies its own {@code memory.input_norm}. Adds into {@code batch.projected} so the
+   * contribution shares the attention output's residual rather than stacking on top of it.
+   */
+  private void memoryBatched(
+      int layerIndex,
+      int startPosition,
+      int batchSize,
+      int dimension,
+      SessionState session,
+      BatchScratch batch) {
+    EdgeRockMemoryLayer memoryLayer = memory.layer(layerIndex);
+    MemoryBank bank = session.memoryBanks[layerIndex];
+    for (int index = 0; index < batchSize; index++) {
+      int position = startPosition + index;
+      int offset = index * dimension;
+      System.arraycopy(batch.state, offset, batch.memoryHidden, 0, dimension);
+      rotary.prepare(position);
+      memoryLayer.forward(
+          batch.memoryHidden,
+          position,
+          head -> rotary.apply(head, 0, true),
+          bank,
+          batch.memoryContribution);
+      for (int lane = 0; lane < dimension; lane++) {
+        batch.projected[offset + lane] += batch.memoryContribution[lane];
+      }
+    }
   }
 
   private void fullAttentionBatched(
@@ -1296,6 +1403,11 @@ public final class Qwen35ForwardPass {
       int position = startPosition + token;
       int queryBase = token * queryDimension;
       int queryGateBase = token * 2 * queryDimension;
+      // Per row, because each row sits at its own position and so has its own window. Same
+      // mechanism as the single-token path: the key cache is contiguous in position, so the
+      // window is a shifted base offset and attendHead is unchanged.
+      int firstVisible = firstVisiblePosition(position, config.attentionWindow());
+      int visiblePositions = position - firstVisible + 1;
       for (int head = 0; head < queryHeads; head++) {
         int kvHead = head / queriesPerKvHead;
         int queryOffset = queryBase + head * headDimension;
@@ -1306,15 +1418,15 @@ public final class Qwen35ForwardPass {
             batch.query,
             queryOffset,
             session.keys[layer],
-            kvHead * headDimension,
+            kvHead * headDimension + firstVisible * keyDimension,
             keyDimension,
             session.values[layer],
-            kvHead * headDimension,
+            kvHead * headDimension + firstVisible * keyDimension,
             keyDimension,
             batch.queryGate,
             gate,
             batch.attentionScores,
-            position + 1,
+            visiblePositions,
             headDimension,
             scale);
       }
@@ -1518,7 +1630,13 @@ public final class Qwen35ForwardPass {
 
     int queriesPerKvHead = queryHeads / kvHeads;
     float scale = (float) (1.0 / Math.sqrt(headDimension));
-    float[] scores = new float[position + 1];
+    // A sliding window is a shifted base offset, not a new kernel: the cache is contiguous in
+    // position with a fixed stride, so dropping the positions before the window means starting
+    // the same walk further in. attendHead therefore needs no window of its own. A width of 0
+    // means "attend to everything", which is what the three Qwen3.5 architectures publish.
+    int firstVisible = firstVisiblePosition(position, config.attentionWindow());
+    int visiblePositions = position - firstVisible + 1;
+    float[] scores = new float[visiblePositions];
     for (int head = 0; head < queryHeads; head++) {
       int kvHead = head / queriesPerKvHead;
       int queryOffset = head * headDimension;
@@ -1530,19 +1648,37 @@ public final class Qwen35ForwardPass {
           query,
           queryOffset,
           keyCache,
-          kvHead * headDimension,
+          kvHead * headDimension + firstVisible * key.length,
           key.length,
           valueCache,
-          kvHead * headDimension,
+          kvHead * headDimension + firstVisible * value.length,
           value.length,
           queryGate,
           gate,
           scores,
-          position + 1,
+          visiblePositions,
           headDimension,
           scale);
     }
     project(output, attended, weights.output(), scratch);
+  }
+
+  /**
+   * The earliest position a query at {@code position} may attend to.
+   *
+   * <p>The span is inclusive of both ends, so a window of w ending at p starts at p - w + 1 and
+   * covers exactly w positions once the sequence is longer than the window. A width of 0 means
+   * unwindowed. Separated out and tested directly because the caller turns this into a base offset
+   * into the key cache, where an off-by-one does not fail -- it attends to the wrong tokens.
+   */
+  static int firstVisiblePosition(int position, int window) {
+    if (position < 0) {
+      throw new IllegalArgumentException("position must be >= 0: " + position);
+    }
+    if (window < 0) {
+      throw new IllegalArgumentException("window must be >= 0: " + window);
+    }
+    return window == 0 ? 0 : Math.max(0, position - window + 1);
   }
 
   static void attendHead(
@@ -1936,6 +2072,10 @@ public final class Qwen35ForwardPass {
   private static final class SessionState {
     private final float[][] keys;
     private final float[][] values;
+
+    /** Per-layer memory banks, null on recurrent layers and on memory-free architectures. */
+    private final MemoryBank[] memoryBanks;
+
     private final float[][] convolutionHistory;
     private final FloatArrayView[] convolutionHistoryViews;
     private final float[][] recurrentState;
@@ -1946,9 +2086,13 @@ public final class Qwen35ForwardPass {
     private SessionState(
         Qwen35Config config,
         Qwen35Weights weights,
+        EdgeRockMemory memory,
         int capacity,
         int prefillBatchSize,
         GgufBatchedMatrixKernel kernel) {
+      // One bank per layer per session: the bank is sequence state, so sharing it across sessions
+      // would let one sequence read anchors another wrote.
+      memoryBanks = memory == null ? null : memory.newBanks();
       keys = new float[config.numLayers()][];
       values = new float[config.numLayers()][];
       convolutionHistory = new float[config.numLayers()][];
@@ -1995,11 +2139,29 @@ public final class Qwen35ForwardPass {
           Arrays.fill(state, 0.0f);
         }
       }
+      // The bank carries the previous sequence's anchors, which a new sequence must not read.
+      if (memoryBanks != null) {
+        for (MemoryBank bank : memoryBanks) {
+          if (bank != null) {
+            bank.reset();
+          }
+        }
+      }
     }
   }
 
   private static final class BatchScratch {
     private final float[] rowState;
+
+    /**
+     * One row's pre-norm residual and one row's memory contribution.
+     *
+     * <p>Two embedding-wide buffers, allocated for every model rather than only for the ones with
+     * anchors, because that is around 20 KB against a batch scratch already measured in megabytes.
+     */
+    private final float[] memoryHidden;
+
+    private final float[] memoryContribution;
     private final float[] state;
     private final float[] normalized;
     private final float[] projected;
@@ -2044,6 +2206,8 @@ public final class Qwen35ForwardPass {
         int batchSize,
         GgufBatchedMatrixKernel kernel) {
       rowState = new float[config.embeddingDim()];
+      memoryHidden = new float[config.embeddingDim()];
+      memoryContribution = new float[config.embeddingDim()];
       state = batchBuffer(batchSize, config.embeddingDim());
       normalized = batchBuffer(batchSize, config.embeddingDim());
       projected = batchBuffer(batchSize, config.embeddingDim());

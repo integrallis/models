@@ -19,8 +19,16 @@ import com.integrallis.vectors.core.VectorUtil;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Float32 Gated DeltaNet recurrence with Java Vector API row operations. */
-final class GatedDeltaNetRecurrence {
+/**
+ * Float32 Gated DeltaNet recurrence with Java Vector API row operations.
+ *
+ * <p>Public because EdgeRock shares this recurrence rather than reimplementing it. Its reference
+ * implementation subclasses Qwen3.5's gated delta net, and 24 of EdgeRock-4B's 32 layers are this
+ * arithmetic unchanged; a second implementation would be a second thing to keep bit-identical with
+ * three already-qualified architectures. The methods are pure -- the input state is copied, never
+ * mutated -- so sharing them is a visibility change and not a coupling of state.
+ */
+public final class GatedDeltaNetRecurrence {
 
   private static final float NORMALIZATION_EPSILON = 1.0e-6f;
 
@@ -145,7 +153,7 @@ final class GatedDeltaNetRecurrence {
   }
 
   /** Applies grouped recurrence into caller-owned state and workspace arrays. */
-  static void forwardInPlace(
+  public static void forwardInPlace(
       float[] query,
       float[] key,
       float[] value,

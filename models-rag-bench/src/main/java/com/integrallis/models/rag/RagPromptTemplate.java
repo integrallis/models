@@ -30,6 +30,7 @@ public enum RagPromptTemplate {
   CHATML_DIRECT("chatml-direct"),
   CHATML_ANSWER("chatml-answer"),
   CHATML_NO_THINK("chatml-no-think"),
+  EDGEROCK("edgerock"),
   ZEPHYR("zephyr"),
   LLAMA3("llama3"),
   MOBILE_MOE("mobilemoe"),
@@ -92,6 +93,18 @@ public enum RagPromptTemplate {
               .control("<|im_start|>user\n")
               .text(prompt)
               .control("<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n")
+              .build();
+      // EdgeRock's own envelope, from Modelfile.Q4_K_M in hkust-aaron/EdgeRock-4B-GGUF: the
+      // assistant turn is OPENED into a thinking block. CHATML_NO_THINK above closes an empty one,
+      // which instructs the opposite, and CHATML leaves the choice to the model, so neither is the
+      // template the publisher ships. This enum is separate from ChatTemplate and the benchmark
+      // parses prompt templates through it, so adding the value there alone left --prompt-template
+      // edgerock rejected at argument parsing.
+      case EDGEROCK ->
+          result
+              .control("<|im_start|>user\n")
+              .text(prompt)
+              .control("<|im_end|>\n<|im_start|>assistant\n<think>\n")
               .build();
       case ZEPHYR ->
           result.control("<|user|>\n").text(prompt).control("</s>\n<|assistant|>").build();
@@ -182,7 +195,7 @@ public enum RagPromptTemplate {
           ChatTemplate.FLINT.render(
               List.of(ChatMessage.system(systemPrompt), ChatMessage.user(userPrompt)));
       case RAW -> result.text(systemPrompt).text(userPrompt).build();
-      case CHATML, CHATML_DIRECT, CHATML_ANSWER, CHATML_NO_THINK -> {
+      case CHATML, CHATML_DIRECT, CHATML_ANSWER, CHATML_NO_THINK, EDGEROCK -> {
         result
             .control("<|im_start|>system\n")
             .text(systemPrompt.stripTrailing())
@@ -195,6 +208,8 @@ public enum RagPromptTemplate {
           result.text("Answer: ");
         } else if (this == CHATML_NO_THINK) {
           result.control("<think>\n\n</think>\n\n");
+        } else if (this == EDGEROCK) {
+          result.control("<think>\n");
         }
         yield result.build();
       }
