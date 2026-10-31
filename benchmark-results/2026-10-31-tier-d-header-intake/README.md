@@ -42,11 +42,16 @@ inflect.v2.reference_deployed_parameter_count = 3966721
 inflect.source.revision / checkpoint_sha256 / config_sha256
 ```
 
-So the ordering argument in #286 **inverts**. It ranks `inflect-v2` last of the three Tier D ports
-partly on this intake defect, and calls it a "worse intake problem" than `kokoro`'s. Measured, it is
-the **better**-described of the two TTS artifacts: `kokoro` publishes 30 keys and **no symbol table
-and no symbol hash**, while `inflect-v2` publishes a symbol count, a symbol hash that pins the
-inventory, the folded-weight-norm count and full upstream provenance.
+So the premise of #286's "no keys at all" claim is wrong, and that correction stands because it is a
+**presence** finding (§0).
+
+The ordering argument it implies does **not** stand. #286 ranks `inflect-v2` last of the three Tier
+D ports partly on this intake defect and calls it a "worse intake problem" than `kokoro`'s, and the
+first pass of this document tried to invert that. Both readings are unsound: **`kokoro` carries its
+symbol table too**, enumerated in `tokenizer.ggml.tokens` rather than pinned by a hash, which is the
+stronger form — and neither artifact reconciles against `kv_count`, so neither can be the subject of
+an absence claim in either direction. The ordering should be decided on the decoder work and the
+companion-artifact shape, not on intake quality.
 
 Two further things worth having: `folded_weight_norm_pairs = 108` says weight norm is already folded
 into the published tensors, so a port must not fold it again; and the 7,920-parameter gap between
@@ -101,6 +106,5 @@ loaded or deliberately skipped rather than ignored by accident.
   Nothing here speaks to that, and a smaller artifact being cheaper to port is not an argument that
   it is the right model.
 - **The 178-symbol match is not a shared-inventory proof**, as stated in §2.
-- **`kokoro` still has no symbol table.** §1 improves `inflect-v2`'s standing; it does not fix
-  `kokoro`, whose symbol-to-id mapping remains implicit and must come from the reference
-  implementation.
+- **Neither TTS artifact reconciles** (§0), so nothing here supports a claim that either one lacks a
+  given key. `kokoro`'s symbol table is present; what else either file carries is unknown.

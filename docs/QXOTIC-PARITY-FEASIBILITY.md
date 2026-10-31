@@ -216,8 +216,16 @@ One intake detail that is cheap to get wrong: the hybrid interval is **not** a
 `full_attention_interval` key as in qwen35. It is encoded as a per-layer `attention.head_count_kv`
 **array**, `[0,0,0,1]` repeated six times — so layers 3, 7, 11, 15, 19 and 23 are the MLA layers and
 the KDA layers report 0 KV heads. `Qwen35Config.java:177` reads that key as a single `requiredInt`,
-so this is a loader change and not only a graph change, and a `head_count_kv` of 0 is a value no
-config in the tree accepts today.
+so this is a loader change and not only a graph change.
+
+**Correction, 2026-10-31.** This paragraph previously ended "and a `head_count_kv` of 0 is a value
+no config in the tree accepts today." That is wrong. `Lfm2Config` already reads the key as a
+per-layer array and **already accepts 0** as the marker for a non-attention layer — `kvHeadsByLayer`
+rejects only negatives and requires at least one non-zero, so a zero entry is how lfm2 distinguishes
+its convolutional blocks from its attention blocks (`Lfm2Config.java:103-122`). That is
+bailingmoe3's usage exactly, so the pattern has prior art in the tree to follow rather than being a
+new concept, and this is a smaller loader change than the sentence implied. The claim was made from
+qwen35 alone without checking the other configs.
 
 - Gate: the KDA recurrence **alone** against a reference's state trajectory step by step before any
   full model runs, exactly as for Mamba-2 below. Then, separately, grouped selection matching the
