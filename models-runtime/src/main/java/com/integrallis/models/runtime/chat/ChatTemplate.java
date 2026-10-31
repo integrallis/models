@@ -37,6 +37,7 @@ public enum ChatTemplate {
   CHATML_DIRECT("chatml-direct", ToolSyntax.QWEN),
   CHATML_ANSWER("chatml-answer", ToolSyntax.QWEN),
   CHATML_NO_THINK("chatml-no-think", ToolSyntax.QWEN),
+  EDGEROCK("edgerock", ToolSyntax.QWEN),
   SMOLLM3_NO_THINK("smollm3-no-think", ToolSyntax.SMOLLM3),
   ZEPHYR("zephyr", ToolSyntax.NONE),
   LLAMA3("llama3", ToolSyntax.LLAMA3),
@@ -169,7 +170,8 @@ public enum ChatTemplate {
               SMOLLM3_NO_THINK,
               NEEDLE2,
               HAMMER,
-              MINICPM5_NO_THINK ->
+              MINICPM5_NO_THINK,
+              EDGEROCK ->
               "<|im_end|>";
           case ZEPHYR, H2O, H2O_DIRECT -> "</s>";
           case LLAMA3 -> "<|eot_id|>";
@@ -248,6 +250,11 @@ public enum ChatTemplate {
       case CHATML_DIRECT -> renderChatMl(conversation, "", "The context states that ");
       case CHATML_ANSWER -> renderChatMl(conversation, "", "Answer: ");
       case CHATML_NO_THINK -> renderChatMl(conversation, "", "<think>\n\n</think>\n\n");
+      // EdgeRock's own template, from Modelfile.Q4_K_M in hkust-aaron/EdgeRock-4B-GGUF: ChatML
+      // with the assistant turn OPENED into a thinking block rather than closed out of one.
+      // CHATML_NO_THINK is the opposite instruction and CHATML leaves the model to decide, so
+      // neither reproduces what the publisher ships.
+      case EDGEROCK -> renderChatMl(conversation, "", "<think>\n");
       case SMOLLM3_NO_THINK -> renderChatMl(conversation, "", "<think>\n\n</think>\n");
       case ZEPHYR -> renderZephyr(conversation);
       case LLAMA3 -> renderLlama3(conversation);
@@ -301,6 +308,7 @@ public enum ChatTemplate {
       case CHATML_ANSWER -> renderChatMlWithTools(conversation, "", "Answer: ", declared);
       case CHATML_NO_THINK ->
           renderChatMlWithTools(conversation, "", "<think>\n\n</think>\n\n", declared);
+      case EDGEROCK -> renderChatMlWithTools(conversation, "", "<think>\n", declared);
       case SMOLLM3_NO_THINK ->
           renderChatMlWithTools(
               conversation, "", "<think>\n\n</think>\n", declared, ToolSyntax.SMOLLM3);
