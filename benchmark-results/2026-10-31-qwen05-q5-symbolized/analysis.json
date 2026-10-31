@@ -1,0 +1,164 @@
+{
+  "samples": 219837,
+  "leafFrames": [
+    {
+      "frame": "std::sys::backtrace::__rust_begin_short_backtrace",
+      "samples": 89211,
+      "percent": 40.58052102239387
+    },
+    {
+      "frame": "jmodels_kernels::q51_reuse::compute_avx2",
+      "samples": 38837,
+      "percent": 17.6662709189081
+    },
+    {
+      "frame": "jmodels_kernels::dot_q5_1_f32_row_avx2",
+      "samples": 30741,
+      "percent": 13.983542351833403
+    },
+    {
+      "frame": "jmodels_kernels::compute_q8_batched_row_range_avx2",
+      "samples": 20685,
+      "percent": 9.409244121781137
+    },
+    {
+      "frame": "jmodels_kernels::compute_q5_k_batched_row_range_avx2",
+      "samples": 10869,
+      "percent": 4.944117687195513
+    },
+    {
+      "frame": "jmodels_kernels::compute_q6_k_batched_row_range_avx2",
+      "samples": 10525,
+      "percent": 4.787638113693327
+    },
+    {
+      "frame": "jmodels_kernels::WorkerPool::await_workers",
+      "samples": 3708,
+      "percent": 1.6867042399596064
+    },
+    {
+      "frame": "native_queued_spin_lock_slowpath_[k]",
+      "samples": 1191,
+      "percent": 0.5417650350032069
+    },
+    {
+      "frame": "[vdso]",
+      "samples": 1183,
+      "percent": 0.5381259751543189
+    },
+    {
+      "frame": "_raw_spin_unlock_irqrestore_[k]",
+      "samples": 1128,
+      "percent": 0.5131074386932136
+    },
+    {
+      "frame": "jdk/incubator/vector/Float256Vector.laneHelper",
+      "samples": 1094,
+      "percent": 0.49764143433543945
+    },
+    {
+      "frame": "<std::sys::sync::mutex::futex::Mutex>::lock_contended",
+      "samples": 960,
+      "percent": 0.4366871818665648
+    },
+    {
+      "frame": "java/util/concurrent/Phaser.internalAwaitAdvance",
+      "samples": 945,
+      "percent": 0.4298639446498997
+    },
+    {
+      "frame": "jdk/incubator/vector/FloatVector.intoArray",
+      "samples": 807,
+      "percent": 0.36709016225658103
+    },
+    {
+      "frame": "dexp",
+      "samples": 802,
+      "percent": 0.364815749851026
+    },
+    {
+      "frame": "jmodels_kernels::quantize_activation_batch",
+      "samples": 786,
+      "percent": 0.3575376301532499
+    },
+    {
+      "frame": "syscall",
+      "samples": 649,
+      "percent": 0.2952187302410422
+    },
+    {
+      "frame": "jdk/incubator/vector/FloatVector.lanewiseTemplate",
+      "samples": 613,
+      "percent": 0.27884296092104605
+    },
+    {
+      "frame": "com/integrallis/models/backend/purejava/ops/TensorOps.softmax",
+      "samples": 372,
+      "percent": 0.16921628297329386
+    },
+    {
+      "frame": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+      "samples": 338,
+      "percent": 0.15375027861551968
+    },
+    {
+      "frame": "<std::sys::pal::unix::time::Timespec>::now",
+      "samples": 298,
+      "percent": 0.1355549793710795
+    },
+    {
+      "frame": "jlong_disjoint_arraycopy",
+      "samples": 224,
+      "percent": 0.10189367576886511
+    },
+    {
+      "frame": "do_syscall_64_[k]",
+      "samples": 204,
+      "percent": 0.09279602614664502
+    },
+    {
+      "frame": "jmodels_kernels::execute_matrix_job_partition",
+      "samples": 175,
+      "percent": 0.07960443419442587
+    },
+    {
+      "frame": "futex_wake_[k]",
+      "samples": 145,
+      "percent": 0.06595795976109572
+    },
+    {
+      "frame": "<std::sys::pal::unix::time::Timespec>::sub_timespec",
+      "samples": 137,
+      "percent": 0.06231889991220768
+    },
+    {
+      "frame": "futex_hash_[k]",
+      "samples": 134,
+      "percent": 0.06095425246887467
+    },
+    {
+      "frame": "_raw_spin_lock_[k]",
+      "samples": 129,
+      "percent": 0.05867984006331964
+    },
+    {
+      "frame": "__clock_gettime",
+      "samples": 111,
+      "percent": 0.050491955403321555
+    },
+    {
+      "frame": "futex_q_lock_[k]",
+      "samples": 72,
+      "percent": 0.03275153863999236
+    }
+  ],
+  "limitations": [
+    "CPU sample shares weight worker count; they are not wall-clock latency.",
+    "Window contains both prefill and decode.",
+    "Inlined native work may resolve to its outer wrapper; std backtrace wrapper cannot be classified as pure spinning."
+  ],
+  "binary": {
+    "sha256": "36ed44e224dd84936ac0312bf33af5b6867dbcf9ff6d894c870d570abe88dd40",
+    "s3": "s3://models-qual-077051030817/results/qwen05-q5-symbolized-20261031T192242Z/shard-0/libjmodels_kernels.so"
+  }
+}
