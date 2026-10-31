@@ -530,9 +530,14 @@ public final class PureJavaBackend
         } else if ("gemma3n".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded = loadGemma3n(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
-        } else if ("lfm2".equals(modelFamily)) {
+        } else if ("lfm2".equals(modelFamily) || "lfm2moe".equals(modelFamily)) {
+          // Both strings reach the same decoder: lfm2moe keeps every structural property of lfm2
+          // and replaces the feed-forward on its routed blocks. Lfm2Config accepts either and
+          // reports which one it read, so the family is threaded through rather than assumed.
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
-          loaded = loadLfm2(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
+          loaded =
+              loadLfm2(
+                  modelPath, file, modelFamily, runtime, planConfiguration, batchedMatrixKernel);
         } else if ("bert".equals(modelFamily) || "nomic-bert".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded = loadBert(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
@@ -1088,6 +1093,7 @@ public final class PureJavaBackend
   private static LoadedDecoder loadLfm2(
       Path modelPath,
       GgufFile file,
+      String modelFamily,
       RuntimeFingerprint runtime,
       PureJavaPlanConfiguration planConfiguration,
       GgufBatchedMatrixKernel batchedMatrixKernel) {
@@ -1103,8 +1109,11 @@ public final class PureJavaBackend
     PureJavaExecutionPlan executionPlan =
         ExecutionPlanner.plan(
             runtime,
+            // The family string, not the literal "lfm2": a routed file and a dense one have
+            // different feed-forward shapes, and a topology that called them the same thing would
+            // make the planner's record of what it planned untrue.
             ModelTopology.mappedArchitecture(
-                "lfm2", config.queryDim(), keyDim, keyDim, config.numLayers()),
+                modelFamily, config.queryDim(), keyDim, keyDim, config.numLayers()),
             planConfiguration,
             batchedMatrixKernel);
     int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
@@ -1118,7 +1127,7 @@ public final class PureJavaBackend
             : new Lfm2DecoderAdapter(Lfm2ForwardPass.fromGgufFile(file, config, contextCapacity));
     ModelMetadata metadata =
         new ModelMetadata(
-            "lfm2",
+            modelFamily,
             modelName(modelPath, file),
             config.contextLength(),
             config.vocabSize(),

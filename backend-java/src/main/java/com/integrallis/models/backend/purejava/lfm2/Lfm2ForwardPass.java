@@ -17,10 +17,12 @@ package com.integrallis.models.backend.purejava.lfm2;
 
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
+import com.integrallis.models.backend.purejava.ops.ExpertRouting;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.lang.foreign.MemorySegment;
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -59,6 +61,28 @@ public final class Lfm2ForwardPass {
   private final float[] up;
   private final float[] ffnOut;
   private final float[] convProjected;
+
+  /**
+   * Per-layer residual observer, mirroring {@code LlamaForwardPass.LayerObserver}.
+   *
+   * <p>Added because this decoder had no way to see inside it, and that cost a diagnosis. The
+   * {@code lfm2moe} port generated {@code " France is France is"} where llama.cpp generated {@code
+   * " Paris. The city of Paris is known for its beautiful landmarks"}, and with the dense path
+   * green on a real artifact and the routed path green on a toy one, there was nothing left to
+   * narrow it with: a 24-layer model that is wrong somewhere needs a per-layer comparison, and this
+   * decoder could not produce one.
+   *
+   * <p>Null when nobody is watching, so the hot path pays one null check per layer.
+   */
+  interface LayerObserver {
+    void onLayerComplete(int layer, int position, float[] state, int offset, int length);
+  }
+
+  private LayerObserver layerObserver;
+  private final float[] routerLogits;
+  private final int[] selectedExperts;
+  private final float[] routingWeights;
+  private final float[] expertOut;
   private final float[] convGated;
   private final float[] logits;
 
@@ -76,6 +100,11 @@ public final class Lfm2ForwardPass {
   private final float[][] convState;
 
   private int nextPosition;
+
+  /** Attaches a per-layer observer; pass null to detach. Diagnostics only. */
+  void observeLayers(LayerObserver observer) {
+    this.layerObserver = observer;
+  }
 
   /**
    * Loads a decoder from a GGUF, keeping the weight layout package-private.
@@ -106,11 +135,25 @@ public final class Lfm2ForwardPass {
     this.attentionOut = new float[config.queryDim()];
     this.projected = new float[dim];
     this.scores = new float[maxSeqLen];
-    this.gate = new float[config.hiddenDim()];
-    this.up = new float[config.hiddenDim()];
+    // The dense feed-forward is feed_forward_length wide and an expert is
+    // expert_feed_forward_length wide, and on lfm2moe those differ (7168 against 1792). One buffer
+    // sized for the wider of the two serves both branches; sizing it from hiddenDim alone would
+    // overflow on a file whose experts are wider than its dense blocks.
+    int ffnWidth =
+        config.isMixtureOfExperts()
+            ? Math.max(config.hiddenDim(), config.experts().hiddenDim())
+            : config.hiddenDim();
+    this.gate = new float[ffnWidth];
+    this.up = new float[ffnWidth];
     // Hidden-width, not model-width: SwiGLU produces one value per hidden unit and only the down
     // projection returns to the model width.
-    this.ffnOut = new float[config.hiddenDim()];
+    this.ffnOut = new float[ffnWidth];
+    this.routerLogits = config.isMixtureOfExperts() ? new float[config.experts().count()] : null;
+    this.selectedExperts =
+        config.isMixtureOfExperts() ? new int[config.experts().usedCount()] : null;
+    this.routingWeights =
+        config.isMixtureOfExperts() ? new float[config.experts().usedCount()] : null;
+    this.expertOut = config.isMixtureOfExperts() ? new float[config.embeddingDim()] : null;
     this.convProjected = new float[3 * dim];
     this.convGated = new float[dim];
     this.logits = new float[config.vocabSize()];
@@ -210,11 +253,18 @@ public final class Lfm2ForwardPass {
       add(state, projected, dim);
 
       TensorOps.rmsNorm(normalized, state, layerWeights.ffnNorm(), dim, config.rmsNormEpsilon());
-      project(layerWeights.gateProjection(), normalized, gate);
-      project(layerWeights.upProjection(), normalized, up);
-      TensorOps.swiGlu(ffnOut, gate, up, config.hiddenDim());
-      project(layerWeights.downProjection(), ffnOut, projected);
+      if (config.usesExperts(layer)) {
+        route(layerWeights);
+      } else {
+        project(layerWeights.gateProjection(), normalized, gate);
+        project(layerWeights.upProjection(), normalized, up);
+        TensorOps.swiGlu(ffnOut, gate, up, config.hiddenDim());
+        project(layerWeights.downProjection(), ffnOut, projected);
+      }
       add(state, projected, dim);
+      if (layerObserver != null) {
+        layerObserver.onLayerComplete(layer, position, state, 0, dim);
+      }
     }
 
     nextPosition++;
@@ -292,6 +342,44 @@ public final class Lfm2ForwardPass {
       }
     }
     project(layerWeights.attentionOutputProjection(), attentionOut, projected);
+  }
+
+  /**
+   * The routed feed-forward: sigmoid gating with a selection-only bias, then a weighted sum.
+   *
+   * <p>Routing goes through {@link ExpertRouting#selectExpertsWithSigmoidGating} rather than a
+   * local copy, because {@code expert_gating_func = 2} is the whole reason #283 was blocked and a
+   * second implementation of it is a second thing to get subtly wrong. {@code lfm2moe} publishes no
+   * {@code expert_weights_norm} and no {@code expert_weights_scale}, so the weights are
+   * renormalised with a unit scale — which is what upstream's defaults give it.
+   *
+   * <p>Each expert is evaluated in turn and accumulated, rather than gathered into one batched
+   * matmul. That is the slower shape and it is deliberate for a first port: the expert matrices are
+   * already non-contiguous slices of one tensor, and a gather would add a copy whose correctness is
+   * harder to see than the loop's. The kernel seam is unchanged, so the batched form is a later
+   * change measurable against this one.
+   */
+  private void route(Lfm2Weights.LayerWeights layerWeights) {
+    Lfm2Config.Experts experts = config.experts();
+    int dim = config.embeddingDim();
+    int expertWidth = experts.hiddenDim();
+
+    project(layerWeights.router(), normalized, routerLogits);
+    ExpertRouting.selectExpertsWithSigmoidGating(
+        routerLogits, layerWeights.selectionBias(), selectedExperts, routingWeights, true, 1.0f);
+
+    Arrays.fill(projected, 0, dim, 0.0f);
+    for (int slot = 0; slot < selectedExperts.length; slot++) {
+      int expert = selectedExperts[slot];
+      project(layerWeights.expertGate()[expert], normalized, gate);
+      project(layerWeights.expertUp()[expert], normalized, up);
+      TensorOps.swiGlu(ffnOut, gate, up, expertWidth);
+      project(layerWeights.expertDown()[expert], ffnOut, expertOut);
+      float weight = routingWeights[slot];
+      for (int i = 0; i < dim; i++) {
+        projected[i] += weight * expertOut[i];
+      }
+    }
   }
 
   private void convolve(Lfm2Weights.LayerWeights layerWeights, int layer) {
