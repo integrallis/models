@@ -111,14 +111,21 @@ def main():
         status.write_text('RUNNING_PAIRED_RAG\n')
         trials = ['--warmups', '1', '--iterations', '3']
         tuned = [] if job.get('decodeThreads') is None else ['-Dmodels.native.kernels.decodeThreads=' + str(job['decodeThreads'])]
-        run('models-rag', java + tuned + classpath + common + candidate + trials + ['--output', str(out / 'models-rag.json')])
+        candidate_command = java + tuned + classpath + common + candidate + trials + ['--output', str(out / 'models-rag.json')]
         if job['comparator'] == 'ollama':
             reference = ['--backend', 'ollama', '--endpoint', 'http://127.0.0.1:11434']
             policy = []
         else:
             raise ValueError('use the separate publisher runner for non-Ollama artifacts')
-        run('reference-rag', java + classpath + common + reference + ['--backend-version', args.reference_version,
-            '--model', args.reference_model, '--artifact', str(args.model)] + trials + ['--output', str(out / 'reference-rag.json')])
+        reference_command = java + classpath + common + reference + ['--backend-version', args.reference_version,
+            '--model', args.reference_model, '--artifact', str(args.model)] + trials + ['--output', str(out / 'reference-rag.json')]
+        if job.get('referenceFirst', False):
+            run('reference-rag', reference_command)
+            run('unload-reference', ['runuser', '-u', 'root', '--', 'ollama', 'stop', args.reference_model], 60)
+            run('models-rag', candidate_command)
+        else:
+            run('models-rag', candidate_command)
+            run('reference-rag', reference_command)
         # A negative verdict is a completed measurement, not an infrastructure exception.
         run('qualification', java + classpath + ['com.integrallis.models.rag.RagQualificationCli',
             '--candidate', str(out / 'models-rag.json'), '--comparator', str(out / 'reference-rag.json'),
