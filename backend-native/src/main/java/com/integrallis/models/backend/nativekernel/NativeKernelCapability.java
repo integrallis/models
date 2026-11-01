@@ -53,7 +53,13 @@ public enum NativeKernelCapability {
    */
   Q5_1_F32_BATCHED_MATMUL(1L << 23),
   /** PTQ1_0 packed ternary rows with Q8_0 activation quantization. */
-  PTQ1_0_Q8_0_BATCHED_MATMUL(1L << 24);
+  PTQ1_0_Q8_0_BATCHED_MATMUL(1L << 24),
+  /** Fixed-tree BF16 projections for the supported shape and vector configuration. */
+  BF16_F32_BATCHED_MATMUL(1L << 25),
+  /** Deterministic float SwiGLU with checked finite gates. */
+  SWIGLU_F32(1L << 26),
+  /** Full-domain ARM128 SLEEF sigmoid, softplus and causal convolution activations. */
+  SLEEF_ACTIVATIONS_F32(1L << 27);
 
   private final long mask;
 

@@ -1,5 +1,11 @@
+mod q51_reuse;
 // Copyright 2025-2026 Integrallis Software, LLC
 // SPDX-License-Identifier: Apache-2.0
+
+mod bfloat16;
+#[cfg(target_arch = "aarch64")]
+mod sleef_activations;
+mod swiglu;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::slice;
@@ -99,6 +105,26 @@ const CAPABILITY_GROUPED_GATED_DELTA_NET_F32: u64 = 1 << 22;
 /// format, this reproduces what Java does: dequantize the row and dot in F32 along
 /// `PinnedReduction`'s pinned fold order. The parity test asserts equality, not closeness.
 const CAPABILITY_Q5_1_F32_BATCHED_MATMUL: u64 = 1 << 23;
+
+const CAPABILITY_BF16_F32_BATCHED_MATMUL: u64 = 1 << 25;
+const CAPABILITY_SWIGLU_F32: u64 = 1 << 26;
+const CAPABILITY_SLEEF_ACTIVATIONS_F32: u64 = 1 << 27;
+
+// Both kernels need the same physical SIMD/FMA features; their capability bits stay independent.
+fn supports_f32_fma_simd() -> bool {
+    #[cfg(target_arch = "x86_64")]
+    {
+        std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma")
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        true
+    }
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    {
+        false
+    }
+}
 
 const STATUS_OK: i32 = 0;
 const STATUS_NULL_POINTER: i32 = 1;
@@ -1468,7 +1494,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_Q5_K_F32_BATCHED_MATMUL
         | CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL
         | CAPABILITY_Q5_0_F32_BATCHED_MATMUL
-        | CAPABILITY_Q5_1_F32_BATCHED_MATMUL
+        | q5_1_simd_capability()
         | CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL
         | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
         | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
@@ -1479,6 +1505,283 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_GROUPED_ATTENTION_F32
         | CAPABILITY_POLL_BUDGET
         | CAPABILITY_GROUPED_GATED_DELTA_NET_F32
+        | if bfloat16::supported() {
+            CAPABILITY_BF16_F32_BATCHED_MATMUL
+        } else {
+            0
+        }
+        | if cfg!(target_arch = "aarch64") {
+            CAPABILITY_SLEEF_ACTIVATIONS_F32
+        } else {
+            0
+        }
+        | if swiglu::supported() {
+            CAPABILITY_SWIGLU_F32
+        } else {
+            0
+        }
+}
+
+/// Projects a measured fixed-shape BF16 matrix with the Java lane/FMA contract.
+///
+/// # Safety
+/// Pointers must reference live readable weights/input and writable F32-aligned output
+/// for the stated sizes. The output must not overlap either input. Shape, lengths and
+/// CPU support are checked before dereferencing; no pointer is retained after return.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_bf16_f32_batched_matmul(
+    weight: *const u16,
+    weight_bytes: u64,
+    input: *const f32,
+    input_len: u64,
+    output: *mut f32,
+    output_len: u64,
+    batch: u32,
+    rows: u32,
+    cols: u32,
+    lanes: u32,
+    fused: u32,
+) -> i32 {
+    if weight.is_null() || input.is_null() || output.is_null() {
+        return STATUS_NULL_POINTER;
+    }
+    if rows != 48
+        || cols != 5120
+        || !(1..=32).contains(&batch)
+        || !matches!(lanes, 4 | 8)
+        || fused > 1
+        || !bfloat16::supported()
+    {
+        return STATUS_INVALID_SHAPE;
+    }
+    let required_input = u64::from(batch) * 5120;
+    let required_output = u64::from(batch) * 48;
+    if weight_bytes < 48 * 5120 * 2 || input_len < required_input || output_len < required_output {
+        return STATUS_BUFFER_TOO_SMALL;
+    }
+    let output_start = output as usize;
+    let Some(output_end) = output_start.checked_add(required_output as usize * 4) else {
+        return STATUS_INVALID_SHAPE;
+    };
+    for (start, bytes) in [
+        (input as usize, required_input as usize * 4),
+        (weight as usize, 48 * 5120 * 2),
+    ] {
+        let Some(end) = start.checked_add(bytes) else {
+            return STATUS_INVALID_SHAPE;
+        };
+        if output_start < end && start < output_end {
+            return STATUS_INVALID_SHAPE;
+        }
+    }
+    match catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: caller supplies live buffers; validated shapes/features and disjoint output above.
+        unsafe {
+            bfloat16::multiply(weight, input, output, batch as usize, lanes, fused != 0);
+        }
+    })) {
+        Ok(()) => STATUS_OK,
+        Err(_) => STATUS_PANIC,
+    }
+}
+
+/// Applies float SwiGLU, preserving exact in-place aliases.
+/// ARM uses the full-domain SLEEF recipe; x86 retains its finite [-80,80] contract.
+/// Invalid shapes/domains return before writing output.
+///
+/// # Safety
+/// Buffers must be live and F32-aligned for the advertised capacities. No pointers are retained.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_swiglu_f32(
+    out: *mut f32,
+    out_len: u64,
+    out_at: u32,
+    gate: *const f32,
+    gate_len: u64,
+    gate_at: u32,
+    up: *const f32,
+    up_len: u64,
+    up_at: u32,
+    len: u32,
+) -> i32 {
+    if out.is_null() || gate.is_null() || up.is_null() {
+        return STATUS_NULL_POINTER;
+    }
+    if len == 0
+        || (!cfg!(target_arch = "aarch64") && !len.is_multiple_of(4))
+        || !swiglu::supported()
+    {
+        return STATUS_INVALID_SHAPE;
+    }
+    if u64::from(out_at) + u64::from(len) > out_len
+        || u64::from(gate_at) + u64::from(len) > gate_len
+        || u64::from(up_at) + u64::from(len) > up_len
+    {
+        return STATUS_BUFFER_TOO_SMALL;
+    }
+    let span = len as usize * 4;
+    let Some(out_start) = (out as usize).checked_add(out_at as usize * 4) else {
+        return STATUS_INVALID_SHAPE;
+    };
+    if out_start.checked_add(span).is_none() {
+        return STATUS_INVALID_SHAPE;
+    }
+    for (ptr, offset) in [(gate, gate_at), (up, up_at)] {
+        let Some(start) = (ptr as usize).checked_add(offset as usize * 4) else {
+            return STATUS_INVALID_SHAPE;
+        };
+        let Some(end) = start.checked_add(span) else {
+            return STATUS_INVALID_SHAPE;
+        };
+        if out_start > start && out_start < end {
+            return STATUS_INVALID_SHAPE;
+        }
+    }
+    // SAFETY: validated ranges, caller-owned live buffers; no mutable views are created.
+    unsafe {
+        let gate = gate.add(gate_at as usize);
+        #[cfg(not(target_arch = "aarch64"))]
+        for i in 0..len as usize {
+            let absolute = (*gate.add(i)).abs();
+            if absolute.is_nan() || absolute > 80.0 {
+                return STATUS_INVALID_SHAPE;
+            }
+        }
+        match catch_unwind(AssertUnwindSafe(|| {
+            swiglu::apply(
+                out.add(out_at as usize),
+                gate,
+                up.add(up_at as usize),
+                len as usize,
+            );
+        })) {
+            Ok(()) => STATUS_OK,
+            Err(_) => STATUS_PANIC,
+        }
+    }
+}
+
+fn activation_span<T>(ptr: *const T, capacity: u64, at: u32, count: u64) -> bool {
+    if ptr.is_null()
+        || u64::from(at)
+            .checked_add(count)
+            .is_none_or(|end| end > capacity)
+    {
+        return false;
+    }
+    let Some(end) = u64::from(at)
+        .checked_add(count)
+        .and_then(|n| n.checked_mul(4))
+    else {
+        return false;
+    };
+    end <= isize::MAX as u64 && (ptr as usize).checked_add(end as usize).is_some()
+}
+
+/// Computes in-place sigmoid and scaled softplus with the ARM SLEEF recipe.
+/// Invalid shapes return before any write; aliases retain four-lane load/store order.
+/// # Safety
+/// Every pointer must be live and F32-aligned for its advertised capacity. No pointer is retained.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_sigmoid_scaled_softplus_f32(
+    sigmoid: *mut f32,
+    sigmoid_len: u64,
+    sigmoid_at: u32,
+    softplus: *const f32,
+    softplus_len: u64,
+    softplus_at: u32,
+    bias: *const f32,
+    bias_len: u64,
+    bias_at: u32,
+    scale: *const f32,
+    scale_len: u64,
+    scale_at: u32,
+    out: *mut f32,
+    out_len: u64,
+    out_at: u32,
+    len: u32,
+) -> i32 {
+    if !cfg!(target_arch = "aarch64") || len == 0 {
+        return STATUS_INVALID_SHAPE;
+    }
+    for (ptr, capacity, at) in [
+        (sigmoid.cast_const(), sigmoid_len, sigmoid_at),
+        (softplus, softplus_len, softplus_at),
+        (bias, bias_len, bias_at),
+        (scale, scale_len, scale_at),
+        (out.cast_const(), out_len, out_at),
+    ] {
+        if ptr.is_null() {
+            return STATUS_NULL_POINTER;
+        }
+        if !activation_span(ptr, capacity, at, u64::from(len)) {
+            return STATUS_BUFFER_TOO_SMALL;
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        sleef_activations::gates(
+            sigmoid.add(sigmoid_at as usize),
+            softplus.add(softplus_at as usize),
+            bias.add(bias_at as usize),
+            scale.add(scale_at as usize),
+            out.add(out_at as usize),
+            len as usize,
+        );
+    }
+    STATUS_OK
+}
+
+/// Advances causal convolution history and applies the ARM SLEEF SiLU recipe.
+/// Invalid shapes return before writes. Accumulation uses the caller's configured FMA policy;
+/// scalar accumulation tails remain unfused. Aliases retain the public four-lane operation order.
+/// # Safety
+/// Every pointer must be live and F32-aligned for its advertised capacity. No pointer is retained.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_causal_depthwise_conv_silu_f32(
+    values: *mut f32,
+    values_len: u64,
+    values_at: u32,
+    history: *mut f32,
+    history_len: u64,
+    history_at: u32,
+    weights: *const f32,
+    weights_len: u64,
+    weights_at: u32,
+    channels: u32,
+    kernel: u32,
+    fused: u32,
+) -> i32 {
+    if !cfg!(target_arch = "aarch64") || channels == 0 || kernel < 2 || fused > 1 {
+        return STATUS_INVALID_SHAPE;
+    }
+    let n = u64::from(channels);
+    let weights_count = n * u64::from(kernel);
+    let history_count = n * u64::from(kernel - 1);
+    for (ptr, capacity, at, count) in [
+        (values.cast_const(), values_len, values_at, n),
+        (history.cast_const(), history_len, history_at, history_count),
+        (weights, weights_len, weights_at, weights_count),
+    ] {
+        if ptr.is_null() {
+            return STATUS_NULL_POINTER;
+        }
+        if !activation_span(ptr, capacity, at, count) {
+            return STATUS_BUFFER_TOO_SMALL;
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        sleef_activations::conv(
+            values.add(values_at as usize),
+            history.add(history_at as usize),
+            weights.add(weights_at as usize),
+            channels as usize,
+            kernel as usize,
+            fused as i32,
+        );
+    }
+    STATUS_OK
 }
 
 #[unsafe(no_mangle)]
@@ -2088,326 +2391,6 @@ pub unsafe extern "C" fn jmodels_quantized_f32_independent_batched_matmul_with_c
     }
 }
 
-#[unsafe(no_mangle)]
-/// # Safety
-///
-/// Every pointer must remain valid for its advertised length for the synchronous call. Output must
-/// be writable and must not alias either input.
-pub unsafe extern "C" fn jmodels_q4_0_f32_batched_matmul(
-    weights: *const u8,
-    weight_bytes: u64,
-    input: *const f32,
-    input_elements: u64,
-    output: *mut f32,
-    output_elements: u64,
-    batch_size: u32,
-    rows: u32,
-    cols: u32,
-) -> i32 {
-    match catch_unwind(AssertUnwindSafe(|| {
-        quantized_f32_batched_matmul(
-            None,
-            weights,
-            weight_bytes,
-            input,
-            input_elements,
-            output,
-            output_elements,
-            batch_size,
-            rows,
-            cols,
-            WeightFormat::Q4_0,
-        )
-    })) {
-        Ok(status) => status,
-        Err(_) => STATUS_PANIC,
-    }
-}
-
-#[unsafe(no_mangle)]
-/// # Safety
-///
-/// `context` must be a live kernel context. Every data pointer must remain valid for its advertised
-/// length for the synchronous call. Output must be writable and must not alias either input.
-pub unsafe extern "C" fn jmodels_q4_0_f32_batched_matmul_with_context(
-    context: *const KernelContext,
-    weights: *const u8,
-    weight_bytes: u64,
-    input: *const f32,
-    input_elements: u64,
-    output: *mut f32,
-    output_elements: u64,
-    batch_size: u32,
-    rows: u32,
-    cols: u32,
-) -> i32 {
-    if context.is_null() {
-        return STATUS_NULL_POINTER;
-    }
-    match catch_unwind(AssertUnwindSafe(|| {
-        // SAFETY: Java owns the context for the duration of this synchronous call.
-        let context = unsafe { &*context };
-        quantized_f32_batched_matmul(
-            Some(context),
-            weights,
-            weight_bytes,
-            input,
-            input_elements,
-            output,
-            output_elements,
-            batch_size,
-            rows,
-            cols,
-            WeightFormat::Q4_0,
-        )
-    })) {
-        Ok(status) => status,
-        Err(_) => STATUS_PANIC,
-    }
-}
-
-#[unsafe(no_mangle)]
-/// # Safety
-///
-/// Every pointer must remain valid for its advertised length for the synchronous call. Output must
-/// be writable and must not alias either input.
-pub unsafe extern "C" fn jmodels_q8_0_f32_batched_matmul(
-    weights: *const u8,
-    weight_bytes: u64,
-    input: *const f32,
-    input_elements: u64,
-    output: *mut f32,
-    output_elements: u64,
-    batch_size: u32,
-    rows: u32,
-    cols: u32,
-) -> i32 {
-    match catch_unwind(AssertUnwindSafe(|| {
-        quantized_f32_batched_matmul(
-            None,
-            weights,
-            weight_bytes,
-            input,
-            input_elements,
-            output,
-            output_elements,
-            batch_size,
-            rows,
-            cols,
-            WeightFormat::Q8_0,
-        )
-    })) {
-        Ok(status) => status,
-        Err(_) => STATUS_PANIC,
-    }
-}
-
-#[unsafe(no_mangle)]
-/// # Safety
-///
-/// `context` must be a live kernel context. Every data pointer must remain valid for its advertised
-/// length for the synchronous call. Output must be writable and must not alias either input.
-pub unsafe extern "C" fn jmodels_q8_0_f32_batched_matmul_with_context(
-    context: *const KernelContext,
-    weights: *const u8,
-    weight_bytes: u64,
-    input: *const f32,
-    input_elements: u64,
-    output: *mut f32,
-    output_elements: u64,
-    batch_size: u32,
-    rows: u32,
-    cols: u32,
-) -> i32 {
-    if context.is_null() {
-        return STATUS_NULL_POINTER;
-    }
-    match catch_unwind(AssertUnwindSafe(|| {
-        // SAFETY: Java owns the context for the duration of this synchronous call.
-        let context = unsafe { &*context };
-        quantized_f32_batched_matmul(
-            Some(context),
-            weights,
-            weight_bytes,
-            input,
-            input_elements,
-            output,
-            output_elements,
-            batch_size,
-            rows,
-            cols,
-            WeightFormat::Q8_0,
-        )
-    })) {
-        Ok(status) => status,
-        Err(_) => STATUS_PANIC,
-    }
-}
-
-#[unsafe(no_mangle)]
-/// # Safety
-///
-/// Metadata arrays must contain `matrix_count` entries. Every data pointer must remain valid for
-/// its advertised length for the synchronous call, and output must not alias any input.
-pub unsafe extern "C" fn jmodels_q4_0_f32_grouped_batched_matmul(
-    weight_pointers: *const *const u8,
-    weight_bytes: *const u64,
-    rows: *const u32,
-    matrix_count: u32,
-    input: *const f32,
-    input_elements: u64,
-    output: *mut f32,
-    output_elements: u64,
-    batch_size: u32,
-    cols: u32,
-) -> i32 {
-    match catch_unwind(AssertUnwindSafe(|| {
-        quantized_f32_grouped_batched_matmul(
-            None,
-            weight_pointers,
-            weight_bytes,
-            rows,
-            matrix_count,
-            input,
-            input_elements,
-            output,
-            output_elements,
-            batch_size,
-            cols,
-            WeightFormat::Q4_0,
-        )
-    })) {
-        Ok(status) => status,
-        Err(_) => STATUS_PANIC,
-    }
-}
-
-#[unsafe(no_mangle)]
-/// # Safety
-///
-/// `context` must be live, metadata arrays must contain `matrix_count` entries, and every data
-/// pointer must remain valid for its advertised length. Output must not alias any input.
-pub unsafe extern "C" fn jmodels_q4_0_f32_grouped_batched_matmul_with_context(
-    context: *const KernelContext,
-    weight_pointers: *const *const u8,
-    weight_bytes: *const u64,
-    rows: *const u32,
-    matrix_count: u32,
-    input: *const f32,
-    input_elements: u64,
-    output: *mut f32,
-    output_elements: u64,
-    batch_size: u32,
-    cols: u32,
-) -> i32 {
-    if context.is_null() {
-        return STATUS_NULL_POINTER;
-    }
-    match catch_unwind(AssertUnwindSafe(|| {
-        // SAFETY: Java owns the context for the duration of this synchronous call.
-        let context = unsafe { &*context };
-        quantized_f32_grouped_batched_matmul(
-            Some(context),
-            weight_pointers,
-            weight_bytes,
-            rows,
-            matrix_count,
-            input,
-            input_elements,
-            output,
-            output_elements,
-            batch_size,
-            cols,
-            WeightFormat::Q4_0,
-        )
-    })) {
-        Ok(status) => status,
-        Err(_) => STATUS_PANIC,
-    }
-}
-
-#[unsafe(no_mangle)]
-/// # Safety
-///
-/// Metadata arrays must contain `matrix_count` entries. Every data pointer must remain valid for
-/// its advertised length for the synchronous call, and output must not alias any input.
-pub unsafe extern "C" fn jmodels_q8_0_f32_grouped_batched_matmul(
-    weight_pointers: *const *const u8,
-    weight_bytes: *const u64,
-    rows: *const u32,
-    matrix_count: u32,
-    input: *const f32,
-    input_elements: u64,
-    output: *mut f32,
-    output_elements: u64,
-    batch_size: u32,
-    cols: u32,
-) -> i32 {
-    match catch_unwind(AssertUnwindSafe(|| {
-        quantized_f32_grouped_batched_matmul(
-            None,
-            weight_pointers,
-            weight_bytes,
-            rows,
-            matrix_count,
-            input,
-            input_elements,
-            output,
-            output_elements,
-            batch_size,
-            cols,
-            WeightFormat::Q8_0,
-        )
-    })) {
-        Ok(status) => status,
-        Err(_) => STATUS_PANIC,
-    }
-}
-
-#[unsafe(no_mangle)]
-/// # Safety
-///
-/// `context` must be live, metadata arrays must contain `matrix_count` entries, and every data
-/// pointer must remain valid for its advertised length. Output must not alias any input.
-pub unsafe extern "C" fn jmodels_q8_0_f32_grouped_batched_matmul_with_context(
-    context: *const KernelContext,
-    weight_pointers: *const *const u8,
-    weight_bytes: *const u64,
-    rows: *const u32,
-    matrix_count: u32,
-    input: *const f32,
-    input_elements: u64,
-    output: *mut f32,
-    output_elements: u64,
-    batch_size: u32,
-    cols: u32,
-) -> i32 {
-    if context.is_null() {
-        return STATUS_NULL_POINTER;
-    }
-    match catch_unwind(AssertUnwindSafe(|| {
-        // SAFETY: Java owns the context for the duration of this synchronous call.
-        let context = unsafe { &*context };
-        quantized_f32_grouped_batched_matmul(
-            Some(context),
-            weight_pointers,
-            weight_bytes,
-            rows,
-            matrix_count,
-            input,
-            input_elements,
-            output,
-            output_elements,
-            batch_size,
-            cols,
-            WeightFormat::Q8_0,
-        )
-    })) {
-        Ok(status) => status,
-        Err(_) => STATUS_PANIC,
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 fn quantized_f32_batched_matmul(
     context: Option<&KernelContext>,
@@ -2532,41 +2515,6 @@ fn compute_with_scratch(
         cols,
         output,
         format.selected_kernel(),
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn quantized_f32_grouped_batched_matmul(
-    context: Option<&KernelContext>,
-    weight_pointers: *const *const u8,
-    weight_bytes: *const u64,
-    rows: *const u32,
-    matrix_count: u32,
-    input: *const f32,
-    input_elements: u64,
-    output: *mut f32,
-    output_elements: u64,
-    batch_size: u32,
-    cols: u32,
-    format: WeightFormat,
-) -> i32 {
-    let formats = [format; MAX_GROUPED_MATRICES];
-    let matrix_count_usize = matrix_count as usize;
-    if !(2..=MAX_GROUPED_MATRICES).contains(&matrix_count_usize) {
-        return STATUS_INVALID_SHAPE;
-    }
-    quantized_f32_mixed_grouped_batched_matmul(
-        context,
-        weight_pointers,
-        weight_bytes,
-        rows,
-        &formats[..matrix_count_usize],
-        input,
-        input_elements,
-        output,
-        output_elements,
-        batch_size,
-        cols,
     )
 }
 
@@ -4166,9 +4114,8 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
                 // multiplied by six-bit minima cannot overflow i32. Vectorize this
                 // portion without changing the scalar floating-point FMA contract.
                 // SAFETY: one Q8_K block contains sixteen complete i16 group sums.
-                let activation_sum_values = unsafe {
-                    _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast())
-                };
+                let activation_sum_values =
+                    unsafe { _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast()) };
                 let paired_sums = _mm256_madd_epi16(activation_sum_values, _mm256_set1_epi16(1));
                 let block_minimum_sum =
                     horizontal_sum_i32_avx2(_mm256_mullo_epi32(minimum_values, paired_sums));
@@ -4702,6 +4649,20 @@ fn selected_q8_kernel() -> DotKernel {
     DotKernel::Q8
 }
 
+// Advertise the Q5_1 route only where the measured SIMD implementation is available.
+// The scalar entry point remains usable by direct ABI correctness tests.
+fn q5_1_simd_capability() -> u64 {
+    #[cfg(target_arch = "x86_64")]
+    if matches!(selected_q5_1_kernel(), DotKernel::Q5_1Avx2) {
+        return CAPABILITY_Q5_1_F32_BATCHED_MATMUL;
+    }
+    #[cfg(target_arch = "aarch64")]
+    if neon::available() {
+        return CAPABILITY_Q5_1_F32_BATCHED_MATMUL;
+    }
+    0
+}
+
 fn selected_q5_1_kernel() -> DotKernel {
     #[cfg(target_arch = "x86_64")]
     if std::arch::is_x86_feature_detected!("avx2")
@@ -5177,8 +5138,8 @@ unsafe fn dot_q5_1_f32_row_avx2(
 ///
 /// Rows are the partition, as everywhere else here, so no two workers contribute to one reduction
 /// and the pinned fold order is untouched by how many threads run. This is also the only Q5_1
-/// kernel on a non-x86-64 host: the scalar routine is the normative one, so aarch64 is bit-exact
-/// with Java without a NEON variant, and claiming parity for one would require its own test.
+/// kernel on a non-x86-64 host. AArch64 uses the exact NEON row-reuse implementation
+/// when available; other targets retain the normative scalar implementation.
 #[allow(clippy::too_many_arguments)]
 unsafe fn compute_q5_1_batched_row_range_scalar(
     weights: &[u8],
@@ -5190,6 +5151,23 @@ unsafe fn compute_q5_1_batched_row_range_scalar(
     start_row: usize,
     end_row: usize,
 ) {
+    #[cfg(target_arch = "aarch64")]
+    if neon::available() {
+        // SAFETY: NEON detected, caller owns each output row and validates all shapes.
+        unsafe {
+            q51_reuse::compute_neon(
+                weights,
+                activations,
+                output,
+                batch_size,
+                rows,
+                cols,
+                start_row,
+                end_row,
+            );
+        }
+        return;
+    }
     for row in start_row..end_row {
         for batch in 0..batch_size {
             let value = dot_q5_1_f32_row_scalar(weights, activations, batch, row, cols);
@@ -5216,6 +5194,22 @@ unsafe fn compute_q5_1_batched_row_range_avx2(
     start_row: usize,
     end_row: usize,
 ) {
+    if batch_size > 1 {
+        // SAFETY: AVX2/FMA/F16C detected, caller owns each row and validates shapes.
+        unsafe {
+            q51_reuse::compute_avx2(
+                weights,
+                activations,
+                output,
+                batch_size,
+                rows,
+                cols,
+                start_row,
+                end_row,
+            );
+        }
+        return;
+    }
     for row in start_row..end_row {
         for batch in 0..batch_size {
             // SAFETY: the caller selected this only after AVX2, FMA and F16C detection.
@@ -6179,7 +6173,7 @@ mod tests {
                 | CAPABILITY_Q5_K_F32_BATCHED_MATMUL
                 | CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_Q5_0_F32_BATCHED_MATMUL
-                | CAPABILITY_Q5_1_F32_BATCHED_MATMUL
+                | q5_1_simd_capability()
                 | CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL
                 | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
                 | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
@@ -6190,6 +6184,21 @@ mod tests {
                 | CAPABILITY_GROUPED_ATTENTION_F32
                 | CAPABILITY_POLL_BUDGET
                 | CAPABILITY_GROUPED_GATED_DELTA_NET_F32
+                | if bfloat16::supported() {
+                    CAPABILITY_BF16_F32_BATCHED_MATMUL
+                } else {
+                    0
+                }
+                | if cfg!(target_arch = "aarch64") {
+                    CAPABILITY_SLEEF_ACTIVATIONS_F32
+                } else {
+                    0
+                }
+                | if swiglu::supported() {
+                    CAPABILITY_SWIGLU_F32
+                } else {
+                    0
+                }
         );
     }
 
@@ -7569,9 +7578,13 @@ mod tests {
         let weights = [0_u8; Q4_0_BLOCK_BYTES];
         let input = [0_f32; QK_0];
         let mut output = [0_f32; 1];
-        // SAFETY: all test arrays remain live and non-aliasing for the synchronous call.
+        let context = jmodels_kernels_context_create(1);
+        assert!(!context.is_null());
+        // SAFETY: the context and test arrays remain live for the synchronous call.
         let status = unsafe {
-            jmodels_q4_0_f32_batched_matmul(
+            jmodels_quantized_f32_batched_matmul_with_context(
+                context,
+                0,
                 weights.as_ptr(),
                 weights.len() as u64,
                 input.as_ptr(),
@@ -7583,6 +7596,11 @@ mod tests {
                 31,
             )
         };
+        // SAFETY: this test owns the context and all synchronous work has completed.
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
+        );
         assert_eq!(status, STATUS_INVALID_SHAPE);
     }
 
@@ -8162,10 +8180,75 @@ mod tests {
             0,
             "an F32 activation format prepares no sums"
         );
-        assert_ne!(
+        assert_eq!(
             jmodels_kernels_capabilities() & CAPABILITY_Q5_1_F32_BATCHED_MATMUL,
-            0,
-            "the capability must be advertised or Java will never route to it"
+            q5_1_simd_capability(),
+            "Q5_1 is advertised only on the measured SIMD hardware route"
+        );
+    }
+    #[test]
+    fn q5_1_reuse_matches_scalar_through_real_worker_dispatch() {
+        let context = jmodels_kernels_context_create(4);
+        assert!(!context.is_null());
+        // SAFETY: this test owns the context until the single final destroy.
+        let c = unsafe { &*context };
+        let before = job_generation(c.workers.shared.generation.0.load(Ordering::Acquire));
+        for cols in [32_usize, 96, 896, 4864] {
+            let rows = 17;
+            let weights = q5_1_rows(rows, cols / 32, 0x81c6_1437 ^ cols as u32);
+            for batch in [1_usize, 2, 3, 8, 32, 1] {
+                let input = q5_1_activations(batch * cols, 0x9876_5431 ^ batch as u32);
+                let mut expected = Vec::new();
+                for b in 0..batch {
+                    for row in 0..rows {
+                        expected.push(
+                            dot_q5_1_f32_row_scalar(&weights, &input, b, row, cols).to_bits(),
+                        );
+                    }
+                }
+                let mut output = vec![f32::NAN; batch * rows + 2];
+                output[0] = 19.0;
+                output[batch * rows + 1] = 23.0;
+                // SAFETY: all buffers are live, disjoint, and correctly sized; output has sentinels.
+                let status = unsafe {
+                    jmodels_quantized_f32_batched_matmul_with_context(
+                        context,
+                        6,
+                        weights.as_ptr(),
+                        weights.len() as u64,
+                        input.as_ptr(),
+                        input.len() as u64,
+                        output.as_mut_ptr().add(1),
+                        (batch * rows) as u64,
+                        batch as u32,
+                        rows as u32,
+                        cols as u32,
+                    )
+                };
+                assert_eq!(status, STATUS_OK);
+                assert_eq!(output[0], 19.0);
+                assert_eq!(output[batch * rows + 1], 23.0);
+                assert_eq!(
+                    output[1..batch * rows + 1]
+                        .iter()
+                        .map(|v| v.to_bits())
+                        .collect::<Vec<_>>(),
+                    expected,
+                    "cols {cols} batch {batch}"
+                );
+                assert_eq!(
+                    c.workers.shared.partitions.0.load(Ordering::Acquire),
+                    4,
+                    "immutable activation gate"
+                );
+            }
+        }
+        let after = job_generation(c.workers.shared.generation.0.load(Ordering::Acquire));
+        assert!(after > before, "test must actually publish worker jobs");
+        // SAFETY: consumes the unique live context once.
+        assert_eq!(
+            unsafe { jmodels_kernels_context_destroy(context) },
+            STATUS_OK
         );
     }
 }

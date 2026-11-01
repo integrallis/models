@@ -69,6 +69,264 @@ class LlamaForwardPassTest {
   private static final int CONTEXT = 64;
   private static final float SIMD_REDUCTION_TOLERANCE = 2.0e-7f;
 
+  @Nested
+  class SessionScratchLifetime {
+    @Test
+    void completedRaggedPrefillReleasesScratchReferencesButPreservesOwnedSessions()
+        throws Exception {
+      GgufFile file = buildQ4NanoModel(new Random(72));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaForwardPass pass = memoryPass(config, weights, null);
+      LlamaForwardPass.Session first = pass.openSession();
+      LlamaForwardPass.Session second = pass.openSession();
+      pass.prefillBatch(
+          new LlamaForwardPass.Session[] {first, second}, new int[][] {{1, 2, 3}, {4, 5}});
+      assertNoScratchSessions(pass);
+      assertThat(first.checkpoint()).isEqualTo(3);
+      assertThat(second.checkpoint()).isEqualTo(2);
+      LlamaForwardPass reference = memoryPass(config, weights, null);
+      LlamaForwardPass.Session referenceSession = reference.openSession();
+      reference.prefill(referenceSession, new int[] {1, 2, 3}, 0);
+      assertThat(pass.forward(first, 7, 3))
+          .containsExactly(reference.forward(referenceSession, 7, 3));
+      LlamaForwardPass.Session shorter = pass.openSession();
+      pass.prefill(shorter, new int[] {6, 7}, 0);
+      assertNoScratchSessions(pass);
+    }
+
+    @Test
+    void failedLayerReleasesAllScratchSessionReferences() throws Exception {
+      GgufFile file = buildQ4NanoModel(new Random(72));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaForwardPass pass =
+          memoryPass(
+              config,
+              weights,
+              (layer, position, state, offset, length) -> {
+                throw new IllegalStateException("injected layer failure");
+              });
+      LlamaForwardPass.Session first = pass.openSession();
+      LlamaForwardPass.Session second = pass.openSession();
+      assertThatThrownBy(
+              () ->
+                  pass.prefillBatch(
+                      new LlamaForwardPass.Session[] {first, second},
+                      new int[][] {{1, 2, 3}, {4, 5}}))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("injected layer failure");
+      assertNoScratchSessions(pass);
+      // Clearing internal references does not reset or invalidate caller-owned state.
+      assertThat(first.cache()).isNotNull();
+      assertThat(second.cache()).isNotNull();
+    }
+
+    @Test
+    void knownPromptCapacityIsReservedBeforeTheFirstLayer() {
+      GgufFile file = buildQ4NanoModel(new Random(72));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      LlamaForwardPass.Session[] observed = new LlamaForwardPass.Session[1];
+      AtomicInteger observations = new AtomicInteger();
+      LlamaForwardPass pass =
+          memoryPass(
+              config,
+              weights,
+              (layer, position, state, offset, length) -> {
+                observations.incrementAndGet();
+                assertThat(observed[0].cache().allocatedSequenceCapacity())
+                    .isGreaterThanOrEqualTo(33);
+              });
+      observed[0] = pass.openSession();
+      int[] prompt = new int[33];
+      java.util.Arrays.fill(prompt, 3);
+      pass.prefill(observed[0], prompt, 0);
+      assertThat(observations.get()).isPositive();
+      assertThat(observed[0].checkpoint()).isEqualTo(33);
+    }
+
+    private LlamaForwardPass memoryPass(
+        LlamaConfig config, LlamaWeights weights, LlamaForwardPass.LayerObserver observer) {
+      return new LlamaForwardPass(
+          config,
+          weights,
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim()),
+          observer,
+          executionPlan(config, weights, 4, false));
+    }
+
+    private void assertNoScratchSessions(LlamaForwardPass pass) throws Exception {
+      // Inspect the strong-reference owner directly rather than depend on nondeterministic GC.
+      var field = LlamaForwardPass.class.getDeclaredField("batchSessions");
+      field.setAccessible(true);
+      assertThat((Object[]) field.get(pass)).containsOnlyNulls();
+    }
+  }
+
+  @Nested
+  class InjectedSwiGlu {
+    @Test
+    void qwenDecodeAndPrefillUseInjectedActivationAndRetainExactLogits() {
+      for (String arch : new String[] {"qwen2", "qwen3"}) {
+        for (boolean accepted : new boolean[] {false, true}) {
+          GgufFile file = buildNanoModel(new Random(62), arch);
+          assertRoute(file, false, accepted, true);
+        }
+      }
+    }
+
+    @Test
+    void unrelatedActivationContractsDoNotInvokeSwiGluProvider() {
+      for (String arch : new String[] {"llama", "granite", "gemma"}) {
+        assertRoute(buildNanoModel(new Random(62), arch), false, true, false);
+      }
+    }
+
+    @Test
+    void stagedQwenQuantizedFfnRetainsJavaActivationAndExactState() {
+      try (Arena arena = Arena.ofShared()) {
+        GgufFile original =
+            copyToSharedArena(
+                buildQuantizedNanoModel(
+                    new Random(63),
+                    GgufTensorType.Q4_0,
+                    32,
+                    1024,
+                    count -> randomQ4(new Random(64), count)),
+                arena);
+        java.util.Map<String, com.integrallis.models.backend.purejava.gguf.GgufMetadataValue>
+            entries = new java.util.LinkedHashMap<>();
+        original
+            .metadata()
+            .entries()
+            .forEach((key, value) -> entries.put(key.replace("llama.", "qwen2."), value));
+        entries.put(
+            "general.architecture",
+            new com.integrallis.models.backend.purejava.gguf.GgufMetadataValue.StringValue(
+                "qwen2"));
+        GgufFile file =
+            new GgufFile(
+                original.header(),
+                new com.integrallis.models.backend.purejava.gguf.GgufMetadata(entries),
+                original.tensorInfos(),
+                original.tensorDataOffset(),
+                original.fileSegment());
+        assertRoute(file, true, true, false);
+        assertRoute(file, true, false, false);
+      }
+    }
+
+    private void assertRoute(
+        GgufFile file, boolean staged, boolean accepted, boolean expectedCalls) {
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      PureJavaPlanConfiguration configuration =
+          new PureJavaPlanConfiguration(
+              true,
+              true,
+              GgufQ4Kernel.WIDENED,
+              GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
+              4,
+              false,
+              false,
+              false,
+              false,
+              false,
+              staged,
+              false,
+              false,
+              GgufQ8BlockMajorKernel.SCATTERED,
+              false,
+              PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
+      PureJavaExecutionPlan plan =
+          ExecutionPlanner.plan(
+              RuntimeFingerprint.capture(),
+              ModelTopology.from(config.architecture().metadataId(), config, weights),
+              configuration);
+      AtomicInteger calls = new AtomicInteger();
+      GgufBatchedMatrixKernel provider =
+          new GgufBatchedMatrixKernel() {
+            @Override
+            public boolean supports(GgufTensorType type) {
+              return false;
+            }
+
+            @Override
+            public void multiply(
+                float[] out,
+                float[] input,
+                MemorySegment matrix,
+                GgufTensorType type,
+                int batch,
+                int rows,
+                int cols) {
+              throw new AssertionError("projection provider must not execute");
+            }
+
+            @Override
+            public FloatArrayView prepareFloatArray(float[] values) {
+              return () -> values;
+            }
+
+            @Override
+            public boolean trySwiGlu(
+                float[] out,
+                int outAt,
+                float[] gate,
+                int gateAt,
+                float[] up,
+                int upAt,
+                int length) {
+              throw new AssertionError("prepared scratch dispatch bypassed the graph observer");
+            }
+
+            @Override
+            public boolean trySwiGlu(
+                FloatArrayView outView,
+                int outAt,
+                FloatArrayView gateView,
+                int gateAt,
+                FloatArrayView upView,
+                int upAt,
+                int length) {
+              float[] out = outView.values();
+              float[] gate = gateView.values();
+              float[] up = upView.values();
+              calls.incrementAndGet();
+              if (accepted)
+                com.integrallis.vectors.core.VectorUtil.swiGlu(
+                    out, outAt, gate, gateAt, up, upAt, length);
+              return accepted;
+            }
+          };
+      KvCache expectedCache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+      KvCache actualCache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+      LlamaForwardPass baseline = new LlamaForwardPass(config, weights, expectedCache, plan);
+      LlamaForwardPass candidate =
+          new LlamaForwardPass(config, weights, actualCache, plan, provider);
+      assertThat(candidate.usesStagedQuantizedFfn()).isEqualTo(staged);
+      int[] prompt = {5, 7, 11, 13, 17, 19, 23, 29};
+      float[] expected = baseline.prefill(prompt, 0).clone();
+      assertThat(candidate.prefill(prompt, 0)).containsExactly(expected);
+      if (expectedCalls) assertThat(calls.get()).isGreaterThan(0);
+      else assertThat(calls.get()).isZero();
+      int priorCalls = calls.get();
+      int next = argmax(expected);
+      assertThat(candidate.forward(next, prompt.length))
+          .containsExactly(baseline.forward(next, prompt.length));
+      if (expectedCalls || staged) assertThat(calls.get()).isGreaterThan(priorCalls);
+      else assertThat(calls.get()).isZero();
+      assertThat(actualCache.keyBuffer()).containsExactly(expectedCache.keyBuffer());
+      assertThat(actualCache.valueBuffer()).containsExactly(expectedCache.valueBuffer());
+    }
+  }
+
   private GgufFile buildNanoModel(Random rng) {
     return buildNanoModel(rng, "llama");
   }
@@ -108,6 +366,12 @@ class LlamaForwardPassTest {
             .addUint32(arch + ".vocab_size", VOCAB_SIZE)
             .addUint32(arch + ".context_length", CONTEXT)
             .addUint32(arch + ".feed_forward_length", HIDDEN_DIM);
+    if (arch.equals("granite")) {
+      builder.addFloat32("granite.embedding_scale", 1.0f);
+      builder.addFloat32("granite.attention.scale", 0.5f);
+      builder.addFloat32("granite.residual_scale", 1.0f);
+      builder.addFloat32("granite.logit_scale", 1.0f);
+    }
     if (attnSoftcap != 0.0f) {
       builder.addFloat32(arch + ".attn_logit_softcapping", attnSoftcap);
     }
