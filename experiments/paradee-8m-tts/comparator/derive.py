@@ -40,6 +40,24 @@ def main(root):
                                "werMin": min(wers) if wers else None, "werMax": max(wers) if wers else None,
                                "realTimeMultipleMin": min(xs) if xs else None, "realTimeMultipleMax": max(xs) if xs else None,
                                "p95RealTimeFactorMax": max(g["p95RealTimeFactor"] for g in gs)})
+    # Phonemizer: per-sentence exact match of the candidate's phoneme string against the comparator's,
+    # per corpus and voice (accent follows the voice), from the first pass of each that exists.
+    # Both arms record the chunk list per sentence; the comparison is on the joined string and on
+    # the chunking separately. Reported, not gated.
+    out["phonemizer"] = []
+    first = {}
+    for g in out["groups"]:
+        first.setdefault((g["arm"], g["corpus"], g["voice"]), g["path"])
+    for (arm, corpus, voice), path in sorted(first.items()):
+        if arm != "candidate" or ("comparator", corpus, voice) not in first: continue
+        ours = json.loads((root / path / "pass.json").read_text())["rows"]
+        theirs = json.loads((root / first[("comparator", corpus, voice)] / "pass.json").read_text())["rows"]
+        n = min(len(ours), len(theirs))
+        joined = sum(1 for a, b in zip(ours, theirs) if " ".join(a["phonemes"]) == " ".join(b["phonemes"]))
+        chunked = sum(1 for a, b in zip(ours, theirs) if a["phonemes"] == b["phonemes"])
+        out["phonemizer"].append({"corpus": corpus, "voice": voice, "sentences": n,
+                                  "exactMatchRate": joined / n if n else None, "exactChunkingMatchRate": chunked / n if n else None,
+                                  "candidatePass": path, "comparatorPass": first[("comparator", corpus, voice)]})
     json.dump(out, sys.stdout, indent=1); print()
     return 0
 

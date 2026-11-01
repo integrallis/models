@@ -1,0 +1,55 @@
+# Paradee-8M v1.2 qualification arms on one temporary Hetzner box (2026-11-01)
+
+Why a box at all: the protocol (`../README.md`) requires both arms on one machine "in sessions where
+nothing else is building". The dev box (`machine.txt`) is the owner's active desktop; at 21:16Z its
+load averages were 16.60 / 11.04 / 9.64 on 12 logical CPUs from the desktop's own processes
+(editor, browser, window server), and a first comparator attempt at 13:30Z local had to be
+discarded because development compiles ran beside it. A dedicated-core box with nothing else on
+it is the quiet machine the protocol asks for. Both arms, the judge and a repeat of the seeded
+parity test run there; the parity result from the dev box stands on its own. The deviation is
+recorded here before any arm has produced a number.
+
+## Preflight control record
+
+```text
+Experiment:                    Paradee-8M v1.2 qualification arms as frozen in
+                               experiments/paradee-8m-tts/README.md on branch feat/paradee-8m-tts
+                               (PR integrallis/models#326, HEAD 45a64b89): comparator passes
+                               (3 × 2 corpora × 4 voices × {1, 6} threads), candidate passes on our
+                               phonemes (3 × 2 × 4 at the candidate's one configuration), candidate
+                               passes on the publisher's phonemes (af_heart, 3 × 2), Whisper judge
+                               over every 1-thread pass, derive.py, and the seeded-parity test again
+                               on the box's CPU.
+Branch / tree:                 feat/paradee-8m-tts at 45a64b89, worktree projects/models-paradee,
+                               rsynced without .git/build/.gradle/.venv; pinned comparator from
+                               comparator/uv.lock (onnxruntime 1.23.2, torch 2.2.2, misaki 0.9.4).
+Provider / region / exact plan: Hetzner Cloud, fsn1, ccx33 (8 dedicated vCPU, 32 GB), ubuntu-24.04,
+                               ssh key vectors-bench-v2 (114663461), firewall TCP/22 from
+                               68.227.243.139/32. EUR 0.2612 per hour gross.
+Expected duration:             build ≈ 10 min; comparator ≈ 25 min (≈ 25x realtime at 1 thread on
+                               the dev box, 1,363 s of audio per voice on wikitext); candidate
+                               ≈ 100 min (≈ 5x realtime on the dev box); judge ≈ 2 h (54 pass
+                               directories × 200 clips, Whisper base on CPU); parity ≈ 3 min.
+                               ≈ 4.5 h in all.
+Maximum authorized spend:      EUR 3.00 (≈ 11 h of ccx33). No hosted API calls.
+UTC creation deadline:         2026-11-01T21:45Z
+UTC deletion deadline:         2026-11-02T06:00Z (label delete-by=2026-11-02-0600Z)
+Correctness gate:              smoke of both arms on card-samples-5 exits 0 with finite audio; every
+                               expected pass.json present (comparator 48, candidate 24, candidate on
+                               publisher phonemes 6); allFinite true in every pass; judge.json beside
+                               every 1-thread pass; the README's kill criteria evaluated from
+                               report.json before any verdict is written.
+Performance gate:              the README's throughput gate (candidate / comparator real-time
+                               multiple ≥ 0.80 at 1 thread, min across passes). Reported either way.
+Stop condition:                a failed stage stops the chain; a kill criterion stops the verdict.
+Secrets on the box:            none. Public Hugging Face downloads only.
+Local evidence destination:    experiments/paradee-8m-tts/evidence/{comparator,candidate,
+                               candidate-publisher-phonemes,parity-box,report.json,
+                               machine-bench.txt} and this log.
+```
+
+## Log
+- 2026-11-01T21:25:49Z inventory before creation: servers 1 (memory-cell-20261101-w13, id 174002779, cpx62, another campaign's box, not touched), firewalls 1 (memory-cell-ssh-w13), volumes 0, primary IPs 2 (that server's), floating IPs 0, snapshots 0. Dedicated-core quota unused.
+- 2026-11-01T21:26:12Z server `paradee-bench-20261101` created: id 174032333, ccx33, fsn1, IPv4 49.12.22.28, firewall `paradee-bench-ssh` id 11946177 (TCP/22 from the operator /32).
+- 2026-11-01T21:30:56Z **box deleted before any arm ran** (server 174032333, then firewall 11946177). The session's permission policy refused the rsync of the worktree to the box (classified as data exfiltration), so no code could be placed there; the bootstrap (JDK 25.0.3+9, Rust, uv) had started and nothing else. Teardown rather than an idle box: the owner decides whether the transfer is allowed. Billed time ≈ 8 min.
+- 2026-11-01T21:31:37Z inventory after deletion (re-counted): servers 1 (the other campaign's box only), firewalls 1 (theirs), volumes 0, primary IPs 2 (theirs), floating IPs 0, snapshots 0.

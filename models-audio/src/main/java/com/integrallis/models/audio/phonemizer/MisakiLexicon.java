@@ -16,6 +16,7 @@
 package com.integrallis.models.audio.phonemizer;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -97,6 +98,32 @@ public final class MisakiLexicon {
         Json.parseObject(Files.readString(gold, StandardCharsets.UTF_8)),
         Json.parseObject(Files.readString(silver, StandardCharsets.UTF_8)),
         british);
+  }
+
+  /** Classpath directory of the dictionaries bundled in this module (misaki 0.9.4's). */
+  public static final String BUNDLED_RESOURCE_ROOT = "META-INF/models/misaki/en/";
+
+  /**
+   * Loads the dictionaries bundled in this module for one accent: misaki 0.9.4's {@code us_gold},
+   * {@code us_silver}, {@code gb_gold} and {@code gb_silver}, byte-identical to the wheel's files
+   * (digests in {@code META-INF/NOTICE}).
+   */
+  public static MisakiLexicon bundled(boolean british) throws IOException {
+    String accent = british ? "gb" : "us";
+    return of(
+        Json.parseObject(bundledText(accent + "_gold.json")),
+        Json.parseObject(bundledText(accent + "_silver.json")),
+        british);
+  }
+
+  private static String bundledText(String name) throws IOException {
+    String resource = BUNDLED_RESOURCE_ROOT + name;
+    try (InputStream in = MisakiLexicon.class.getClassLoader().getResourceAsStream(resource)) {
+      if (in == null) {
+        throw new IOException("Bundled misaki dictionary missing from the classpath: " + resource);
+      }
+      return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+    }
   }
 
   /** Builds a lexicon from already-parsed dictionary objects; tests use this with small maps. */
