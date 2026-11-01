@@ -10,8 +10,11 @@ dependencies {
     // No internal or external dependencies: the ONNX protobuf schema is decoded by hand.
 }
 
-// The kernels use the Java Vector API, which is still an incubating module; the root build adds it
-// to every test JVM and to javadoc, and this is the compiler's side of the same requirement.
+// The kernels use the Java Vector API, which is still an incubating module. The root build adds
+// it to every test JVM; the compiler and javadoc need it here, as backend-java does.
 tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.addAll(listOf("--add-modules", "jdk.incubator.vector"))
+}
+tasks.withType<Javadoc>().configureEach {
+    (options as StandardJavadocDocletOptions).addStringOption("-add-modules", "jdk.incubator.vector")
 }
