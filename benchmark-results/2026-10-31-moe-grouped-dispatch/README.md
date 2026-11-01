@@ -51,3 +51,36 @@ and any future ternary MoE.
 - **No profile.** This removed dispatch overhead that was visible from the code; it does not say
   what the remaining 1.58× is. #322 still wants a fresh profile.
 - **One host class**, 9 cases per arm, one iteration, zero warmups.
+
+## Profile after grouping (`mellum-post-grouping.jfr`, `profile-top-frames.txt`)
+
+JFR on the mellum candidate arm, `settings=profile`, 6107 native and 1860 execution samples. Top
+frames by sample count:
+
+```
+5357  LlamaForwardPass.routedFfn
+4934  LlamaForwardPass.matmulDispatch
+4860  RustGgufBatchedMatrixKernel.multiply
+3275  NativeKernelLibrary.q4_KF32BatchedMatmul
+1525  NativeKernelLibrary.q5_0F32BatchedMatmul
+1089  LlamaForwardPass.routeExpertsGrouped
+ 709  NativeKernelLibrary.quantizedF32GroupedBatchedMatmul
+ 589  LlamaForwardPass.attendGroupHeadByHead
+ 572  LlamaForwardPass.attendGroup
+```
+
+**`routedFfn` is still where the time is, and `matmulDispatch` holds most of it** — 4934 samples
+against 1089 in the grouped route. The grouped route is executing (535 samples inside
+`multiplyGrouped`, 709 inside `quantizedF32GroupedBatchedMatmul`), so this is not a silent fallback
+of the whole path; both routes are running.
+
+**Hypothesis, not a finding:** `isGroupedEligible` takes an array of types and may decline a *mixed*
+set, and two quantisations appear in the profile (`q4_K` 3275 samples, `q5_0` 1525). If a layer's
+selected experts do not share one type, that layer falls back to the per-expert loop. Grouping each
+type's run separately, instead of requiring one group for all `2 * used`, would then recover the
+rest. **This needs confirming by printing the declined type arrays before anything is written** —
+the route has to be read, not assumed, which is how the two defects fixed today were found.
+
+Attention is **not** the problem here: `attendGroupHeadByHead` and `attendGroup` together are ~1161
+samples against `routedFfn`'s 5357. The stale profile that pointed at attention was taken on maple
+before the TQ1_0 computation fix and does not describe mellum.
