@@ -3,6 +3,17 @@ import json
 from pathlib import Path
 
 
+def aggregate_limit_seconds():
+    path = Path(__file__).parent/'continuation-budget.json'
+    if not path.exists():
+        return 7200
+    record = json.loads(path.read_text())
+    limit = record['maximumAggregateRentedSeconds']
+    if type(limit) is not int or limit != record['previousAggregateLimitSeconds'] + record['additionalAllocationSeconds']:
+        raise ValueError('invalid continuation budget')
+    return limit
+
+
 def prior_rented_seconds(evidence):
     evidence = Path(evidence)
     initial = json.loads((evidence/'deployment.json').read_text())

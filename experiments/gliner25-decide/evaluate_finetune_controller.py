@@ -11,7 +11,7 @@ import tarfile
 import time
 
 import boto3
-from rental_budget import prior_rented_seconds
+from rental_budget import prior_rented_seconds, aggregate_limit_seconds
 
 HERE=Path(__file__).resolve().parent
 REPO=HERE.parent.parent
@@ -24,9 +24,11 @@ def main():
     parser.add_argument('--training-control',type=Path,required=True)
     parser.add_argument('--dense-payload',type=Path)
     parser.add_argument('--dense-manifest',type=Path)
+    parser.add_argument('--profile',action='store_true')
     args=parser.parse_args()
     if bool(args.dense_payload)!=bool(args.dense_manifest):raise ValueError('dense payload and manifest are required together')
     dense=json.loads(args.dense_manifest.read_text()) if args.dense_manifest else None
+    if args.profile and dense:raise ValueError('profile the original runtime independently')
     if dense and hashlib.file_digest(args.dense_payload.open('rb'),'sha256').hexdigest()!=dense['sha256']:
         raise ValueError('dense payload identity mismatch')
     training=json.loads(args.training_control.read_text())
@@ -34,8 +36,9 @@ def main():
         raise ValueError('training must be complete, uploaded and its pod deleted')
     previous=json.loads((EVIDENCE/'deployment.json').read_text())
     prior=prior_rented_seconds(EVIDENCE)
-    seconds=min(2700,7200-prior-120)
-    if seconds<1500:raise ValueError('insufficient remaining budget for complete CPU evaluation')
+    aggregate_limit=aggregate_limit_seconds()
+    seconds=min(900 if args.profile else 2700,aggregate_limit-prior-120)
+    if seconds<(600 if args.profile else 1500):raise ValueError('insufficient remaining budget for this CPU experiment')
     ec2=boto3.client('ec2',region_name='us-east-1');s3=boto3.client('s3',region_name='us-east-1')
     quota=boto3.client('service-quotas',region_name='us-east-1').get_service_quota(ServiceCode='ec2',QuotaCode='L-1216C47A')['Quota']['Value']
     active=[i for r in ec2.describe_instances(Filters=[dict(Name='instance-state-name',Values=['pending','running','stopping','shutting-down'])])['Reservations'] for i in r['Instances']]
@@ -63,7 +66,8 @@ def main():
     else:
         s3.copy_object(Bucket=BUCKET,Key=prefix+'/payload.tar.gz',CopySource={'Bucket':BUCKET,'Key':previous['payloadUri'].split(BUCKET+'/')[1]+'/payload.tar.gz'})
     s3.upload_file(str(overlay),BUCKET,prefix+'/evaluation-overlay.tar.gz')
-    s3.upload_file(str(HERE/('dense_projection_screen_remote.sh' if dense else 'evaluate_finetune_remote.sh')),BUCKET,prefix+'/jobs/evaluate.sh')
+    job='profile_remote.sh' if args.profile else 'dense_projection_screen_remote.sh' if dense else 'evaluate_finetune_remote.sh'
+    s3.upload_file(str(HERE/job),BUCKET,prefix+'/jobs/evaluate.sh')
     s3.put_object(Bucket=BUCKET,Key=prefix+'/next-job.json',Body=b'{"id":"evaluate"}')
     worker=(HERE/'remote-worker.sh').read_text().replace('shutdown -h +110','shutdown -h +'+str(seconds//60))
     worker=worker.replace('timeout --signal=TERM --kill-after=10 1800 bash','timeout --signal=TERM --kill-after=10 '+str(seconds-180)+' bash')
@@ -81,7 +85,8 @@ def main():
     body['UserData']=userdata
     record=dict(experiment=run,provider='EC2',region='us-east-1',plan='m6a.4xlarge',
         sourceRevision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),
-        mode='dense-projection-screen' if dense else 'fine-tune-quality',
+        mode='cpu-profile' if args.profile else 'dense-projection-screen' if dense else 'fine-tune-quality',
+        maximumAggregateRentedSeconds=aggregate_limit,
         measuredRuntimeSource=dense['sourceRevision'] if dense else previous['payloadManifest']['sourceRevision'],payloadSha256=env['GLINER_PAYLOAD_SHA'],overlaySha256=sha,
         trainedWeightSha256=training['workerResult']['mergedWeightSha256'],trainedSourceUri=training['resultUri'],
         stagedTrainedUri=env['GLINER_TRAINED_RESULTS'],priorAggregateRentedSecondsUpperBound=prior,
@@ -92,7 +97,7 @@ def main():
         stopCondition='evaluation complete, failure, setup timeout or deadline',secretsOnBox='instance-scoped IAM role; no account API credentials',catalogQualified=False)
     def save():(root/'control.json').write_text(json.dumps(record,indent=2)+'\n')
     save()
-    print(json.dumps(dict(control=str(root/'control.json'),remainingAggregateSeconds=7200-prior,rentalLimitSeconds=seconds)),flush=True)
+    print(json.dumps(dict(control=str(root/'control.json'),remainingAggregateSeconds=aggregate_limit-prior,rentalLimitSeconds=seconds)),flush=True)
     launched=ec2.run_instances(**body)['Instances'][0]
     instance=launched['InstanceId'];record.update(instanceId=instance,launchTime=launched['LaunchTime'].isoformat(),state='running');save()
     print('created '+instance,flush=True)
