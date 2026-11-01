@@ -993,44 +993,57 @@ public final class LlamaForwardPass {
       remaining = Math.addExact(remaining, tokens.length);
     }
 
-    while (remaining > 0) {
-      Arrays.fill(chunkCounts, 0);
-      int batchSize = 0;
-      boolean admitted = true;
-      while (batchSize < prefillBatchCapacity && admitted) {
-        admitted = false;
-        for (int sessionIndex = 0;
-            sessionIndex < sessionCount && batchSize < prefillBatchCapacity;
-            sessionIndex++) {
-          int promptIndex = consumed[sessionIndex];
-          if (promptIndex >= tokenBatches[sessionIndex].length) {
-            continue;
+    try {
+      // Validation already established that every complete prompt fits its session context.
+      // Reserve once instead of repeatedly copying all layers as individual rows arrive.
+      for (int index = 0; index < sessionCount; index++) {
+        sessions[index].cache.reserveSequenceCapacity(
+            Math.addExact(sessions[index].nextPosition, tokenBatches[index].length));
+      }
+      while (remaining > 0) {
+        Arrays.fill(chunkCounts, 0);
+        int batchSize = 0;
+        boolean admitted = true;
+        while (batchSize < prefillBatchCapacity && admitted) {
+          admitted = false;
+          for (int sessionIndex = 0;
+              sessionIndex < sessionCount && batchSize < prefillBatchCapacity;
+              sessionIndex++) {
+            int promptIndex = consumed[sessionIndex];
+            if (promptIndex >= tokenBatches[sessionIndex].length) {
+              continue;
+            }
+            batchSessions[batchSize] = sessions[sessionIndex];
+            batchTokens[batchSize] = tokenBatches[sessionIndex][promptIndex];
+            batchSessionIndexes[batchSize] = sessionIndex;
+            batchPromptIndexes[batchSize] = promptIndex;
+            batchPositions[batchSize] =
+                sessions[sessionIndex].nextPosition + chunkCounts[sessionIndex];
+            consumed[sessionIndex]++;
+            chunkCounts[sessionIndex]++;
+            batchSize++;
+            remaining--;
+            admitted = true;
           }
-          batchSessions[batchSize] = sessions[sessionIndex];
-          batchTokens[batchSize] = tokenBatches[sessionIndex][promptIndex];
-          batchSessionIndexes[batchSize] = sessionIndex;
-          batchPromptIndexes[batchSize] = promptIndex;
-          batchPositions[batchSize] =
-              sessions[sessionIndex].nextPosition + chunkCounts[sessionIndex];
-          consumed[sessionIndex]++;
-          chunkCounts[sessionIndex]++;
-          batchSize++;
-          remaining--;
-          admitted = true;
+        }
+
+        advanceIndependentSessionRows(batchSessions, batchTokens, batchSize);
+        for (int row = 0; row < batchSize; row++) {
+          int sessionIndex = batchSessionIndexes[row];
+          if (batchPromptIndexes[row] + 1 == tokenBatches[sessionIndex].length) {
+            System.arraycopy(batchX, row * dim, finalStates, sessionIndex * dim, dim);
+          }
+        }
+        for (int sessionIndex = 0; sessionIndex < sessionCount; sessionIndex++) {
+          sessions[sessionIndex].nextPosition += chunkCounts[sessionIndex];
+          advanceActivatedInvocation(sessions[sessionIndex], chunkCounts[sessionIndex]);
         }
       }
 
-      advanceIndependentSessionRows(batchSessions, batchTokens, batchSize);
-      for (int row = 0; row < batchSize; row++) {
-        int sessionIndex = batchSessionIndexes[row];
-        if (batchPromptIndexes[row] + 1 == tokenBatches[sessionIndex].length) {
-          System.arraycopy(batchX, row * dim, finalStates, sessionIndex * dim, dim);
-        }
-      }
-      for (int sessionIndex = 0; sessionIndex < sessionCount; sessionIndex++) {
-        sessions[sessionIndex].nextPosition += chunkCounts[sessionIndex];
-        advanceActivatedInvocation(sessions[sessionIndex], chunkCounts[sessionIndex]);
-      }
+    } finally {
+      // The caller owns these sessions. Scratch storage must not keep their KV caches alive
+      // after a request, including stale tail slots and exceptional exits.
+      Arrays.fill(batchSessions, null);
     }
 
     return finalStates;
@@ -2915,11 +2928,13 @@ public final class LlamaForwardPass {
     if (config.usesGeluFfn()) {
       TensorOps.geluGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
     } else if (config.usesGraniteScaling()) {
-      // Granite: the tier-stable vector sigmoid; vectors-core's swiGlu resolves lanewise EXP to
-      // the vector math library only once compiled and would differ by JIT tier.
+      // Granite retains its distinct sigmoid arithmetic; it does not use the Qwen activation.
+      // Routing this branch through the optional Qwen kernel would change that contract.
       GroupedQueryAttentionKernel.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
     } else if (usesVectorizedSwiGlu()) {
-      VectorUtil.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
+      if (!batchedMatrixKernel.trySwiGlu(out, outOffset, gate, gateOffset, up, upOffset, size)) {
+        VectorUtil.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
+      }
     } else {
       TensorOps.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
     }

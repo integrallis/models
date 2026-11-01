@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava;
 import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.llama.LlamaForwardPass;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -181,12 +182,22 @@ final class LlamaDecoder implements PureJavaDecoder {
 
   @Override
   public LogitBatch prefillBatch(Session[] sessions, int[][] tokenBatches) {
-    return forwardPass.prefillBatch(unwrapSessions(sessions), tokenBatches);
+    try {
+      return forwardPass.prefillBatch(unwrapSessions(sessions), tokenBatches);
+    } finally {
+      // Scratch borrows session state only for this call, including validation failures.
+      Arrays.fill(sessionBatch, null);
+    }
   }
 
   @Override
   public float[][] prefillBatchHiddenStates(Session[] sessions, int[][] tokenBatches) {
-    return forwardPass.prefillBatchHiddenStates(unwrapSessions(sessions), tokenBatches);
+    try {
+      return forwardPass.prefillBatchHiddenStates(unwrapSessions(sessions), tokenBatches);
+    } finally {
+      // Scratch borrows session state only for this call, including validation failures.
+      Arrays.fill(sessionBatch, null);
+    }
   }
 
   @Override
@@ -196,17 +207,32 @@ final class LlamaDecoder implements PureJavaDecoder {
 
   @Override
   public LogitBatch prefillBatchTransient(Session[] sessions, int[][] tokenBatches) {
-    return forwardPass.prefillBatchTransient(unwrapSessions(sessions), tokenBatches);
+    try {
+      return forwardPass.prefillBatchTransient(unwrapSessions(sessions), tokenBatches);
+    } finally {
+      // Scratch borrows session state only for this call, including validation failures.
+      Arrays.fill(sessionBatch, null);
+    }
   }
 
   @Override
   public LogitBatch forwardBatch(Session[] sessions, int[] tokens) {
-    return forwardPass.forwardBatch(unwrapSessions(sessions), tokens);
+    try {
+      return forwardPass.forwardBatch(unwrapSessions(sessions), tokens);
+    } finally {
+      // Scratch borrows session state only for this call, including validation failures.
+      Arrays.fill(sessionBatch, null);
+    }
   }
 
   @Override
   public LogitBatch forwardBatchTransient(Session[] sessions, int[] tokens) {
-    return forwardPass.forwardBatchTransient(unwrapSessions(sessions), tokens);
+    try {
+      return forwardPass.forwardBatchTransient(unwrapSessions(sessions), tokens);
+    } finally {
+      // Scratch borrows session state only for this call, including validation failures.
+      Arrays.fill(sessionBatch, null);
+    }
   }
 
   @Override

@@ -755,11 +755,13 @@ class NativeKernelLibraryTest {
   @Test
   void q51EligibilitySelectsTheMeasuredHardwareAndBatchRoute() {
     try (RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
-      boolean x86 = NativeKernelPlatform.current().id().endsWith("x86_64");
-      assertThat(kernel.supports(GgufTensorType.Q5_1)).isTrue();
-      assertThat(kernel.isEligible(GgufTensorType.Q5_1, 1, 896, 4864)).isEqualTo(x86);
-      assertThat(kernel.isEligible(GgufTensorType.Q5_1, 2, 896, 4864)).isFalse();
-      assertThat(kernel.isEligible(GgufTensorType.Q5_1, 64, 4864, 896)).isFalse();
+      boolean simd = kernel.supports(GgufTensorType.Q5_1);
+      for (int batch : new int[] {1, 2, 3, 8, 32}) {
+        assertThat(kernel.isEligible(GgufTensorType.Q5_1, batch, 896, 4864)).isEqualTo(simd);
+      }
+      for (int batch : new int[] {-1, 0, 33, 64}) {
+        assertThat(kernel.isEligible(GgufTensorType.Q5_1, batch, 4864, 896)).isFalse();
+      }
     }
   }
 
@@ -1351,6 +1353,71 @@ class NativeKernelLibraryTest {
       for (int index = 0; index < matrixCount; index++) {
         assertClose(actual[index], expected[index], K_QUANT_REDUCTION_TOLERANCE);
       }
+    }
+  }
+
+  @Test
+  void genericIndependentBlockFormatsReuseTheContextAcrossBatchGrowth() {
+    int cols = 64;
+    int[] rowCounts = {192, 193, 65};
+    for (GgufTensorType type : new GgufTensorType[] {GgufTensorType.Q4_0, GgufTensorType.Q8_0}) {
+      try (Arena arena = Arena.ofConfined();
+          RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath(), 4)) {
+        MemorySegment[] weights = new MemorySegment[rowCounts.length];
+        GgufTensorType[] types = new GgufTensorType[rowCounts.length];
+        Arrays.fill(types, type);
+        for (int matrix = 0; matrix < rowCounts.length; matrix++) {
+          int rows = rowCounts[matrix];
+          weights[matrix] =
+              arena.allocate((long) rows * cols / 32 * (type == GgufTensorType.Q4_0 ? 18 : 34));
+          if (type == GgufTensorType.Q4_0) fillWeights(weights[matrix], rows, cols);
+          else fillQ8_0Weights(weights[matrix], rows, cols);
+        }
+        for (int batch : new int[] {1, 3, 1}) {
+          float[][] input = new float[rowCounts.length][];
+          float[][] output = new float[rowCounts.length][];
+          float[][] expected = new float[rowCounts.length][];
+          for (int matrix = 0; matrix < rowCounts.length; matrix++) {
+            input[matrix] = inputs(batch, cols);
+            for (int index = 0; index < input[matrix].length; index++)
+              input[matrix][index] += matrix * 0.03125f;
+            output[matrix] = new float[batch * rowCounts[matrix]];
+            expected[matrix] = new float[output[matrix].length];
+            if (type == GgufTensorType.Q4_0)
+              referenceQ4_0F32BatchedMatmul(
+                  weights[matrix], input[matrix], batch, rowCounts[matrix], cols, expected[matrix]);
+            else
+              referenceQ8_0F32BatchedMatmul(
+                  weights[matrix], input[matrix], batch, rowCounts[matrix], cols, expected[matrix]);
+          }
+          assertThat(kernel.isIndependentEligible(types, rowCounts, rowCounts.length, batch, cols))
+              .isTrue();
+          kernel.multiplyIndependent(
+              output, weights, types, rowCounts, rowCounts.length, input, batch, cols);
+          for (int matrix = 0; matrix < rowCounts.length; matrix++) {
+            if (type == GgufTensorType.Q4_0)
+              assertThat(output[matrix]).containsExactly(expected[matrix]);
+            else assertClose(output[matrix], expected[matrix], BLOCK_QUANT_REDUCTION_TOLERANCE);
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  void genericProjectionRejectsAClosedContextAndClosingTwiceIsSafe() {
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment weights = arena.allocate(18);
+      fillWeights(weights, 1, 32);
+      NativeKernelLibrary library = NativeKernelLibrary.open(libraryPath(), 2);
+      library.close();
+      library.close();
+      float[] output = {42f};
+      assertThatThrownBy(
+              () -> library.q4_0F32BatchedMatmul(weights, inputs(1, 32), 1, 1, 32, output))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("closed");
+      assertThat(output).containsExactly(42f);
     }
   }
 
