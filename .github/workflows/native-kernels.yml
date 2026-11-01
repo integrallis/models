@@ -178,7 +178,9 @@ jobs:
           name: native-test-reports-${{ matrix.platform }}
           if-no-files-found: ignore
           retention-days: 30
-          path: models/backend-native/build/reports/tests/
+          path: |
+            models/backend-native/build/reports/tests/
+            models/backend-native/hs_err_pid*.log
 
   java:
     name: Java backend JAR

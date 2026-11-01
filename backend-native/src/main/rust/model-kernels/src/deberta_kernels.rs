@@ -6,9 +6,65 @@ use std::collections::HashMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
+use std::thread::JoinHandle;
 static NEXT: AtomicU64 = AtomicU64::new(1);
-static POOLS: LazyLock<Mutex<HashMap<u64, Arc<rayon::ThreadPool>>>> =
+static POOLS: LazyLock<Mutex<HashMap<u64, Arc<OwnedPool>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+// Rayon dropping a pool requests shutdown but does not join its OS threads. The FFM owner
+// may unload this library immediately after destroy, so all threads must have returned first.
+struct OwnedPool {
+    pool: Option<rayon::ThreadPool>,
+    workers: Arc<Mutex<Vec<JoinHandle<()>>>>,
+}
+impl OwnedPool {
+    fn new(threads: usize) -> Result<Self, rayon::ThreadPoolBuildError> {
+        let mut owned = Self {
+            pool: None,
+            workers: Arc::new(Mutex::new(Vec::new())),
+        };
+        let workers = Arc::clone(&owned.workers);
+        owned.pool = Some(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .spawn_handler(move |thread| {
+                    let mut builder = std::thread::Builder::new();
+                    if let Some(name) = thread.name() {
+                        builder = builder.name(name.to_owned());
+                    }
+                    if let Some(size) = thread.stack_size() {
+                        builder = builder.stack_size(size);
+                    }
+                    let handle = builder.spawn(move || thread.run())?;
+                    workers
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .push(handle);
+                    Ok(())
+                })
+                .build()?,
+        );
+        Ok(owned)
+    }
+}
+impl std::ops::Deref for OwnedPool {
+    type Target = rayon::ThreadPool;
+    fn deref(&self) -> &Self::Target {
+        self.pool.as_ref().expect("live DeBERTa pool")
+    }
+}
+impl Drop for OwnedPool {
+    fn drop(&mut self) {
+        drop(self.pool.take());
+        for worker in self
+            .workers
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .drain(..)
+        {
+            let _ = worker.join();
+        }
+    }
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn jmodels_deberta_abi() -> i32 {
     1
@@ -19,10 +75,7 @@ pub extern "C" fn jmodels_deberta_create(threads: u32) -> u64 {
         if threads == 0 || threads > 256 {
             return 0;
         }
-        let Ok(pool) = rayon::ThreadPoolBuilder::new()
-            .num_threads(threads as usize)
-            .build()
-        else {
+        let Ok(pool) = OwnedPool::new(threads as usize) else {
             return 0;
         };
         let handle = NEXT.fetch_add(1, Ordering::Relaxed);
@@ -40,9 +93,12 @@ pub extern "C" fn jmodels_deberta_create(threads: u32) -> u64 {
 #[unsafe(no_mangle)]
 pub extern "C" fn jmodels_deberta_destroy(handle: u64) {
     let _ = catch_unwind(|| {
-        if let Ok(mut registry) = POOLS.lock() {
-            registry.remove(&handle);
-        }
+        let removed = POOLS
+            .lock()
+            .ok()
+            .and_then(|mut registry| registry.remove(&handle));
+        // Joining outside the registry lock lets independent model calls continue.
+        drop(removed);
     });
 }
 /// Returns 0 on success, -1 for invalid dimensions/buffers, -2 for a stale handle, -3 on panic.
@@ -375,6 +431,34 @@ pub unsafe extern "C" fn jmodels_deberta_attend(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn destroying_pool_waits_for_worker_thread_local_cleanup() {
+        use std::cell::RefCell;
+        use std::sync::atomic::AtomicUsize;
+        struct Exit(Arc<AtomicUsize>);
+        impl Drop for Exit {
+            fn drop(&mut self) {
+                // Make an asynchronous Rayon shutdown observably different from a joined one.
+                std::thread::sleep(std::time::Duration::from_millis(20));
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        thread_local! { static EXIT: RefCell<Option<Exit>> = const { RefCell::new(None) }; }
+        for _ in 0..5 {
+            let exited = Arc::new(AtomicUsize::new(0));
+            let pool = OwnedPool::new(3).unwrap();
+            pool.broadcast(|_| {
+                EXIT.with(|slot| *slot.borrow_mut() = Some(Exit(Arc::clone(&exited))))
+            });
+            drop(pool);
+            assert_eq!(
+                exited.load(Ordering::SeqCst),
+                3,
+                "all TLS destructors must finish before the FFM library can unload"
+            );
+        }
+    }
+
     #[test]
     fn uneven_rows_match_scalar_and_invalid_calls_preserve_output() {
         assert_eq!(jmodels_deberta_create(0), 0);
