@@ -48,6 +48,11 @@ def main():
     now=datetime.now(timezone.utc);run='gliner25-eval-'+now.strftime('%Y%m%dT%H%M%SZ')
     root=EVIDENCE/run;root.mkdir();work=REPO/'build/gliner-runpod'/run;work.mkdir(parents=True)
     prefix='payload/'+run;results='results/'+run
+    # Worker IAM permits GET under payload/, not the training archive prefix. Stage server-side.
+    trained_prefix=training['resultUri'].split(BUCKET+'/')[1]
+    trained_manifest=json.loads(s3.get_object(Bucket=BUCKET,Key=trained_prefix+'/snapshot.json')['Body'].read())
+    for name in ['snapshot.json']+['snapshot/'+entry['path'] for entry in trained_manifest['files']]:
+        s3.copy_object(Bucket=BUCKET,Key=prefix+'/variant/'+name,CopySource={'Bucket':BUCKET,'Key':trained_prefix+'/'+name})
     overlay=work/'evaluation-overlay.tar.gz'
     with tarfile.open(overlay,'w:gz') as archive:
         for name in ['common.py','run_worker.py','reference_worker.py','compare_parity.py','assess_quality.py','assess_finetune.py',
@@ -67,7 +72,7 @@ def main():
     body['TagSpecifications']=[dict(ResourceType='instance',Tags=[dict(Key='Name',Value=run),dict(Key='project',Value='models-qualification'),dict(Key='campaign',Value=run),dict(Key='delete-by',Value=(now+timedelta(seconds=seconds)).strftime('%Y%m%dT%H%M%SZ'))])]
     env=dict(GLINER_URI='s3://'+BUCKET+'/'+prefix,GLINER_RESULTS='s3://'+BUCKET+'/'+results,
              GLINER_PAYLOAD_SHA=previous['payloadSha256'],GLINER_EVAL_OVERLAY_SHA=sha,
-             GLINER_TRAINED_RESULTS=training['resultUri'])
+             GLINER_TRAINED_RESULTS='s3://'+BUCKET+'/'+prefix+'/variant')
     userdata='#!/bin/bash\nset -euo pipefail\n'+'\n'.join('export '+k+'='+shlex.quote(v) for k,v in env.items())+'\n'
     userdata+="mkdir -p /work\napt-get update -qq\napt-get install -y -qq curl unzip\ncurl -fsSL --max-time 120 "+shlex.quote(s3.generate_presigned_url('get_object',Params={'Bucket':BUCKET,'Key':prefix+'/worker.sh'},ExpiresIn=5400))+" -o /work/worker.sh\nbash /work/worker.sh\n"
     # boto3 encodes UserData; unlike the CLI request it takes the plain script.
@@ -75,7 +80,8 @@ def main():
     record=dict(experiment=run,provider='EC2',region='us-east-1',plan='m6a.4xlarge',
         sourceRevision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),
         measuredRuntimeSource=previous['payloadManifest']['sourceRevision'],payloadSha256=previous['payloadSha256'],overlaySha256=sha,
-        trainedWeightSha256=training['workerResult']['mergedWeightSha256'],priorAggregateRentedSecondsUpperBound=prior,
+        trainedWeightSha256=training['workerResult']['mergedWeightSha256'],trainedSourceUri=training['resultUri'],
+        stagedTrainedUri=env['GLINER_TRAINED_RESULTS'],priorAggregateRentedSecondsUpperBound=prior,
         maximumRentalSeconds=seconds,maximumAuthorizedSpendUsd=1.0,expectedMinutes=30,
         creationDeadline=(now+timedelta(minutes=5)).isoformat(),deletionDeadline=(now+timedelta(seconds=seconds)).isoformat(),
         resultUri='s3://'+BUCKET+'/'+results,correctnessGate='unchanged numerical parity; exact checkpoint and CPU thread budget',
