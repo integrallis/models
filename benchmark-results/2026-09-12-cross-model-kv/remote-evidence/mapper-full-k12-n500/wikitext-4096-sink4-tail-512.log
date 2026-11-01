@@ -1,0 +1,31 @@
+Fetching 10 files:   0%|          | 0/10 [00:00<?, ?it/s]Fetching 10 files: 100%|██████████| 10/10 [00:00<00:00, 4843.87it/s]
+Fetching 12 files:   0%|          | 0/12 [00:00<?, ?it/s]Fetching 12 files: 100%|██████████| 12/12 [00:00<00:00, 5353.86it/s]
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00, 37.35it/s]
+Token indices sequence length is longer than the specified maximum sequence length for this model (296047 > 131072). Running this sequence through the model will result in indexing errors
+Traceback (most recent call last):
+  File "/opt/cross-kv-work/evaluate_hf_quality.py", line 476, in <module>
+    main()
+  File "/opt/cross-kv-work/evaluate_hf_quality.py", line 457, in main
+    report["wikitext"] = evaluate_wikitext(
+                         ^^^^^^^^^^^^^^^^^^
+  File "/opt/cross-kv-work/evaluate_hf_quality.py", line 364, in evaluate_wikitext
+    native, mapped = oracle.paired_scores(context, continuation)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/cross-kv-work/evaluate_hf_quality.py", line 305, in paired_scores
+    return self.paired_scores_many(context, [continuation])[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/cross-kv-work/evaluate_hf_quality.py", line 286, in paired_scores_many
+    self._mapped_prefix(context)
+  File "/opt/cross-kv-work/evaluate_hf_quality.py", line 214, in _mapped_prefix
+    source_keys, source_values = _canonical_content(
+                                 ^^^^^^^^^^^^^^^^^^^
+  File "/opt/cross-kv-work/evaluate_hf_mapper.py", line 91, in _canonical_content
+    keys.append(invert_rope(canonical_key, positions, rope).to(torch.float32))
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/vllm-cross-model-kv/cross_model_kv/rope.py", line 181, in invert_rope
+    return _transform(keys, positions, spec, inverse=True, compute_dtype=compute_dtype)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/vllm-cross-model-kv/cross_model_kv/rope.py", line 154, in _transform
+    work = keys.to(compute_dtype)
+           ^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 14.00 MiB. GPU 0 has a total capacity of 7.82 GiB of which 48.94 MiB is free. Including non-PyTorch memory, this process has 7.14 GiB memory in use. Of the allocated memory 6.71 GiB is allocated by PyTorch, and 123.28 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

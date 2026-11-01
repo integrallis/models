@@ -1,0 +1,116 @@
+{
+  "base": "ibm-granite/granite-4.1-3b",
+  "baseRevision": "c0650403e44e78ec0262dab1c90914c65b196c4e",
+  "invocation": {
+    "tokens": [
+      100264,
+      78191,
+      100265
+    ],
+    "text": "<|start_of_role|>assistant<|end_of_role|>"
+  },
+  "config": {
+    "rank": 16,
+    "alpha": 32,
+    "dropout": 0.05,
+    "targetModules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "maxLength": 2048,
+    "epochs": 1.0,
+    "learningRate": 0.0002,
+    "batchTokens": 2048,
+    "gradientAccumulation": 8,
+    "seed": 20260916,
+    "loadIn4bit": true
+  },
+  "prepared": {
+    "salt": "20260916-answerability-alora",
+    "seed": 20260916,
+    "sources": {
+      "quac-train": {
+        "records": 83568,
+        "train": 8000,
+        "validation": 300,
+        "file": "quac-train_v0.2.json",
+        "sha256": "ff5cca5a2e4b4d1cb5b5ced68b9fce88394ef6d93117426d6d4baafbcc05c56a"
+      },
+      "squad-v2-train": {
+        "records": 130319,
+        "train": 8000,
+        "validation": 300,
+        "file": "squad_v2-train.parquet",
+        "sha256": "f6da32ffb482ff463ad056477740d1bb284b96a45db3a08bee6a225ca6abf291"
+      },
+      "msmarco-v2.1-train": {
+        "records": 115533,
+        "train": 8000,
+        "validation": 300,
+        "file": "msmarco-train-00000-of-00007.parquet",
+        "sha256": "c92b58a2f53fbbe3cb6a24dadeafaaa7c0cf6f231eb99b95910d6b339812cffc"
+      }
+    },
+    "train": {
+      "records": 24000,
+      "sha256": "734b4e4714c984fa47329f99e7373c7de9355b186a3a471cfd27ab52b8e4d70a"
+    },
+    "validation": {
+      "records": 900,
+      "sha256": "ed10f53c6ec78f703da32509b10fbd6601b4e57acf0b8f4a4621f9dd484fe38f"
+    }
+  },
+  "trainExamples": 1941,
+  "droppedOverLength": 459,
+  "steps": 145,
+  "best": {
+    "step": 145,
+    "loss": 0.0487,
+    "lr": 0.0,
+    "elapsed": 6420,
+    "validation": {
+      "balancedAccuracy": 0.7418562044774119,
+      "structuredRate": 1.0,
+      "answerable": [
+        94,
+        139
+      ],
+      "unanswerable": [
+        130,
+        161
+      ],
+      "bySource": {
+        "squad-v2-train": 0.8247,
+        "quac-train": 0.6991,
+        "msmarco-v2.1-train": 0.7222
+      }
+    }
+  },
+  "seconds": 7013,
+  "versions": {
+    "python": "3.10.12",
+    "torch": "2.6.0+cu124",
+    "peft": "0.21.0",
+    "transformers": "5.17.0",
+    "device": "NVIDIA A16-8Q"
+  },
+  "adapterFiles": {
+    "README.md": {
+      "bytes": 5206,
+      "sha256": "2bfe62296f146ec950bbf3ab231a35a3cdc65272494b51f7f9b90a1432bcabba"
+    },
+    "adapter_config.json": {
+      "bytes": 1217,
+      "sha256": "c5cee88d675a5f60a1fc3ff0230696f23edb9d4eac4d6d4d4f578551b2ef6bb9"
+    },
+    "adapter_model.safetensors": {
+      "bytes": 124593064,
+      "sha256": "c69fe225928d86cb827b90a18cea46a6cb76cc5ccf644bd675bcb01da152f5aa"
+    }
+  }
+}

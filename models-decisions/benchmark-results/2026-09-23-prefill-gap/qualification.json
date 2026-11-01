@@ -1,0 +1,31 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v6",
+  "candidate" : {
+    "path" : "/root/qual-out/models-rust-ffm.json",
+    "sha256" : "1ae64158cc4d43d055fe7de4736861fe84f7c36b7c0faf91bb65de22c36e9878"
+  },
+  "comparators" : [ {
+    "path" : "/root/qual-out/llama.cpp.json",
+    "sha256" : "0022848124a776809bb315ac621e1c43520bdd5ec99abc9973a8b31536c9571e"
+  }, {
+    "path" : "/root/qual-out/ollama.json",
+    "sha256" : "219c030be3a977eb112ec0ca17bd49492d22d616d27af417271aca1fc12385ef"
+  } ],
+  "qualification" : {
+    "modelId" : "unsloth_qwen3_5_4b_gguf_q4_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+    "absoluteTier" : "OFFLINE",
+    "verdict" : "FAILED_ABSOLUTE_GATE",
+    "qualified" : false,
+    "modelAnswerCount" : 0,
+    "modelAnswerRate" : 0.0,
+    "modelAnswerCorrectRate" : 0.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ ],
+    "comparisons" : [ ],
+    "exclusions" : { }
+  }
+}

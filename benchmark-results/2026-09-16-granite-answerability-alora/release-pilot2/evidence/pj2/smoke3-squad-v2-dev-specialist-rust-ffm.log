@@ -1,0 +1,14 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 17, 2026 12:24:22 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256 (capped from hardware-preferred 512; raise with -Dvectors.maxBits))
+Sep 17, 2026 12:24:22 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=512 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+5ad247b0d7d075001a428b45 label=unanswerable prediction=unanswerable structured=true shared=true millis=7337 prefill=237 decode=2291
+57267640f1498d1400e8e074 label=answerable prediction=answerable structured=true shared=true millis=6642 prefill=173 decode=1547
+5737432bc3c5551400e51e9b label=answerable prediction=answerable structured=true shared=true millis=5645 prefill=161 decode=1514
+EXECUTED backend=rust-ffm arm=specialist suite=squad-v2-dev cases=3 structured=1.0000 balancedAccuracy=1.0000 shared=3 complete=false

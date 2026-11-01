@@ -1,0 +1,20 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+clean-host modelsVersion=0.3.42 java=25.0.4.1 vendor=Eclipse Adoptium os=Linux/amd64 processors=16
+fetched granite-4.1-3b-Q4_K_M.gguf sha256=662b0626cd58f443baea23559b469df6576a81d349649c59413b36a9fb32eb29 bytes=2099501664
+fetched adapter_model.safetensors sha256=67533dff14cd0cfa9ae0d00e83a9955226426ff1f98f1fd28790b2fd8757eea6 bytes=124593064
+fetched LICENSE sha256=f3b8149a65f7ae0e2fe55de40d52b98dd8965e6b213b7c441a9596ba670c2e64 bytes=10784
+fetched models-activated-lora.json sha256=27de22cf55ca941832bb3d5d6e0ce46de570edfc85f00ea33a11c30b2d33ccd3 bytes=1976
+fetched NOTICE sha256=4d3b1f70e77411b1d51ba33215dfe2bd7d1f4090d384725b7f1820df7a8937b1 bytes=1095
+fetched qualification-window-v2.json sha256=dfb8cd7203418c79bae27306ffc4857f0ab02be7f9f8ddcae793af556e9cab37 bytes=2226884
+Sep 17, 2026 4:58:35 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256 (capped from hardware-preferred 512; raise with -Dvectors.maxBits))
+Sep 17, 2026 4:58:35 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=512 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+loaded backend=pure-java adapterSha256=67533dff14cd0cfa9ae0d00e83a9955226426ff1f98f1fd28790b2fd8757eea6 invocation="<|start_of_role|>assistant<|end_of_role|>" millis=1894
+CASE PASS suite=squad-v2-dev id=5ad247b0d7d075001a428b45 promptSha256=7aaa491a77e0829b0e34624e86fb5842eaafc797cd548df4984a3eaf5cc7bb04 output="\"unanswerable\"" structured=true physicallySharesPrefix=true sharedPrefixTokens=269 expectedOutput="\"unanswerable\"" expectedSharedPrefixTokens=269 byteIdentical=true millis=22452
+CASE PASS suite=squad-v2-dev id=57267640f1498d1400e8e074 promptSha256=c65e890c5141a6b85d4f1c118168e13f4d7c82481e9618d13e2b5e14eb7d8094 output="\"answerable\"" structured=true physicallySharesPrefix=true sharedPrefixTokens=386 expectedOutput="\"answerable\"" expectedSharedPrefixTokens=386 byteIdentical=true millis=26362
+CASE PASS suite=squad-v2-dev id=5737432bc3c5551400e51e9b promptSha256=c7e008f5ad65a56181ec0402c0ab1c6fe162c02c3c6822e0492c8d80e500348e output="\"answerable\"" structured=true physicallySharesPrefix=true sharedPrefixTokens=357 expectedOutput="\"answerable\"" expectedSharedPrefixTokens=357 byteIdentical=true millis=23524
+CASE PASS suite=msmarco-v2.1-validation id=95542 promptSha256=15824a433591f1317836bf7f543a45b046a231c03967e3205ea2e3a5b0b3eba7 output="\"unanswerable\"" structured=true physicallySharesPrefix=true sharedPrefixTokens=776 expectedOutput="\"unanswerable\"" expectedSharedPrefixTokens=776 byteIdentical=true millis=53279
+CASE PASS suite=msmarco-v2.1-validation id=851555 promptSha256=3b44bd392c387b69415726299a4549dc458308d3392727307a8506d468c22108 output="\"answerable\"" structured=true physicallySharesPrefix=true sharedPrefixTokens=1082 expectedOutput="\"answerable\"" expectedSharedPrefixTokens=1082 byteIdentical=true millis=71679
+CASE PASS suite=msmarco-v2.1-validation id=1067349 promptSha256=9439d5af8c6910825dec9265b435d7a272adc30459bd0c486260e7fd40019121 output="\"answerable\"" structured=true physicallySharesPrefix=true sharedPrefixTokens=853 expectedOutput="\"answerable\"" expectedSharedPrefixTokens=853 byteIdentical=true millis=56652
+PASS cases=6 passed=6
