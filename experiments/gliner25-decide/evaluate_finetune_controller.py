@@ -21,7 +21,9 @@ BUCKET='models-qual-077051030817'
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('--training-control',type=Path,required=True)
+    source=parser.add_mutually_exclusive_group(required=True)
+    source.add_argument('--training-control',type=Path)
+    source.add_argument('--original-base',action='store_true')
     parser.add_argument('--dense-payload','--runtime-payload',dest='dense_payload',type=Path)
     parser.add_argument('--dense-manifest','--runtime-manifest',dest='dense_manifest',type=Path)
     parser.add_argument('--profile',action='store_true')
@@ -31,6 +33,7 @@ def main():
     parser.add_argument('--replications',type=int,choices=[1,3],default=1)
     parser.add_argument('--recipe',type=Path,default=HERE)
     args=parser.parse_args()
+    if args.original_base and not args.performance:raise ValueError('original-base mode requires paired performance')
     if args.development_cases and (args.profile or args.performance or args.quality_and_performance):raise ValueError('development is a separate mode')
     if args.replications!=1 and not (args.performance or args.quality_and_performance):raise ValueError('replications require performance mode')
     if bool(args.dense_payload)!=bool(args.dense_manifest):raise ValueError('dense payload and manifest are required together')
@@ -39,8 +42,8 @@ def main():
     if args.profile and (dense or args.performance):raise ValueError('profile the original runtime independently')
     if dense and hashlib.file_digest(args.dense_payload.open('rb'),'sha256').hexdigest()!=dense['sha256']:
         raise ValueError('dense payload identity mismatch')
-    training=json.loads(args.training_control.read_text())
-    if training['state']!='deleted' or training.get('workerResult',{}).get('stage')!='complete':
+    training=json.loads(args.training_control.read_text()) if args.training_control else None
+    if training and (training['state']!='deleted' or training.get('workerResult',{}).get('stage')!='complete'):
         raise ValueError('training must be complete, uploaded and its pod deleted')
     previous=json.loads((EVIDENCE/'deployment.json').read_text())
     prior=prior_rented_seconds(EVIDENCE,reserve_active=True)
@@ -59,10 +62,13 @@ def main():
     root=EVIDENCE/run;root.mkdir();work=REPO/'build/gliner-runpod'/run;work.mkdir(parents=True)
     prefix='payload/'+run;results='results/'+run
     # Worker IAM permits GET under payload/, not the training archive prefix. Stage server-side.
-    trained_prefix=training['resultUri'].split(BUCKET+'/')[1]
-    trained_manifest=json.loads(s3.get_object(Bucket=BUCKET,Key=trained_prefix+'/snapshot.json')['Body'].read())
-    for name in ['snapshot.json']+['snapshot/'+entry['path'] for entry in trained_manifest['files']]:
-        s3.copy_object(Bucket=BUCKET,Key=prefix+'/variant/'+name,CopySource={'Bucket':BUCKET,'Key':trained_prefix+'/'+name})
+    if training:
+        trained_prefix=training['resultUri'].split(BUCKET+'/')[1]
+        trained_manifest=json.loads(s3.get_object(Bucket=BUCKET,Key=trained_prefix+'/snapshot.json')['Body'].read())
+        for name in ['snapshot.json']+['snapshot/'+entry['path'] for entry in trained_manifest['files']]:
+            s3.copy_object(Bucket=BUCKET,Key=prefix+'/variant/'+name,CopySource={'Bucket':BUCKET,'Key':trained_prefix+'/'+name})
+    else:
+        trained_manifest=json.loads((HERE/'snapshot.json').read_text())
     overlay=work/'evaluation-overlay.tar.gz'
     with tarfile.open(overlay,'w:gz') as archive:
         if args.development_cases:
@@ -74,6 +80,9 @@ def main():
         for name in ['performance_remote.sh','run_performance_pairs.py','SummarizeJfr.java','common.py','run_worker.py','reference_worker.py','compare_parity.py','assess_quality.py','assess_finetune.py',
                      'finetune-policy.json','finetune-splits.json','finetune-qualification-cases.jsonl','policy.json','quality-cases.jsonl','parity-cases.jsonl','performance-parity-cases.jsonl','performance-cases.jsonl','performance-cohort.json','compare_performance.py','evaluate_finetune_remote.sh','download_reranker_fixture.sh']:
             source=args.recipe/name if name in ['finetune-policy.json','finetune-splits.json','finetune-qualification-cases.jsonl'] else HERE/name
+            if args.original_base and name=='finetune-policy.json':
+                policy=json.loads(source.read_text());policy['candidate']=trained_manifest['id']
+                source=work/'original-base-policy.json';source.write_text(json.dumps(policy)+'\n')
             archive.add(source,arcname=name)
     sha=hashlib.file_digest(overlay.open('rb'),'sha256').hexdigest()
     if dense:
@@ -93,7 +102,7 @@ def main():
     body['TagSpecifications']=[dict(ResourceType='instance',Tags=[dict(Key='Name',Value=run),dict(Key='project',Value='models-qualification'),dict(Key='campaign',Value=run),dict(Key='delete-by',Value=(now+timedelta(seconds=seconds)).strftime('%Y%m%dT%H%M%SZ'))])]
     env=dict(GLINER_URI='s3://'+BUCKET+'/'+prefix,GLINER_RESULTS='s3://'+BUCKET+'/'+results,
              GLINER_PAYLOAD_SHA=dense['sha256'] if dense else previous['payloadSha256'],GLINER_EVAL_OVERLAY_SHA=sha,
-             GLINER_REPLICATIONS=str(args.replications),GLINER_TRAINED_RESULTS='s3://'+BUCKET+'/'+prefix+'/variant')
+             GLINER_ORIGINAL_BASE='1' if args.original_base else '0',GLINER_REPLICATIONS=str(args.replications),GLINER_TRAINED_RESULTS='s3://'+BUCKET+'/'+prefix+'/variant')
     userdata='#!/bin/bash\nset -euo pipefail\n'+'\n'.join('export '+k+'='+shlex.quote(v) for k,v in env.items())+'\n'
     userdata+="mkdir -p /work\napt-get update -qq\napt-get install -y -qq curl unzip\ncurl -fsSL --max-time 120 "+shlex.quote(s3.generate_presigned_url('get_object',Params={'Bucket':BUCKET,'Key':prefix+'/worker.sh'},ExpiresIn=5400))+" -o /work/worker.sh\nbash /work/worker.sh\n"
     # boto3 encodes UserData; unlike the CLI request it takes the plain script.
@@ -104,7 +113,8 @@ def main():
         mode='development-diagnostics' if args.development_cases else 'quality-and-performance' if args.quality_and_performance else 'cpu-profile' if args.profile else 'paired-performance' if args.performance else 'fine-tune-quality',
         maximumAggregateRentedSeconds=aggregate_limit,
         measuredRuntimeSource=dense['sourceRevision'] if dense else previous['payloadManifest']['sourceRevision'],payloadSha256=env['GLINER_PAYLOAD_SHA'],overlaySha256=sha,
-        trainedWeightSha256=training['workerResult']['mergedWeightSha256'],trainedSourceUri=training['resultUri'],
+        trainedWeightSha256=next(e['sha256'] for e in trained_manifest['files'] if e['path']=='model.safetensors'),
+        trainedSourceUri=training['resultUri'] if training else trained_manifest['sourceUri'],
         stagedTrainedUri=env['GLINER_TRAINED_RESULTS'],priorAggregateRentedSecondsUpperBound=prior,
         maximumRentalSeconds=seconds,maximumAuthorizedSpendUsd=1.0,expectedMinutes=30,
         creationDeadline=(now+timedelta(minutes=5)).isoformat(),deletionDeadline=(now+timedelta(seconds=seconds)).isoformat(),
@@ -112,6 +122,7 @@ def main():
         qualityGate='development-only, not qualification' if args.development_cases else 'not measured in profiling or performance mode' if args.profile or args.performance else 'all frozen fine-tune and original regression floors',
         performanceGate='complete 13-shape pairs; every pair must pass, at least three for final qualification' if args.performance or args.quality_and_performance else 'CPU cost attribution only, not qualification' if args.profile else 'not measured in this quality run',
         stopCondition='evaluation complete, failure, setup timeout or deadline',secretsOnBox='instance-scoped IAM role; no account API credentials',catalogQualified=False)
+    record['snapshotOrigin']='original-publisher' if args.original_base else 'fine-tuned'
     def save():(root/'control.json').write_text(json.dumps(record,indent=2)+'\n')
     save()
     print(json.dumps(dict(control=str(root/'control.json'),remainingAggregateSeconds=aggregate_limit-prior,rentalLimitSeconds=seconds)),flush=True)

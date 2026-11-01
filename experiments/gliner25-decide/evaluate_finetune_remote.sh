@@ -11,6 +11,10 @@ export PATH=/work/jdk/bin:/root/.cargo/bin:$PATH TOKENIZERS_PARALLELISM=false
 aws s3 cp "$GLINER_URI/evaluation-overlay.tar.gz" /work/evaluation-overlay.tar.gz --only-show-errors
 printf '%s  %s\n' "$GLINER_EVAL_OVERLAY_SHA" /work/evaluation-overlay.tar.gz | sha256sum -c -
 tar -xzf /work/evaluation-overlay.tar.gz -C /work/payload/experiment
+if [[ "${GLINER_ORIGINAL_BASE:-0}" == 1 ]]; then
+  cp snapshot.json /work/variant-manifest.json
+  ln -s /work/snapshot /work/variant
+else
 aws s3 cp "$GLINER_TRAINED_RESULTS/snapshot.json" /work/variant-manifest.json --only-show-errors
 /work/python/bin/python - <<'PY'
 import json,os,pathlib,subprocess,sys
@@ -23,6 +27,7 @@ for entry in manifest['files']:
     subprocess.run(['aws','s3','cp',os.environ['GLINER_TRAINED_RESULTS']+'/snapshot/'+entry['path'],str(path),'--only-show-errors'],check=True)
 verify_snapshot('/work/variant','/work/variant-manifest.json')
 PY
+fi
 cp /work/variant-manifest.json /work/out/variant-manifest.json
 sha256sum /work/payload/lib/*.jar /work/payload/rust/target/release/libjmodels_kernels.so > /work/out/runtime-sha256.txt
 reference() {
