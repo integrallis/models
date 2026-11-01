@@ -1,0 +1,15 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Synthetic matrices only; no model weights. Java=25.0.3 CPUs=12
+Nov 01, 2026 12:27:48 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 01, 2026 12:27:48 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[vectors.gguf.threads=8]
+rows=1024 cols=1024 batch=32 currentMs=1.188 rustSgemmMs=0.611 speedup=1.945 maxError=0.00000525
+rows=1024 cols=1024 batch=128 currentMs=4.369 rustSgemmMs=1.420 speedup=3.076 maxError=0.00000525
+rows=1024 cols=1024 batch=512 currentMs=11.959 rustSgemmMs=3.349 speedup=3.571 maxError=0.00000572
+rows=4096 cols=1024 batch=32 currentMs=4.546 rustSgemmMs=2.679 speedup=1.697 maxError=0.00000525
+rows=4096 cols=1024 batch=128 currentMs=18.606 rustSgemmMs=4.810 speedup=3.869 maxError=0.00000572
+rows=4096 cols=1024 batch=512 currentMs=83.610 rustSgemmMs=15.087 speedup=5.542 maxError=0.00000668
+rows=1024 cols=4096 batch=32 currentMs=5.916 rustSgemmMs=1.844 speedup=3.208 maxError=0.00000900
+rows=1024 cols=4096 batch=128 currentMs=20.698 rustSgemmMs=4.257 speedup=4.862 maxError=0.00000954
+rows=1024 cols=4096 batch=512 currentMs=91.061 rustSgemmMs=14.722 speedup=6.185 maxError=0.00000966
