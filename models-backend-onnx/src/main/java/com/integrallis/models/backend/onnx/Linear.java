@@ -68,16 +68,7 @@ final class Linear {
           }
         }
       } else {
-        for (int i = 0; i < m; i++) {
-          for (int p = 0; p < k; p++) {
-            float av = fa[baseA + i * k + p];
-            int rowB = baseB + p * n;
-            int rowO = baseO + i * n;
-            for (int j = 0; j < n; j++) {
-              outF[rowO + j] += av * fb[rowB + j];
-            }
-          }
-        }
+        Simd.gemm(fa, baseA, k, fb, baseB, n, outF, baseO, n, m, k, n);
       }
     }
     long[] shape;
@@ -110,22 +101,35 @@ final class Linear {
     float[] fb = b.toFloat().floats();
     float[] out = new float[m * n];
     if (!transA && transB) {
-      // The common linear-layer layout: rows of A dotted with rows of B.
-      for (int i = 0; i < m; i++) {
+      // The common linear-layer layout: rows of A dotted with rows of B, four rows per pass.
+      float[] four = new float[4];
+      int i = 0;
+      for (; i + 4 <= m; i += 4) {
         int rowA = i * k;
         for (int j = 0; j < n; j++) {
-          int rowB = j * k;
-          float acc = 0f;
-          for (int p = 0; p < k; p++) {
-            acc += fa[rowA + p] * fb[rowB + p];
-          }
-          out[i * n + j] = alpha * acc;
+          Simd.dot4(fa, rowA, rowA + k, rowA + 2 * k, rowA + 3 * k, fb, j * k, k, four, 0);
+          out[i * n + j] = alpha * four[0];
+          out[(i + 1) * n + j] = alpha * four[1];
+          out[(i + 2) * n + j] = alpha * four[2];
+          out[(i + 3) * n + j] = alpha * four[3];
+        }
+      }
+      for (; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+          out[i * n + j] = alpha * Simd.dot(fa, i * k, fb, j * k, k);
+        }
+      }
+    } else if (!transA) {
+      Simd.gemm(fa, 0, k, fb, 0, n, out, 0, n, m, k, n);
+      if (alpha != 1f) {
+        for (int i = 0; i < out.length; i++) {
+          out[i] *= alpha;
         }
       }
     } else {
       for (int i = 0; i < m; i++) {
         for (int p = 0; p < k; p++) {
-          float av = transA ? fa[p * m + i] : fa[i * k + p];
+          float av = fa[p * m + i];
           for (int j = 0; j < n; j++) {
             float bv = transB ? fb[j * k + p] : fb[p * n + j];
             out[i * n + j] += av * bv;

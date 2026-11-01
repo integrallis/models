@@ -106,6 +106,9 @@ class ElementwiseTest {
     assertThat(Elementwise.erf(f(0)).floats()).containsExactly(0f);
     assertThat(Elementwise.erf(0.5)).isCloseTo(0.5204998778, within(1e-9));
     assertThat(Elementwise.erf(4.5)).isCloseTo(0.9999999998, within(1e-9));
+    assertThat(Elementwise.erf(1.0000001)).isCloseTo(0.8427008, within(1e-7));
+    assertThat(Elementwise.erf(0.9999999)).isCloseTo(0.8427007, within(1e-7));
+    assertThat(Elementwise.erf(2.0)).isCloseTo(0.9953222650, within(1e-9));
     assertThat(Elementwise.erf(-7.0)).isEqualTo(-1.0);
     assertThat(Elementwise.erf(1.0)).isCloseTo(0.8427007929, within(1e-9));
     assertThat(Elementwise.erf(-1.0)).isCloseTo(-0.8427007929, within(1e-9));

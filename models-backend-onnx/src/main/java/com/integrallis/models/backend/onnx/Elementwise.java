@@ -65,6 +65,11 @@ final class Elementwise {
     return unary(x, v -> 1.0 / (1.0 + Math.exp(-v)));
   }
 
+  /**
+   * Sine and cosine stay on {@link java.lang.Math}: the graph feeds them accumulated phases in the
+   * hundreds of thousands of radians, where only a full range reduction is correct, and on this JDK
+   * the Vector API's lane-wise sine was measured slower than the scalar call, not faster.
+   */
   static Tensor sin(Tensor x) {
     return unary(x, Math::sin);
   }
@@ -171,6 +176,21 @@ final class Elementwise {
 
   static Tensor arithmetic(Arithmetic op, Tensor a, Tensor b) {
     long[] shape = Broadcast.shape(a.shape(), b.shape());
+    boolean basic =
+        op == Arithmetic.ADD
+            || op == Arithmetic.SUB
+            || op == Arithmetic.MUL
+            || op == Arithmetic.DIV;
+    if (basic && a.isFloat() && b.isFloat()) {
+      return stridedFloat(op, a, b, shape);
+    }
+    if (basic
+        && a.isFloatingPoint()
+        && b.isFloatingPoint()
+        && (a.isDouble() || b.isDouble())
+        && shape.length > 0) {
+      return stridedDouble(op, a.toDouble(), b.toDouble(), shape);
+    }
     int[] ia = Broadcast.same(a.shape(), shape) ? null : Broadcast.indexMap(a.shape(), shape);
     int[] ib = Broadcast.same(b.shape(), shape) ? null : Broadcast.indexMap(b.shape(), shape);
     int count = (int) Tensor.elementCount(shape);
@@ -236,6 +256,138 @@ final class Elementwise {
     return int32 ? Tensor.ofInts(shape, out) : Tensor.ofLongs(shape, out);
   }
 
+  /**
+   * Float arithmetic over a broadcast without materializing index maps: the output is walked in
+   * row-major order one innermost run at a time, and each run is a contiguous SIMD loop whose
+   * operands are either contiguous or a single broadcast value.
+   */
+  private static Tensor stridedFloat(Arithmetic op, Tensor a, Tensor b, long[] shape) {
+    int rank = shape.length;
+    float[] fa = a.floats();
+    float[] fb = b.floats();
+    int count = (int) Tensor.elementCount(shape);
+    float[] out = new float[count];
+    if (rank == 0) {
+      out[0] = apply(op, fa[0], fb[0]);
+      return Tensor.ofFloats(shape, out);
+    }
+    long[] sa = Broadcast.strides(a.shape(), shape);
+    long[] sb = Broadcast.strides(b.shape(), shape);
+    int inner = (int) shape[rank - 1];
+    int innerA = (int) sa[rank - 1];
+    int innerB = (int) sb[rank - 1];
+    int outer = inner == 0 ? 0 : count / inner;
+    long[] counter = new long[rank - 1];
+    int oa = 0;
+    int ob = 0;
+    for (int run = 0; run < outer; run++) {
+      int oi = run * inner;
+      if (innerA == 1 && innerB == 1) {
+        switch (op) {
+          case ADD -> Simd.add(out, oi, fa, oa, fb, ob, inner);
+          case SUB -> Simd.sub(out, oi, fa, oa, fb, ob, inner);
+          case MUL -> Simd.mul(out, oi, fa, oa, fb, ob, inner);
+          default -> Simd.div(out, oi, fa, oa, fb, ob, inner);
+        }
+      } else if (innerA == 1 && innerB == 0) {
+        float s = fb[ob];
+        switch (op) {
+          case ADD -> Simd.addScalar(out, oi, fa, oa, s, inner);
+          case SUB -> Simd.addScalar(out, oi, fa, oa, -s, inner);
+          case MUL -> Simd.mulScalar(out, oi, fa, oa, s, inner);
+          default -> Simd.divScalar(out, oi, fa, oa, s, inner);
+        }
+      } else if (innerA == 0 && innerB == 1) {
+        float s = fa[oa];
+        for (int i = 0; i < inner; i++) {
+          out[oi + i] = apply(op, s, fb[ob + i]);
+        }
+      } else {
+        float v = apply(op, fa[oa], fb[ob]);
+        java.util.Arrays.fill(out, oi, oi + inner, v);
+      }
+      // Advance the outer odometer.
+      for (int axis = rank - 2; axis >= 0; axis--) {
+        counter[axis]++;
+        oa += (int) sa[axis];
+        ob += (int) sb[axis];
+        if (counter[axis] < shape[axis]) {
+          break;
+        }
+        oa -= (int) (sa[axis] * counter[axis]);
+        ob -= (int) (sb[axis] * counter[axis]);
+        counter[axis] = 0;
+      }
+    }
+    return Tensor.ofFloats(shape, out);
+  }
+
+  /** Double arithmetic over a broadcast without index maps; the phase arithmetic runs here. */
+  private static Tensor stridedDouble(Arithmetic op, Tensor a, Tensor b, long[] shape) {
+    int rank = shape.length;
+    double[] da = a.doubles();
+    double[] db = b.doubles();
+    int count = (int) Tensor.elementCount(shape);
+    double[] out = new double[count];
+    long[] sa = Broadcast.strides(a.shape(), shape);
+    long[] sb = Broadcast.strides(b.shape(), shape);
+    int inner = (int) shape[rank - 1];
+    int stepA = (int) sa[rank - 1];
+    int stepB = (int) sb[rank - 1];
+    int outer = inner == 0 ? 0 : count / inner;
+    long[] counter = new long[rank - 1];
+    int oa = 0;
+    int ob = 0;
+    for (int run = 0; run < outer; run++) {
+      int oi = run * inner;
+      int ia = oa;
+      int ib = ob;
+      switch (op) {
+        case ADD -> {
+          for (int i = 0; i < inner; i++, ia += stepA, ib += stepB) {
+            out[oi + i] = da[ia] + db[ib];
+          }
+        }
+        case SUB -> {
+          for (int i = 0; i < inner; i++, ia += stepA, ib += stepB) {
+            out[oi + i] = da[ia] - db[ib];
+          }
+        }
+        case MUL -> {
+          for (int i = 0; i < inner; i++, ia += stepA, ib += stepB) {
+            out[oi + i] = da[ia] * db[ib];
+          }
+        }
+        default -> {
+          for (int i = 0; i < inner; i++, ia += stepA, ib += stepB) {
+            out[oi + i] = da[ia] / db[ib];
+          }
+        }
+      }
+      for (int axis = rank - 2; axis >= 0; axis--) {
+        counter[axis]++;
+        oa += (int) sa[axis];
+        ob += (int) sb[axis];
+        if (counter[axis] < shape[axis]) {
+          break;
+        }
+        oa -= (int) (sa[axis] * counter[axis]);
+        ob -= (int) (sb[axis] * counter[axis]);
+        counter[axis] = 0;
+      }
+    }
+    return Tensor.ofDoubles(shape, out);
+  }
+
+  private static float apply(Arithmetic op, float x, float y) {
+    return switch (op) {
+      case ADD -> x + y;
+      case SUB -> x - y;
+      case MUL -> x * y;
+      default -> x / y;
+    };
+  }
+
   private static DoubleBinaryOperator doubleOperator(Arithmetic op) {
     return switch (op) {
       case ADD -> Double::sum;
@@ -274,6 +426,9 @@ final class Elementwise {
 
   static Tensor compare(Comparison op, Tensor a, Tensor b) {
     long[] shape = Broadcast.shape(a.shape(), b.shape());
+    if (a.isFloat() && b.isFloat() && op != Comparison.AND && shape.length > 0) {
+      return stridedCompare(op, a, b, shape);
+    }
     int[] ia = Broadcast.same(a.shape(), shape) ? null : Broadcast.indexMap(a.shape(), shape);
     int[] ib = Broadcast.same(b.shape(), shape) ? null : Broadcast.indexMap(b.shape(), shape);
     int count = (int) Tensor.elementCount(shape);
@@ -295,6 +450,63 @@ final class Elementwise {
           };
     }
     return Tensor.ofBooleans(shape, out);
+  }
+
+  /** Float comparison over a broadcast, one contiguous innermost run at a time. */
+  private static Tensor stridedCompare(Comparison op, Tensor a, Tensor b, long[] shape) {
+    int rank = shape.length;
+    float[] fa = a.floats();
+    float[] fb = b.floats();
+    int count = (int) Tensor.elementCount(shape);
+    byte[] out = new byte[count];
+    long[] sa = Broadcast.strides(a.shape(), shape);
+    long[] sb = Broadcast.strides(b.shape(), shape);
+    int inner = (int) shape[rank - 1];
+    int stepA = (int) sa[rank - 1];
+    int stepB = (int) sb[rank - 1];
+    int outer = inner == 0 ? 0 : count / inner;
+    long[] counter = new long[rank - 1];
+    int oa = 0;
+    int ob = 0;
+    for (int run = 0; run < outer; run++) {
+      int oi = run * inner;
+      int ia = oa;
+      int ib = ob;
+      switch (op) {
+        case LESS -> {
+          for (int i = 0; i < inner; i++, ia += stepA, ib += stepB) {
+            out[oi + i] = (byte) (fa[ia] < fb[ib] ? 1 : 0);
+          }
+        }
+        case GREATER -> {
+          for (int i = 0; i < inner; i++, ia += stepA, ib += stepB) {
+            out[oi + i] = (byte) (fa[ia] > fb[ib] ? 1 : 0);
+          }
+        }
+        case GREATER_OR_EQUAL -> {
+          for (int i = 0; i < inner; i++, ia += stepA, ib += stepB) {
+            out[oi + i] = (byte) (fa[ia] >= fb[ib] ? 1 : 0);
+          }
+        }
+        default -> {
+          for (int i = 0; i < inner; i++, ia += stepA, ib += stepB) {
+            out[oi + i] = (byte) (fa[ia] == fb[ib] ? 1 : 0);
+          }
+        }
+      }
+      for (int axis = rank - 2; axis >= 0; axis--) {
+        counter[axis]++;
+        oa += (int) sa[axis];
+        ob += (int) sb[axis];
+        if (counter[axis] < shape[axis]) {
+          break;
+        }
+        oa -= (int) (sa[axis] * counter[axis]);
+        ob -= (int) (sb[axis] * counter[axis]);
+        counter[axis] = 0;
+      }
+    }
+    return Tensor.ofBytes(OnnxDataType.BOOL, shape, out);
   }
 
   /** {@code Where(condition, x, y)} with three-way broadcasting; the result takes x's storage. */
@@ -348,6 +560,7 @@ final class Elementwise {
     }
     double result;
     if (z < 4.0) {
+      // Maclaurin series: alternating terms summed until they vanish against the partial sum.
       double term = z;
       double sum = z;
       double z2 = z * z;
@@ -361,10 +574,10 @@ final class Elementwise {
       }
       result = sum * 2.0 / Math.sqrt(Math.PI);
     } else {
+      // Asymptotic erfc beyond 4, where erfc is already below 1.6e-8.
       double z2 = z * z;
       double series = 1 - 1 / (2 * z2) + 3 / (4 * z2 * z2) - 15 / (8 * z2 * z2 * z2);
-      double erfc = Math.exp(-z2) / (z * Math.sqrt(Math.PI)) * series;
-      result = 1.0 - erfc;
+      result = 1.0 - Math.exp(-z2) / (z * Math.sqrt(Math.PI)) * series;
     }
     return x < 0 ? -result : result;
   }

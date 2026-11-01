@@ -95,6 +95,23 @@ final class Reductions {
       }
       return Tensor.ofLongs(shape, out);
     }
+    if (x.isFloat()) {
+      float[] in = x.floats();
+      float[] out = new float[a.outer() * a.inner()];
+      if (a.inner() == 1) {
+        for (int o = 0; o < a.outer(); o++) {
+          out[o] = Simd.sum(in, o * a.length(), a.length());
+        }
+      } else {
+        for (int o = 0; o < a.outer(); o++) {
+          int oBase = o * a.inner();
+          for (int k = 0; k < a.length(); k++) {
+            Simd.add(out, oBase, out, oBase, in, (o * a.length() + k) * a.inner(), a.inner());
+          }
+        }
+      }
+      return Tensor.ofFloats(shape, out);
+    }
     double[] acc = new double[a.outer() * a.inner()];
     for (int o = 0; o < a.outer(); o++) {
       for (int k = 0; k < a.length(); k++) {
@@ -104,14 +121,7 @@ final class Reductions {
         }
       }
     }
-    if (x.isDouble()) {
-      return Tensor.ofDoubles(shape, acc);
-    }
-    float[] out = new float[acc.length];
-    for (int i = 0; i < out.length; i++) {
-      out[i] = (float) acc[i];
-    }
-    return Tensor.ofFloats(shape, out);
+    return Tensor.ofDoubles(shape, acc);
   }
 
   static Tensor cumSum(Tensor x, Tensor axisTensor, boolean exclusive, boolean reverse) {

@@ -9,3 +9,9 @@ description = "In-process, pure-Java ONNX graph execution"
 dependencies {
     // No internal or external dependencies: the ONNX protobuf schema is decoded by hand.
 }
+
+// The kernels use the Java Vector API, which is still an incubating module; the root build adds it
+// to every test JVM and to javadoc, and this is the compiler's side of the same requirement.
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.addAll(listOf("--add-modules", "jdk.incubator.vector"))
+}
