@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.gemma4.Gemma4Decoder;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Objects;
 
 /** Adapts the Gemma 4 graph to the backend's architecture-neutral decoder contract. */
@@ -104,12 +105,22 @@ final class Gemma4DecoderAdapter implements PureJavaDecoder {
 
   @Override
   public LogitBatch forwardBatch(Session[] sessions, int[] tokens) {
-    return decoder.forwardBatch(unwrapSessions(sessions), tokens);
+    try {
+      return decoder.forwardBatch(unwrapSessions(sessions), tokens);
+    } finally {
+      // Scratch borrows session state only for this call, including validation failures.
+      Arrays.fill(sessionBatch, null);
+    }
   }
 
   @Override
   public LogitBatch forwardBatchTransient(Session[] sessions, int[] tokens) {
-    return decoder.forwardBatchTransient(unwrapSessions(sessions), tokens);
+    try {
+      return decoder.forwardBatchTransient(unwrapSessions(sessions), tokens);
+    } finally {
+      // Scratch borrows session state only for this call, including validation failures.
+      Arrays.fill(sessionBatch, null);
+    }
   }
 
   @Override

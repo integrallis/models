@@ -25,10 +25,17 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/** Per-layer key-value cache for autoregressive transformer decoding. */
+/**
+ * Per-layer key-value cache for autoregressive transformer decoding.
+ *
+ * <p>Token storage is allocated on the first reservation or store. Creating an unused session or
+ * shared-prefix branch allocates no token buffers.
+ */
 public final class KvCache {
 
   private static final int INITIAL_SEQUENCE_CAPACITY = 16;
+  private static final float[] EMPTY_FLOATS = new float[0];
+  private static final boolean[] EMPTY_OCCUPANCY = new boolean[0];
 
   private final int numLayers;
   private final int maxSeqLen;
@@ -37,9 +44,9 @@ public final class KvCache {
   private final SharedPrefix sharedPrefix;
   private final int localStartPosition;
   private int allocatedSequenceCapacity;
-  private float[] keys;
-  private float[] values;
-  private boolean[] populated;
+  private float[] keys = EMPTY_FLOATS;
+  private float[] values = EMPTY_FLOATS;
+  private boolean[] populated = EMPTY_OCCUPANCY;
   private boolean frozen;
 
   /** One contiguous chronological run in either shared-prefix or branch-owned storage. */
@@ -264,10 +271,7 @@ public final class KvCache {
     this.valueDim = valueDim;
     this.sharedPrefix = null;
     this.localStartPosition = 0;
-    this.allocatedSequenceCapacity = Math.min(maxSeqLen, INITIAL_SEQUENCE_CAPACITY);
-    this.keys = allocateStore("key cache", allocatedSequenceCapacity, keyDim);
-    this.values = allocateStore("value cache", allocatedSequenceCapacity, valueDim);
-    this.populated = new boolean[checkedSlots(allocatedSequenceCapacity)];
+    validateInitialStorageSize(Math.min(maxSeqLen, INITIAL_SEQUENCE_CAPACITY));
   }
 
   private KvCache(SharedPrefix prefix) {
@@ -278,10 +282,7 @@ public final class KvCache {
     this.sharedPrefix = prefix;
     this.localStartPosition = prefix.length;
     int remainingPositions = maxSeqLen - localStartPosition;
-    this.allocatedSequenceCapacity = Math.min(remainingPositions, INITIAL_SEQUENCE_CAPACITY);
-    this.keys = allocateStore("key cache", allocatedSequenceCapacity, keyDim);
-    this.values = allocateStore("value cache", allocatedSequenceCapacity, valueDim);
-    this.populated = new boolean[checkedSlots(allocatedSequenceCapacity)];
+    validateInitialStorageSize(Math.min(remainingPositions, INITIAL_SEQUENCE_CAPACITY));
   }
 
   /** Stores a key and value vector for a given layer and position. */
@@ -956,6 +957,14 @@ public final class KvCache {
         || position - localStartPosition >= allocatedSequenceCapacity) {
       throw new IllegalStateException("position has no allocated storage: " + position);
     }
+  }
+
+  // Reject the same oversized shapes at construction, without allocating storage that a known
+  // prompt reservation would immediately replace. The first reservation/store allocates once.
+  private void validateInitialStorageSize(int sequenceCapacity) {
+    int slots = checkedSlots(sequenceCapacity);
+    checkedProduct("key cache", slots, keyDim);
+    checkedProduct("value cache", slots, valueDim);
   }
 
   private float[] allocateStore(String name, int sequenceCapacity, int dimension) {

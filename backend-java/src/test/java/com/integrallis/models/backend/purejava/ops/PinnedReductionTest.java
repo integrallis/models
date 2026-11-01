@@ -16,7 +16,6 @@
 package com.integrallis.models.backend.purejava.ops;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.integrallis.vectors.core.PanamaConstants;
 import com.integrallis.vectors.core.VectorUtil;
@@ -44,23 +43,59 @@ class PinnedReductionTest {
 
   @ParameterizedTest(name = "{0} elements")
   @ValueSource(ints = {1, 7, 8, 16, 17, 31, 32, 33, 64, 127, 128, 2048, 4096})
-  @DisplayName("the pinned dot is bit-identical to VectorUtil.dotProduct on a 256-bit host")
-  void pinnedMatchesTheOriginalAt256Bits(int size) {
-    // This is the claim that makes the change free: on the default ceiling the pinned shape IS the
-    // shape already computed, so no pinned model oracle moves. It can only be asserted where the
-    // host actually is 256 bits and fuses, which is the common case and this development machine.
-    assumeTrue(
-        Math.min(PanamaConstants.MAX_BITS, FloatVector.SPECIES_PREFERRED.vectorBitSize()) == 256,
-        "only meaningful where the original computes 8 lanes");
-    assumeTrue(PanamaConstants.HAS_FAST_VECTOR_FMA, "the original fuses only with fast vector FMA");
-    assumeTrue(PanamaConstants.HAS_FAST_SCALAR_FMA, "and fuses its scalar tail likewise");
-
+  @DisplayName("the pinned dot matches its independent eight-lane contract on every host")
+  void pinnedMatchesIndependentContract(int size) {
     float[] a = fixture(size, 11);
     float[] b = fixture(size, 29);
     assertEquals(
-        Float.floatToRawIntBits(VectorUtil.dotProduct(a, 0, b, 0, size)),
+        Float.floatToRawIntBits(referenceDot(a, 0, b, 0, size)),
         Float.floatToRawIntBits(PinnedReduction.dot(a, 0, b, 0, size)),
-        "pinned dot differs from the original at " + size + " elements");
+        "pinned dot differs from its eight-lane contract at " + size + " elements");
+    // The old host-dependent implementation is an additional oracle only on hosts whose
+    // active width and FMA behavior match the fixed contract. The independent oracle above
+    // always executes, including on 128-bit ARM hosts.
+    if (Math.min(PanamaConstants.MAX_BITS, FloatVector.SPECIES_PREFERRED.vectorBitSize()) == 256
+        && PanamaConstants.HAS_FAST_VECTOR_FMA
+        && PanamaConstants.HAS_FAST_SCALAR_FMA) {
+      assertEquals(
+          Float.floatToRawIntBits(VectorUtil.dotProduct(a, 0, b, 0, size)),
+          Float.floatToRawIntBits(PinnedReduction.dot(a, 0, b, 0, size)));
+    }
+  }
+
+  /** Scalar statement of the eight-lane, four-accumulator contract; no Vector API calls. */
+  static float referenceDot(float[] a, int aOffset, float[] b, int bOffset, int length) {
+    int index = 0;
+    float result = 0.0f;
+    if (length > 16) {
+      float[][] sums = new float[4][8];
+      int wholeVectors = length / 8;
+      int groups = wholeVectors / 4;
+      for (int group = 0; group < groups; group++) {
+        for (int accumulator = 0; accumulator < 4; accumulator++) {
+          for (int lane = 0; lane < 8; lane++, index++) {
+            sums[accumulator][lane] =
+                Math.fma(a[aOffset + index], b[bOffset + index], sums[accumulator][lane]);
+          }
+        }
+      }
+      for (int vector = groups * 4; vector < wholeVectors; vector++) {
+        for (int lane = 0; lane < 8; lane++, index++) {
+          sums[0][lane] = Math.fma(a[aOffset + index], b[bOffset + index], sums[0][lane]);
+        }
+      }
+      float[] folded = new float[8];
+      for (int lane = 0; lane < 8; lane++) {
+        folded[lane] = (sums[0][lane] + sums[1][lane]) + (sums[2][lane] + sums[3][lane]);
+      }
+      result +=
+          ((folded[4] + folded[0]) + (folded[6] + folded[2]))
+              + ((folded[5] + folded[1]) + (folded[7] + folded[3]));
+    }
+    for (; index < length; index++) {
+      result = Math.fma(a[aOffset + index], b[bOffset + index], result);
+    }
+    return result;
   }
 
   @Test

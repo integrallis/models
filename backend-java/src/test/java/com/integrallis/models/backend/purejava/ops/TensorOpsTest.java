@@ -175,8 +175,8 @@ class TensorOpsTest {
      * lanes with {@code reduceLanes(ADD)}, whose float order differs between the interpreted/C1
      * fallback and the C2 intrinsic, so the same projection changed its last bits once C2 compiled
      * it (see benchmark-results/2026-09-16-flaky-injected-attention). Requiring equality with the
-     * order-defined {@link VectorUtil#dotProduct(float[], int, float[], int, int)} pins the
-     * arithmetic to one reduction order in every tier.
+     * independent eight-lane scalar reference pins the arithmetic to one reduction order in every
+     * tier.
      */
     @Test
     void ggufF32MatrixIsBitIdenticalToTheOrderDefinedRowDotProduct() {
@@ -198,7 +198,7 @@ class TensorOpsTest {
       }
       float[] expected = new float[rows];
       for (int row = 0; row < rows; row++) {
-        expected[row] = VectorUtil.dotProduct(x, 0, weights, row * cols, cols);
+        expected[row] = PinnedReductionTest.referenceDot(x, 0, weights, row * cols, cols);
       }
 
       try (Arena arena = Arena.ofConfined()) {

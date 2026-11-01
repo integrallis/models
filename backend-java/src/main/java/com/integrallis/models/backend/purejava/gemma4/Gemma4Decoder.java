@@ -19,6 +19,7 @@ import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Objects;
 
 /** Owns one loaded Gemma 4 decoder and its zero-copy mapped expert views. */
@@ -154,12 +155,22 @@ public final class Gemma4Decoder implements AutoCloseable {
 
   /** Executes one token per independent session and returns stable logits. */
   public LogitBatch forwardBatch(Session[] sessions, int[] tokens) {
-    return forwardPass.forwardBatch(unwrapSessions(sessions), tokens);
+    try {
+      return forwardPass.forwardBatch(unwrapSessions(sessions), tokens);
+    } finally {
+      // Scratch borrows session state only for this call, including validation failures.
+      Arrays.fill(sessionBatch, null);
+    }
   }
 
   /** Executes one token per independent session using reusable batch storage. */
   public LogitBatch forwardBatchTransient(Session[] sessions, int[] tokens) {
-    return forwardPass.forwardBatchTransient(unwrapSessions(sessions), tokens);
+    try {
+      return forwardPass.forwardBatchTransient(unwrapSessions(sessions), tokens);
+    } finally {
+      // Scratch borrows session state only for this call, including validation failures.
+      Arrays.fill(sessionBatch, null);
+    }
   }
 
   /** Discards one session's state at and after a prior checkpoint. */
