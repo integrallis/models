@@ -2469,12 +2469,18 @@ public final class LlamaForwardPass {
       moeGroupedDownTypes[slot] = moe.downType();
       moeGroupedDownRows[slot] = dim;
     }
+    // The two groups are decided SEPARATELY. Requiring both cost mellum half its layers: its
+    // ffn_down_exps is Q5_0 on 14 of 28 layers and Q8_0 on the rest, and Q5_0 is the one
+    // quantisation the kernel groups neither way (measured: Q4_K, Q4_0, Q6_K and Q8_0 all group,
+    // Q5_0 does not). Those 14 layers were falling back wholesale and losing the gate and up
+    // grouping as well, even though both are Q4_K on every layer and eligible on every layer.
     if (!batchedMatrixKernel.isGroupedEligible(
-            moeGroupedGateUpTypes, moeGroupedGateUpRows, 2 * used, 1, dim)
-        || !batchedMatrixKernel.isIndependentEligible(
-            moeGroupedDownTypes, moeGroupedDownRows, used, 1, hidden)) {
+        moeGroupedGateUpTypes, moeGroupedGateUpRows, 2 * used, 1, dim)) {
       return false;
     }
+    boolean groupDown =
+        batchedMatrixKernel.isIndependentEligible(
+            moeGroupedDownTypes, moeGroupedDownRows, used, 1, hidden);
     batchedMatrixKernel.multiplyGrouped(
         moeGroupedGateUpOutputs,
         moeGroupedGateUpWeights,
@@ -2492,15 +2498,29 @@ public final class LlamaForwardPass {
           hidden,
           layer);
     }
-    batchedMatrixKernel.multiplyIndependent(
-        moeGroupedDownOutputs,
-        moeGroupedDownWeights,
-        moeGroupedDownTypes,
-        moeGroupedDownRows,
-        used,
-        moeGroupedActivations,
-        1,
-        hidden);
+    if (groupDown) {
+      batchedMatrixKernel.multiplyIndependent(
+          moeGroupedDownOutputs,
+          moeGroupedDownWeights,
+          moeGroupedDownTypes,
+          moeGroupedDownRows,
+          used,
+          moeGroupedActivations,
+          1,
+          hidden);
+    } else {
+      // One dispatch each, which is what the per-expert loop would have done -- but the gate and up
+      // projections above were still grouped, which is the half this recovers.
+      for (int slot = 0; slot < used; slot++) {
+        matmulDispatch(
+            moeGroupedDownOutputs[slot],
+            moeGroupedActivations[slot],
+            moeGroupedDownWeights[slot],
+            moeGroupedDownTypes[slot],
+            dim,
+            hidden);
+      }
+    }
     for (int slot = 0; slot < used; slot++) {
       float weight = moeRoutingWeights[slot];
       float[] contribution = moeGroupedDownOutputs[slot];
