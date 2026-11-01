@@ -1,5 +1,6 @@
-mod q51_reuse;
+mod dense_f32;
 mod hf_tokenizer;
+mod q51_reuse;
 #[cfg(target_arch = "x86_64")]
 mod q8f32_reuse;
 // Copyright 2025-2026 Integrallis Software, LLC

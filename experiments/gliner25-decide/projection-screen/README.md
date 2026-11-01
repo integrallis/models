@@ -26,3 +26,16 @@ reproductions. Model inference remains remote-only.
 
 Next: account for native buffer ownership and copying, exercise the target Linux CPU, and
 measure encoder-wide parity, accuracy and latency before adopting a production kernel.
+
+The isolated `experiment/gliner25-batched-projection` branch now contains that integration
+candidate. It injects one synchronous projector into the shared DeBERTa encoder and uses an
+owned Rust pool behind a checked FFM adapter. Reusable native buffers stage input, weights and
+output on every call; their copies are therefore included in whole-model timings. The existing
+tokenizer's Rayon 1.12.0 dependency is retained. The public GLiNER loader does not select this
+candidate yet. The experimental qualification worker does, and records cumulative completed
+native projection calls on every response. There is no experimental toggle in the public runtime.
+
+Local validation: Java/native tests cover uneven dimensions, buffer reuse, scalar-oracle parity,
+output bounds, invalid inputs, concurrency and close. Existing Java encoder/classifier tests,
+SpotBugs, all 47 enabled Rust tests, Clippy and native export/notice checks pass. None of these
+component checks establishes a whole-model performance gain or catalog qualification.
