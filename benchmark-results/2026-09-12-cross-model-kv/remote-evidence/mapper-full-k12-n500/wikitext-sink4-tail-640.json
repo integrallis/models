@@ -1,0 +1,79 @@
+{
+  "gates": {
+    "wikitextPplRatio": {
+      "maximum": 1.1,
+      "pass": false,
+      "value": 1.128893401400972
+    }
+  },
+  "mapper": {
+    "path": "mapper-full-k12-n500/mapper.safetensors",
+    "sha256": "37a231af96485682a02f866298777e420addb04ab8e90eee398dd5e673c6965b"
+  },
+  "method": "paired Hugging Face target continuation scoring after mapped versus native prefix",
+  "nativeTargetSinkTokens": 4,
+  "qualified": false,
+  "recomputedTargetTailTokens": 640,
+  "schemaVersion": 1,
+  "source": {
+    "model": "Qwen/Qwen3-0.6B",
+    "revision": "c1899de289a04d12100db370d81485cdf75e47ca"
+  },
+  "target": {
+    "model": "Qwen/Qwen3-1.7B",
+    "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
+  },
+  "wikitext": {
+    "count": 10,
+    "dataset": {
+      "configuration": "wikitext-2-raw-v1",
+      "id": "Salesforce/wikitext",
+      "revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+      "split": "test"
+    },
+    "elapsedSeconds": 2.9729714393615723,
+    "gate": {
+      "maximum": 1.1,
+      "pass": false,
+      "value": 1.128893401400972
+    },
+    "mapped": {
+      "meanNll": 2.4480950117111204,
+      "ppl": 11.566292068031569,
+      "totalNll": 783.3904037475586
+    },
+    "mappedNll": [
+      72.5833740234375,
+      92.58821868896484,
+      67.23269653320312,
+      98.51518249511719,
+      60.658634185791016,
+      105.75898742675781,
+      86.33653259277344,
+      53.135536193847656,
+      83.41073608398438,
+      63.17050552368164
+    ],
+    "native": {
+      "meanNll": 2.3268571496009827,
+      "ppl": 10.245690207487833,
+      "totalNll": 744.5942878723145
+    },
+    "nativeNll": [
+      39.889076232910156,
+      95.36457824707031,
+      68.66018676757812,
+      94.78861999511719,
+      51.67948913574219,
+      101.92044830322266,
+      85.77206420898438,
+      55.147274017333984,
+      87.48976135253906,
+      63.882789611816406
+    ],
+    "pplRatio": 1.128893401400972,
+    "prefixTokens": 1024,
+    "tailTokensPerChunk": 32,
+    "tokens": 320
+  }
+}

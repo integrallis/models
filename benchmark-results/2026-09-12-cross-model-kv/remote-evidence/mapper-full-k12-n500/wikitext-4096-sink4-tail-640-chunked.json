@@ -1,0 +1,70 @@
+{
+  "gates": {
+    "wikitextPplRatio": {
+      "maximum": 1.1,
+      "pass": true,
+      "value": 1.0365872021083182
+    }
+  },
+  "mapper": {
+    "path": "mapper-full-k12-n500/mapper.safetensors",
+    "sha256": "37a231af96485682a02f866298777e420addb04ab8e90eee398dd5e673c6965b"
+  },
+  "mappingTokenChunk": 128,
+  "method": "paired Hugging Face target continuation scoring after mapped versus native prefix",
+  "nativeTargetSinkTokens": 4,
+  "qualified": true,
+  "recomputedTargetTailTokens": 640,
+  "schemaVersion": 1,
+  "source": {
+    "model": "Qwen/Qwen3-0.6B",
+    "revision": "c1899de289a04d12100db370d81485cdf75e47ca"
+  },
+  "target": {
+    "model": "Qwen/Qwen3-1.7B",
+    "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
+  },
+  "wikitext": {
+    "count": 5,
+    "dataset": {
+      "configuration": "wikitext-2-raw-v1",
+      "id": "Salesforce/wikitext",
+      "revision": "b08601e04326c79dfdd32d625aee71d232d685c3",
+      "split": "test"
+    },
+    "elapsedSeconds": 16.740000247955322,
+    "gate": {
+      "maximum": 1.1,
+      "pass": true,
+      "value": 1.0365872021083182
+    },
+    "mapped": {
+      "meanNll": 1.9202179431915283,
+      "ppl": 6.822445212755752,
+      "totalNll": 307.23487091064453
+    },
+    "mappedNll": [
+      65.01152801513672,
+      40.89369201660156,
+      42.444984436035156,
+      106.07994842529297,
+      52.804718017578125
+    ],
+    "native": {
+      "meanNll": 1.8842841625213622,
+      "ppl": 6.58164136975602,
+      "totalNll": 301.48546600341797
+    },
+    "nativeNll": [
+      59.077430725097656,
+      45.0567626953125,
+      38.82939147949219,
+      100.96534729003906,
+      57.55653381347656
+    ],
+    "pplRatio": 1.0365872021083182,
+    "prefixTokens": 4096,
+    "tailTokensPerChunk": 32,
+    "tokens": 160
+  }
+}
