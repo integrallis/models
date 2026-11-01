@@ -82,8 +82,36 @@ bringing the aggregate through training to 3,059 seconds. This is not an accurac
 The first CPU evaluation stopped before inference because the worker role cannot read the
 training archive prefix. Its 225 seconds count toward the cap and its logs are retained.
 The replacement stages the same objects server-side into the permitted payload prefix and
-is running the frozen parity and quality suites. No held-out accuracy gain is claimed yet.
-ModelJars integration, a released
-runtime repeat, native packaging checks across advertised platforms, and catalog publication
-remain outstanding. A different or fine-tuned checkpoint would need a distinct identity and
-fresh held-out qualification; this base checkpoint remains a candidate.
+completed the frozen parity and quality suites. The complete evidence is under
+`gliner25-eval-20261101T195217Z/`. Models and the publisher select identical labels on all
+1,001 fresh cases with zero inference errors. Both load the exact merged checkpoint above.
+Diagnostic parity passes at maximum absolute error 0.0000085835; shape parity through 512
+passes at 0.0000191984.
+
+| Fresh cohort | Base | Fine-tuned | Fixed floor |
+| --- | --- | --- | --- |
+| BoolQ accuracy, 296 cases | 73.6486% | 80.4054% | 70% |
+| CLINC overall accuracy, 450 cases / 10 domains | 84% | 94% | Per-domain macro-F1 >= 70% |
+| CLINC mean per-domain macro-F1 | 81.6664% | 93.6016% | Every domain passes |
+| GoEmotions micro-F1, 255 cases | 38.6555% | **49.6732%** | **70%: fails** |
+| GoEmotions macro-F1 | 38.3370% | **47.0916%** | **60%: fails** |
+
+The original 529-case regression suite also completes without inference errors. JevBench
+accuracy is 85%, choice accuracy 88.8889%, and yes/no accuracy 72.2222%, now above its 70%
+floor. CLINC banking macro-F1 is 94.6281%. GoEmotions still fails at 51.9393% micro-F1 and
+47.7815% macro-F1. All fresh per-cohort nonregression checks pass. Fresh and original cohorts
+are different samples; compare checkpoints within each cohort, not across these two tables.
+The report retains all four failed GoEmotions floor checks. Neither checkpoint is qualified.
+
+The selected adapter was chosen solely by development loss. The bounded training run processed
+24,000 examples, about 0.365 of one epoch; development loss was still improving at its end.
+Longer training is a hypothesis for a subsequent accuracy experiment, not a measured remedy.
+No threshold fitting or test-set checkpoint selection was performed.
+
+An isolated native batched F32 projection candidate is on
+`experiment/gliner25-batched-projection` at `6bb9a050edc0884faeb75ea80bf034854be50b47`.
+Its local synthetic, FFM lifecycle, Rust, and Java static checks pass. It is not the public
+default; a bounded same-host parity/performance screen is pending. A passing screen would still
+need full task-quality regression and default-route validation before adoption, followed by the
+required three passing final pairs. ModelJars integration, a released-runtime repeat, native
+packaging checks across advertised platforms, and catalog publication remain outstanding.
