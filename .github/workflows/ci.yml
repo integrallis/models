@@ -88,6 +88,9 @@ jobs:
       - name: Test GLiNER qualification evidence
         run: python3 -m unittest discover -s experiments/gliner25-decide -p 'test_*.py' -v
 
+      - name: Check native Rust dependency notices
+        run: python3 scripts/generate-native-rust-notices.py --check
+
       # Integrity checks. These exist because of specific defects that shipped, each named in the
       # script that catches it. The mutation check runs LAST because it is the one that proves the
       # others can fail -- a guard that cannot detect its own defect reports green and everyone
