@@ -118,6 +118,13 @@ class NativeKernelLibraryTest {
       assertThat(kernels.supports(NativeKernelCapability.Q5_1_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL)).isTrue();
+      // Advertised so the caller can detect the mixed-activation grouping the kernel always did.
+      assertThat(
+              kernels.supports(
+                  NativeKernelCapability.MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL))
+          .isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL))
+          .isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q5_K_F32_BATCHED_MATMUL)).isTrue();
@@ -1342,10 +1349,16 @@ class NativeKernelLibraryTest {
               kernel.isDualEligible(
                   GgufTensorType.Q8_0, firstRows, GgufTensorType.Q8_0, secondRows, batchSize, cols))
           .isTrue();
+      // Was asserted false, pinning a restriction this side invented rather than one the kernel
+      // has: multiplyDual dispatches through invokeGrouped, the same entry point as
+      // multiplyGrouped, whose only format requirement is that the group agrees on the activation
+      // format. Q4_0 and Q8_0 both quantize activations to Q8_0, so the group is valid and always
+      // was. Values for a mixed group are checked in
+      // groupedKernelMixesQ4_0AndQ8_0BecauseBothQuantizeActivationsToQ8_0.
       assertThat(
               kernel.isDualEligible(
                   GgufTensorType.Q4_0, firstRows, GgufTensorType.Q8_0, secondRows, batchSize, cols))
-          .isFalse();
+          .isTrue();
       kernel.multiplyDual(
           actualFirst,
           firstWeights,
@@ -1480,6 +1493,81 @@ class NativeKernelLibraryTest {
       assertClose(actualFirst, expectedFirst, K_QUANT_REDUCTION_TOLERANCE);
       assertClose(actualSecond, expectedSecond, K_QUANT_REDUCTION_TOLERANCE);
       assertClose(actualThird, expectedThird, K_QUANT_REDUCTION_TOLERANCE);
+    }
+  }
+
+  /**
+   * A group mixing Q4_0 and Q8_0 is eligible, because both quantize activations to Q8_0.
+   *
+   * <p>Pinned because this side used to be stricter than the kernel it guards. Grouping shares one
+   * quantized activation, so the real requirement is that the group agrees on the activation format
+   * -- which is all {@code quantized_f32_mixed_grouped_batched_matmul} ever checked, and why it
+   * carries "mixed" in its name. {@code compatibleGroup} nonetheless demanded identical weight
+   * formats, or K-quants under {@code MIXED_K}, and refused everything else.
+   *
+   * <p>A file whose projections are all one type already grouped on the identity arm, so this
+   * changes nothing for it -- verified on LFM2.5-8B-A1B-Q4_0, which is uniformly Q4_0 across its
+   * 132 projection tensors and measured flat. What it reaches is a file that mixes formats wanting
+   * the same activation, and TQ1_0 models whose ternary projections share a Q8_K activation with a
+   * K-quant head yet matched no previous rule.
+   *
+   * <p>Values are checked against the per-matrix reference, so this fails if the shared activation
+   * is wrong for either format rather than merely if eligibility flips.
+   */
+  @Test
+  void groupedKernelMixesQ4_0AndQ8_0BecauseBothQuantizeActivationsToQ8_0() {
+    int batchSize = 1;
+    int cols = 256;
+    int matrixCount = 4;
+    int[] rowCounts = {4, 6, 8, 10};
+    GgufTensorType[] types = {
+      GgufTensorType.Q4_0, GgufTensorType.Q8_0, GgufTensorType.Q4_0, GgufTensorType.Q8_0
+    };
+    float[] input = inputs(batchSize, cols);
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment[] weights = new MemorySegment[matrixCount];
+      float[][] expected = new float[matrixCount][];
+      float[][] actual = new float[matrixCount][];
+      for (int index = 0; index < matrixCount; index++) {
+        int rows = rowCounts[index];
+        int blocksPerRow = cols / 32;
+        if (types[index] == GgufTensorType.Q4_0) {
+          weights[index] = arena.allocate((long) rows * blocksPerRow * 18);
+          fillWeights(weights[index], rows, cols);
+        } else {
+          weights[index] = arena.allocate((long) rows * blocksPerRow * 34);
+          fillQ8_0Weights(weights[index], rows, cols);
+        }
+        expected[index] =
+            tensorOpsReference(weights[index], types[index], input, batchSize, rows, cols);
+        actual[index] = new float[expected[index].length];
+      }
+
+      assertThat(kernel.isGroupedEligible(types, rowCounts, matrixCount, batchSize, cols))
+          .as("Q4_0 and Q8_0 share one Q8_0 activation, so the group is valid")
+          .isTrue();
+      kernel.multiplyGrouped(
+          actual, weights, types, rowCounts, matrixCount, input, batchSize, cols);
+
+      for (int index = 0; index < matrixCount; index++) {
+        assertClose(actual[index], expected[index], K_QUANT_REDUCTION_TOLERANCE);
+      }
+    }
+  }
+
+  /** Q5_1 wants F32 activations, so it may not join a group that shares a quantized one. */
+  @Test
+  void groupedKernelStillRefusesFormatsThatDisagreeOnTheActivation() {
+    int cols = 256;
+    int[] rowCounts = {4, 6};
+    GgufTensorType[] types = {GgufTensorType.Q4_0, GgufTensorType.Q5_1};
+
+    try (RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      assertThat(kernel.isGroupedEligible(types, rowCounts, 2, 1, cols))
+          .as("Q5_1 dots against F32 activations, so there is nothing for it to share")
+          .isFalse();
     }
   }
 

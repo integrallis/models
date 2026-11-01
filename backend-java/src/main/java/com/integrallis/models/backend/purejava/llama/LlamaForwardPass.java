@@ -3179,9 +3179,26 @@ public final class LlamaForwardPass {
     return usesVectorizedSwiGlu() ? batchedMatrixKernel.prepareFloatArray(values) : null;
   }
 
+  /**
+   * Which architectures take the vectorised SwiGLU.
+   *
+   * <p>This is an <b>output-parity</b> whitelist, not a performance one. The vectorised form
+   * evaluates {@code exp} by polynomial rather than by {@code Math.exp}, so an architecture moved
+   * onto it stops reproducing the greedy outputs its published records were measured with. Every
+   * architecture here therefore keeps the activation it was qualified on, and one is added only
+   * when nothing published depends on its current arithmetic.
+   *
+   * <p>MELLUM is admitted on exactly that basis: the catalog carries no mellum entry -- checked
+   * against all 80 qualified records, not assumed -- so there is no published output to preserve.
+   * It is worth admitting because mellum routes 8 of 64 experts across 28 blocks, which is 224
+   * SwiGLU calls per token over {@code expert_feed_forward_length} 896 each, every one of them a
+   * scalar {@code Math.exp} per element. mellum declares no {@code swiglu_clamp_exp}, so {@link
+   * #activateExpert} does not intercept it with the clamped scalar route first.
+   */
   private boolean usesVectorizedSwiGlu() {
     return config.architecture() == DecoderArchitecture.QWEN2
-        || config.architecture() == DecoderArchitecture.QWEN3;
+        || config.architecture() == DecoderArchitecture.QWEN3
+        || config.architecture() == DecoderArchitecture.MELLUM;
   }
 
   private static void scaleActive(float[] values, int offset, int length, float scale) {

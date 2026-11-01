@@ -30,7 +30,9 @@
     "SLEEF_ACTIVATIONS_F32": 134217728,
     "Q8_0_F32_ACTIVATION_BATCHED_MATMUL": 268435456,
     "TQ1_0_Q8_K_BATCHED_MATMUL": 536870912,
-    "Q4_K_ORDERED_REDUCTION": 1073741824
+    "Q4_K_ORDERED_REDUCTION": 1073741824,
+    "MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL": 2147483648,
+    "TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL": 4294967296
   },
   "exports": {
     "cpu": [
@@ -86,7 +88,8 @@
       "summary": "Q4_0 packed-weight projections; speed measurements alone do not prove a JVM limitation.",
       "capabilities": [
         "Q4_0_F32_BATCHED_MATMUL",
-        "Q4_0_F32_GROUPED_BATCHED_MATMUL"
+        "Q4_0_F32_GROUPED_BATCHED_MATMUL",
+        "MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL"
       ],
       "exports": {
         "cpu": [
@@ -823,7 +826,8 @@
       "status": "UNPROVEN",
       "summary": "ggml TQ1_0 weights against Q8_K activations. Exists because our exact-F32 path is not the reference arithmetic, not because the JVM cannot do it: bit-exactness with ggml_vec_dot_tq1_0_q8_K is the requirement, and speed is a second, unproven motive.",
       "capabilities": [
-        "TQ1_0_Q8_K_BATCHED_MATMUL"
+        "TQ1_0_Q8_K_BATCHED_MATMUL",
+        "TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL"
       ],
       "exports": {
         "cpu": [

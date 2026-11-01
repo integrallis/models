@@ -81,6 +81,21 @@ const CAPABILITY_Q4_K_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 6;
 const CAPABILITY_Q6_K_F32_BATCHED_MATMUL: u64 = 1 << 7;
 const CAPABILITY_Q6_K_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 8;
 const CAPABILITY_MIXED_K_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 9;
+/// Grouping matrices of DIFFERENT weight formats that share one Q8_0 activation quantization.
+///
+/// `quantized_f32_mixed_grouped_batched_matmul` has always accepted this: its only format
+/// requirement is that every matrix agrees on `activation_format()`, and Q4_0, Q8_0 and PTQ1_0 all
+/// quantize activations to Q8_0. The Java side was stricter than the kernel it guards -- it grouped
+/// only identical formats, or K-quants under CAPABILITY_MIXED_K -- so a model whose projections mix
+/// Q4_0 and Q8_0 silently fell back to one call per matrix. This bit lets the caller detect the
+/// support that was already here rather than infer it.
+const CAPABILITY_MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 31;
+/// TQ1_0 rows inside a grouped dispatch, sharing the group's Q8_K activation.
+///
+/// `compute_grouped_with_scratch` quantizes the activation once for the whole group and then takes
+/// `format.selected_kernel()` per matrix, which for TQ1_0 is the AVX2 ternary dot. So the grouped
+/// path has always handled TQ1_0; only the caller's per-type grouped check lacked a bit to read.
+const CAPABILITY_TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL: u64 = 1 << 32;
 const CAPABILITY_Q5_K_F32_BATCHED_MATMUL: u64 = 1 << 10;
 const CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 11;
 const CAPABILITY_Q5_0_F32_BATCHED_MATMUL: u64 = 1 << 12;
@@ -1548,6 +1563,8 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_Q6_K_F32_BATCHED_MATMUL
         | CAPABILITY_Q6_K_F32_GROUPED_BATCHED_MATMUL
         | CAPABILITY_MIXED_K_F32_GROUPED_BATCHED_MATMUL
+        | CAPABILITY_MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL
+        | CAPABILITY_TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL
         | CAPABILITY_Q5_K_F32_BATCHED_MATMUL
         | CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL
         | CAPABILITY_Q5_0_F32_BATCHED_MATMUL
@@ -6965,6 +6982,8 @@ mod tests {
                 | CAPABILITY_Q6_K_F32_BATCHED_MATMUL
                 | CAPABILITY_Q6_K_F32_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_MIXED_K_F32_GROUPED_BATCHED_MATMUL
+                | CAPABILITY_MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL
+                | CAPABILITY_TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_Q5_K_F32_BATCHED_MATMUL
                 | CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_Q5_0_F32_BATCHED_MATMUL

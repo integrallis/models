@@ -1105,6 +1105,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
               && library.supports(NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL);
       case Q5_K -> library.supports(NativeKernelCapability.Q5_K_F32_GROUPED_BATCHED_MATMUL);
       case Q6_K -> library.supports(NativeKernelCapability.Q6_K_F32_GROUPED_BATCHED_MATMUL);
+      case TQ1_0 -> library.supports(NativeKernelCapability.TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL);
       default -> false;
     };
   }
@@ -1245,7 +1246,60 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return firstType == secondType
         || (isKQuant(firstType)
             && isKQuant(secondType)
-            && library.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL));
+            && library.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL))
+        || sharedQ8Activation(firstType, secondType);
+  }
+
+  /**
+   * Whether two different formats may group because they quantize activations identically.
+   *
+   * <p>Grouping shares one quantized activation across the group, so the real requirement is that
+   * every matrix wants the same activation format -- which is exactly what the native entry point
+   * checks, and why it is named {@code quantized_f32_mixed_grouped_batched_matmul}. Q4_0, Q8_0 and
+   * PTQ1_0 all quantize to Q8_0, so a group mixing them is valid and always was.
+   *
+   * <p>This side was stricter than the kernel it guards: it grouped identical formats, or K-quants
+   * under {@code MIXED_K}, and refused everything else. So a file whose projections mix formats
+   * that want the same activation -- Q4_0 beside Q8_0, or TQ1_0 beside a K-quant head -- fell back
+   * to one dispatch per matrix even though the group was valid.
+   *
+   * <p>Scope, measured rather than assumed: this is a no-op for a file whose projections are all
+   * one type, which already grouped on the identity arm. LFM2.5-8B-A1B-Q4_0 is such a file -- its
+   * 132 projection tensors are uniformly Q4_0, with F32 norms and a single Q6_K embedding -- and
+   * regrouping it measured 28.52 against 28.74 tok/s, flat. The gap this closes is for mixed files
+   * and for TQ1_0 models like maple, whose ternary projections could not group with their Q4_K head
+   * under any previous rule.
+   */
+  private boolean sharedQ8Activation(GgufTensorType firstType, GgufTensorType secondType) {
+    ActivationFamily family = activationFamily(firstType);
+    return family != ActivationFamily.UNSHAREABLE
+        && family == activationFamily(secondType)
+        && library.supports(
+            family == ActivationFamily.Q8_0
+                ? NativeKernelCapability.MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL
+                : NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL);
+  }
+
+  /** The activation quantization a weight format wants, which is what a group must agree on. */
+  private enum ActivationFamily {
+    Q8_0,
+    Q8_K,
+    UNSHAREABLE
+  }
+
+  /**
+   * Mirrors the Rust {@code WeightFormat::activation_format}, which is the group's real constraint.
+   *
+   * <p>Q5_1 and the F32-activation Q8_0 variant map to F32 and have no quantized activation to
+   * share, so they are {@code UNSHAREABLE}; Q5_0 is refused by {@link #groupable} for its own
+   * measured reason and never reaches here.
+   */
+  private static ActivationFamily activationFamily(GgufTensorType type) {
+    return switch (type) {
+      case Q4_0, Q8_0 -> ActivationFamily.Q8_0;
+      case Q4_K, Q5_K, Q6_K, TQ1_0 -> ActivationFamily.Q8_K;
+      default -> ActivationFamily.UNSHAREABLE;
+    };
   }
 
   /**
@@ -1272,7 +1326,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
         || (isKQuant(firstType)
             && isKQuant(secondType)
             && isKQuant(thirdType)
-            && library.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL));
+            && library.supports(NativeKernelCapability.MIXED_K_F32_GROUPED_BATCHED_MATMUL))
+        || (sharedQ8Activation(firstType, secondType) && sharedQ8Activation(secondType, thirdType));
   }
 
   private static boolean isKQuant(GgufTensorType type) {
