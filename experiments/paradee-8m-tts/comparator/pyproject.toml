@@ -1,0 +1,24 @@
+[project]
+name = "paradee-comparator"
+version = "0.1.0"
+description = "Comparator arm and judge for the Paradee-8M v1.2 qualification: the publisher's own package, pinned"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # The publisher's runtime, at the commit the candidate record pins.
+    "paradee @ git+https://github.com/sahilmahendrakar/paradee@aae3cc46657bc69c6dbf9573bba556fb233f6bc0",
+    "onnxruntime==1.31.1",
+    "onnx==1.20.1",
+    "misaki==0.9.4",
+    "spacy==3.8.18",
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+    "num2words==0.5.14",
+    "phonemizer-fork",
+    "espeakng-loader",
+    "numpy",
+    "soundfile",
+    # The judge, exactly as training/scripts/onnx_eval.py uses it.
+    "openai-whisper==20250625",
+    "jiwer==4.0.0",
+    "torch",
+    "torchaudio",
+]
