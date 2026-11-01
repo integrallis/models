@@ -19,6 +19,7 @@ for threads in ${THREADS:-1 6}; do
           continue
         fi
         echo "=== $corpus $voice threads=$threads pass=$pass -> $out"
+        mkdir -p "$out" && uptime | sed 's/.*load averages*: *//' > "$out/load.txt"
         .venv/bin/python comparator_arm.py --corpus "../corpus/$corpus.json" --voice "$voice" \
           --threads "$threads" --pass "$pass" --out "$out" 2> >(tail -1 >&2)
       done

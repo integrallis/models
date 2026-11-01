@@ -51,6 +51,15 @@ class MisakiBundledLexiconTest {
   }
 
   @Test
+  void agreesWithMisakiOnTheCasesTheFirstExactMatchPassDisagreedOn() throws Exception {
+    // Expected strings are misaki 0.9.4's own output on the comparator pass for these sentences
+    // (evidence/devbox/comparator/wikitext103-heldout-200/af_heart/t1/pass1, rows 29 and 49).
+    MisakiEnglishPhonemizer us = new MisakiEnglishPhonemizer(MisakiLexicon.bundled(false), "");
+    assertThat(us.phonemize("John Wilson writes that the tomb lies.")).contains("ðæt ðə tˈum");
+    assertThat(us.phonemize("On 3 July 2012, US Secretary of State")).contains("jˌuˈɛs sˈɛkɹətˌ");
+  }
+
+  @Test
   void bothAccentsLoadAndResolveCommonWords() throws Exception {
     MisakiLexicon us = MisakiLexicon.bundled(false);
     MisakiLexicon gb = MisakiLexicon.bundled(true);

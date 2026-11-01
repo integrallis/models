@@ -1,10 +1,61 @@
 # Qualifying Paradee-8M v1.2: protocol, frozen before data
 
-**Status 2026-11-01: protocol frozen. No arm has run. Nothing below is a result.** Every threshold
-and every corpus is fixed in this file before the first synthesis so that none can be chosen after
-seeing numbers. The candidate record that decided to run this is
+**Status 2026-11-01, evening: protocol frozen; the WER passes of both arms are running; no verdict
+exists.** Every threshold and every corpus was fixed in this file before the first synthesis so
+that none could be chosen after seeing numbers. The candidate record that decided to run this is
 `modeljars/docs/CANDIDATE-PARADEE-8M-20261101.md`; the artifact triage is
 `modeljars/docs/model-evidence/paradee-8m/TRIAGE-v1.2.md`.
+
+## State of the work (updated 2026-11-01, evening)
+
+- **Kernels on the Vector API** landed after the parity closure; parity was not re-run after the
+  last kernel change on the dev box and is scheduled to run again on whichever machine measures
+  throughput (`paradee-chain.sh` stage 5 in the box log).
+- **Phonemizer, measured** (`evidence/phonemizer/*.json`, written by
+  `ParadeePhonemizerReportIntegrationTest`): on `harvard-200` the port leaves **1 of 1,765 words**
+  unresolved in both accents (`rosebush`); on `wikitext103-heldout-200` it leaves **161 of 3,896
+  (4.13 %)** in US spelling and 160 (4.11 %) in British, touching 90 and 91 of the 200 sentences,
+  almost all proper nouns, which is the eSpeak fallback the port does not carry. Two of the
+  unresolved tokens are punctuation, checked against misaki's own lexicon path (`fallback=None`)
+  on the same sentences: for `Xenoceratops - (Alberta, Canada)` misaki tags `-` as punctuation
+  with empty phonemes and the port counts it as unresolved, and the two phoneme strings are
+  identical, so that is an accounting difference only; for `Play Zone!'s PC game …` misaki keeps
+  the `!` inside the word (`zˈOn!s`) where the port drops it and spells the clitic as a letter
+  (`zˈOn ˈɛs`), a real tokenizer discrepancy on one sentence in 400. **Exact match against the
+  publisher's phonemes**, from `derive.py` over the first `af_heart` passes on
+  `wikitext103-heldout-200`: **44.5 % of the 200 sentences** were phoneme-for-phoneme identical
+  on the first candidate pass; the 90 sentences with an unresolved word cannot match, and among
+  the other 110 the rate was **80.9 %**. Read side by side, the mismatches were a stressed
+  `that` where misaki's lexicon has the unstressed complementizer as its default (the port's
+  tagger called every `that` a determiner), the initialism `US` tagged as the pronoun instead of
+  a proper noun (misaki spells it, `jˌuˈɛs`), the verb `progresses` read as a noun, and the
+  direction of a quotation mark. **Two of these are tagger defects and were corrected before any
+  WER had been read** (`that` is now a determiner only when a noun phrase follows it; an all-caps
+  word in mixed-case text is a proper noun, as spaCy tags it); with the correction the rate is
+  **49.5 % overall and 90.0 % among resolved sentences** (`bf_isabella`: 49.0 % and 89.9 %). The
+  one candidate pass on our phonemes that had run with the old tagger was discarded and rerun, so
+  every candidate pass uses the corrected port. The verb/noun case and the quotation direction
+  stand as known discrepancies.
+- **Where the arms run, and why that deviates from "this machine, nothing else building".** The dev
+  box is shared by several concurrent agent sessions running Gradle builds; its load average was
+  16 at 21:16Z and between 50 and 450 (on 12 logical CPUs) through the first passes. A dedicated
+  Hetzner box was provisioned for both arms and torn down eight minutes later because the session
+  was not permitted to copy the worktree to it (`evidence/bench-box-2026-11-01-vps-log.md`). So:
+  the **intelligibility gate**, which does not depend on load, is measured here under
+  `evidence/devbox/` by `comparator/run_devbox_arms.sh`, interleaving each comparator pass with the
+  candidate pass that follows it and writing the load averages before every pass (`load.txt`); the
+  **throughput gate** is not measured by those passes and stays open until both arms run on a
+  quiet machine. The per-pass real-time multiples under `evidence/devbox/` are reported with their
+  load values and are not the gate number.
+- First passes present (`evidence/devbox/*/wikitext103-heldout-200/af_heart/t1/pass1/pass.json`):
+  comparator 1,362.8 s of audio at 8.74x realtime (load 14–21), candidate on our phonemes 1,284.8 s
+  at 1.69x (load 50 rising to 400), candidate on the publisher's phonemes **1,362.8 s, the
+  comparator's sample count exactly**, at 2.07x. That pass has no `junit.xml` because a concurrent
+  Gradle run in the same module clobbered the test-results directory after the pass had written
+  its `pass.json`; the pass is complete and the runners are now sequenced.
+- Judge: running over completed passes as they appear (`comparator/run_judge_loop.sh`); the
+  Soprano judge-sanity pass (`SopranoJudgeSanityIntegrationTest`, the shipped Q8_0 artifact,
+  `evidence/judge-sanity-soprano/`) is scored by the same loop.
 
 ## State of the work (updated 2026-11-01, end of the first session)
 
@@ -85,7 +136,10 @@ Paradee model feeding it from a Java misaki port. Run in two configurations: on 
 phonemes (isolates the executor) and on our phonemes (what a user gets). Both are published.
 
 Both arms run on this machine (`evidence/machine.txt`), CPU only, with the same thread count, on
-byte-identical sentence lists, in sessions where nothing else is building.
+byte-identical sentence lists, in sessions where nothing else is building. *Deviation, recorded
+before any verdict:* the WER passes ran on this machine under other sessions' build load, with
+the load averages written beside every pass, because WER does not depend on load; the throughput
+comparison is deferred to a quiet machine (see "State of the work").
 
 ## Gates, and where each number comes from
 

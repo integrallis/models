@@ -119,6 +119,8 @@ class SopranoJudgeSanityIntegrationTest {
           "sampling",
           "model defaults: temperature 0.3, topP 0.95, repetitionPenalty 1.2, unseeded");
       report.put("sampleRate", model == null ? null : rows.isEmpty() ? null : sampleRateOf(out));
+      report.put("voice", "default");
+      report.put("intraOpThreads", 1);
       report.put("corpus", corpus.get("name"));
       report.put("corpusSource", corpus.get("source"));
       report.put("limit", limit);

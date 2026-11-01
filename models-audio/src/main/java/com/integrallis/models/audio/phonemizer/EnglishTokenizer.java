@@ -59,6 +59,13 @@ public final class EnglishTokenizer {
       Set.of("i", "he", "she", "it", "we", "they", "you", "me", "him", "her", "us", "them");
   private static final Set<String> CONJUNCTIONS = Set.of("and", "or", "but", "nor", "yet", "so");
 
+  /** Words that open a clause after a complementizer "that" rather than a noun phrase it owns. */
+  private static final Set<String> CLAUSE_OPENERS =
+      Set.of(
+          "there", "if", "when", "while", "not", "all", "none", "both", "his", "her", "its",
+          "their", "our", "my", "your", "what", "which", "who", "whom", "whose", "how", "where",
+          "why");
+
   private EnglishTokenizer() {}
 
   /** Tokenizes {@code text}; each token records whether whitespace followed it. */
@@ -145,6 +152,7 @@ public final class EnglishTokenizer {
   private static void tagAll(List<MToken> tokens) {
     boolean sentenceStart = true;
     boolean quoteOpen = false;
+    boolean shouting = allCaps(tokens);
     for (int i = 0; i < tokens.size(); i++) {
       MToken tk = tokens.get(i);
       String next = i + 1 < tokens.size() ? tokens.get(i + 1).text : "";
@@ -154,7 +162,7 @@ public final class EnglishTokenizer {
         tag = quoteOpen ? "''" : "\u0060\u0060";
         quoteOpen = !quoteOpen;
       } else {
-        tag = tagOf(t, next, sentenceStart);
+        tag = tagOf(t, next, sentenceStart, shouting);
       }
       tk.tag = tag;
       sentenceStart =
@@ -162,7 +170,52 @@ public final class EnglishTokenizer {
     }
   }
 
+  /** Whether every word of two or more letters is upper-case, so capitals carry no information. */
+  private static boolean allCaps(List<MToken> tokens) {
+    boolean sawWord = false;
+    for (MToken tk : tokens) {
+      String t = tk.text;
+      if (t.length() < 2 || t.chars().noneMatch(Character::isLetter)) {
+        continue;
+      }
+      sawWord = true;
+      if (!t.equals(t.toUpperCase(Locale.ROOT))) {
+        return false;
+      }
+    }
+    return sawWord;
+  }
+
   static String tagOf(String t, String next, boolean sentenceStart) {
+    return tagOf(t, next, sentenceStart, false);
+  }
+
+  /**
+   * Whether the token after "that" opens a clause (complementizer or relative "that", unstressed in
+   * the lexicon) rather than a noun phrase the determiner owns.
+   */
+  private static boolean complementizerFollows(String next) {
+    if (next.isEmpty()) {
+      return true;
+    }
+    char c = next.charAt(0);
+    if (!Character.isLetterOrDigit(c) || Character.isUpperCase(c)) {
+      return true;
+    }
+    String lower = next.toLowerCase(Locale.ROOT);
+    if (DETERMINERS.contains(lower)
+        || PRONOUNS.contains(lower)
+        || CLAUSE_OPENERS.contains(lower)
+        || NUMBER.matcher(next).matches()) {
+      return true;
+    }
+    return lower.length() > 3
+        && (lower.endsWith("ed")
+            || lower.endsWith("ing")
+            || (lower.endsWith("s") && !lower.endsWith("ss")));
+  }
+
+  static String tagOf(String t, String next, boolean sentenceStart, boolean shouting) {
     if (t.length() == 1) {
       char c = t.charAt(0);
       switch (c) {
@@ -212,6 +265,15 @@ public final class EnglishTokenizer {
     String lower = t.toLowerCase(Locale.ROOT);
     if (t.equals("I")) {
       return "PRP";
+    }
+    if (t.length() > 1 && t.equals(t.toUpperCase(Locale.ROOT)) && !shouting) {
+      // An all-caps word in mixed-case text is an initialism or a proper noun to the tagger misaki
+      // runs ("US", "NASA"), even when its lowercase spelling is a function word; the lexicon's
+      // own entries then decide whether to spell it out.
+      return "NNP";
+    }
+    if (lower.equals("that") && !sentenceStart && complementizerFollows(next)) {
+      return "IN";
     }
     if (DETERMINERS.contains(lower)) {
       return "DT";

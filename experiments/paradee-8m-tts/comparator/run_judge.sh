@@ -9,7 +9,8 @@ cd "$(dirname "$0")"
 root="${1:-../evidence/comparator}"
 dirs=()
 while IFS= read -r d; do
-  [ -f "$d/judge.json" ] || dirs+=("$d")
+  # A pass directory counts once its pass.json exists; before that it is still being written.
+  [ -f "$d/pass.json" ] && [ ! -f "$d/judge.json" ] && dirs+=("$d")
 done < <(find "$root" -type d -path '*/t1/pass*' | sort)
 if [ ${#dirs[@]} -eq 0 ]; then
   echo "nothing to judge under $root"

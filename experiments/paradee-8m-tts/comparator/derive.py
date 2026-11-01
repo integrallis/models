@@ -53,11 +53,23 @@ def main(root):
         ours = json.loads((root / path / "pass.json").read_text())["rows"]
         theirs = json.loads((root / first[("comparator", corpus, voice)] / "pass.json").read_text())["rows"]
         n = min(len(ours), len(theirs))
-        joined = sum(1 for a, b in zip(ours, theirs) if " ".join(a["phonemes"]) == " ".join(b["phonemes"]))
+        same = [" ".join(a["phonemes"]) == " ".join(b["phonemes"]) for a, b in zip(ours, theirs)]
         chunked = sum(1 for a, b in zip(ours, theirs) if a["phonemes"] == b["phonemes"])
-        out["phonemizer"].append({"corpus": corpus, "voice": voice, "sentences": n,
-                                  "exactMatchRate": joined / n if n else None, "exactChunkingMatchRate": chunked / n if n else None,
-                                  "candidatePass": path, "comparatorPass": first[("comparator", corpus, voice)]})
+        entry = {"corpus": corpus, "voice": voice, "sentences": n,
+                 "exactMatchRate": sum(same) / n if n else None, "exactChunkingMatchRate": chunked / n if n else None,
+                 "candidatePass": path, "comparatorPass": first[("comparator", corpus, voice)]}
+        # Split the mismatches by cause when the phonemizer's own report is beside the evidence:
+        # sentences with an unresolved word cannot match, so the rate among the rest is the
+        # tokenizer/tagger/stress agreement on its own.
+        accent = "gb" if voice.startswith("b") else "us"
+        report = root.parent / "phonemizer" / f"{corpus}-{accent}.json"
+        if report.exists():
+            unresolved = {r["index"] for r in json.loads(report.read_text())["rows"] if r["unknownWords"]}
+            resolved = [i for i in range(n) if i not in unresolved]
+            entry["phonemizerReport"] = str(report.relative_to(root.parent))
+            entry["sentencesWithUnresolvedWords"] = len(unresolved)
+            entry["exactMatchRateAmongResolvedSentences"] = (sum(same[i] for i in resolved) / len(resolved)) if resolved else None
+        out["phonemizer"].append(entry)
     json.dump(out, sys.stdout, indent=1); print()
     return 0
 
