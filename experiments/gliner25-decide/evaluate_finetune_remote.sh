@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Runs only on the disposable CPU qualification worker after its pinned bootstrap.
 set -euo pipefail
+case "${1:-}" in
+  ''|--parity-only) ;;
+  *) echo 'Unsupported evaluation phase' >&2; exit 2 ;;
+esac
 trap 'touch /work/STOP' EXIT
 cd /work/payload/experiment
 export PATH=/work/jdk/bin:/root/.cargo/bin:$PATH TOKENIZERS_PARALLELISM=false
@@ -35,6 +39,7 @@ models parity-cases.jsonl variant-parity-models
 reference performance-parity-cases.jsonl variant-shape-reference /work/variant /work/variant-manifest.json
 models performance-parity-cases.jsonl variant-shape-models
 /work/python/bin/python compare_parity.py --cases performance-parity-cases.jsonl --candidate /work/out/variant-shape-models.jsonl --reference /work/out/variant-shape-reference.jsonl --output /work/out/variant-shape-report.json
+if [[ "${1:-}" == --parity-only ]]; then exit 0; fi
 reference finetune-qualification-cases.jsonl fresh-base /work/snapshot snapshot.json
 reference finetune-qualification-cases.jsonl fresh-reference /work/variant /work/variant-manifest.json
 models finetune-qualification-cases.jsonl fresh-models
