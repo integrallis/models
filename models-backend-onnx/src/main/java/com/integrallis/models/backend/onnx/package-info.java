@@ -14,5 +14,12 @@
  * limitations under the License.
  */
 
-/** Planned in-process, pure-Java ONNX artifact support; never an ONNX Runtime wrapper. */
+/**
+ * In-process, pure-Java ONNX graph execution; never an ONNX Runtime wrapper.
+ *
+ * <p>{@link com.integrallis.models.backend.onnx.OnnxModel} decodes an ONNX protobuf file with the
+ * module's own wire-format reader, and the graph is executed eagerly, node by node, with Java
+ * kernels. The first artifact this module exists for is Paradee-8M, an 8M-parameter text-to-speech
+ * model published only as ONNX.
+ */
 package com.integrallis.models.backend.onnx;

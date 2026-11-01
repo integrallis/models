@@ -1,0 +1,37 @@
+[project]
+name = "paradee-comparator"
+version = "0.1.0"
+description = "Comparator arm and judge for the Paradee-8M v1.2 qualification: the publisher's own package, pinned"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # The publisher's runtime, at the commit the candidate record pins.
+    "paradee @ git+https://github.com/sahilmahendrakar/paradee@aae3cc46657bc69c6dbf9573bba556fb233f6bc0",
+    # 1.23.2 is the newest onnxruntime that ships a wheel for Intel macOS, the dev box; the
+    # publisher requires >=1.17 and ships no pin of its own.
+    "onnxruntime==1.23.2",
+    "onnx==1.16.0",
+    "misaki==0.9.4",
+    "spacy==3.8.18",
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+    "num2words==0.5.14",
+    "phonemizer-fork",
+    "espeakng-loader",
+    "numpy<2",
+    "soundfile",
+    # The judge, exactly as training/scripts/onnx_eval.py uses it.
+    "openai-whisper==20250625",
+    "jiwer==4.0.0",
+    # The last torch/torchaudio with Intel macOS wheels; the judge only needs CPU inference.
+    "torch==2.2.2",
+    "torchaudio==2.2.2",
+    # whisper needs numba; 0.62.1 / 0.45.1 are the last with Intel macOS wheels.
+    "numba==0.62.1",
+    "llvmlite==0.45.1",
+]
+
+[tool.uv]
+# Resolve to versions that have wheels for the dev box, an Intel Mac, as well as Linux x86_64.
+required-environments = [
+    "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]

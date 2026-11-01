@@ -387,6 +387,7 @@ documented in [Execution planning](https://integrallis.github.io/models/docs/mod
 | Vector storage | `models-embedding` | optional bridge to `vectors` |
 | Apple on-device model | `backend-apple` | Apple Foundation Models through Java FFM |
 | NVIDIA GPU acceleration | `backend-cuda` | optional Rust-authored PTX K-quant projections and decode attention |
+| ONNX graphs | `models-backend-onnx` | in-process, pure-Java execution of ONNX models, never ONNX Runtime |
 
 These adapters are implemented and tested against the same backend contracts;
 they do not select hidden inference paths. Their framework dependencies are
