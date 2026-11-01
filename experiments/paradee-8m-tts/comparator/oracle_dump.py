@@ -14,8 +14,10 @@ usage: oracle_dump.py --out DIR
 """
 import argparse, hashlib, json, pathlib
 import numpy as np, onnx, onnxruntime as ort
-from paradee import Paradee
 import pins
+
+pins.prepare_espeak()
+from paradee import Paradee  # noqa: E402
 
 
 def session_with_outputs(model_path: pathlib.Path, extra_outputs, threads=1):

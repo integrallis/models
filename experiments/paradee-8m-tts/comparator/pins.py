@@ -37,3 +37,32 @@ def load_corpus(path: str) -> dict:
     import json
     with open(path, encoding="utf-8") as f:
         return json.load(f)
+
+
+def prepare_espeak() -> str:
+    """Make misaki's eSpeak fallback work with the espeakng-loader wheel on this host.
+
+    The loader's libespeak-ng (1.52.0, Intel macOS wheel) ignores the data path handed to
+    espeak_Initialize and, when ESPEAK_DATA_PATH is set, checks that <path>/espeak-ng-data is a
+    directory but then reads its files from <path> itself. A directory of symlinks to the wheel's
+    data files that also contains a self-link named espeak-ng-data satisfies both reads. The data
+    bytes are the wheel's own; only the directory they are read from changes. misaki sets an
+    explicit data path at import, which this build ignores, so it is reset to None here after
+    the import and before the publisher's code constructs the fallback.
+    """
+    import os
+    import espeakng_loader
+    data = pathlib.Path(espeakng_loader.get_data_path())
+    farm = CACHE / "espeak-data"
+    if not (farm / "espeak-ng-data").exists():
+        farm.mkdir(parents=True, exist_ok=True)
+        for entry in data.iterdir():
+            link = farm / entry.name
+            if not link.exists():
+                link.symlink_to(entry)
+        (farm / "espeak-ng-data").symlink_to(".")
+    os.environ["ESPEAK_DATA_PATH"] = str(farm)
+    from misaki import espeak  # noqa: F401  (sets the explicit path this build ignores)
+    from phonemizer.backend.espeak.wrapper import EspeakWrapper
+    EspeakWrapper.set_data_path(None)
+    return str(farm)

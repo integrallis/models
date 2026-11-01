@@ -11,8 +11,10 @@ sentence, then sum(audio seconds) / sum(session.run seconds). Per-sentence real-
 import argparse, json, pathlib, platform, sys, time
 import numpy as np, soundfile as sf
 import onnxruntime as ort
-from paradee import Paradee
 import pins
+
+pins.prepare_espeak()
+from paradee import Paradee  # noqa: E402
 
 
 def main() -> int:

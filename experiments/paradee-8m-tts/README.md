@@ -28,10 +28,17 @@ publisher states about 62x for onnxruntime on an M4 Pro. Per-operator time on th
 puts 4.2 s of 5.4 s in `Conv`, then `ConvTranspose`, `MatMul`, broadcast `Mul`/`Less`, `LSTM`,
 `Sin`. No kernel has been optimized yet; the gate ratio will be measured when both arms exist.
 
-**Blocked on the comparator environment:** `uv sync --frozen` in `comparator/` pulls the
-publisher's package from GitHub and was refused by the session's tool policy as external code; the
-owner has to run it. Everything in steps 1 and 2 of the order of work, and the seeded parity
-tensors, wait on it. Nothing numeric from those steps exists yet.
+**Seeded parity: closed, 2026-11-01.** `evidence/parity/seeded-parity-2026-11-01.json`, derived by
+`comparator/derive_parity.py` from the JUnit XML beside it: 40 of 40 cases pass (fp32 and int8
+graphs, four voices, five sentences each) with PCM cosine 1.000000 on every case, worst
+signal-to-difference 63.37 dB against the 20 dB floor, worst absolute sample difference 0.00155,
+and identical sample counts throughout. The executor reproduces onnxruntime 1.23.2 to single
+precision when fed the noise it drew.
+
+**Comparator environment: installed.** After an Intel-Mac re-pin (onnxruntime 1.23.2, torch 2.2.2,
+numba 0.62.1) and the eSpeak data-path workaround in `pins.prepare_espeak()`, the publisher's
+package phonemizes and synthesizes on this host. Steps 1 and 2 of the order of work are running or
+next; no WER or throughput number exists yet.
 
 ## Hypothesis
 
@@ -67,7 +74,10 @@ Four voices, in the config's order: `af_heart` (0), `bf_isabella` (1), `am_puck`
 `comparator/uv.lock`. onnxruntime is 1.23.2 rather than the current 1.31.1 because the dev box is
 an Intel Mac and 1.23.2 is the newest release that ships a wheel for it; the publisher's package
 requires only `>=1.17` and pins nothing itself. The judge runs on torch 2.2.2 for the same reason.
-Both deviations are stated here before any arm has run. Sentence split, phonemization, pad tokens, truncation and `voice` index are
+Both deviations are stated here before any arm has run. A third, mechanical one: the loader
+wheel's libespeak-ng on this host ignores explicit data paths and misreads `ESPEAK_DATA_PATH`, so
+`pins.prepare_espeak()` points it at a directory of symlinks to the wheel's own data files; the
+phoneme data is byte-identical to what the publisher's pipeline reads elsewhere. Sentence split, phonemization, pad tokens, truncation and `voice` index are
 the package's own code, called through its own methods, never re-implemented here.
 
 **Candidate (ours):** `models-backend-onnx` executing the same int8 graph, `models-audio`'s
