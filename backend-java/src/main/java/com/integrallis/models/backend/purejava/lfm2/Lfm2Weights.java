@@ -82,7 +82,12 @@ final class Lfm2Weights {
       float[] keyNorm,
       Matrix shortConvInProjection,
       float[] shortConvKernel,
-      Matrix shortConvOutProjection) {}
+      Matrix shortConvOutProjection,
+      Matrix router,
+      float[] selectionBias,
+      Matrix[] expertGate,
+      Matrix[] expertUp,
+      Matrix[] expertDown) {}
 
   private final MemorySegment tokenEmbedding;
   private final GgufTensorType tokenEmbeddingType;
@@ -117,13 +122,18 @@ final class Lfm2Weights {
     for (int layer = 0; layer < layers.length; layer++) {
       String prefix = "blk." + layer + ".";
       boolean attends = config.usesAttention(layer);
+      // The feed-forward axis is independent of the attention axis: lfm2moe's routed blocks and
+      // its attention blocks are different sets, so a layer can be routed and convolutional, or
+      // dense and attentive. Deriving one from the other would be right on some layers.
+      boolean routed = config.usesExperts(layer);
+      Lfm2Config.Experts experts = config.experts();
       layers[layer] =
           new LayerWeights(
               vector(file, prefix + "attn_norm.weight", dim),
               vector(file, prefix + "ffn_norm.weight", dim),
-              matrix(file, prefix + "ffn_gate.weight", config.hiddenDim(), dim),
-              matrix(file, prefix + "ffn_up.weight", config.hiddenDim(), dim),
-              matrix(file, prefix + "ffn_down.weight", dim, config.hiddenDim()),
+              routed ? null : matrix(file, prefix + "ffn_gate.weight", config.hiddenDim(), dim),
+              routed ? null : matrix(file, prefix + "ffn_up.weight", config.hiddenDim(), dim),
+              routed ? null : matrix(file, prefix + "ffn_down.weight", dim, config.hiddenDim()),
               attends ? matrix(file, prefix + "attn_q.weight", config.queryDim(), dim) : null,
               attends ? matrix(file, prefix + "attn_k.weight", config.keyDim(layer), dim) : null,
               attends ? matrix(file, prefix + "attn_v.weight", config.keyDim(layer), dim) : null,
@@ -135,7 +145,40 @@ final class Lfm2Weights {
                   ? null
                   : convKernel(
                       file, prefix + "shortconv.conv.weight", config.shortConvCache(), dim),
-              attends ? null : matrix(file, prefix + "shortconv.out_proj.weight", dim, dim));
+              attends ? null : matrix(file, prefix + "shortconv.out_proj.weight", dim, dim),
+              routed ? matrix(file, prefix + "ffn_gate_inp.weight", experts.count(), dim) : null,
+              // Optional even on a routed layer: exp_probs_b.bias is the selection bias and a file
+              // without it routes on the sigmoid alone. Zeros are the identity for a bias that is
+              // added before the top-k, so an absent tensor and a zero tensor are the same model.
+              routed
+                  ? (file.hasTensor(prefix + "exp_probs_b.bias")
+                      ? vector(file, prefix + "exp_probs_b.bias", experts.count())
+                      : new float[experts.count()])
+                  : null,
+              routed
+                  ? expertSlices(
+                      file.getTensor(prefix + "ffn_gate_exps.weight"),
+                      experts.hiddenDim(),
+                      dim,
+                      experts.count(),
+                      prefix + "ffn_gate_exps.weight")
+                  : null,
+              routed
+                  ? expertSlices(
+                      file.getTensor(prefix + "ffn_up_exps.weight"),
+                      experts.hiddenDim(),
+                      dim,
+                      experts.count(),
+                      prefix + "ffn_up_exps.weight")
+                  : null,
+              routed
+                  ? expertSlices(
+                      file.getTensor(prefix + "ffn_down_exps.weight"),
+                      dim,
+                      experts.hiddenDim(),
+                      experts.count(),
+                      prefix + "ffn_down_exps.weight")
+                  : null);
     }
 
     return new Lfm2Weights(
@@ -180,6 +223,64 @@ final class Lfm2Weights {
       rows = maxQ40Rows(rows, layer.shortConvOutProjection());
     }
     return rows;
+  }
+
+  /**
+   * Slices one fused expert tensor into per-expert matrices without copying.
+   *
+   * <p>GGUF stores the routed feed-forward as one three-dimensional tensor per projection, experts
+   * outermost, so each expert is a contiguous run of rows and a slice is an offset and a length.
+   *
+   * <p>This is the <b>fifth</b> copy of this routine in the backend — {@code Qwen35Weights}, {@code
+   * Deepseek2Weights}, {@code FlintWeights} and {@code LlamaWeights} carry the others. That is
+   * deliberate rather than overlooked: each package declares its own {@code Matrix} record, so one
+   * shared slicer needs a shared matrix type first. Worth doing, and a larger change than this
+   * port. Unlike the expert <i>routing</i>, which was consolidated into {@code ops/ExpertRouting}
+   * because a divergent gating function silently changes answers, this computes nothing — it
+   * asserts a shape and takes a byte offset, and every copy asserts the shape independently.
+   */
+  private static Matrix[] expertSlices(
+      GgufTensorData tensor, int rows, int columns, int experts, String name) {
+    requireShape(tensor, columns, rows, experts);
+    GgufTensorType type = tensor.type();
+    if (!MATRIX_TYPES.contains(type)) {
+      throw new IllegalArgumentException(name + " has unsupported matrix type " + type);
+    }
+    if (columns % type.blockSize() != 0) {
+      throw new IllegalArgumentException(
+          name
+              + ": row length "
+              + columns
+              + " is not a multiple of the "
+              + type.blockSize()
+              + "-element "
+              + type
+              + " block, so experts cannot be sliced exactly");
+    }
+    long bytesPerRow = (long) (columns / type.blockSize()) * type.typeSize();
+    long bytesPerExpert = bytesPerRow * rows;
+    MemorySegment segment = tensor.dataSegment();
+    long expected = bytesPerExpert * experts;
+    if (segment.byteSize() != expected) {
+      throw new IllegalArgumentException(
+          name
+              + " is "
+              + segment.byteSize()
+              + " bytes but "
+              + experts
+              + " experts of "
+              + rows
+              + "x"
+              + columns
+              + " need "
+              + expected);
+    }
+    Matrix[] slices = new Matrix[experts];
+    for (int expert = 0; expert < experts; expert++) {
+      slices[expert] =
+          new Matrix(segment.asSlice(bytesPerExpert * expert, bytesPerExpert), type, rows, columns);
+    }
+    return slices;
   }
 
   private static int maxQ40Rows(int rows, Matrix matrix) {

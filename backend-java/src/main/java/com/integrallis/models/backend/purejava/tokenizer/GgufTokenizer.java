@@ -318,8 +318,39 @@ public final class GgufTokenizer implements Tokenizer {
             && !useWordPiece
             && !useUnigram
             && detectByteLevel(tokenizerModel, vocab, tokenToId);
+    // add_bos_token when declared; otherwise SentencePiece and WordPiece add one and byte-level BPE
+    // does not -- EXCEPT for two cases, each measured separately and each independently sufficient.
+    //
+    // 1. Llama-3 BPE defaults to a leading BOS even when the optional GGUF flag is absent. The chat
+    //    envelope does not own BOS: omitting it changes every subsequent position. All three
+    //    locally cached catalog models qualified under the llama3 prompt template declare
+    //    `tokenizer.ggml.pre = llama-bpe` with no `add_bos_token`.
+    //
+    // 2. The model's own chat template emits it. MEASURED 2026-11-01: lfm2moe is byte-level BPE,
+    //    declares no add_bos_token, and its chat template opens with `{{- bos_token -}}`.
+    //    llama.cpp renders that template, so its prompt carries the BOS id; ours did not, and every
+    //    case in a qualification ran with exactly one fewer input token than the comparator -- 189
+    //    against 190, 175 against 176, on all nine. The model answered 2 of 9 where llama.cpp
+    //    answered 4 of 9, and a local greedy continuation without the BOS degenerated to
+    //    " France is France is" where with it the output matched the oracle byte for byte.
+    //
+    // Reading the template is how case 2 is decided rather than naming the architecture, because
+    // the template is the model's own statement about its envelope -- the same source this class
+    // already uses to resolve the assistant end-of-turn marker. The two cases are a union and not
+    // an either/or: a llama-bpe file whose template is absent still needs the BOS, and a non-llama
+    // file whose template emits one still needs it.
+    String preTokenizer = metadata.getString("tokenizer.ggml.pre").orElse("");
+    boolean llama3Bos =
+        "llama3".equals(preTokenizer)
+            || "llama-v3".equals(preTokenizer)
+            || "llama-bpe".equals(preTokenizer);
+    String declaredChatTemplate = metadata.getString("tokenizer.chat_template").orElse(null);
+    boolean templateEmitsBos =
+        declaredChatTemplate != null && declaredChatTemplate.contains("bos_token");
     boolean addBosToken =
-        metadata.getBool("tokenizer.ggml.add_bos_token").orElse(useSentencePiece || useWordPiece);
+        metadata
+            .getBool("tokenizer.ggml.add_bos_token")
+            .orElse(useSentencePiece || useWordPiece || llama3Bos || templateEmitsBos);
     boolean addEosToken =
         metadata.getBool("tokenizer.ggml.add_eos_token").orElse(useWordPiece || useUnigram);
     boolean addSpacePrefix =
@@ -336,7 +367,6 @@ public final class GgufTokenizer implements Tokenizer {
                 metadata.getBool("tokenizer.ggml.remove_extra_whitespaces").orElse(false),
                 unknownTokenId)
             : null;
-    String preTokenizer = metadata.getString("tokenizer.ggml.pre").orElse("");
     BpePreTokenizer bpePreTokenizer = BpePreTokenizer.forName(preTokenizer);
 
     return new GgufTokenizer(

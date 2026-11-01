@@ -186,6 +186,20 @@ public final class RagBenchmarkCli {
             values.getOrDefault(
                 "output",
                 "build/reports/rag/" + modelId + "-" + framework + "-" + backend + ".json"));
+    // A local-engine arm exists to be a comparator, and RagProductionQualificationPolicy excludes
+    // any comparator whose artifactSha256 does not equal the candidate's -- a null one never
+    // matches. Without --artifact this CLI emitted a complete-looking report that the policy could
+    // only ever answer NO_COMPARABLE_BASELINE to, and the omission stayed invisible to anyone
+    // reading throughput out of the two reports by hand instead of running the policy. That is how
+    // three two-arm runs on 2026-10-31 produced ratios no gate had admitted. Refused here, after
+    // every other option is validated, so a bad flag still reports itself first.
+    if (artifact == null && !HOSTED_BACKENDS.contains(backend)) {
+      throw new IllegalArgumentException(
+          "--artifact is required for backend "
+              + backend
+              + ": a report without an artifact SHA-256 can never match a candidate, so the"
+              + " qualification would exclude it as \"artifact SHA-256 differs\"");
+    }
     return new RagBenchmarkConfiguration(
         framework,
         backend,

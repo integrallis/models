@@ -27,6 +27,26 @@ public enum NativeKernelCapability {
   Q6_K_F32_BATCHED_MATMUL(1L << 7),
   Q6_K_F32_GROUPED_BATCHED_MATMUL(1L << 8),
   MIXED_K_F32_GROUPED_BATCHED_MATMUL(1L << 9),
+  /**
+   * Grouping different weight formats that share one Q8_0 activation quantization.
+   *
+   * <p>Q4_0, Q8_0 and PTQ1_0 all quantize activations to Q8_0, and the native grouped entry point
+   * only ever required the group to agree on that. This side was stricter than the kernel: it
+   * grouped identical formats, or K-quants under {@link #MIXED_K_F32_GROUPED_BATCHED_MATMUL}, so a
+   * model mixing Q4_0 and Q8_0 projections fell back to one dispatch per matrix with no diagnostic
+   * saying so.
+   */
+  MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL(1L << 31),
+  /** TQ1_0 rows inside a grouped dispatch, sharing the group's Q8_K activation quantization. */
+  TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL(1L << 32),
+  /**
+   * Q5_0 matrices inside an independent batched dispatch, each against its own activation.
+   *
+   * <p>Not a revival of the retired grouped Q5_0 bit. Grouping shares one quantized activation and
+   * that sharing measured slower for Q5_0, which is why the grouped capability was removed. An
+   * independent dispatch quantizes per matrix, so that measurement does not speak to this path.
+   */
+  Q5_0_INDEPENDENT_BATCHED_MATMUL(1L << 33),
   Q5_K_F32_BATCHED_MATMUL(1L << 10),
   Q5_K_F32_GROUPED_BATCHED_MATMUL(1L << 11),
   Q5_0_F32_BATCHED_MATMUL(1L << 12),

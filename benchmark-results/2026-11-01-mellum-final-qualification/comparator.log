@@ -1,0 +1,32 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Nov 01, 2026 4:47:44 AM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256; FMA enabled
+iteration 1/3 case=list-copy-null-handling correct=true retrieval=8.3ms ttft=1996.3ms decode=39.56 tok/s e2e=2839.5ms
+iteration 1/3 case=compute-if-absent-null correct=true retrieval=5.7ms ttft=172.3ms decode=41.01 tok/s e2e=1153.9ms
+iteration 1/3 case=virtual-thread-executor correct=true retrieval=3.7ms ttft=1988.7ms decode=23.30 tok/s e2e=3323.6ms
+iteration 1/3 case=record-compact-validation correct=true retrieval=5.9ms ttft=1884.0ms decode=37.83 tok/s e2e=2554.3ms
+iteration 1/3 case=gradle-java-25 correct=true retrieval=8.0ms ttft=2085.4ms decode=36.60 tok/s e2e=9061.1ms
+iteration 1/3 case=http-retry-rules correct=true retrieval=2.1ms ttft=1988.1ms decode=40.14 tok/s e2e=2717.1ms
+iteration 1/3 case=migration-lock-expiry correct=true retrieval=8.9ms ttft=1995.9ms decode=2.09 tok/s e2e=15382.9ms
+iteration 1/3 case=jackson-module-and-feature correct=true retrieval=8.7ms ttft=2328.4ms decode=31.03 tok/s e2e=3658.6ms
+iteration 1/3 case=unsupported-cuda-kernel correct=true retrieval=1.4ms ttft=2076.4ms decode=37.19 tok/s e2e=2212.5ms
+iteration 2/3 case=list-copy-null-handling correct=true retrieval=27.2ms ttft=2115.9ms decode=33.93 tok/s e2e=3116.2ms
+iteration 2/3 case=compute-if-absent-null correct=true retrieval=2.4ms ttft=169.1ms decode=38.47 tok/s e2e=1211.7ms
+iteration 2/3 case=virtual-thread-executor correct=true retrieval=1.3ms ttft=2055.3ms decode=32.04 tok/s e2e=3031.5ms
+iteration 2/3 case=record-compact-validation correct=true retrieval=1.2ms ttft=1909.2ms decode=4.50 tok/s e2e=7465.9ms
+iteration 2/3 case=gradle-java-25 correct=true retrieval=2.4ms ttft=2430.1ms decode=24.75 tok/s e2e=12734.9ms
+iteration 2/3 case=http-retry-rules correct=true retrieval=8.4ms ttft=2038.2ms decode=33.89 tok/s e2e=2903.0ms
+iteration 2/3 case=migration-lock-expiry correct=true retrieval=6.2ms ttft=1875.0ms decode=30.65 tok/s e2e=2795.1ms
+iteration 2/3 case=jackson-module-and-feature correct=true retrieval=1.4ms ttft=2092.3ms decode=32.88 tok/s e2e=3345.0ms
+iteration 2/3 case=unsupported-cuda-kernel correct=true retrieval=1.3ms ttft=2062.3ms decode=27.54 tok/s e2e=2251.6ms
+iteration 3/3 case=list-copy-null-handling correct=true retrieval=2.1ms ttft=2118.0ms decode=32.10 tok/s e2e=3148.3ms
+iteration 3/3 case=compute-if-absent-null correct=true retrieval=4.8ms ttft=132.0ms decode=7.59 tok/s e2e=5409.9ms
+iteration 3/3 case=virtual-thread-executor correct=true retrieval=5.0ms ttft=2400.8ms decode=36.16 tok/s e2e=3263.3ms
+iteration 3/3 case=record-compact-validation correct=true retrieval=6.9ms ttft=1948.3ms decode=35.14 tok/s e2e=2666.9ms
+iteration 3/3 case=gradle-java-25 correct=true retrieval=1.2ms ttft=2160.3ms decode=37.57 tok/s e2e=8952.6ms
+iteration 3/3 case=http-retry-rules correct=true retrieval=6.6ms ttft=2056.4ms decode=35.45 tok/s e2e=2881.4ms
+iteration 3/3 case=migration-lock-expiry correct=true retrieval=8.0ms ttft=2018.7ms decode=35.21 tok/s e2e=2822.2ms
+iteration 3/3 case=jackson-module-and-feature correct=true retrieval=1.2ms ttft=11527.5ms decode=0.86 tok/s e2e=59092.6ms
+iteration 3/3 case=unsupported-cuda-kernel correct=true retrieval=1.1ms ttft=2092.9ms decode=37.85 tok/s e2e=2230.3ms
+plain-java/ollama/mellum2_12b_a2_5b_thinking_q4_k_m: tier=PERFORMANCE_REDUCED success=27/27 p95-retrieval=8.8ms p95-ttft=2421.3ms p50-decode=33.93 tok/s p95-e2e=14588.5ms correct=100.0% model-answered=77.8% of-those-correct=100.0% extractive-fallback=11.1% truncated=11.1%
+report: /root/out/mellum-final/comparator.json

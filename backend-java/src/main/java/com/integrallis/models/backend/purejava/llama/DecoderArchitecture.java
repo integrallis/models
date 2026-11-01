@@ -46,6 +46,13 @@ public enum DecoderArchitecture {
   // head dimensions. Read from the artifact in benchmark-results/2026-10-22-qxotic-header-intake,
   // not inferred from the family name.
   MAPLE("maple"),
+  // Structurally a routed Qwen3 as well, and byte-identical to maple's tensor set -- but it is NOT
+  // config-free. Read off Mellum2-12B-A2.5B-Thinking-Q4_K_M.gguf on 2026-10-31: 28 blocks, 2304
+  // dim, 64 experts of 8 used, QK-norm, sliding window 1024 and YaRN x16 over an 8192 trained
+  // context. The two keys that decide the graph are the ones it does NOT declare --
+  // attention.sliding_window_pattern and expert_weights_norm -- so both come from defaults, and
+  // upstream's mellum defaults are not the generic ones. See slidingWindowPatternDefault().
+  MELLUM("mellum"),
   GRANITE("granite"),
   SMOLLM3("smollm3"),
   GEMMA3("gemma3"),
@@ -75,7 +82,29 @@ public enum DecoderArchitecture {
    * <p>Every architecture that declares no sliding window answers false and never reads it.
    */
   boolean seedsSlidingWindowRopeFromBase() {
-    return this == GEMMA2 || this == MAPLE;
+    return this == GEMMA2 || this == MAPLE || this == MELLUM;
+  }
+
+  /**
+   * The sliding-window stride to assume when a checkpoint declares a window but no pattern.
+   *
+   * <p>Upstream decides this per architecture and the values disagree, so a single generic default
+   * is wrong for someone. {@code llama_model_base::load_swa_pattern(ml, n_pattern)} takes the
+   * stride as an argument and only overrides it from a key when the file carries one; mellum passes
+   * <b>4</b> ({@code src/models/mellum.cpp}, unchanged between ggml-org/llama.cpp 3f03b1772 and
+   * origin/master), Gemma 2 alternates every other layer, and the generic fallback here is 6.
+   *
+   * <p>This matters because the stride is only reached when the key is <b>absent</b>, which is
+   * exactly when nothing can fail. mellum at the generic 6 would attend locally on 23 of 28 layers
+   * instead of 21, load cleanly and generate plausible text -- the same defect maple had when its
+   * declared pattern was ignored, arrived at from the other direction.
+   */
+  int slidingWindowPatternDefault() {
+    return switch (this) {
+      case GEMMA2 -> 2;
+      case MELLUM -> 4;
+      default -> 6;
+    };
   }
 
   /** Resolves only architectures whose complete semantics are implemented. */

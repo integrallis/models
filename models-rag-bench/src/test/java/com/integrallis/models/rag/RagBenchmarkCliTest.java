@@ -89,6 +89,46 @@ class RagBenchmarkCliTest {
     assertThat(configuration.iterations()).isEqualTo(2);
   }
 
+  /**
+   * A comparator arm without {@code --artifact} is refused, because the policy can never admit it.
+   *
+   * <p>Pinned because the omission is silent in every artifact a reader would look at: the report
+   * is complete, its runs and timings are real, and only {@code artifactSha256} is null. The policy
+   * then excludes the comparison as "artifact SHA-256 differs" and returns NO_COMPARABLE_BASELINE,
+   * so anyone who divides the two reports' throughput by hand gets a plausible ratio that no gate
+   * ever accepted. That happened to three two-arm runs on 2026-10-31.
+   */
+  @Test
+  void refusesALocalComparatorArmThatCouldNeverBeAdmittedAsAComparator() {
+    assertThatThrownBy(
+            () ->
+                RagBenchmarkCli.parse(
+                    new String[] {
+                      "--framework", "plain-java",
+                      "--backend", "llama.cpp",
+                      "--model", "qwen",
+                      "--model-id", "qwen"
+                    }))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("--artifact is required")
+        .hasMessageContaining("artifact SHA-256 differs");
+  }
+
+  /** A hosted provider has no artifact to hash, so the same guard must not fire for one. */
+  @Test
+  void doesNotRequireAnArtifactFromAHostedProviderThatHasNone() {
+    RagBenchmarkConfiguration configuration =
+        RagBenchmarkCli.parse(
+            new String[] {
+              "--framework", "plain-java",
+              "--backend", "openai",
+              "--model", "gpt-5.4-nano-2026-03-17",
+              "--model-id", "hosted"
+            });
+
+    assertThat(configuration.artifact()).isNull();
+  }
+
   @Test
   void rejectsInvalidSamplingControlsBeforeLoadingTheBackend() {
     assertThatThrownBy(

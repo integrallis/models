@@ -1,0 +1,37 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v6",
+  "candidate" : {
+    "path" : "/root/out/mellum-rep1/candidate.json",
+    "sha256" : "ca74e36b1548270b94a8d8184a454abb97c4e8e4fa835fd2758beffae465fc2d"
+  },
+  "comparators" : [ {
+    "path" : "/root/out/mellum-rep1/comparator.json",
+    "sha256" : "20268bd11862f033aae29f458b14c262af8b04cd978cfee4629af11ca4bd026c"
+  } ],
+  "qualification" : {
+    "modelId" : "mellum2_12b_a2_5b_thinking_q4_k_m",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "489cf0d7ca86ef4683e34e2efe8a46a9b52573bfe994a6ad9c86bf57c7173ccb",
+    "absoluteTier" : "PERFORMANCE_REDUCED",
+    "verdict" : "FAILED_RELATIVE_GATE",
+    "qualified" : false,
+    "modelAnswerCount" : 21,
+    "modelAnswerRate" : 0.7777777777777778,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ ],
+    "comparisons" : [ {
+      "comparatorBackend" : "ollama",
+      "decodeThroughputRatio" : 0.7386126909536324,
+      "endToEndLatencyRatio" : 0.26040666734243717,
+      "timeToFirstTokenRatio" : 0.5585050652043553,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : false,
+      "failures" : [ "decode throughput below relative floor" ]
+    } ],
+    "exclusions" : { }
+  }
+}

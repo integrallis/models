@@ -15,7 +15,15 @@
  */
 package com.integrallis.models.backend.purejava.flint;
 
-/** Sigmoid routing: the optional bias affects selection only, never the mixture weights. */
+import com.integrallis.models.backend.purejava.ops.ExpertRouting;
+
+/**
+ * Sigmoid routing: the optional bias affects selection only, never the mixture weights.
+ *
+ * <p>The implementation moved to {@link ExpertRouting#selectExpertsWithSigmoidGating} so the three
+ * other MoE ports in the queue can reach it; this stays as flint's call site. {@code
+ * FlintRoutingTest} is unchanged across that move, which is what says the move changed nothing.
+ */
 final class FlintRouting {
   private FlintRouting() {}
 
@@ -26,29 +34,6 @@ final class FlintRouting {
       float[] weights,
       boolean normalize,
       float scale) {
-    int used = selected.length;
-    int filled = 0;
-    for (int expert = 0; expert < logits.length; expert++) {
-      logits[expert] = 1f / (1f + (float) Math.exp(-logits[expert]));
-      float score = logits[expert] + bias[expert];
-      if (filled == used && score <= weights[used - 1]) continue;
-      int slot = Math.min(filled, used - 1);
-      while (slot > 0 && weights[slot - 1] < score) {
-        weights[slot] = weights[slot - 1];
-        selected[slot] = selected[slot - 1];
-        slot--;
-      }
-      weights[slot] = score;
-      selected[slot] = expert;
-      if (filled < used) filled++;
-    }
-    float sum = 0f;
-    for (int i = 0; i < used; i++) {
-      weights[i] = logits[selected[i]];
-      sum += weights[i];
-    }
-    // Matches the GGUF reference's F16-normal minimum guard on the selected weight sum.
-    float denominator = normalize ? Math.max(sum, 0x1.0p-14f) : 1f;
-    for (int i = 0; i < used; i++) weights[i] = weights[i] / denominator * scale;
+    ExpertRouting.selectExpertsWithSigmoidGating(logits, bias, selected, weights, normalize, scale);
   }
 }

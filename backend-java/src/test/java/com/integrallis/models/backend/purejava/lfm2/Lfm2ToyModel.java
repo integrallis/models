@@ -117,57 +117,75 @@ public final class Lfm2ToyModel {
           GgufTensorType.F32,
           new long[] {HIDDEN, DIM},
           f32(matrix(DIM, HIDDEN, 51 + layer)));
-      if (ATTENTION_LAYERS.contains(layer)) {
-        builder.addTensor(
-            prefix + "attn_q.weight",
-            GgufTensorType.F32,
-            new long[] {DIM, HEADS * HEAD_DIM},
-            f32(matrix(HEADS * HEAD_DIM, DIM, 61)));
-        builder.addTensor(
-            prefix + "attn_k.weight",
-            GgufTensorType.F32,
-            new long[] {DIM, KV_HEADS * HEAD_DIM},
-            f32(matrix(KV_HEADS * HEAD_DIM, DIM, attentionKeySeed)));
-        builder.addTensor(
-            prefix + "attn_v.weight",
-            GgufTensorType.F32,
-            new long[] {DIM, KV_HEADS * HEAD_DIM},
-            f32(matrix(KV_HEADS * HEAD_DIM, DIM, 71)));
-        builder.addTensor(
-            prefix + "attn_output.weight",
-            GgufTensorType.F32,
-            new long[] {HEADS * HEAD_DIM, DIM},
-            f32(matrix(DIM, HEADS * HEAD_DIM, 81)));
-        builder.addTensor(
-            prefix + "attn_q_norm.weight",
-            GgufTensorType.F32,
-            new long[] {HEAD_DIM},
-            f32(norm(91, HEAD_DIM)));
-        builder.addTensor(
-            prefix + "attn_k_norm.weight",
-            GgufTensorType.F32,
-            new long[] {HEAD_DIM},
-            f32(norm(101, HEAD_DIM)));
-      } else {
-        builder.addTensor(
-            prefix + "shortconv.in_proj.weight",
-            GgufTensorType.F32,
-            new long[] {DIM, 3 * DIM},
-            f32(matrix(3 * DIM, DIM, 111 + layer)));
-        builder.addTensor(
-            prefix + "shortconv.conv.weight",
-            GgufTensorType.F32,
-            new long[] {L_CACHE, DIM},
-            f32(matrix(DIM, L_CACHE, convKernelSeed + layer)));
-        builder.addTensor(
-            prefix + "shortconv.out_proj.weight",
-            GgufTensorType.F32,
-            new long[] {DIM, DIM},
-            f32(matrix(DIM, DIM, 121 + layer)));
-      }
+      addMixerTensors(builder, layer, prefix, convKernelSeed, attentionKeySeed);
     }
 
     return builder;
+  }
+
+  /**
+   * The attention or short-convolution tensors for one layer.
+   *
+   * <p>Extracted so a second fixture can build the same mixers rather than copy them. This class's
+   * own contract says why: "a header fixture that drifts between its copies is worse than no
+   * fixture", and {@code Lfm2MoeEquivalenceTest} compares a routed model against a dense one, so
+   * the two must differ in the feed-forward and <b>nowhere else</b> or the comparison means
+   * nothing.
+   */
+  static void addMixerTensors(
+      SyntheticGgufBuilder builder,
+      int layer,
+      String prefix,
+      int convKernelSeed,
+      int attentionKeySeed) {
+    if (ATTENTION_LAYERS.contains(layer)) {
+      builder.addTensor(
+          prefix + "attn_q.weight",
+          GgufTensorType.F32,
+          new long[] {DIM, HEADS * HEAD_DIM},
+          f32(matrix(HEADS * HEAD_DIM, DIM, 61)));
+      builder.addTensor(
+          prefix + "attn_k.weight",
+          GgufTensorType.F32,
+          new long[] {DIM, KV_HEADS * HEAD_DIM},
+          f32(matrix(KV_HEADS * HEAD_DIM, DIM, attentionKeySeed)));
+      builder.addTensor(
+          prefix + "attn_v.weight",
+          GgufTensorType.F32,
+          new long[] {DIM, KV_HEADS * HEAD_DIM},
+          f32(matrix(KV_HEADS * HEAD_DIM, DIM, 71)));
+      builder.addTensor(
+          prefix + "attn_output.weight",
+          GgufTensorType.F32,
+          new long[] {HEADS * HEAD_DIM, DIM},
+          f32(matrix(DIM, HEADS * HEAD_DIM, 81)));
+      builder.addTensor(
+          prefix + "attn_q_norm.weight",
+          GgufTensorType.F32,
+          new long[] {HEAD_DIM},
+          f32(norm(91, HEAD_DIM)));
+      builder.addTensor(
+          prefix + "attn_k_norm.weight",
+          GgufTensorType.F32,
+          new long[] {HEAD_DIM},
+          f32(norm(101, HEAD_DIM)));
+    } else {
+      builder.addTensor(
+          prefix + "shortconv.in_proj.weight",
+          GgufTensorType.F32,
+          new long[] {DIM, 3 * DIM},
+          f32(matrix(3 * DIM, DIM, 111 + layer)));
+      builder.addTensor(
+          prefix + "shortconv.conv.weight",
+          GgufTensorType.F32,
+          new long[] {L_CACHE, DIM},
+          f32(matrix(DIM, L_CACHE, convKernelSeed + layer)));
+      builder.addTensor(
+          prefix + "shortconv.out_proj.weight",
+          GgufTensorType.F32,
+          new long[] {DIM, DIM},
+          f32(matrix(DIM, DIM, 121 + layer)));
+    }
   }
 
   static float[] norm(int seed) {

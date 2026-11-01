@@ -1,0 +1,623 @@
+{
+  "job" : {
+    "id" : "unsloth_qwen3_5_0_8b_gguf_q5_k_m",
+    "sha256" : "c3ef5827b322c4be08a3a26ce424460d8b37daf593356c2cc1f4e40a7ab0581b",
+    "sizeBytes" : 590057728,
+    "uri" : "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/6ab461498e2023f6e3c1baea90a8f0fe38ab64d0/Qwen3.5-0.8B-Q5_K_M.gguf",
+    "maxTokens" : 512,
+    "modes" : [ {
+      "name" : "candidate-default-chat",
+      "template" : "default-chat"
+    } ],
+    "cases" : [ {
+      "id" : "capital",
+      "input" : "What is the capital of France? Reply with only the city name.",
+      "expected" : "Paris"
+    }, {
+      "id" : "sum",
+      "input" : "What is 17 + 25? Reply with only the number.",
+      "expected" : "42"
+    }, {
+      "id" : "missing-price",
+      "input" : "Context: The museum closes at 6 PM on Fridays. What is the admission price? Reply UNKNOWN if the context does not say.",
+      "expected" : "UNKNOWN"
+    }, {
+      "id" : "capital-holdout",
+      "input" : "What is the capital of Japan? Reply with only the city name.",
+      "expected" : "Tokyo"
+    }, {
+      "id" : "sum-holdout",
+      "input" : "What is 23 + 19? Reply with only the number.",
+      "expected" : "42"
+    }, {
+      "id" : "subtract-holdout",
+      "input" : "What is 81 - 36? Reply with only the number.",
+      "expected" : "45"
+    }, {
+      "id" : "supported-price",
+      "input" : "Context: Museum admission costs 12 dollars. How much does admission cost? Reply with only the number.",
+      "expected" : "12"
+    }, {
+      "id" : "missing-time",
+      "input" : "Context: The library has four floors. What time does it open? Reply UNKNOWN if the context does not say.",
+      "expected" : "UNKNOWN"
+    } ]
+  },
+  "java" : "25.0.3+9-LTS",
+  "scope" : "Paired chat diagnosis; not a RAG admission verdict",
+  "cases" : [ {
+    "mode" : "candidate-default-chat",
+    "caseId" : "capital",
+    "prompt" : "<|im_start|>user\nWhat is the capital of France? Reply with only the city name.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "expected" : "Paris",
+    "promptTokenIds" : [ 248045, 846, 198, 3710, 369, 279, 6511, 314, 9338, 30, 17308, 440, 1132, 279, 3177, 803, 13, 248046, 198, 248045, 74455, 198, 248068, 271, 248069, 271 ],
+    "template" : "CHATML_NO_THINK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 26,
+      "completionTokens" : 1
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 972.586728,
+    "raw" : "Paris",
+    "visible" : "Paris",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "sum",
+    "prompt" : "<|im_start|>user\nWhat is 17 + 25? Reply with only the number.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "expected" : "42",
+    "promptTokenIds" : [ 248045, 846, 198, 3710, 369, 220, 16, 22, 478, 220, 17, 20, 30, 17308, 440, 1132, 279, 1324, 13, 248046, 198, 248045, 74455, 198, 248068, 271, 248069, 271 ],
+    "template" : "CHATML_NO_THINK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 28,
+      "completionTokens" : 2
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 196.849561,
+    "raw" : "42",
+    "visible" : "42",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "missing-price",
+    "prompt" : "<|im_start|>user\nContext: The museum closes at 6 PM on Fridays. What is the admission price? Reply UNKNOWN if the context does not say.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "expected" : "UNKNOWN",
+    "promptTokenIds" : [ 248045, 846, 198, 1905, 25, 561, 23223, 32147, 506, 220, 21, 5670, 383, 76692, 13, 3437, 369, 279, 24490, 3240, 30, 17308, 59322, 413, 279, 2193, 1503, 524, 1910, 13, 248046, 198, 248045, 74455, 198, 248068, 271, 248069, 271 ],
+    "template" : "CHATML_NO_THINK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 39,
+      "completionTokens" : 1
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 178.703135,
+    "raw" : "UNKNOWN",
+    "visible" : "UNKNOWN",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "capital-holdout",
+    "prompt" : "<|im_start|>user\nWhat is the capital of Japan? Reply with only the city name.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "expected" : "Tokyo",
+    "promptTokenIds" : [ 248045, 846, 198, 3710, 369, 279, 6511, 314, 6124, 30, 17308, 440, 1132, 279, 3177, 803, 13, 248046, 198, 248045, 74455, 198, 248068, 271, 248069, 271 ],
+    "template" : "CHATML_NO_THINK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 26,
+      "completionTokens" : 2
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 137.884263,
+    "raw" : "Tokyo",
+    "visible" : "Tokyo",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "sum-holdout",
+    "prompt" : "<|im_start|>user\nWhat is 23 + 19? Reply with only the number.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "expected" : "42",
+    "promptTokenIds" : [ 248045, 846, 198, 3710, 369, 220, 17, 18, 478, 220, 16, 24, 30, 17308, 440, 1132, 279, 1324, 13, 248046, 198, 248045, 74455, 198, 248068, 271, 248069, 271 ],
+    "template" : "CHATML_NO_THINK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 28,
+      "completionTokens" : 2
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 147.77652,
+    "raw" : "42",
+    "visible" : "42",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "subtract-holdout",
+    "prompt" : "<|im_start|>user\nWhat is 81 - 36? Reply with only the number.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "expected" : "45",
+    "promptTokenIds" : [ 248045, 846, 198, 3710, 369, 220, 23, 16, 471, 220, 18, 21, 30, 17308, 440, 1132, 279, 1324, 13, 248046, 198, 248045, 74455, 198, 248068, 271, 248069, 271 ],
+    "template" : "CHATML_NO_THINK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 28,
+      "completionTokens" : 2
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 142.61487,
+    "raw" : "45",
+    "visible" : "45",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "supported-price",
+    "prompt" : "<|im_start|>user\nContext: Museum admission costs 12 dollars. How much does admission cost? Reply with only the number.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "expected" : "12",
+    "promptTokenIds" : [ 248045, 846, 198, 1905, 25, 15849, 24490, 6829, 220, 16, 17, 10867, 13, 2500, 1691, 1503, 24490, 2695, 30, 17308, 440, 1132, 279, 1324, 13, 248046, 198, 248045, 74455, 198, 248068, 271, 248069, 271 ],
+    "template" : "CHATML_NO_THINK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 34,
+      "completionTokens" : 2
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 170.727935,
+    "raw" : "12",
+    "visible" : "12",
+    "exactAnswer" : true
+  }, {
+    "mode" : "candidate-default-chat",
+    "caseId" : "missing-time",
+    "prompt" : "<|im_start|>user\nContext: The library has four floors. What time does it open? Reply UNKNOWN if the context does not say.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+    "expected" : "UNKNOWN",
+    "promptTokenIds" : [ 248045, 846, 198, 1905, 25, 561, 6522, 682, 2943, 25115, 13, 3437, 854, 1503, 424, 1724, 30, 17308, 59322, 413, 279, 2193, 1503, 524, 1910, 13, 248046, 198, 248045, 74455, 198, 248068, 271, 248069, 271 ],
+    "template" : "CHATML_NO_THINK",
+    "sampling" : {
+      "temperature" : 0.0,
+      "topP" : 1.0,
+      "topK" : 1,
+      "maxTokens" : 512,
+      "seed" : 42,
+      "repetitionPenalty" : 1.0,
+      "stopSequences" : [ ],
+      "minP" : 0.0,
+      "repetitionLoopDetection" : {
+        "maxSpan" : 0,
+        "minRepeats" : 0,
+        "minLoopTokens" : 0
+      }
+    },
+    "usage" : {
+      "promptTokens" : 35,
+      "completionTokens" : 1
+    },
+    "stopReason" : "EOS",
+    "elapsedMillis" : 162.019303,
+    "raw" : "UNKNOWN",
+    "visible" : "UNKNOWN",
+    "exactAnswer" : true
+  } ],
+  "artifactSha256" : "c3ef5827b322c4be08a3a26ce424460d8b37daf593356c2cc1f4e40a7ab0581b",
+  "diagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v14",
+    "environment" : {
+      "processors" : "16",
+      "native-grouped-attention" : "true",
+      "kernel-implementation" : "rust-ffm-quantized-v14",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "modeljars-artifact-sha256" : "c3ef5827b322c4be08a3a26ce424460d8b37daf593356c2cc1f4e40a7ab0581b",
+      "q4-short-pairwise-supported" : "true",
+      "compiler" : "hotspot-c2",
+      "fast-scalar-fma" : "true",
+      "gguf-parallel" : "true",
+      "vm-vendor" : "Eclipse Adoptium",
+      "java-feature" : "25",
+      "modeljars-qualification-workload" : "general",
+      "end-of-generation-token-ids" : "248044,248046",
+      "native-kernel-decode-threads" : "8",
+      "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+      "gguf-executor" : "persistent",
+      "native-kernel-poll-millis" : "5",
+      "vector-api" : "true",
+      "end-of-generation.248046" : "tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn",
+      "java-version" : "25.0.3",
+      "end-of-generation.248044" : "vocabulary-text",
+      "architecture" : "amd64",
+      "gguf-chunks-per-thread" : "2",
+      "native-kernel-abi" : "7",
+      "java-executor-poll-millis" : "0",
+      "modeljars-marker" : "org.modeljars.huggingface:unsloth.qwen3.5-0.8b-gguf.q5_k_m:3.5.0-q5_k_m.1",
+      "tokenizer.pre.implemented" : "true",
+      "kernel-runtime" : "rust-ffm",
+      "native-quantized-decode" : "true",
+      "end-of-generation.chat-template" : "resolved:248046",
+      "native-q5-0-grouped" : "false",
+      "preferred-vector-bits" : "256",
+      "projection-layers" : "24",
+      "q4-unsigned-pairwise-supported" : "true",
+      "model-architecture" : "qwen35",
+      "tokenizer.pre" : "qwen35",
+      "native-kernel-threads" : "8",
+      "native-gated-delta-net" : "true",
+      "os" : "Linux",
+      "vm-version" : "25.0.3+9-LTS",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "fast-vector-fma" : "true",
+      "active-vector-bits" : "256",
+      "sve" : "false",
+      "transformer-runtime" : "java",
+      "gguf-threads" : "16"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "grouped",
+        "implementation" : "rust-ffm-quantized-v14",
+        "gate-up" : "grouped"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "active-vector-bits" : "256",
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64",
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "architecture" : "amd64",
+        "batch-size" : "32",
+        "active-vector-bits" : "256",
+        "requested-kernel" : "one-query-block",
+        "kernel" : "one-query-block"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q5_K,Q5_K,Q6_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q5_K,Q5_K,Q6_K,Q5_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "2"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "eligible-layers" : "0",
+        "parallel" : "true",
+        "stages" : "7"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256",
+        "requested-kernel" : "scattered"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "16",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment",
+        "artifact-format" : "gguf"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "16",
+        "chunks-per-thread" : "2",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "modeljars.performance-profile",
+      "status" : "DISABLED",
+      "reason" : "no exact artifact, backend, and runtime profile matched",
+      "settings" : {
+        "backend" : "rust-ffm"
+      }
+    }, {
+      "id" : "rust-ptq1-0-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+      "settings" : {
+        "weight" : "PTQ1_0",
+        "transformer" : "java",
+        "activation" : "Q8_0"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "boundary" : "panama-ffm",
+        "abi" : "7",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7",
+        "state" : "caller-owned-java-array"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "independent recurrent state slots share one native worker dispatch",
+      "settings" : {
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7",
+        "state" : "branch-major-caller-owned-java-array"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+      "settings" : {
+        "evidence" : "benchmark-results/2026-10-12-q5-production/"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "complete" : true
+}

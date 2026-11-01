@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.ops.ExpertRouting;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.Arrays;
 import java.util.Objects;
@@ -74,6 +75,15 @@ public final class Deepseek2ForwardPass {
   private int nextPosition;
 
   Deepseek2ForwardPass(Deepseek2Config config, Deepseek2Weights weights, int capacity) {
+    this(config, weights, capacity, GgufBatchedMatrixKernel.none());
+  }
+
+  Deepseek2ForwardPass(
+      Deepseek2Config config,
+      Deepseek2Weights weights,
+      int capacity,
+      GgufBatchedMatrixKernel matrixKernel) {
+    this.matrixKernel = Objects.requireNonNull(matrixKernel, "matrixKernel");
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     if (capacity <= 0) {
@@ -130,7 +140,14 @@ public final class Deepseek2ForwardPass {
   /** Loads a decoder from a parsed GGUF. */
   public static Deepseek2ForwardPass fromGgufFile(
       GgufFile file, Deepseek2Config config, int capacity) {
-    return new Deepseek2ForwardPass(config, Deepseek2Weights.fromGgufFile(file, config), capacity);
+    return fromGgufFile(file, config, capacity, GgufBatchedMatrixKernel.none());
+  }
+
+  /** Loads a decoder that projects through the injected kernel where it is eligible. */
+  public static Deepseek2ForwardPass fromGgufFile(
+      GgufFile file, Deepseek2Config config, int capacity, GgufBatchedMatrixKernel matrixKernel) {
+    return new Deepseek2ForwardPass(
+        config, Deepseek2Weights.fromGgufFile(file, config), capacity, matrixKernel);
   }
 
   public int nextPosition() {
@@ -336,7 +353,29 @@ public final class Deepseek2ForwardPass {
     }
   }
 
+  /**
+   * The injected batched matrix kernel, or {@link GgufBatchedMatrixKernel#none()}.
+   *
+   * <p>This decoder had no kernel seam: every projection went to {@code TensorOps.ggufMatmul} and
+   * the kernel the caller injected was never consulted, so the model ran unaccelerated while
+   * diagnostics reported a kernel was loaded. Found by audit on 2026-11-01 after the same gap cost
+   * {@code lfm2moe} 166% of its decode throughput -- 8.94 to 23.80 tok/s, our own arm before and
+   * after, one host and one protocol. (The gate ratios first reported beside those figures were
+   * withdrawn: the comparator arm carried no artifact SHA-256, so the policy had excluded it and
+   * returned NO_COMPARABLE_BASELINE. The admitted comparison, measured 2026-11-01 against ollama at
+   * warmups 1 and iterations 3, is decodeThroughputRatio 0.3974.) No qualified catalog entry used
+   * this decoder, so no published number moved; the cost was that a future two-arm run here would
+   * have read "the model is slow".
+   */
+  private final GgufBatchedMatrixKernel matrixKernel;
+
   private void project(Deepseek2Weights.Matrix matrix, float[] input, float[] output) {
+    // The injected kernel first, as LlamaForwardPass.matmulDispatch does.
+    if (matrixKernel.isEligible(matrix.type(), 1, matrix.rows(), matrix.columns())) {
+      matrixKernel.multiply(
+          output, input, matrix.data(), matrix.type(), 1, matrix.rows(), matrix.columns());
+      return;
+    }
     TensorOps.ggufMatmul(
         output, input, matrix.data(), matrix.type(), matrix.rows(), matrix.columns());
   }
