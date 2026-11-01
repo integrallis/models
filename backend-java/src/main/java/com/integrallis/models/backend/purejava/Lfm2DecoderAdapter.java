@@ -110,15 +110,31 @@ final class Lfm2DecoderAdapter implements PureJavaDecoder {
     // Serial: the convolution recurrence is sequential, so a batched prefill would still have to
     // advance it one token at a time.
     //
-    // Through forward(int, int) rather than the graph directly, so these tokens are recorded. Going
-    // straight to the forward pass left a prefilled prompt absent from the replay history, and the
-    // first rewind then rebuilt an empty state -- which is how this is written down rather than
-    // remembered.
-    float[] logits = null;
-    for (int index = 0; index < tokens.length; index++) {
-      logits = forward(tokens[index], startPosition + index);
+    // Only the LAST token's logits are ever returned, so the output projection is skipped for every
+    // other one. MEASURED 2026-11-01: that projection is `vocab_size x embedding_length` =
+    // 128000 x 2048 = 262M parameters, about 21% of all the weight bytes a token reads and the
+    // widest matmul in the pass. Computing it for all 190 tokens of a prompt and discarding 189 of
+    // the results was most of why lfm2moe's prefill measured 0.2076 of its comparator while decode
+    // measured 0.4674 -- prefill was doing strictly more wasted work per token than decode.
+    //
+    // Lfm2ForwardPass.hiddenState is exactly this: the same advance with the projection skipped.
+    // LlamaForwardPass has had the equivalent as finishFinalLayerKvOnlyToken.
+    //
+    // record() is called here rather than relying on forward(int, int), because the forward pass is
+    // being driven directly: going straight to it without recording left a prefilled prompt absent
+    // from the replay history, and the first rewind then rebuilt an empty state. The adapter's own
+    // hiddenState(int, int) does not record either, which is why it is not the thing called here.
+    if (tokens.length == 0) {
+      throw new IllegalArgumentException("prefill needs at least one token");
     }
-    return logits;
+    int last = tokens.length - 1;
+    for (int index = 0; index < last; index++) {
+      int position = startPosition + index;
+      forwardPass.hiddenState(tokens[index], position);
+      // After the call, so a rejected position does not leave a token recorded for it.
+      record(tokens[index], position);
+    }
+    return forward(tokens[last], startPosition + last);
   }
 
   @Override
