@@ -1,0 +1,108 @@
+{
+  "judge": {
+    "implementation": "faster-whisper",
+    "model": "base",
+    "computeType": "int8",
+    "beamSize": 5,
+    "device": "cpu",
+    "normalizer": "whisper-normalizer EnglishTextNormalizer",
+    "note": "a CTranslate2 conversion of openai-whisper base, not that binary",
+    "resampling": "ours: 63-tap Hamming-windowed sinc, then 2:1 decimation 32k -> 16k"
+  },
+  "sentences": 10,
+  "corpusWer": 0.05263157894736842,
+  "perSentenceWerMax": 0.25,
+  "perSentenceWerZeroCount": 6,
+  "results": [
+    {
+      "index": 0,
+      "wav": "00.wav",
+      "realTimeFactor": 0.4286,
+      "reference": "the jvm can speak for itself",
+      "hypothesis": "the gbm can speak for itself",
+      "raw": "The GBM can speak for itself.",
+      "wer": 0.16666666666666666
+    },
+    {
+      "index": 1,
+      "wav": "01.wav",
+      "realTimeFactor": 0.3171,
+      "reference": "a small model that runs anywhere is worth more than a large one that does not",
+      "hypothesis": "a small model that runs anywhere is worth more than a large one that does not",
+      "raw": "A small model that runs anywhere is worth more than a large one that does not.",
+      "wer": 0.0
+    },
+    {
+      "index": 2,
+      "wav": "02.wav",
+      "realTimeFactor": 0.3168,
+      "reference": "she sells sea shells by the sea shore",
+      "hypothesis": "she sells seashells by the sea shore",
+      "raw": "She sells seashells by the sea shore.",
+      "wer": 0.25
+    },
+    {
+      "index": 3,
+      "wav": "03.wav",
+      "realTimeFactor": 0.3013,
+      "reference": "the quick brown fox jumps over the lazy dog",
+      "hypothesis": "a quick brown fox jumps over the lazy dog",
+      "raw": "A quick brown fox jumps over the lazy dog.",
+      "wer": 0.1111111111111111
+    },
+    {
+      "index": 4,
+      "wav": "04.wav",
+      "realTimeFactor": 0.2933,
+      "reference": "portability is a feature not an afterthought",
+      "hypothesis": "portability is a feature not an afterthought",
+      "raw": "Portability is a feature not an afterthought.",
+      "wer": 0.0
+    },
+    {
+      "index": 5,
+      "wav": "05.wav",
+      "realTimeFactor": 0.3436,
+      "reference": "12 catalog entries were qualified under the same prompt template",
+      "hypothesis": "12 catalog entries were qualified under the same prompt template",
+      "raw": "12 catalog entries were qualified under the same prompt template.",
+      "wer": 0.0
+    },
+    {
+      "index": 6,
+      "wav": "06.wav",
+      "realTimeFactor": 0.3218,
+      "reference": "measurement without provenance is just a confident opinion",
+      "hypothesis": "measurement without provenance is just a confident opinion",
+      "raw": "Measurement without provenance is just a confident opinion.",
+      "wer": 0.0
+    },
+    {
+      "index": 7,
+      "wav": "07.wav",
+      "realTimeFactor": 0.3068,
+      "reference": "the oracle cannot judge a model that draws its own noise",
+      "hypothesis": "the oracle cannot judge a model that draws its own noise",
+      "raw": "The Oracle cannot judge a model that draws its own noise.",
+      "wer": 0.0
+    },
+    {
+      "index": 8,
+      "wav": "08.wav",
+      "realTimeFactor": 0.3129,
+      "reference": "reproducibility is the only claim a user can check",
+      "hypothesis": "reproducibility is the only claim a user can check",
+      "raw": "reproducibility is the only claim a user can check.",
+      "wer": 0.0
+    },
+    {
+      "index": 9,
+      "wav": "09.wav",
+      "realTimeFactor": 0.3113,
+      "reference": "publish the nulls because a failed hypothesis is still a result",
+      "hypothesis": "publish the knowles because a failed hypothesis is still a result",
+      "raw": "Publish the Knowles because a failed hypothesis is still a result.",
+      "wer": 0.09090909090909091
+    }
+  ]
+}
