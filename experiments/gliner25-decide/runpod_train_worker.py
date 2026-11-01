@@ -85,9 +85,10 @@ def main():
                  ROOT/'base-snapshot'/entry['path'], entry['sha256'])
     command([python, '-c', 'import torch,json; print(json.dumps(dict(torch=torch.__version__, cuda=torch.version.cuda, available=torch.cuda.is_available(), gpu=torch.cuda.get_device_name(0), bf16=torch.cuda.is_bf16_supported())))'], 60)
     status('training')
+    policy=json.loads((experiment/'finetune-policy.json').read_text())
     command([python, str(experiment/'train_general.py'), '--snapshot', str(ROOT/'base-snapshot'),
              '--source', str(ROOT/'publisher'), '--data', str(ROOT/'payload/data'),
-             '--output', str(ROOT/'training-output')], 1500)
+             '--output', str(ROOT/'training-output')], policy['maximumTrainingSeconds']+600)
     status('uploading')
     output = ROOT/'training-output'
     for name in ['snapshot.json', 'training-record.json']:

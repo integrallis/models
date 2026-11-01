@@ -4,6 +4,9 @@ set -euo pipefail
 trap 'touch /work/STOP' EXIT
 cd /work/payload/experiment
 export PATH=/work/jdk/bin:/root/.cargo/bin:$PATH TOKENIZERS_PARALLELISM=false
+aws s3 cp "$GLINER_URI/evaluation-overlay.tar.gz" /work/evaluation-overlay.tar.gz --only-show-errors
+printf '%s  %s\n' "$GLINER_EVAL_OVERLAY_SHA" /work/evaluation-overlay.tar.gz | sha256sum -c -
+tar -xzf /work/evaluation-overlay.tar.gz -C /work/payload/experiment
 /work/python/bin/python - <<'PY'
 import collections,json,pathlib
 counts=collections.Counter(); chosen=[]

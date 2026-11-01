@@ -1,6 +1,7 @@
 """Account for every completed rental before authorizing another model experiment."""
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 
 
 def aggregate_limit_seconds():
@@ -14,7 +15,7 @@ def aggregate_limit_seconds():
     return limit
 
 
-def prior_rented_seconds(evidence):
+def prior_rented_seconds(evidence, reserve_active=False):
     evidence = Path(evidence)
     initial = json.loads((evidence/'deployment.json').read_text())
     total = initial['cleanup']['rentedSecondsUpperBound']
@@ -29,6 +30,13 @@ def prior_rented_seconds(evidence):
             if identifier not in record:
                 continue
             if record.get('state') != final:
+                if reserve_active:
+                    deadline=datetime.fromisoformat(record['deletionDeadline'])
+                    seconds=record.get('maximumRentalSeconds')
+                    if deadline<=datetime.now(timezone.utc) or type(seconds) is not int or seconds<=0:
+                        raise ValueError('invalid or expired active reservation: '+path.parent.name)
+                    total+=seconds
+                    continue
                 raise ValueError('unresolved rental: '+path.parent.name)
             seconds = record.get('rentedSecondsUpperBound')
             if type(seconds) is not int or seconds <= 0:

@@ -40,6 +40,8 @@ def main():
     parser = argparse.ArgumentParser()
     for name in ['sources', 'publisher', 'tokenizer', 'output']:
         parser.add_argument('--'+name, type=Path, required=True)
+    parser.add_argument('--reuse-splits',type=Path)
+    parser.add_argument('--candidate',default='modeljars-gliner25-decide-general-v1')
     args = parser.parse_args()
     for entry in json.loads((HERE/'finetune-sources.json').read_text()):
         path = args.sources/entry['file']
@@ -109,6 +111,9 @@ def main():
                 ['yes' if row['answer'] else 'no'], 'boolq', split))
     excluded = collections.Counter(); eligible = []
     old = {fingerprint(c['request']['text']) for c in read_cases(HERE/'quality-cases.jsonl')}
+    if args.reuse_splits:
+        for name in ['train','development','qualification']:
+            old.update(fingerprint(c['request']['text']) for c in read_cases(args.reuse_splits/(name+'-cases.jsonl')))
     for row in rows:
         row['textFingerprint'] = fingerprint(row['request']['text'])
         row['encodedTokens'] = len(encode(row['request']))
@@ -136,9 +141,15 @@ def main():
     dev += stratified([r for r in available if r['cohort'].startswith('clinc-') and r['sourceSplit']=='val'],3)
     dev = unique(dev,used)
     train = unique([r for r in eligible if r['sourceSplit']=='train'],used)
+    if args.reuse_splits:
+        train=read_cases(args.reuse_splits/'train-cases.jsonl')
+        dev=read_cases(args.reuse_splits/'development-cases.jsonl')
+        assert not ({fingerprint(r['request']['text']) for r in final} & old)
     args.output.mkdir(parents=True,exist_ok=True)
-    manifest = dict(candidate='modeljars-gliner25-decide-general-v1', selection='deterministic hash, no inference-based selection',
+    manifest = dict(candidate=args.candidate, selection='deterministic hash, no inference-based selection',
         maximumEncodedTokens=512, exclusions=dict(excluded), files={})
+    if args.reuse_splits:
+        manifest['previousSplitsSha256']={name:digest(args.reuse_splits/(name+'-cases.jsonl')) for name in ['train','development','qualification']}
     for name,data in [('train',train),('development',dev),('qualification',final)]:
         path=args.output/(name+'-cases.jsonl')
         path.write_text(''.join(json.dumps(r,ensure_ascii=False)+'\n' for r in data))

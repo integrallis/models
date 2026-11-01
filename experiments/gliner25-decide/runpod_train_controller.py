@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 
 import boto3
-from rental_budget import prior_rented_seconds
+from rental_budget import prior_rented_seconds, aggregate_limit_seconds
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
@@ -54,6 +54,9 @@ def main():
     parser.add_argument('--publisher-bundle',type=Path,required=True)
     parser.add_argument('--gpu',default='NVIDIA A100-SXM4-80GB')
     parser.add_argument('--launch',action='store_true')
+    parser.add_argument('--recipe',type=Path,default=HERE)
+    parser.add_argument('--data',type=Path,default=REPO/'build/gliner-finetune/data')
+    parser.add_argument('--maximum-rental-seconds',type=int,default=2100)
     args=parser.parse_args()
     key=read_key(args.env_file)
     s3=boto3.client('s3',region_name='us-east-1',config=Config(signature_version='s3v4'))
@@ -62,13 +65,15 @@ def main():
     existing=api(key,'GET','pods')['pods']
     if any(p['name'].startswith('gliner25-training-') for p in existing):
         raise ValueError('existing GLiNER training pod must be reconciled before a new rental')
-    prior_seconds=prior_rented_seconds(REPO/'benchmark-results/2026-11-01-gliner25-decide')
-    rental_seconds=min(2100,7200-prior_seconds-120)
+    prior_seconds=prior_rented_seconds(REPO/'benchmark-results/2026-11-01-gliner25-decide',reserve_active=True)
+    aggregate_limit=aggregate_limit_seconds()
+    if not 1800<=args.maximum_rental_seconds<=3300:raise ValueError('rental must be bounded between 1800 and 3300 seconds')
+    rental_seconds=min(args.maximum_rental_seconds,aggregate_limit-prior_seconds-120)
     if rental_seconds<1800:raise ValueError('insufficient aggregate budget for another training attempt')
-    policy=json.loads((HERE/'finetune-policy.json').read_text())
-    splits=json.loads((HERE/'finetune-splits.json').read_text())
+    policy=json.loads((args.recipe/'finetune-policy.json').read_text())
+    splits=json.loads((args.recipe/'finetune-splits.json').read_text())
     for name in ['train.jsonl','development.jsonl']:
-        if digest(REPO/'build/gliner-finetune/data'/name)!=splits['files'][name]['sha256']:
+        if digest(args.data/name)!=splits['files'][name]['sha256']:
             raise ValueError('training data mismatch')
     now=datetime.now(timezone.utc)
     run='gliner25-training-'+now.strftime('%Y%m%dT%H%M%SZ')
@@ -78,12 +83,14 @@ def main():
     work.mkdir(parents=True)
     prefix='training/'+run
     payload=work/'payload.tar.gz'
-    names=['train_general.py','common.py','snapshot.json','finetune-policy.json','finetune-splits.json',
+    names=['train_general.py','development_metrics.py','common.py','snapshot.json','finetune-policy.json','finetune-splits.json',
            'requirements-training.in','requirements-training.lock']
     with tarfile.open(payload,'w:gz') as archive:
-        for name in names:archive.add(HERE/name,arcname='experiment/'+name)
-        for name in ['train.jsonl','development.jsonl']:
-            archive.add(REPO/'build/gliner-finetune/data'/name,arcname='data/'+name)
+        for name in names:
+            source=args.recipe/name if name in ['finetune-policy.json','finetune-splits.json'] else HERE/name
+            archive.add(source,arcname='experiment/'+name)
+        for name in ['train.jsonl','development.jsonl','development-cases.jsonl']:
+            archive.add(args.data/name,arcname='data/'+name)
         archive.add(args.publisher_bundle,arcname='publisher.bundle')
     def signed(operation,name):
         return s3.generate_presigned_url(operation,Params={'Bucket':BUCKET,'Key':prefix+'/'+name},ExpiresIn=5400)
@@ -105,7 +112,8 @@ def main():
         payloadSha256=digest(payload),workerSha256=manifest['workerSha256'],provider='RunPod',cloud='SECURE',gpu=gpu,
         expectedMinutes=25,maximumRentalSeconds=rental_seconds,maximumAuthorizedSpendUsd=2.50,
         creationDeadline=(now+timedelta(minutes=5)).isoformat(),deletionDeadline=(now+timedelta(seconds=rental_seconds)).isoformat(),
-        priorAggregateRentedSecondsUpperBound=prior_seconds,maximumAggregateRentedSeconds=7200,
+        priorAggregateRentedSecondsUpperBound=prior_seconds,maximumAggregateRentedSeconds=aggregate_limit,
+        candidate=policy['candidate'],policySha256=digest(args.recipe/'finetune-policy.json'),
         correctnessGate='exact tensor inventory, finite F32 export, unchanged tokenizer/config',
         qualityGate='frozen finetune-policy; this training run alone cannot qualify',
         performanceGate='unchanged same-class CPU policy; GPU training is not a performance comparison',

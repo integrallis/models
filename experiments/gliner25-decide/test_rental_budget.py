@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from datetime import datetime, timezone, timedelta
 
 from rental_budget import prior_rented_seconds
 
@@ -37,6 +38,17 @@ class RentalBudgetTest(unittest.TestCase):
     def test_unlaunched_preparation_is_not_a_rental(self):
         self.receipt('gliner25-eval-1',state='prepared')
         self.assertEqual(prior_rented_seconds(self.root),2602)
+
+    def test_concurrent_worker_reserves_its_entire_rental_limit(self):
+        self.receipt('gliner25-eval-1',instanceId='live',state='running',maximumRentalSeconds=900,
+                     deletionDeadline=(datetime.now(timezone.utc)+timedelta(minutes=15)).isoformat())
+        self.assertEqual(prior_rented_seconds(self.root,reserve_active=True),3502)
+
+    def test_expired_reservation_requires_cleanup(self):
+        self.receipt('gliner25-eval-1',instanceId='live',state='running',maximumRentalSeconds=900,
+                     deletionDeadline=(datetime.now(timezone.utc)-timedelta(minutes=1)).isoformat())
+        with self.assertRaisesRegex(ValueError,'expired active reservation'):
+            prior_rented_seconds(self.root,reserve_active=True)
 
 
 if __name__ == '__main__':

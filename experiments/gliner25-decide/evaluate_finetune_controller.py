@@ -35,7 +35,7 @@ def main():
     if training['state']!='deleted' or training.get('workerResult',{}).get('stage')!='complete':
         raise ValueError('training must be complete, uploaded and its pod deleted')
     previous=json.loads((EVIDENCE/'deployment.json').read_text())
-    prior=prior_rented_seconds(EVIDENCE)
+    prior=prior_rented_seconds(EVIDENCE,reserve_active=True)
     aggregate_limit=aggregate_limit_seconds()
     seconds=min(900 if args.profile else 2700,aggregate_limit-prior-120)
     if seconds<(600 if args.profile else 1500):raise ValueError('insufficient remaining budget for this CPU experiment')

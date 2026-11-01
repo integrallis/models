@@ -64,7 +64,15 @@ def main():
             return super()._optimizer_step()
     config = TrainingConfig(output_dir=str(checkpoint_dir), experiment_name=policy['candidate'],
                             **policy['training'])
-    trainer = BoundedTrainer(model=model,config=config)
+    compute_metrics=None
+    if policy.get('developmentDiagnostics'):
+        from development_metrics import measure_development
+        development_path=args.data/'development-cases.jsonl'
+        if digest(development_path)!=splits['files']['development-cases.jsonl']['sha256']:
+            raise ValueError('development diagnostic data identity mismatch')
+        development=[json.loads(line) for line in development_path.read_text().splitlines()]
+        compute_metrics=lambda trained,dataset:measure_development(trained,development,policy['training']['bf16'])
+    trainer = BoundedTrainer(model=model,config=config,compute_metrics=compute_metrics)
     trainer.deadline = time.monotonic()+policy['maximumTrainingSeconds']
     started = time.monotonic(); status='completed'
     try:
