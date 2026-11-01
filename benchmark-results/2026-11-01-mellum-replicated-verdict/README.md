@@ -62,3 +62,46 @@ so 27.92 tok/s is about 45 GB/s against the comparator's 59 on the same 16 cores
 Not qualified, and not claimed to be. One untested lever remains (`q6BatchedKernel`, a variant
 choice for the Q6_K output head, which at 98304 x 2304 is a real share of what each token reads);
 beyond it the gap is kernel work rather than wiring.
+
+## Null: the Q6 two-query-block kernel (added 2026-11-01)
+
+The last untested lever. `q6-batched-kernel` was `DISABLED` by property rather than unsupported --
+`models.purejava.q6BatchedKernel` selects one-query blocks by default -- and mellum's output head is
+Q6_K at 98304 x 2304, a real share of what each token reads, so the specialised variant was worth
+measuring.
+
+| configuration | decode runs | mean | tokens |
+|---|---|---:|---:|
+| one-query-block (default) | 27.80, 28.20, 27.76 | **27.92** | 825 |
+| two-query-block | 28.46, 27.90 | **28.18** | 825 |
+
+**+0.9%, which is inside the noise.** The default's runs span 27.76-28.20 and the variant's span
+27.90-28.46; the means differ by 0.26 tok/s against spreads of 0.44 and 0.56. Output tokens are
+identical at 825 in every run, so unlike the fused-attention measurement there is no generation-
+length confound to unpick -- this is a clean comparison and it shows nothing.
+
+The toggle was observable, which is why the null can be trusted: the run reports
+`q6-batched-kernel: ENABLED` with `kernel: two-query-block, requested-kernel: two-query-block`, so
+the variant executed rather than silently declining. A flat result from a setting that never took
+effect would be "no data", not "no effect".
+
+Ratio against the comparator mean: **0.7698, FAIL**. Artifacts `q6-two-query-run1.json` and
+`q6-two-query-run2.json`.
+
+## Final standing for mellum
+
+`FAILED_RELATIVE_GATE`, replicated, at **0.763-0.770** against a 0.80 floor. Every dispatch-level
+lever is now taken or measured null:
+
+| lever | decode effect |
+|---|---|
+| kernel seam, grouped expert dispatch | part of the 21.70 baseline |
+| vectorised swiGLU | prefill +76%, decode unmoved |
+| Q5_0 independent dispatch | **+13.2%** |
+| fused grouped attention | **+17.0%** (+21% at matched token length) |
+| native kernel threads 16 -> 8 | **null**, 33% worse |
+| Q6 two-query-block | **null**, +0.9% within noise |
+
+Decode went 21.70 -> 27.92, **+28.7%**, and needs 29.29. The remaining 4.8% is the quantised GEMV's
+bandwidth efficiency -- about 45 GB/s against the comparator's 59 on the same 16 cores -- which is
+kernel work, not wiring, and is where this stops.
