@@ -2915,11 +2915,13 @@ public final class LlamaForwardPass {
     if (config.usesGeluFfn()) {
       TensorOps.geluGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
     } else if (config.usesGraniteScaling()) {
-      // Granite: the tier-stable vector sigmoid; vectors-core's swiGlu resolves lanewise EXP to
-      // the vector math library only once compiled and would differ by JIT tier.
+      // Granite retains its distinct sigmoid arithmetic; it does not use the Qwen activation.
+      // Routing this branch through the optional Qwen kernel would change that contract.
       GroupedQueryAttentionKernel.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
     } else if (usesVectorizedSwiGlu()) {
-      VectorUtil.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
+      if (!batchedMatrixKernel.trySwiGlu(out, outOffset, gate, gateOffset, up, upOffset, size)) {
+        VectorUtil.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
+      }
     } else {
       TensorOps.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
     }

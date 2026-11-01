@@ -204,6 +204,9 @@ val nativePlatformJar by tasks.registering(Jar::class) {
     archiveBaseName.set("models-kernels-${nativePlatform.id}")
     destinationDirectory.set(layout.buildDirectory.dir("native-artifacts"))
     from(nativeResourceRoot)
+    from("src/main/resources") {
+        include("META-INF/NOTICE", "META-INF/licenses/arm-optimized-routines.txt")
+    }
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
     manifest {
@@ -227,6 +230,9 @@ artifacts {
 fun verifyNativeArtifact(artifact: File, platform: NativePlatformSpec) {
     require(artifact.isFile) { "Missing native artifact: ${artifact.absolutePath}" }
     JarFile(artifact).use { jar ->
+        for (notice in listOf("META-INF/NOTICE", "META-INF/licenses/arm-optimized-routines.txt")) {
+            require(jar.getJarEntry(notice) != null) { "${artifact.name} is missing $notice" }
+        }
         val resourceDirectory = "META-INF/models/native/${platform.id}/"
         val metadataEntry =
             jar.getJarEntry("${resourceDirectory}native.properties")

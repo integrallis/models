@@ -1,0 +1,12 @@
+The native float SwiGLU exponential polynomial is adapted from Arm optimized-routines.
+Copyright (c) 2019-2026, Arm Limited.
+SPDX-License-Identifier: MIT OR Apache-2.0 WITH LLVM-exception
+
+Upstream: https://github.com/ARM-software/optimized-routines
+Revision: 69d38dd8e3ee8bdde2f674ecc2d99af10fd27996
+File: math/aarch64/advsimd/expf.c
+License text: META-INF/licenses/arm-optimized-routines.txt
+
+Modifications: Rust AVX2/NEON port of the polynomial and fixed coefficients;
+nearest-even range reduction; checked input-domain and alias validation;
+fused SiLU and up multiplication. Unsupported inputs remain on the Java path.
