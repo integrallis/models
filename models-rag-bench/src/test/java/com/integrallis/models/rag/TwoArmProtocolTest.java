@@ -74,21 +74,43 @@ class TwoArmProtocolTest {
     for (String script :
         new String[] {"scripts/fleet/two-arm-pod.sh", "scripts/fleet/qual-worker-two-arm.sh"}) {
       String body = Files.readString(repositoryFile(script));
-      int cursor = 0;
-      while (true) {
-        int arm = body.indexOf("--backend llama.cpp", cursor);
-        if (arm < 0) {
-          break;
+      for (String engine : new String[] {"--backend llama.cpp", "--backend ollama"}) {
+        int cursor = 0;
+        while (true) {
+          int arm = body.indexOf(engine, cursor);
+          if (arm < 0) {
+            break;
+          }
+          // The invocation ends at the first --output, which every arm writes. The pod runner
+          // builds its arm into COMPARATOR_ARGS and passes --artifact beside it, so the window
+          // searched runs from the engine to the end of the invocation that consumes it.
+          int end = body.indexOf("--output", arm);
+          assertThat(end).as("comparator arm in %s has no --output", script).isPositive();
+          assertThat(body.substring(arm, end))
+              .as("the %s comparator arm in %s must pass --artifact", engine, script)
+              .contains("--artifact");
+          cursor = end;
         }
-        // The invocation ends at the first --output, which every arm writes.
-        int end = body.indexOf("--output", arm);
-        assertThat(end).as("comparator arm in %s has no --output", script).isPositive();
-        assertThat(body.substring(arm, end))
-            .as("the llama.cpp comparator arm in %s must pass --artifact", script)
-            .contains("--artifact");
-        cursor = end;
       }
     }
+  }
+
+  /**
+   * The pod runner defaults to the only comparator that can reach QUALIFIED.
+   *
+   * <p>{@code RagProductionQualificationPolicy.AUTHORITATIVE_ENGINES} is {@code {ollama,
+   * transformers}}. A llama.cpp arm is admitted at 0.45/2.0 but is never the backend that qualifies
+   * a model, so a runner defaulting to it produces a comparison that is real, admissible, and still
+   * cannot return better than FAILED_RELATIVE_GATE -- a whole run that decides nothing. The
+   * publisher-reference route that does let llama.cpp qualify a model is reviewed per artifact and
+   * exists for publishers who ship their own llama.cpp, which is not the case for any of the
+   * architectures this runner was written for.
+   */
+  @Test
+  void thePodRunnerDefaultsToAnAuthoritativeComparator() throws IOException {
+    String runner = Files.readString(repositoryFile("scripts/fleet/two-arm-pod.sh"));
+
+    assertThat(runner).contains("COMPARATOR=${COMPARATOR:-ollama}");
   }
 
   private static int valueOf(String protocol, String name) {

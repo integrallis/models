@@ -17,7 +17,6 @@ CP=$(ls /root/models-rag-bench/lib/*.jar | tr '\n' ':')
 KERNEL=${KERNEL:-/root/model-kernels/target/release/libjmodels_kernels.so}
 SERVER=${SERVER:-/root/llama.cpp/build/bin/llama-server}
 : "${BACKEND_VERSION:?BACKEND_VERSION is required: it is stamped into the candidate report}"
-: "${COMPARATOR_VERSION:?COMPARATOR_VERSION is required: it identifies the comparator build}"
 mkdir -p "$OUT"
 ARGS=$(two_arm_common_args "$WORKLOAD" "$TPL" "$TOPK" "$CONTEXT" "$THREADS" "$MAXTOK")
 
@@ -39,49 +38,75 @@ $JAVA --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED \
   --output "$OUT/candidate.json" > "$OUT/candidate.log" 2>&1
 echo "### candidate rc=$?"
 
-echo "### starting llama-server"
-$SERVER -m "$ART" -c $CONTEXT -t $THREADS --port $PORT --host 127.0.0.1 > "$OUT/server.log" 2>&1 &
-SPID=$!
-trap 'kill $SPID 2>/dev/null' EXIT
-READY=0
-for i in $(seq 1 300); do
-  # Readiness is the HTTP status, never the body: a loading server answers 503 with prose that
-  # contains the word "ok".
-  CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/health" 2>/dev/null || echo 000)
-  [ "$CODE" = "200" ] && { READY=1; echo "### server ready after ${i}s"; break; }
-  sleep 1
-done
-[ "$READY" = "1" ] || { echo "### SERVER NEVER REACHED HTTP 200 (last $CODE) -- aborting rather than recording an error arm"; tail -25 "$OUT/server.log"; exit 1; }
+# COMPARATOR picks the engine. ollama is the default because it is the only one that can produce a
+# QUALIFIED verdict here: RagProductionQualificationPolicy's AUTHORITATIVE_ENGINES is
+# {ollama, transformers}, and while a llama.cpp arm is admitted at 0.45/2.0 it can never be the
+# backend that qualifies a model -- it reaches FAILED_RELATIVE_GATE at best unless a reviewed
+# --publisher-reference is supplied, and the two pinned references exist only because those
+# publishers ship their own llama.cpp (a fork, and a patch). Upstream serves mellum, lfm2moe and
+# maple without either, so the publisher-reference route does not apply to them.
+COMPARATOR=${COMPARATOR:-ollama}
+
+if [ "$COMPARATOR" = "ollama" ]; then
+  export HOME=${HOME:-/root}
+  export OLLAMA_MODELS=${OLLAMA_MODELS:-/root/ollama}
+  # HOME must be set before any ollama invocation: envconfig resolves the model directory while
+  # building the CLI, so `serve` and `create` alike die on an unset HOME before parsing an argument.
+  command -v ollama >/dev/null || { echo "### ollama is not installed"; exit 1; }
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:11434/api/tags 2>/dev/null || echo 000)
+  [ "$CODE" = "200" ] || (OLLAMA_HOST=127.0.0.1:11434 OLLAMA_MAX_LOADED_MODELS=1 nohup ollama serve >> /root/ollama-serve.log 2>&1 &)
+  for i in $(seq 1 120); do
+    CODE=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:11434/api/tags 2>/dev/null || echo 000)
+    [ "$CODE" = "200" ] && { echo "### ollama ready after ${i}s"; break; }
+    sleep 1
+  done
+  [ "$CODE" = "200" ] || { echo "### OLLAMA NEVER ANSWERED 200 -- aborting"; exit 1; }
+  # `ollama create` from this exact file, never a registry copy of the same name, so the layer
+  # digest equals the candidate's artifactSha256 and the comparison is not excluded.
+  printf 'FROM %s\n' "$ART" > "$OUT/Modelfile"
+  ollama create "qual-$MODEL_ID" -f "$OUT/Modelfile" > "$OUT/create.log" 2>&1 || {
+    echo "### ollama create failed"; tail -5 "$OUT/create.log"; exit 1; }
+  # Warm the weights off disk so the first measured case is not paying a 5-20 GB cold read. The
+  # protocol's --warmups covers JIT and caches on our side; it does not cover the comparator's load.
+  curl -s http://127.0.0.1:11434/api/generate --max-time 900 \
+    -d "{\"model\":\"qual-$MODEL_ID\",\"prompt\":\"warm\",\"stream\":false,\"options\":{\"num_predict\":1,\"num_thread\":$THREADS}}" \
+    > "$OUT/warm.json" 2>&1 || true
+  COMPARATOR_ARGS="--backend ollama --backend-version ollama@$(ollama --version 2>&1 | head -1 | tr -d '\n' | tr ' ' '-')"
+  COMPARATOR_ARGS="$COMPARATOR_ARGS --endpoint http://127.0.0.1:11434 --model qual-$MODEL_ID"
+else
+  echo "### starting llama-server"
+  $SERVER -m "$ART" -c $CONTEXT -t $THREADS --port $PORT --host 127.0.0.1 > "$OUT/server.log" 2>&1 &
+  SPID=$!
+  trap 'kill $SPID 2>/dev/null' EXIT
+  READY=0
+  for i in $(seq 1 300); do
+    # Readiness is the HTTP status, never the body: a loading server answers 503 with prose that
+    # contains the word "ok".
+    CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/health" 2>/dev/null || echo 000)
+    [ "$CODE" = "200" ] && { READY=1; echo "### server ready after ${i}s"; break; }
+    sleep 1
+  done
+  [ "$READY" = "1" ] || { echo "### SERVER NEVER REACHED HTTP 200 (last $CODE) -- aborting rather than recording an error arm"; tail -25 "$OUT/server.log"; exit 1; }
+  : "${COMPARATOR_VERSION:?COMPARATOR_VERSION is required for a llama.cpp arm}"
+  COMPARATOR_ARGS="--backend llama.cpp --backend-version $COMPARATOR_VERSION"
+  COMPARATOR_ARGS="$COMPARATOR_ARGS --endpoint http://127.0.0.1:$PORT --model $ART"
+fi
 
 # --artifact is what makes this report admissible: without it artifactSha256 is null and the policy
 # excludes the comparison as "artifact SHA-256 differs". RagBenchmarkCli now refuses the run
 # outright, so this cannot be forgotten again, but it is passed explicitly here for the reader.
-echo "### ARM 2 comparator (llama.cpp)"
+echo "### ARM 2 comparator ($COMPARATOR)"
 $JAVA --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -cp "$CP" \
   com.integrallis.models.rag.RagBenchmarkCli \
-  --framework plain-java --backend llama.cpp --backend-version "$COMPARATOR_VERSION" \
-  --endpoint "http://127.0.0.1:$PORT" \
-  --model "$ART" --artifact "$ART" --model-id "$MODEL_ID" $ARGS \
+  --framework plain-java $COMPARATOR_ARGS \
+  --artifact "$ART" --model-id "$MODEL_ID" $ARGS \
   --output "$OUT/comparator.json" > "$OUT/comparator.log" 2>&1
 echo "### comparator rc=$?"
 echo "### host loadavg after: $(cat /proc/loadavg)   [host-wide, not ours]"
 
-# A verdict comes from the policy, never from dividing the two reports by hand. A llama.cpp
-# comparator is admitted at 0.45/2.0 but is not an AUTHORITATIVE_ENGINE, so the verdict it can
-# reach alone is FAILED_RELATIVE_GATE -- it takes ollama, transformers, or a reviewed
-# --publisher-reference to reach QUALIFIED. Run it anyway: the comparison it prints is the evidence.
+# A verdict comes from the policy, never from dividing the two reports by hand.
 $JAVA -cp "$CP" com.integrallis.models.rag.RagQualificationCli \
   --candidate "$OUT/candidate.json" --comparator "$OUT/comparator.json" \
   --output "$OUT/verdict.json" > "$OUT/verdict.log" 2>&1 || true
-python3 - "$OUT/verdict.json" <<'PY' || true
-import json,sys
-q=json.load(open(sys.argv[1]))['qualification']
-print('### verdict:',q['verdict'],'qualified=',q['qualified'])
-print('### contribution: answerRate=%.4f correctRate=%.4f'%(q['modelAnswerRate'],q['modelAnswerCorrectRate']))
-for c in q.get('comparisons',[]):
-    print('### vs %s: decodeRatio=%.4f e2eRatio=%.4f qualified=%s'
-          %(c['comparatorBackend'],c['decodeThroughputRatio'],c['endToEndLatencyRatio'],c['qualified']))
-for k,v in (q.get('exclusions') or {}).items():
-    print('### EXCLUDED %s: %s'%(k,v))
-PY
+python3 "$SCRIPT_DIR/print-verdict.py" "$OUT/verdict.json" || true
 echo DONE > "$OUT/arms.done"
