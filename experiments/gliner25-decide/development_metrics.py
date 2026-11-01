@@ -35,3 +35,14 @@ def measure_development(model, cases, bf16):
         metrics[prefix+'micro_f1']=f1([sum(row[i] for row in labels.values()) for i in range(3)])
         metrics[prefix+'macro_f1']=sum(map(f1,labels.values()))/len(labels)
     return metrics
+
+
+def admission_margin(metrics, gates):
+    """Development-only minimum normalized gate score; no qualification outcomes are consumed."""
+    ratios=[metrics['dev_boolq_accuracy']/gates['boolqAccuracy'],
+        metrics['dev_goemotions_micro_f1']/gates['goEmotionsMicroF1'],
+        metrics['dev_goemotions_macro_f1']/gates['goEmotionsMacroF1']]
+    domains=[value for name,value in metrics.items() if name.startswith('dev_clinc_') and name.endswith('_macro_f1')]
+    if len(domains)!=10:raise ValueError('development intent-domain coverage differs')
+    ratios += [value/gates['eachClincDomainMacroF1'] for value in domains]
+    return min(ratios)

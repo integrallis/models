@@ -1,4 +1,4 @@
-"""Remote GPU-only bounded LoRA training; qualification data is never opened here."""
+"""Remote GPU-only bounded training; qualification data is never opened here."""
 import argparse
 import gc
 import importlib.metadata
@@ -66,12 +66,16 @@ def main():
                             **policy['training'])
     compute_metrics=None
     if policy.get('developmentDiagnostics'):
-        from development_metrics import measure_development
+        from development_metrics import measure_development, admission_margin
         development_path=args.data/'development-cases.jsonl'
         if digest(development_path)!=splits['files']['development-cases.jsonl']['sha256']:
             raise ValueError('development diagnostic data identity mismatch')
         development=[json.loads(line) for line in development_path.read_text().splitlines()]
-        compute_metrics=lambda trained,dataset:measure_development(trained,development,policy['training']['bf16'])
+        def compute_metrics(trained,dataset):
+            metrics=measure_development(trained,development,policy['training']['bf16'])
+            metrics['dev_admission_margin']=admission_margin(metrics,policy['quality'])
+            print(json.dumps(dict(stage='development',metrics=metrics)),flush=True)
+            return metrics
     trainer = BoundedTrainer(model=model,config=config,compute_metrics=compute_metrics)
     trainer.deadline = time.monotonic()+policy['maximumTrainingSeconds']
     started = time.monotonic(); status='completed'
@@ -83,24 +87,32 @@ def main():
         # The cutoff is not a selected checkpoint. Evaluate it on development data only.
         trainer._evaluate(trainer._prepare_data(str(args.data/'development.jsonl'),is_train=False))
     best = checkpoint_dir/'best'
-    if not (best/'adapter_model.safetensors').is_file() or not math.isfinite(trainer.best_metric):
+    selected_file=best/('adapter_model.safetensors' if config.use_lora else 'model.safetensors')
+    if not selected_file.is_file() or not math.isfinite(trainer.best_metric):
         raise RuntimeError('no valid development-selected checkpoint')
     record = dict(candidate=policy['candidate'],status=status,steps=trainer.global_step,
-        trainingSeconds=time.monotonic()-started,selectionMetric='development_loss',
-        bestDevelopmentLoss=trainer.best_metric,trainingHistory=trainer.train_metrics_history,
+        trainingSeconds=time.monotonic()-started,selectionMetric=config.metric_for_best,
+        bestSelectionMetric=trainer.best_metric,
+        bestDevelopmentLoss=next(row['eval_loss'] for row in trainer.eval_metrics_history if row[config.metric_for_best]==trainer.best_metric),
+        trainableParameters=sum(p.numel() for p in trainer.model.parameters() if p.requires_grad),
+        trainingHistory=trainer.train_metrics_history,
         developmentHistory=trainer.eval_metrics_history,baseSnapshot=base_manifest,
         trainingPolicy=policy,splitManifest=splits,gpu=torch.cuda.get_device_name(0),
         torchVersion=torch.__version__,cudaVersion=torch.version.cuda,
         packages={name:importlib.metadata.version(name) for name in ['transformers','tokenizers','peft','safetensors']},
-        adapterSha256=digest(best/'adapter_model.safetensors'),catalogQualified=False)
+        selectedCheckpointSha256=digest(selected_file),catalogQualified=False)
     trainer.model.cpu()
     del trainer,model
     gc.collect();torch.cuda.empty_cache()
-    # Reload the selected adapter on a fresh base: no accidental merge of the final step's adapter.
-    base = AutoExtractor.from_pretrained(str(args.snapshot),local_files_only=True,
-                                         attention_backend='standard',map_location='cpu')
-    selected = PeftModel.from_pretrained(base,str(best))
-    merged = selected.merge_and_unload().float().eval()
+    # Reload the development-selected checkpoint; never export the last training step accidentally.
+    if config.use_lora:
+        base = AutoExtractor.from_pretrained(str(args.snapshot),local_files_only=True,
+                                             attention_backend='standard',map_location='cpu')
+        selected = PeftModel.from_pretrained(base,str(best))
+        merged = selected.merge_and_unload().float().eval()
+    else:
+        merged = AutoExtractor.from_pretrained(str(best),local_files_only=True,
+                                               attention_backend='standard',map_location='cpu').float().eval()
     state = {name:tensor.detach().cpu().contiguous() for name,tensor in merged.state_dict().items()}
     with safe_open(str(args.snapshot/'model.safetensors'),framework='pt',device='cpu') as original:
         if set(state) != set(original.keys()):

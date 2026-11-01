@@ -95,10 +95,11 @@ def main():
         upload(output/name, name)
     for entry in snapshot['files']:
         upload(output/'snapshot'/entry['path'], 'snapshot/'+entry['path'])
-    adapter = ROOT/'selected-adapter.tar.gz'
-    with tarfile.open(adapter, 'w:gz') as archive:
-        archive.add(output/'checkpoints/best', arcname='best')
-    upload(adapter, 'selected-adapter.tar.gz')
+    if policy['training']['use_lora']:
+        adapter = ROOT/'selected-adapter.tar.gz'
+        with tarfile.open(adapter, 'w:gz') as archive:
+            archive.add(output/'checkpoints/best', arcname='best')
+        upload(adapter, 'selected-adapter.tar.gz')
     upload(LOG, 'worker.log')
     result = json.loads((output/'training-record.json').read_text())
     status('complete', steps=result['steps'], trainingSeconds=result['trainingSeconds'],
