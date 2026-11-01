@@ -5,6 +5,9 @@ edition = "2024"
 license = "Apache-2.0"
 publish = false
 
+[dependencies]
+tokenizers = { version = "=0.22.2", default-features = false, features = ["onig"] }
+
 [lib]
 name = "jmodels_kernels"
 crate-type = ["cdylib"]

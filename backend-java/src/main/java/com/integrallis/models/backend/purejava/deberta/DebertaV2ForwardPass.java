@@ -73,6 +73,26 @@ final class DebertaV2ForwardPass {
     return VectorUtil.dotProduct(pooled, weights.classifierWeight()) + weights.classifierBias()[0];
   }
 
+  synchronized float[][] encode(int[] tokens, int[] positions) {
+    Objects.requireNonNull(tokens, "tokens");
+    Objects.requireNonNull(positions, "positions");
+    if (tokens.length == 0 || tokens.length > config.maxPositions()) {
+      throw new IllegalArgumentException("token count outside encoder context: " + tokens.length);
+    }
+    for (int position : positions) {
+      if (position < 0 || position >= tokens.length) {
+        throw new IllegalArgumentException("marker position outside input: " + position);
+      }
+    }
+    execute(tokens);
+    float[][] result = new float[positions.length][config.hiddenSize()];
+    for (int row = 0; row < positions.length; row++) {
+      System.arraycopy(
+          hidden, positions[row] * config.hiddenSize(), result[row], 0, config.hiddenSize());
+    }
+    return result;
+  }
+
   static int relativeBucket(int relativePosition, int bucketSize, int maxPosition) {
     if (bucketSize <= 0 || maxPosition <= bucketSize / 2) {
       throw new IllegalArgumentException("invalid relative-position bucket geometry");

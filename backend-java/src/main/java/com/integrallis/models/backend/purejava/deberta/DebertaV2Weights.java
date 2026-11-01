@@ -24,7 +24,7 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** DeBERTa-v2 reranker weights expanded once from immutable F16 Safetensors storage. */
+/** DeBERTa-v2 reranker weights expanded once from immutable F16/F32 Safetensors storage. */
 final class DebertaV2Weights {
 
   static final class Matrix {
@@ -110,13 +110,23 @@ final class DebertaV2Weights {
   }
 
   static DebertaV2Weights load(TensorSource source, DebertaV2Config config) {
+    return load(source, config, "deberta.", true);
+  }
+
+  static DebertaV2Weights loadEncoder(
+      TensorSource source, DebertaV2Config config, String namespace) {
+    return load(source, config, namespace, false);
+  }
+
+  private static DebertaV2Weights load(
+      TensorSource source, DebertaV2Config config, String namespace, boolean withHead) {
     Objects.requireNonNull(source, "source");
     Objects.requireNonNull(config, "config");
     int dim = config.hiddenSize();
     int relativeRows = Math.multiplyExact(config.positionBuckets(), 2);
     Layer[] layers = new Layer[config.numLayers()];
     for (int layer = 0; layer < layers.length; layer++) {
-      String prefix = "deberta.encoder.layer." + layer + ".";
+      String prefix = namespace + "encoder.layer." + layer + ".";
       layers[layer] =
           new Layer(
               matrix(source, prefix + "attention.self.query_proj.weight", dim, dim),
@@ -137,17 +147,19 @@ final class DebertaV2Weights {
               vector(source, prefix + "output.LayerNorm.bias", dim));
     }
     return new DebertaV2Weights(
-        matrix(source, "deberta.embeddings.word_embeddings.weight", config.vocabSize(), dim),
-        vector(source, "deberta.embeddings.LayerNorm.weight", dim),
-        vector(source, "deberta.embeddings.LayerNorm.bias", dim),
-        matrix(source, "deberta.encoder.rel_embeddings.weight", relativeRows, dim),
-        vector(source, "deberta.encoder.LayerNorm.weight", dim),
-        vector(source, "deberta.encoder.LayerNorm.bias", dim),
+        matrix(source, namespace + "embeddings.word_embeddings.weight", config.vocabSize(), dim),
+        vector(source, namespace + "embeddings.LayerNorm.weight", dim),
+        vector(source, namespace + "embeddings.LayerNorm.bias", dim),
+        matrix(source, namespace + "encoder.rel_embeddings.weight", relativeRows, dim),
+        vector(source, namespace + "encoder.LayerNorm.weight", dim),
+        vector(source, namespace + "encoder.LayerNorm.bias", dim),
         layers,
-        matrix(source, "pooler.dense.weight", config.poolerHiddenSize(), dim),
-        vector(source, "pooler.dense.bias", config.poolerHiddenSize()),
-        matrix(source, "classifier.weight", 1, config.poolerHiddenSize()).values(),
-        vector(source, "classifier.bias", 1));
+        withHead ? matrix(source, "pooler.dense.weight", config.poolerHiddenSize(), dim) : null,
+        withHead ? vector(source, "pooler.dense.bias", config.poolerHiddenSize()) : null,
+        withHead
+            ? matrix(source, "classifier.weight", 1, config.poolerHiddenSize()).values()
+            : null,
+        withHead ? vector(source, "classifier.bias", 1) : null);
   }
 
   Matrix wordEmbeddings() {
@@ -225,9 +237,10 @@ final class DebertaV2Weights {
               + Arrays.toString(tensor.shape()));
     }
     TensorStorage expected = new TensorStorage("safetensors", "F16", 1, Short.BYTES);
-    if (!expected.equals(tensor.storage())) {
+    boolean f32 = new TensorStorage("safetensors", "F32", 1, Float.BYTES).equals(tensor.storage());
+    if (!expected.equals(tensor.storage()) && !f32) {
       throw new IllegalArgumentException(
-          name + " must use Safetensors F16; got " + tensor.storage());
+          name + " must use Safetensors F16 or F32; got " + tensor.storage());
     }
     int elements = 1;
     for (long dimension : shape) {
@@ -236,7 +249,12 @@ final class DebertaV2Weights {
     float[] values = new float[elements];
     MemorySegment data = tensor.data();
     for (int index = 0; index < elements; index++) {
-      values[index] = Float.float16ToFloat(data.get(LE_SHORT, (long) index * Short.BYTES));
+      values[index] =
+          f32
+              ? data.get(
+                  ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN),
+                  (long) index * Float.BYTES)
+              : Float.float16ToFloat(data.get(LE_SHORT, (long) index * Short.BYTES));
     }
     return values;
   }
