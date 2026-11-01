@@ -18,6 +18,8 @@ package com.integrallis.models.backend.purejava.deberta;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -37,6 +39,8 @@ final class DebertaV2ForwardPass {
   private final float[] pooled;
   private final Worker[] workers;
   private final DebertaV2Kernels projection;
+  private final Map<DebertaV2Weights.Matrix, DebertaV2Kernels.Projection> preparedMatrices =
+      new IdentityHashMap<>();
 
   private float[] hidden = new float[0];
   private float[] queries = new float[0];
@@ -65,6 +69,23 @@ final class DebertaV2ForwardPass {
     this.workers = new Worker[resolveParallelism()];
     for (int worker = 0; worker < workers.length; worker++) {
       workers[worker] = new Worker(new float[config.maxPositions()]);
+    }
+    if (projection != null) {
+      for (int index = 0; index < config.numLayers(); index++) {
+        var layer = weights.layer(index);
+        for (var matrix :
+            new DebertaV2Weights.Matrix[] {
+              layer.query(),
+              layer.key(),
+              layer.value(),
+              layer.attentionOutput(),
+              layer.feedForwardUp(),
+              layer.feedForwardDown()
+            }) {
+          preparedMatrices.computeIfAbsent(
+              matrix, value -> projection.prepare(value.values(), value.rows(), value.columns()));
+        }
+      }
     }
     this.relativeProjections = prepareRelativeProjections();
   }
@@ -318,7 +339,7 @@ final class DebertaV2ForwardPass {
 
   private void project(float[] output, float[] input, int rows, DebertaV2Weights.Matrix matrix) {
     if (projection != null) {
-      projection.project(output, input, rows, matrix.values(), matrix.rows(), matrix.columns());
+      preparedMatrices.get(matrix).project(output, input, rows);
       return;
     }
     forEachRow(

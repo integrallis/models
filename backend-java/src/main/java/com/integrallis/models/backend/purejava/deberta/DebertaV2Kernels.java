@@ -17,10 +17,17 @@ package com.integrallis.models.backend.purejava.deberta;
 
 /** Synchronous dense projection and disentangled attention over caller-owned row-major buffers. */
 public interface DebertaV2Kernels {
+  /** A prepared immutable matrix whose storage is owned by the enclosing kernel provider. */
+  @FunctionalInterface
+  interface Projection {
+    /** Computes output[batch, outputs] = input[batch, inputs] * transpose(prepared weights). */
+    void project(float[] output, float[] input, int batch);
+  }
+
   /**
-   * Computes output[batch, outputs] = input[batch, inputs] * transpose(weights[outputs, inputs]).
+   * Copies immutable weights once; callers may subsequently modify or release their input array.
    */
-  void project(float[] output, float[] input, int batch, float[] weights, int outputs, int inputs);
+  Projection prepare(float[] weights, int outputs, int inputs);
 
   /** Computes bidirectional attention with the supplied relative-position indices. */
   void attend(

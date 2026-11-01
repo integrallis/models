@@ -101,7 +101,8 @@ class NativeDebertaKernelsTest {
         Arrays.fill(y, 99);
         for (int i = 0; i < x.length; i++) x[i] = random.nextFloat() - 0.5f;
         for (int i = 0; i < w.length; i++) w[i] = random.nextFloat() - 0.5f;
-        projection.project(y, x, batch, w, outputs, inputs);
+        var prepared = projection.prepare(w, outputs, inputs);
+        prepared.project(y, x, batch);
         for (int row = 0; row < batch; row++)
           for (int col = 0; col < outputs; col++) {
             double expected = 0;
@@ -112,27 +113,33 @@ class NativeDebertaKernelsTest {
           }
         for (int i = batch * outputs; i < y.length; i++) assertThat(y[i]).isEqualTo(99f);
         float[] before = y.clone();
-        assertThatThrownBy(() -> projection.project(y, x, batch, w, outputs + 1, inputs))
+        assertThatThrownBy(() -> prepared.project(y, new float[x.length - 1], batch))
             .isInstanceOf(IllegalArgumentException.class);
         assertThat(y).containsExactly(before);
       }
+      float[] mutableWeights = {11, 13};
+      var shared = projection.prepare(mutableWeights, 1, 2);
+      Arrays.fill(mutableWeights, 0); // Preparation owns an immutable copy.
       try (var pool = Executors.newFixedThreadPool(4)) {
         var tasks = new ArrayList<Callable<Void>>();
         for (int i = 0; i < 16; i++)
           tasks.add(
               () -> {
                 float[] out = new float[2];
-                projection.project(out, new float[] {2, -3, 5, 7}, 2, new float[] {11, 13}, 1, 2);
+                shared.project(out, new float[] {2, -3, 5, 7}, 2);
                 assertThat(out).containsExactly(-17, 146);
                 return null;
               });
         for (var future : pool.invokeAll(tasks)) future.get();
       }
+      projection.close();
+      assertThatThrownBy(() -> shared.project(new float[1], new float[2], 1))
+          .isInstanceOf(IllegalStateException.class);
     } finally {
       projection.close();
     }
     projection.close();
-    assertThatThrownBy(() -> projection.project(new float[1], new float[1], 1, new float[1], 1, 1))
+    assertThatThrownBy(() -> projection.prepare(new float[1], 1, 1))
         .isInstanceOf(IllegalStateException.class);
   }
 }

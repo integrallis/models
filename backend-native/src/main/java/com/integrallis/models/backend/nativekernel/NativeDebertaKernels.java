@@ -22,7 +22,10 @@ import java.lang.invoke.MethodHandle;
 import java.nio.file.Path;
 import java.util.Objects;
 
-/** Owned synchronous F32 matrix and disentangled-attention pool with reusable native staging buffers. */
+/**
+ * Owned synchronous F32 matrix and disentangled-attention pool with reusable native staging
+ * buffers.
+ */
 @SuppressWarnings("restricted")
 public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseable {
   private final Arena arena = Arena.ofShared();
@@ -111,24 +114,32 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
   }
 
   @Override
-  public synchronized void project(
-      float[] output, float[] input, int batch, float[] weights, int outputs, int inputs) {
-    if (handle == 0) throw new IllegalStateException("dense projection is closed");
+  public synchronized Projection prepare(float[] weights, int outputs, int inputs) {
+    if (handle == 0) throw new IllegalStateException("DeBERTa kernels are closed");
+    Objects.requireNonNull(weights, "weights");
+    if (outputs < 1 || inputs < 1)
+      throw new IllegalArgumentException("positive dimensions required");
+    int count = Math.multiplyExact(outputs, inputs);
+    if (weights.length != count)
+      throw new IllegalArgumentException("projection weight shape mismatch");
+    MemorySegment matrix = arena.allocate((long) count * Float.BYTES, 64);
+    MemorySegment.copy(MemorySegment.ofArray(weights), 0, matrix, 0, matrix.byteSize());
+    return (output, input, batch) -> projectPrepared(output, input, batch, matrix, outputs, inputs);
+  }
+
+  private synchronized void projectPrepared(
+      float[] output, float[] input, int batch, MemorySegment matrix, int outputs, int inputs) {
+    if (handle == 0) throw new IllegalStateException("DeBERTa kernels are closed");
     Objects.requireNonNull(output, "output");
     Objects.requireNonNull(input, "input");
-    Objects.requireNonNull(weights, "weights");
-    if (batch < 1 || outputs < 1 || inputs < 1)
-      throw new IllegalArgumentException("positive dimensions required");
+    if (batch < 1) throw new IllegalArgumentException("positive batch required");
     int xn = Math.multiplyExact(batch, inputs);
-    int wn = Math.multiplyExact(outputs, inputs);
     int yn = Math.multiplyExact(batch, outputs);
-    if (input.length < xn || weights.length != wn || output.length < yn)
+    if (input.length < xn || output.length < yn)
       throw new IllegalArgumentException("projection buffer shape mismatch");
     x = reserve(x, xn);
-    w = reserve(w, wn);
     y = reserve(y, yn);
     MemorySegment.copy(MemorySegment.ofArray(input), 0, x, 0, (long) xn * Float.BYTES);
-    MemorySegment.copy(MemorySegment.ofArray(weights), 0, w, 0, (long) wn * Float.BYTES);
     try {
       int result =
           (int)
@@ -136,8 +147,8 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
                   handle,
                   x,
                   (long) xn,
-                  w,
-                  (long) wn,
+                  matrix,
+                  matrix.byteSize() / Float.BYTES,
                   y,
                   (long) yn,
                   (long) batch,
