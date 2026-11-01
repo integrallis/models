@@ -71,9 +71,19 @@ Both instances are verified terminated and no volumes from their launch window r
 ## Remaining work
 
 The user authorized a separately named accuracy-improved variant for qualification and general
-use. Training/development/fresh qualification splits and bounded LoRA tooling are prepared;
-no training has run and no accuracy improvement is claimed. The AWS account reports zero G- and
-P-family GPU quota; locating the existing RunPod configuration is pending. ModelJars integration, a released
+use. RunPod training completed all 1,500 steps in 262.4 seconds on one RTX PRO 6000 Blackwell
+Server Edition. The selected adapter's development loss is 10.5616. Its merged F32 checkpoint
+has SHA-256 `d1ca5a14b0b535987ce6333680d0de2c963100cbff91745620e8455ec731caf5` and the unchanged
+tensor inventory and tokenizer/config files. Training details, dependency versions, split identities
+and logs are in `gliner25-training-20261101T193857Z/`; the weights remain in the private result
+bucket. The pod is verified deleted. Its conservative rental upper bound is 457 seconds,
+bringing the aggregate through training to 3,059 seconds. This is not an accuracy result.
+
+The first CPU evaluation stopped before inference because the worker role cannot read the
+training archive prefix. Its 225 seconds count toward the cap and its logs are retained.
+The replacement stages the same objects server-side into the permitted payload prefix and
+is running the frozen parity and quality suites. No held-out accuracy gain is claimed yet.
+ModelJars integration, a released
 runtime repeat, native packaging checks across advertised platforms, and catalog publication
 remain outstanding. A different or fine-tuned checkpoint would need a distinct identity and
 fresh held-out qualification; this base checkpoint remains a candidate.

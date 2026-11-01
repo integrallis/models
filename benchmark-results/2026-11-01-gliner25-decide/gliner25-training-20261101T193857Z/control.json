@@ -1,0 +1,117 @@
+{
+  "experiment": "gliner25-training-20261101T193857Z",
+  "sourceRevision": "e77b48fdfbf03036ccc1ef66aa99611bdf15e5d2",
+  "payloadSha256": "d21971fc7f6a882c4bd178e386fa3e9bd68b8e88a314838988e1f72838c69deb",
+  "workerSha256": "5a0416923cd6b78dd865f4660273a4c05a1f8bdb82d304527a688b45c11636e8",
+  "provider": "RunPod",
+  "cloud": "SECURE",
+  "gpu": {
+    "availability": "MEDIUM",
+    "community": true,
+    "cudaVersions": [
+      {
+        "available": true,
+        "version": "13.2"
+      }
+    ],
+    "dataCenters": [
+      {
+        "availability": "LOW",
+        "id": "EU-CZ-1",
+        "name": "EU-CZ-1"
+      },
+      {
+        "availability": "LOW",
+        "id": "EU-NL-1",
+        "name": "EU-NL-1"
+      },
+      {
+        "availability": "LOW",
+        "id": "EU-RO-1",
+        "name": "EU-RO-1"
+      },
+      {
+        "availability": "LOW",
+        "id": "EUR-IS-1",
+        "name": "EUR-IS-1"
+      },
+      {
+        "availability": "LOW",
+        "id": "EUR-IS-2",
+        "name": "EUR-IS-2"
+      },
+      {
+        "availability": "LOW",
+        "id": "US-CO-1",
+        "name": "US-CO-1"
+      },
+      {
+        "availability": "LOW",
+        "id": "US-MO-2",
+        "name": "US-MO-2"
+      },
+      {
+        "availability": "LOW",
+        "id": "US-NC-2",
+        "name": "US-NC-2"
+      },
+      {
+        "availability": "LOW",
+        "id": "US-NE-1",
+        "name": "US-NE-1"
+      },
+      {
+        "availability": "LOW",
+        "id": "US-PA-1",
+        "name": "US-PA-1"
+      }
+    ],
+    "id": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+    "manufacturer": "NVIDIA",
+    "maxCount": {
+      "community": 9,
+      "secure": 9
+    },
+    "memory": 96,
+    "name": "RTX PRO 6000",
+    "pool": "BLACKWELL_96",
+    "price": {
+      "community": 1.69,
+      "secure": 2.49,
+      "serverless": 3.49
+    },
+    "secure": true
+  },
+  "expectedMinutes": 25,
+  "maximumRentalSeconds": 2100,
+  "maximumAuthorizedSpendUsd": 2.5,
+  "creationDeadline": "2026-11-01T19:43:57.364180+00:00",
+  "deletionDeadline": "2026-11-01T20:13:57.364180+00:00",
+  "priorAggregateRentedSecondsUpperBound": 2602,
+  "maximumAggregateRentedSeconds": 7200,
+  "correctnessGate": "exact tensor inventory, finite F32 export, unchanged tokenizer/config",
+  "qualityGate": "frozen finetune-policy; this training run alone cannot qualify",
+  "performanceGate": "unchanged same-class CPU policy; GPU training is not a performance comparison",
+  "stopCondition": "completion, failed job, setup timeout, or rental deadline",
+  "secretsOnPod": "only expiring object-scoped S3 URLs; no provider API credentials",
+  "resultUri": "s3://models-qual-077051030817/training/gliner25-training-20261101T193857Z/results",
+  "localEvidenceDestination": "/Users/briansam-bodden/Code/java-ai/projects/models-gliner25-decide/benchmark-results/2026-11-01-gliner25-decide/gliner25-training-20261101T193857Z",
+  "catalogQualified": false,
+  "podId": "1zxoivp98rkeh8",
+  "createdAt": "2026-11-01T19:39:05.633Z",
+  "costPerHour": 2.49,
+  "dataCenterId": "US-NE-1",
+  "state": "deleted",
+  "workerResult": {
+    "stage": "complete",
+    "utc": 1793562389.543357,
+    "steps": 1500,
+    "trainingSeconds": 262.3950863729697,
+    "mergedWeightSha256": "d1ca5a14b0b535987ce6333680d0de2c963100cbff91745620e8455ec731caf5",
+    "catalogQualified": false
+  },
+  "terminationRequestedAt": "2026-11-01T19:46:32.946741+00:00",
+  "deletionVerifiedAt": "2026-11-01T19:46:33.882056+00:00",
+  "rentedSecondsUpperBound": 457,
+  "aggregateRentedSecondsUpperBound": 3059
+}
