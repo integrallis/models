@@ -1,0 +1,212 @@
+name: Final Bonsai public answer quality
+run-name: Bonsai final artifact public QA (200 paired cases)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qualify:
+    name: Public QA shard ${{ matrix.shard }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: harness
+      - name: Read frozen runtime revisions
+        id: runtime
+        run: |
+          python3 - <<'PY'
+          import json, os
+          p = json.load(open('harness/scripts/bonsai-final-qa/protocol.json'))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              for name in ['modelsRevision', 'vectorsRevision']:
+                  value = p[name]
+                  if len(value) != 40 or any(c not in '0123456789abcdef' for c in value):
+                      raise ValueError('Runtime revision must be an immutable commit')
+                  out.write(name + '=' + value + '\n')
+          PY
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.runtime.outputs.modelsRevision }}
+          path: models
+      - uses: actions/checkout@v5
+        with:
+          repository: integrallis/vectors
+          ref: ${{ steps.runtime.outputs.vectorsRevision }}
+          path: vectors
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25.0.3'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.96.0 --profile minimal --no-self-update
+      - uses: actions/cache@v5
+        with:
+          path: ~/.jvllm/models/Ternary-Bonsai-2-27B-PTQ1_0.gguf
+          key: bonsai2-27b-ptq1_0-fixture-v1
+      - name: Build exact candidate runtime
+        run: |
+          set -euo pipefail
+          (cd vectors && ./gradlew :vectors-core:jar --no-daemon --max-workers=2)
+          (cd models && ./gradlew :backend-native:cargoBuildRelease :backend-native:copyPairedRuntime --init-script ../harness/scripts/bonsai-final-qa/runtime.init.gradle --no-daemon --max-workers=2)
+      - name: Verify artifacts and every prompt token
+        env:
+          REFERENCE_ARCHIVE_URL: ${{ secrets.BONSAI_FINAL_QA_REFERENCE_URL }}
+          SHARD: ${{ matrix.shard }}
+        run: python3 harness/scripts/bonsai-final-qa/run.py prepare --shard "$SHARD"
+      - name: Retain prepared provenance
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-qa-prepare-${{ matrix.shard }}
+          path: |
+            out/shard-${{ matrix.shard }}/*.json
+            out/shard-${{ matrix.shard }}/*.jsonl
+            out/shard-${{ matrix.shard }}/*.stdout
+            out/shard-${{ matrix.shard }}/*.stderr
+            out/shard-${{ matrix.shard }}/PREPARED
+          retention-days: 30
+      - name: Paired single-case block 0
+        timeout-minutes: 30
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: python3 harness/scripts/bonsai-final-qa/run.py block --shard "$SHARD" --block 0
+      - name: Retain every observation from block 0
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-qa-${{ matrix.shard }}-block-0
+          path: out/shard-${{ matrix.shard }}/block-0/
+          retention-days: 30
+      - name: Paired single-case block 1
+        timeout-minutes: 30
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: python3 harness/scripts/bonsai-final-qa/run.py block --shard "$SHARD" --block 1
+      - name: Retain every observation from block 1
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-qa-${{ matrix.shard }}-block-1
+          path: out/shard-${{ matrix.shard }}/block-1/
+          retention-days: 30
+      - name: Paired single-case block 2
+        timeout-minutes: 30
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: python3 harness/scripts/bonsai-final-qa/run.py block --shard "$SHARD" --block 2
+      - name: Retain every observation from block 2
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-qa-${{ matrix.shard }}-block-2
+          path: out/shard-${{ matrix.shard }}/block-2/
+          retention-days: 30
+      - name: Paired single-case block 3
+        timeout-minutes: 30
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: python3 harness/scripts/bonsai-final-qa/run.py block --shard "$SHARD" --block 3
+      - name: Retain every observation from block 3
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-qa-${{ matrix.shard }}-block-3
+          path: out/shard-${{ matrix.shard }}/block-3/
+          retention-days: 30
+      - name: Paired single-case block 4
+        timeout-minutes: 30
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: python3 harness/scripts/bonsai-final-qa/run.py block --shard "$SHARD" --block 4
+      - name: Retain every observation from block 4
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-qa-${{ matrix.shard }}-block-4
+          path: out/shard-${{ matrix.shard }}/block-4/
+          retention-days: 30
+      - name: Paired single-case block 5
+        timeout-minutes: 30
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: python3 harness/scripts/bonsai-final-qa/run.py block --shard "$SHARD" --block 5
+      - name: Retain every observation from block 5
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-qa-${{ matrix.shard }}-block-5
+          path: out/shard-${{ matrix.shard }}/block-5/
+          retention-days: 30
+      - name: Paired single-case block 6
+        timeout-minutes: 30
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: python3 harness/scripts/bonsai-final-qa/run.py block --shard "$SHARD" --block 6
+      - name: Retain every observation from block 6
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-qa-${{ matrix.shard }}-block-6
+          path: out/shard-${{ matrix.shard }}/block-6/
+          retention-days: 30
+      - name: Paired single-case block 7
+        timeout-minutes: 30
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: python3 harness/scripts/bonsai-final-qa/run.py block --shard "$SHARD" --block 7
+      - name: Retain every observation from block 7
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-qa-${{ matrix.shard }}-block-7
+          path: out/shard-${{ matrix.shard }}/block-7/
+          retention-days: 30
+      - name: Paired single-case block 8
+        timeout-minutes: 30
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: python3 harness/scripts/bonsai-final-qa/run.py block --shard "$SHARD" --block 8
+      - name: Retain every observation from block 8
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-qa-${{ matrix.shard }}-block-8
+          path: out/shard-${{ matrix.shard }}/block-8/
+          retention-days: 30
+      - name: Paired single-case block 9
+        timeout-minutes: 30
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: python3 harness/scripts/bonsai-final-qa/run.py block --shard "$SHARD" --block 9
+      - name: Retain every observation from block 9
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-qa-${{ matrix.shard }}-block-9
+          path: out/shard-${{ matrix.shard }}/block-9/
+          retention-days: 30
+  analyze:
+    if: always()
+    needs: qualify
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: public-qa-*
+          path: evidence
+      - name: Require all 200 same-host paired cases and unchanged quality gates
+        run: python3 scripts/bonsai-final-qa/analyze.py evidence summary
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: public-qa-summary
+          path: summary/
+          retention-days: 30

@@ -1,0 +1,207 @@
+name: Bonsai final convolution whole-model proof
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  paired:
+    name: ${{ matrix.arch }} Bonsai full-metric pair ${{ matrix.shard }}
+    runs-on: ${{ matrix.arch == 'arm' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        include:
+          - {arch: x86, shard: '0'}
+          - {arch: arm, shard: '0'}
+          - {arch: x86, shard: '1'}
+          - {arch: arm, shard: '1'}
+          - {arch: x86, shard: '2'}
+          - {arch: arm, shard: '2'}
+          - {arch: x86, shard: '3'}
+          - {arch: arm, shard: '3'}
+          - {arch: x86, shard: '4'}
+          - {arch: arm, shard: '4'}
+          - {arch: x86, shard: '5'}
+          - {arch: arm, shard: '5'}
+          - {arch: x86, shard: '6'}
+          - {arch: arm, shard: '6'}
+          - {arch: x86, shard: '7'}
+          - {arch: arm, shard: '7'}
+          - {arch: x86, shard: '8'}
+          - {arch: arm, shard: '8'}
+          - {arch: x86, shard: '9'}
+          - {arch: arm, shard: '9'}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: harness
+      - name: Read immutable protocol
+        id: protocol
+        run: |
+          python3 - <<'PY'
+          import json, os
+          p=json.load(open('harness/scripts/bonsai-cold/protocol.json'))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              f.write('models='+p['modelsRevision']+'\n')
+              f.write('vectors='+p['vectorsRevision']+'\n')
+          PY
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.protocol.outputs.models }}
+          path: models
+      - uses: actions/checkout@v5
+        with:
+          repository: integrallis/vectors
+          ref: ${{ steps.protocol.outputs.vectors }}
+          path: vectors
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25.0.3'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal --no-self-update
+      - name: Build immutable actual artifacts
+        run: |
+          set -euo pipefail
+          test "$(git -C models rev-parse HEAD)" = '${{ steps.protocol.outputs.models }}'
+          test "$(git -C vectors rev-parse HEAD)" = '${{ steps.protocol.outputs.vectors }}'
+          (cd vectors && ./gradlew :vectors-core:jar --no-daemon --max-workers=2)
+          (cd models && ./gradlew :backend-native:cargoBuildRelease :backend-native:copyPairedRuntime --init-script ../harness/scripts/bonsai-paired/runtime.init.gradle --no-daemon --max-workers=2)
+      - name: prepare
+        timeout-minutes: 82
+        env:
+          SHARD: ${{ matrix.shard }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          mapfile -t jars < <(find vectors/vectors-core/build/libs -maxdepth 1 -name 'vectors-core-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
+          test "${#jars[@]}" -eq 1
+          python3 harness/scripts/bonsai-cold/run.py --shard "$SHARD" --arch "$ARCH" --models models --candidate-core "${jars[0]}" --output "out/cold-$ARCH-$SHARD" --stage prepare
+      - name: Retain prepare checkpoint
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cold-${{ matrix.arch }}-${{ matrix.shard }}-prepare
+          path: |
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.json
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.stdout
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.stderr
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/STATUS
+          if-no-files-found: warn
+          retention-days: 30
+      - name: fixture-baseline
+        timeout-minutes: 82
+        env:
+          SHARD: ${{ matrix.shard }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          mapfile -t jars < <(find vectors/vectors-core/build/libs -maxdepth 1 -name 'vectors-core-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
+          test "${#jars[@]}" -eq 1
+          python3 harness/scripts/bonsai-cold/run.py --shard "$SHARD" --arch "$ARCH" --models models --candidate-core "${jars[0]}" --output "out/cold-$ARCH-$SHARD" --stage fixture-baseline
+      - name: Retain fixture-baseline checkpoint
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cold-${{ matrix.arch }}-${{ matrix.shard }}-fixture-baseline
+          path: |
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.json
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.stdout
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.stderr
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/STATUS
+          if-no-files-found: warn
+          retention-days: 30
+      - name: fixture-candidate
+        timeout-minutes: 82
+        env:
+          SHARD: ${{ matrix.shard }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          mapfile -t jars < <(find vectors/vectors-core/build/libs -maxdepth 1 -name 'vectors-core-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
+          test "${#jars[@]}" -eq 1
+          python3 harness/scripts/bonsai-cold/run.py --shard "$SHARD" --arch "$ARCH" --models models --candidate-core "${jars[0]}" --output "out/cold-$ARCH-$SHARD" --stage fixture-candidate
+      - name: Retain fixture-candidate checkpoint
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cold-${{ matrix.arch }}-${{ matrix.shard }}-fixture-candidate
+          path: |
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.json
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.stdout
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.stderr
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/STATUS
+          if-no-files-found: warn
+          retention-days: 30
+      - name: first
+        timeout-minutes: 82
+        env:
+          SHARD: ${{ matrix.shard }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          mapfile -t jars < <(find vectors/vectors-core/build/libs -maxdepth 1 -name 'vectors-core-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
+          test "${#jars[@]}" -eq 1
+          python3 harness/scripts/bonsai-cold/run.py --shard "$SHARD" --arch "$ARCH" --models models --candidate-core "${jars[0]}" --output "out/cold-$ARCH-$SHARD" --stage first
+      - name: Retain first checkpoint
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cold-${{ matrix.arch }}-${{ matrix.shard }}-first
+          path: |
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.json
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.stdout
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.stderr
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/STATUS
+          if-no-files-found: warn
+          retention-days: 30
+      - name: second
+        timeout-minutes: 82
+        env:
+          SHARD: ${{ matrix.shard }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          mapfile -t jars < <(find vectors/vectors-core/build/libs -maxdepth 1 -name 'vectors-core-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
+          test "${#jars[@]}" -eq 1
+          python3 harness/scripts/bonsai-cold/run.py --shard "$SHARD" --arch "$ARCH" --models models --candidate-core "${jars[0]}" --output "out/cold-$ARCH-$SHARD" --stage second
+      - name: Retain second checkpoint
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cold-${{ matrix.arch }}-${{ matrix.shard }}-second
+          path: |
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.json
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.stdout
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/*.stderr
+            out/cold-${{ matrix.arch }}-${{ matrix.shard }}/STATUS
+          if-no-files-found: warn
+          retention-days: 30
+  analyze:
+    if: always()
+    needs: paired
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cold-*-second
+          path: evidence
+      - name: Normalize final checkpoint names
+        run: |
+          for path in evidence/*-second; do mv "$path" "${path%-second}"; done
+      - name: Enforce fixed numerical, quality, latency and resource gates
+        run: python3 scripts/bonsai-cold/analyze.py evidence cold-summary.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: cold-summary
+          path: cold-summary.json
+          retention-days: 30

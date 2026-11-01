@@ -1,0 +1,103 @@
+{
+  "models": [
+    {
+      "key": "qwen-bf16",
+      "entrypoint": ".",
+      "files": [
+        {
+          "path": "config.json",
+          "role": "model-configuration",
+          "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45",
+          "sizeBytes": 659,
+          "uri": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/7ae557604adf67be50417f59c2c2f167def9a775/config.json"
+        },
+        {
+          "path": "model.safetensors",
+          "role": "model-weights",
+          "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe",
+          "sizeBytes": 988097824,
+          "uri": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/7ae557604adf67be50417f59c2c2f167def9a775/model.safetensors"
+        },
+        {
+          "path": "tokenizer.json",
+          "role": "tokenizer",
+          "sha256": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+          "sizeBytes": 7031645,
+          "uri": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/7ae557604adf67be50417f59c2c2f167def9a775/tokenizer.json"
+        },
+        {
+          "path": "tokenizer_config.json",
+          "role": "tokenizer-configuration",
+          "sha256": "5b5d4f65d0acd3b2d56a35b56d374a36cbc1c8fa5cf3b3febbbfabf22f359583",
+          "sizeBytes": 7305,
+          "uri": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/resolve/7ae557604adf67be50417f59c2c2f167def9a775/tokenizer_config.json"
+        }
+      ]
+    },
+    {
+      "key": "bonsai2",
+      "entrypoint": "model.gguf",
+      "files": [
+        {
+          "path": "model.gguf",
+          "uri": "https://huggingface.co/prism-ml/Ternary-Bonsai-2-27B-gguf/resolve/b072e1d3b35a0a630cece372c2127528e0994386/Ternary-Bonsai-2-27B-PTQ1_0.gguf",
+          "sha256": "53107f530aa52eb00912263ab1ee29bd199261c87cd7b4ad4ca1318c1fe33ee3",
+          "sizeBytes": 5946648928
+        }
+      ],
+      "architecture": "qwen35"
+    }
+  ],
+  "modelsRevision": "4f3d3e9a548bf3781ab3d002ff37df0875760e49",
+  "vectorsRevision": "8495fbf9ea7e151f25853dedbcf413f811cc24ce",
+  "baselineCore": "0.1.29",
+  "pairs": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "shards": {
+    "0": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "1": [
+      5,
+      6,
+      7,
+      8,
+      9
+    ]
+  },
+  "bootstrapSeed": 716309,
+  "bootstrapResamples": 20000,
+  "maximumIntervalWidth": 0.02,
+  "limits": {
+    "prefillNanos": 1.0,
+    "decodeNanos": 1.0,
+    "requestNanos": 1.0,
+    "coldRequestNanos": 1.0,
+    "loadNanos": 1.01,
+    "peakRssKiB": 1.01,
+    "javaAllocatedBytes": 1.01
+  },
+  "dataSha256": {
+    "sources.json": "8f7cff970c0a094fe6e8393d39d54ecd5bda7dff05a428ee0a200d1306f30f17",
+    "SNIPS-LICENSE": "36ffd9dc085d529a7e60e1276d73ae5a030b020313e6c5408593a6ae2af39673",
+    "tasks.json": "ffdd301d53afe86e529a6bdcf3e7e9646b08f2f9368a8efeb9344def77f863d3",
+    "JEVBENCH-LICENSE": "3e5beed774bb0bcbfb2fcf24ba9554212c6ae112937d308040989465ab0c5784"
+  },
+  "baselineCoreSha256": "21eeae4fcaa56fa26ed45d99610142f794cdec0e1d852894e637263f5bd0b40c",
+  "harnessSha256": "0a325a6d37aebd949653773c10cbf5ef6232a7d293c388e6fa9aa7b1290873a8",
+  "scope": "All deterministic activations only, no BF16/executor change; actual Bonsai2 qwen35"
+}

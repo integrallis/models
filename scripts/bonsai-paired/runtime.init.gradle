@@ -1,0 +1,13 @@
+// Copies the actual pinned Models runtime; never publishes or substitutes its dependencies.
+gradle.projectsEvaluated {
+    def project = gradle.rootProject.project(':backend-native')
+    def harness = project.configurations.detachedConfiguration(
+        project.dependencies.create("com.fasterxml.jackson.core:jackson-databind:${gradle.rootProject.ext.jacksonVersion}"))
+    project.tasks.register('copyPairedRuntime', Copy) {
+        dependsOn project.tasks.named('jar')
+        from project.configurations.runtimeClasspath
+        from harness
+        from project.tasks.named('jar')
+        into project.layout.buildDirectory.dir('paired-runtime')
+    }
+}
