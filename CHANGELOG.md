@@ -20,7 +20,10 @@ All notable changes to models are documented here.
   `fba1236`, the stem, number, currency and stress rules, and compound handling. The spaCy
   tokenizer and tagger are replaced by a rule-based approximation and there is no eSpeak fallback,
   because eSpeak NG is GPL-licensed; unresolved words are reported rather than guessed. Agreement
-  with misaki itself is to be measured in the Paradee qualification record, not assumed.
+  with misaki itself is to be measured in the Paradee qualification record, not assumed. The four
+  dictionaries ship inside `models-audio` under `META-INF/models/misaki/en/`, byte-identical to
+  the misaki 0.9.4 wheel's files (Apache-2.0; digests in the jar's `META-INF/NOTICE`), so
+  `ParadeeTextToSpeechModel.load(onnx, config)` needs nothing beyond the published artifact.
 - Add `ParadeeTextToSpeechModel`, the publisher's own pipeline for Paradee-8M v1.2 over the two:
   sentence splitting, accent-matched phonemization, a 510-phoneme cap with pad tokens, the `speed`
   and `voice` inputs, sentence-level streaming, a seedable noise draw, and a phoneme-level entry

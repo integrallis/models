@@ -66,3 +66,8 @@ scripts/fleet/ud-boot-*.sh
 
 # Paradee comparator downloads and oracle dumps (pinned by digest in pins.py, regenerated on demand)
 experiments/paradee-8m-tts/comparator/.artifacts/
+# Qualification pass directories keep their pass.json / judge.json / junit.xml; the per-sentence
+# WAV and text files are regenerable from them and run to gigabytes.
+experiments/paradee-8m-tts/evidence/**/[0-9][0-9][0-9].wav
+experiments/paradee-8m-tts/evidence/**/[0-9][0-9][0-9].txt
+experiments/paradee-8m-tts/evidence/**/gradle.log

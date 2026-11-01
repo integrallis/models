@@ -131,6 +131,19 @@ public final class ParadeeTextToSpeechModel implements TextToSpeechModel {
   }
 
   /**
+   * Loads the model from the publisher's ONNX graph and config with the English dictionaries
+   * bundled in this module ({@link MisakiLexicon#bundled}). This is the route a catalog entry
+   * takes; {@link #load(Path, Path, Path)} reads the same four files from a directory instead.
+   */
+  public static ParadeeTextToSpeechModel load(Path onnx, Path configJson) throws IOException {
+    return load(
+        onnx,
+        configJson,
+        new MisakiEnglishPhonemizer(MisakiLexicon.bundled(false), ""),
+        new MisakiEnglishPhonemizer(MisakiLexicon.bundled(true), ""));
+  }
+
+  /**
    * Loads the model from the publisher's ONNX graph and config plus a directory holding misaki's
    * {@code us_gold.json}, {@code us_silver.json}, {@code gb_gold.json} and {@code gb_silver.json}.
    */
