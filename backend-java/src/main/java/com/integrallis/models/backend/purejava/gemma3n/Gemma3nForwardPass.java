@@ -21,6 +21,7 @@ import com.integrallis.models.backend.purejava.cache.LayeredKvCache.AttentionVie
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.Arrays;
 import java.util.Objects;
@@ -79,6 +80,15 @@ public final class Gemma3nForwardPass {
   private int nextPosition;
 
   Gemma3nForwardPass(Gemma3nConfig config, Gemma3nWeights weights, LayeredKvCache cache) {
+    this(config, weights, cache, GgufBatchedMatrixKernel.none());
+  }
+
+  Gemma3nForwardPass(
+      Gemma3nConfig config,
+      Gemma3nWeights weights,
+      LayeredKvCache cache,
+      GgufBatchedMatrixKernel matrixKernel) {
+    this.matrixKernel = Objects.requireNonNull(matrixKernel, "matrixKernel");
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     this.cache = Objects.requireNonNull(cache, "cache");
@@ -135,10 +145,20 @@ public final class Gemma3nForwardPass {
   /** Loads a decoder from a parsed GGUF. */
   public static Gemma3nForwardPass fromGgufFile(
       GgufFile file, Gemma3nConfig config, int runtimeContextLength) {
+    return fromGgufFile(file, config, runtimeContextLength, GgufBatchedMatrixKernel.none());
+  }
+
+  /** Loads a decoder that projects through the injected kernel where it is eligible. */
+  public static Gemma3nForwardPass fromGgufFile(
+      GgufFile file,
+      Gemma3nConfig config,
+      int runtimeContextLength,
+      GgufBatchedMatrixKernel matrixKernel) {
     return new Gemma3nForwardPass(
         config,
         Gemma3nWeights.fromGgufFile(file, config),
-        Gemma3nKvCache.create(config, runtimeContextLength, 1));
+        Gemma3nKvCache.create(config, runtimeContextLength, 1),
+        matrixKernel);
   }
 
   public int nextPosition() {
@@ -470,7 +490,26 @@ public final class Gemma3nForwardPass {
     }
   }
 
+  /**
+   * The injected batched matrix kernel, or {@link GgufBatchedMatrixKernel#none()}.
+   *
+   * <p>This decoder had no kernel seam: every projection went to {@code TensorOps.ggufMatmul} and
+   * the kernel the caller injected was never consulted, so the model ran unaccelerated while
+   * diagnostics reported a kernel was loaded. Found by audit on 2026-11-01 after the same gap cost
+   * {@code lfm2moe} a qualification -- 8.94 tok/s against a reference's 45.33, a {@code
+   * decodeThroughputRatio} of 0.1972, where a seamed decoder on the same host reached 0.5794. No
+   * qualified catalog entry used this decoder, so no published number moved; the cost was that a
+   * future two-arm run here would have read "the model is slow".
+   */
+  private final GgufBatchedMatrixKernel matrixKernel;
+
   private void project(Gemma3nWeights.Matrix matrix, float[] input, float[] output) {
+    // The injected kernel first, as LlamaForwardPass.matmulDispatch does.
+    if (matrixKernel.isEligible(matrix.type(), 1, matrix.rows(), matrix.columns())) {
+      matrixKernel.multiply(
+          output, input, matrix.data(), matrix.type(), 1, matrix.rows(), matrix.columns());
+      return;
+    }
     TensorOps.ggufMatmul(
         output, input, matrix.data(), matrix.type(), matrix.rows(), matrix.columns());
   }

@@ -652,7 +652,7 @@ public final class PureJavaBackend
             config.numHeads(),
             config.numHeads());
     return new LoadedDecoder(
-        new EncoderDecoderAdapter(BertForwardPass.fromGgufFile(file, config)),
+        new EncoderDecoderAdapter(BertForwardPass.fromGgufFile(file, config, batchedMatrixKernel)),
         metadata,
         contextCapacity,
         executionPlan);
@@ -844,7 +844,8 @@ public final class PureJavaBackend
               new EncoderForwardPass(
                   config,
                   weights,
-                  DenseProjectionHead.load(file, modelFamily, config.embeddingDim()).orElse(null)));
+                  DenseProjectionHead.load(file, modelFamily, config.embeddingDim()).orElse(null),
+                  batchedMatrixKernel));
     } else {
       ActivatedLoraAdapter activatedAdapter =
           activatedAdapterDirectory == null
@@ -973,7 +974,7 @@ public final class PureJavaBackend
     int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
     PureJavaDecoder decoder =
         new Deepseek2DecoderAdapter(
-            Deepseek2ForwardPass.fromGgufFile(file, config, contextCapacity));
+            Deepseek2ForwardPass.fromGgufFile(file, config, contextCapacity, batchedMatrixKernel));
     ModelMetadata metadata =
         new ModelMetadata(
             "deepseek2",
@@ -1041,7 +1042,8 @@ public final class PureJavaBackend
             batchedMatrixKernel);
     int contextCapacity = runtimeContextLength(config.contextLength(), planConfiguration);
     PureJavaDecoder decoder =
-        new Gemma3nDecoderAdapter(Gemma3nForwardPass.fromGgufFile(file, config, contextCapacity));
+        new Gemma3nDecoderAdapter(
+            Gemma3nForwardPass.fromGgufFile(file, config, contextCapacity, batchedMatrixKernel));
     ModelMetadata metadata =
         new ModelMetadata(
             "gemma3n",
@@ -1123,8 +1125,10 @@ public final class PureJavaBackend
     // worst-probe cosine 0.03 on all seven LFM2.5-Embedding artifacts.
     PureJavaDecoder decoder =
         config.encodesWholeSequence()
-            ? new EncoderDecoderAdapter(Lfm2SequenceEncoder.fromGgufFile(file, config))
-            : new Lfm2DecoderAdapter(Lfm2ForwardPass.fromGgufFile(file, config, contextCapacity));
+            ? new EncoderDecoderAdapter(
+                Lfm2SequenceEncoder.fromGgufFile(file, config, batchedMatrixKernel))
+            : new Lfm2DecoderAdapter(
+                Lfm2ForwardPass.fromGgufFile(file, config, contextCapacity, batchedMatrixKernel));
     ModelMetadata metadata =
         new ModelMetadata(
             modelFamily,

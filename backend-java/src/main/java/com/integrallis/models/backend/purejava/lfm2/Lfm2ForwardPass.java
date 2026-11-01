@@ -20,6 +20,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.ExpertRouting;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
@@ -79,6 +80,30 @@ public final class Lfm2ForwardPass {
   }
 
   private LayerObserver layerObserver;
+
+  /**
+   * The injected batched matrix kernel, or {@link GgufBatchedMatrixKernel#none()}.
+   *
+   * <p><b>This decoder had no kernel seam at all.</b> Every projection went through {@code
+   * TensorOps.ggufMatmul}, and {@code PureJavaBackend.loadLfm2} never passed the kernel it had
+   * already resolved -- so an lfm2 or lfm2moe model ran with no native acceleration even when the
+   * caller injected one and the diagnostics reported it. Measured 2026-11-01: lfm2moe decoded 8.94
+   * tok/s against the reference's 45.33, a {@code decodeThroughputRatio} of 0.1972 against a 0.80
+   * floor, while mellum on the Llama path -- same host, same comparator -- reached 0.5794.
+   */
+  private final GgufBatchedMatrixKernel matrixKernel;
+
+  // Grouped expert dispatch scratch, allocated once: a routed layer runs every token of every
+  // layer, so an allocation here is an allocation in the hot path. Null on a dense lfm2.
+  private final float[][] groupedGateUp;
+  private final MemorySegment[] groupedGateUpWeights;
+  private final GgufTensorType[] groupedGateUpTypes;
+  private final int[] groupedGateUpRows;
+  private final float[][] groupedActivations;
+  private final float[][] groupedDownOutputs;
+  private final MemorySegment[] groupedDownWeights;
+  private final GgufTensorType[] groupedDownTypes;
+  private final int[] groupedDownRows;
   private final float[] routerLogits;
   private final int[] selectedExperts;
   private final float[] routingWeights;
@@ -115,10 +140,23 @@ public final class Lfm2ForwardPass {
    * @return a ready decoder
    */
   public static Lfm2ForwardPass fromGgufFile(GgufFile file, Lfm2Config config, int maxSeqLen) {
-    return new Lfm2ForwardPass(config, Lfm2Weights.fromGgufFile(file, config), maxSeqLen);
+    return fromGgufFile(file, config, maxSeqLen, GgufBatchedMatrixKernel.none());
+  }
+
+  /** Loads a decoder that projects through the injected kernel where it is eligible. */
+  public static Lfm2ForwardPass fromGgufFile(
+      GgufFile file, Lfm2Config config, int maxSeqLen, GgufBatchedMatrixKernel matrixKernel) {
+    return new Lfm2ForwardPass(
+        config, Lfm2Weights.fromGgufFile(file, config), maxSeqLen, matrixKernel);
   }
 
   Lfm2ForwardPass(Lfm2Config config, Lfm2Weights weights, int maxSeqLen) {
+    this(config, weights, maxSeqLen, GgufBatchedMatrixKernel.none());
+  }
+
+  Lfm2ForwardPass(
+      Lfm2Config config, Lfm2Weights weights, int maxSeqLen, GgufBatchedMatrixKernel matrixKernel) {
+    this.matrixKernel = Objects.requireNonNull(matrixKernel, "matrixKernel");
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     if (maxSeqLen <= 0 || maxSeqLen > config.contextLength()) {
@@ -154,6 +192,29 @@ public final class Lfm2ForwardPass {
     this.routingWeights =
         config.isMixtureOfExperts() ? new float[config.experts().usedCount()] : null;
     this.expertOut = config.isMixtureOfExperts() ? new float[config.embeddingDim()] : null;
+    if (config.isMixtureOfExperts()) {
+      int used = config.experts().usedCount();
+      int expertWidth = config.experts().hiddenDim();
+      this.groupedGateUp = new float[2 * used][expertWidth];
+      this.groupedGateUpWeights = new MemorySegment[2 * used];
+      this.groupedGateUpTypes = new GgufTensorType[2 * used];
+      this.groupedGateUpRows = new int[2 * used];
+      this.groupedActivations = new float[used][expertWidth];
+      this.groupedDownOutputs = new float[used][config.embeddingDim()];
+      this.groupedDownWeights = new MemorySegment[used];
+      this.groupedDownTypes = new GgufTensorType[used];
+      this.groupedDownRows = new int[used];
+    } else {
+      this.groupedGateUp = null;
+      this.groupedGateUpWeights = null;
+      this.groupedGateUpTypes = null;
+      this.groupedGateUpRows = null;
+      this.groupedActivations = null;
+      this.groupedDownOutputs = null;
+      this.groupedDownWeights = null;
+      this.groupedDownTypes = null;
+      this.groupedDownRows = null;
+    }
     this.convProjected = new float[3 * dim];
     this.convGated = new float[dim];
     this.logits = new float[config.vocabSize()];
@@ -369,6 +430,9 @@ public final class Lfm2ForwardPass {
         routerLogits, layerWeights.selectionBias(), selectedExperts, routingWeights, true, 1.0f);
 
     Arrays.fill(projected, 0, dim, 0.0f);
+    if (routeGrouped(layerWeights, dim, expertWidth)) {
+      return;
+    }
     for (int slot = 0; slot < selectedExperts.length; slot++) {
       int expert = selectedExperts[slot];
       project(layerWeights.expertGate()[expert], normalized, gate);
@@ -380,6 +444,96 @@ public final class Lfm2ForwardPass {
         projected[i] += weight * expertOut[i];
       }
     }
+  }
+
+  /**
+   * The selected experts in two native dispatches instead of {@code 3 * usedCount}.
+   *
+   * <p>Same change as {@code LlamaForwardPass.routeExpertsGrouped}, for this decoder. The loop in
+   * {@link #route} issues one dispatch per projection per expert — twelve at {@code
+   * expert_used_count = 4} — where ggml issues one {@code mul_mat_id}. Measured 2026-11-01:
+   * lfm2moe's qualification {@code decodeThroughputRatio} was 0.1972 against a 0.80 floor, 8.94
+   * against the reference's 45.33 tok/s, while the same fix on the Llama path moved mellum from
+   * 0.3771 to 0.5794.
+   *
+   * <p>The two groups are decided separately, which is not symmetry for its own sake: mellum lost
+   * half its layers to a coupled check because one of its three expert families is Q5_0, the single
+   * quantisation the shim groups neither way. lfm2moe's are all Q4_0, so both groups are expected
+   * to take — but the check is written so a future file with a mixed set keeps whichever half it
+   * can.
+   *
+   * <p>Returns false when the gate/up group is declined, leaving the loop to run.
+   */
+  private boolean routeGrouped(Lfm2Weights.LayerWeights layerWeights, int dim, int expertWidth) {
+    if (groupedGateUp == null) {
+      return false;
+    }
+    int used = selectedExperts.length;
+    for (int slot = 0; slot < used; slot++) {
+      int expert = selectedExperts[slot];
+      Lfm2Weights.Matrix gateMatrix = layerWeights.expertGate()[expert];
+      Lfm2Weights.Matrix upMatrix = layerWeights.expertUp()[expert];
+      Lfm2Weights.Matrix downMatrix = layerWeights.expertDown()[expert];
+      groupedGateUpWeights[2 * slot] = gateMatrix.data();
+      groupedGateUpWeights[2 * slot + 1] = upMatrix.data();
+      groupedGateUpTypes[2 * slot] = gateMatrix.type();
+      groupedGateUpTypes[2 * slot + 1] = upMatrix.type();
+      groupedGateUpRows[2 * slot] = gateMatrix.rows();
+      groupedGateUpRows[2 * slot + 1] = upMatrix.rows();
+      groupedDownWeights[slot] = downMatrix.data();
+      groupedDownTypes[slot] = downMatrix.type();
+      groupedDownRows[slot] = downMatrix.rows();
+    }
+    if (!matrixKernel.isGroupedEligible(groupedGateUpTypes, groupedGateUpRows, 2 * used, 1, dim)) {
+      return false;
+    }
+    boolean groupDown =
+        matrixKernel.isIndependentEligible(groupedDownTypes, groupedDownRows, used, 1, expertWidth);
+    matrixKernel.multiplyGrouped(
+        groupedGateUp,
+        groupedGateUpWeights,
+        groupedGateUpTypes,
+        groupedGateUpRows,
+        2 * used,
+        normalized,
+        1,
+        dim);
+    for (int slot = 0; slot < used; slot++) {
+      TensorOps.swiGlu(
+          groupedActivations[slot],
+          groupedGateUp[2 * slot],
+          groupedGateUp[2 * slot + 1],
+          expertWidth);
+    }
+    if (groupDown) {
+      matrixKernel.multiplyIndependent(
+          groupedDownOutputs,
+          groupedDownWeights,
+          groupedDownTypes,
+          groupedDownRows,
+          used,
+          groupedActivations,
+          1,
+          expertWidth);
+    } else {
+      for (int slot = 0; slot < used; slot++) {
+        project(
+            groupedDownWeights[slot],
+            groupedDownTypes[slot],
+            dim,
+            expertWidth,
+            groupedActivations[slot],
+            groupedDownOutputs[slot]);
+      }
+    }
+    for (int slot = 0; slot < used; slot++) {
+      float weight = routingWeights[slot];
+      float[] contribution = groupedDownOutputs[slot];
+      for (int index = 0; index < dim; index++) {
+        projected[index] += weight * contribution[index];
+      }
+    }
+    return true;
   }
 
   private void convolve(Lfm2Weights.LayerWeights layerWeights, int layer) {
@@ -411,6 +565,13 @@ public final class Lfm2ForwardPass {
       int columns,
       float[] input,
       float[] output) {
+    // The injected kernel first, exactly as LlamaForwardPass.matmulDispatch does. Before
+    // 2026-11-01 this method went straight to the Java path and the kernel was never consulted,
+    // so an lfm2 model ran unaccelerated while reporting that a kernel was loaded.
+    if (matrixKernel.isEligible(type, 1, rows, columns)) {
+      matrixKernel.multiply(output, input, matrix, type, 1, rows, columns);
+      return;
+    }
     TensorOps.ggufMatmul(
         output,
         input,

@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.SequenceEncoder;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.util.Arrays;
 import java.util.Objects;
@@ -80,15 +81,27 @@ public final class Lfm2SequenceEncoder implements SequenceEncoder {
 
   /** Loads a bidirectional LFM2 encoder from an already parsed GGUF. */
   public static Lfm2SequenceEncoder fromGgufFile(GgufFile file, Lfm2Config config) {
+    return fromGgufFile(file, config, GgufBatchedMatrixKernel.none());
+  }
+
+  /** Loads a bidirectional LFM2 encoder that projects through the injected kernel. */
+  public static Lfm2SequenceEncoder fromGgufFile(
+      GgufFile file, Lfm2Config config, GgufBatchedMatrixKernel matrixKernel) {
     Objects.requireNonNull(config, "config");
     if (!config.encodesWholeSequence()) {
       throw new IllegalArgumentException(
           "this file declares causal attention and is a decoder; load Lfm2ForwardPass instead");
     }
-    return new Lfm2SequenceEncoder(config, Lfm2Weights.fromGgufFile(file, config));
+    return new Lfm2SequenceEncoder(config, Lfm2Weights.fromGgufFile(file, config), matrixKernel);
   }
 
   Lfm2SequenceEncoder(Lfm2Config config, Lfm2Weights weights) {
+    this(config, weights, GgufBatchedMatrixKernel.none());
+  }
+
+  Lfm2SequenceEncoder(
+      Lfm2Config config, Lfm2Weights weights, GgufBatchedMatrixKernel matrixKernel) {
+    this.matrixKernel = Objects.requireNonNull(matrixKernel, "matrixKernel");
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     this.rotary = new RotaryTable(config.headDim(), config.ropeTheta(), 1.0f);
@@ -269,8 +282,32 @@ public final class Lfm2SequenceEncoder implements SequenceEncoder {
     }
   }
 
+  /**
+   * The injected batched matrix kernel, or {@link GgufBatchedMatrixKernel#none()}.
+   *
+   * <p>This pass had no kernel seam: projections went straight to {@code TensorOps} and the kernel
+   * the caller injected was never consulted, so it ran unaccelerated while diagnostics reported one
+   * was loaded. Found by audit on 2026-11-01 after the same gap cost {@code lfm2moe} a
+   * qualification -- 8.94 tok/s against a reference's 45.33 -- where a seamed decoder on the same
+   * host reached 0.5794 of its reference. No qualified catalog entry used this pass, so no
+   * published number moved; the cost was that a future run here would read "the model is slow".
+   */
+  private final GgufBatchedMatrixKernel matrixKernel;
+
   private void project(
       float[] output, float[] input, int sequenceLength, Lfm2Weights.Matrix matrix) {
+    // The injected kernel first; batchSize is the sequence length for an encoder.
+    if (matrixKernel.isEligible(matrix.type(), sequenceLength, matrix.rows(), matrix.columns())) {
+      matrixKernel.multiply(
+          output,
+          input,
+          matrix.data(),
+          matrix.type(),
+          sequenceLength,
+          matrix.rows(),
+          matrix.columns());
+      return;
+    }
     TensorOps.ggufBatchedMatmul(
         output,
         input,
