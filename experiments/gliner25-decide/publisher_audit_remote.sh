@@ -9,7 +9,9 @@ printf '%s  %s\n' "$GLINER_EVAL_OVERLAY_SHA" /work/evaluation-overlay.tar.gz | s
 tar -xzf /work/evaluation-overlay.tar.gz -C /work/payload/experiment
 bash evaluate_finetune_remote.sh --parity-only
 cp publisher-audit-manifest.json /work/out/
-for suite in publisher go-full; do
+suites=(publisher go-full)
+if [[ "${GLINER_SINGLE_HEAD:-0}" == 1 ]]; then suites=(publisher); fi
+for suite in "${suites[@]}"; do
   if [[ "$suite" == publisher ]]; then cases=publisher-development-cases.jsonl; else cases=go-full-test-cases.jsonl; fi
   /work/python/bin/python run_worker.py --cases "$cases" --output "/work/out/$suite-reference.jsonl" -- /work/python/bin/python reference_worker.py --snapshot /work/variant --manifest /work/variant-manifest.json --source /work/reference --threads 8 --api classify-text &
   reference_pid=$!
@@ -21,4 +23,6 @@ for suite in publisher go-full; do
   printf '%s %s %s\n' "$suite" "$reference_status" "$models_status" >> /work/out/audit-phase-exits.txt
   [[ "$reference_status" == 0 && "$models_status" == 0 ]] || exit 1
 done
-/work/python/bin/python report_publisher_audit.py --directory /work/out --output /work/out/publisher-and-emotion-audit.json
+report_args=()
+if [[ "${GLINER_SINGLE_HEAD:-0}" == 1 ]]; then report_args=(--publisher-only); fi
+/work/python/bin/python report_publisher_audit.py "${report_args[@]}" --directory /work/out --output /work/out/publisher-and-emotion-audit.json

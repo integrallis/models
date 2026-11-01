@@ -29,11 +29,15 @@ def main():
     parser.add_argument('--profile',action='store_true')
     parser.add_argument('--development-cases',type=Path)
     parser.add_argument('--publisher-audit',type=Path)
+    parser.add_argument('--publisher-single-head',action='store_true')
+    parser.add_argument('--overlap-control',type=Path)
     parser.add_argument('--performance',action='store_true')
     parser.add_argument('--quality-and-performance',action='store_true')
     parser.add_argument('--replications',type=int,choices=[1,3],default=1)
     parser.add_argument('--recipe',type=Path,default=HERE)
     args=parser.parse_args()
+    if args.publisher_single_head and not args.publisher_audit:raise ValueError('single-head requires publisher audit')
+    if args.overlap_control and not args.publisher_single_head:raise ValueError('bounded overlap only supports the single-head publisher audit')
     if args.original_base and not (args.performance or args.publisher_audit):raise ValueError('original-base mode requires performance or publisher audit')
     if args.publisher_audit and (not args.original_base or args.performance or args.profile or args.quality_and_performance or args.development_cases):raise ValueError('publisher audit requires original base in a separate mode')
     if args.development_cases and (args.profile or args.performance or args.quality_and_performance):raise ValueError('development is a separate mode')
@@ -50,7 +54,7 @@ def main():
     previous=json.loads((EVIDENCE/'deployment.json').read_text())
     prior=prior_rented_seconds(EVIDENCE,reserve_active=True)
     aggregate_limit=aggregate_limit_seconds()
-    seconds=min(5400 if args.publisher_audit else 900 if args.profile else 2700,aggregate_limit-prior-120)
+    seconds=min(2700 if args.publisher_single_head else 5400 if args.publisher_audit else 900 if args.profile else 2700,aggregate_limit-prior-120)
     if seconds<(600 if args.profile else 1500):raise ValueError('insufficient remaining budget for this CPU experiment')
     ec2=boto3.client('ec2',region_name='us-east-1');s3=boto3.client('s3',region_name='us-east-1')
     quota=boto3.client('service-quotas',region_name='us-east-1').get_service_quota(ServiceCode='ec2',QuotaCode='L-1216C47A')['Quota']['Value']
@@ -58,7 +62,17 @@ def main():
     types={i['InstanceType'] for i in active}|{'m6a.4xlarge'}
     cpus={t['InstanceType']:t['VCpuInfo']['DefaultVCpus'] for t in ec2.describe_instance_types(InstanceTypes=list(types))['InstanceTypes']}
     if sum(cpus[i['InstanceType']] for i in active)+16>quota:raise ValueError('insufficient verified vCPU headroom')
-    if any(any(t['Key']=='campaign' and t['Value'].startswith('gliner25-') for t in i.get('Tags',[])) for i in active):
+    gliner_active=[i for i in active if any(t['Key']=='campaign' and t['Value'].startswith('gliner25-') for t in i.get('Tags',[]))]
+    overlap=None
+    if args.overlap_control:
+        if args.overlap_control.resolve().parent.parent!=EVIDENCE.resolve():raise ValueError('overlap control must be retained campaign evidence')
+        overlap=json.loads(args.overlap_control.read_text())
+        if (overlap['mode']!='publisher-and-emotion-audit' or overlap['state']!='running'
+                or datetime.fromisoformat(overlap['deletionDeadline'])<=datetime.now(timezone.utc)
+                or {i['InstanceId'] for i in gliner_active}!={overlap['instanceId']}
+                or any(i['State']['Name']!='running' for i in gliner_active)):
+            raise ValueError('overlap must match the one active bounded full emotion audit')
+    elif gliner_active:
         raise ValueError('another GLiNER instance is not fully terminated')
     now=datetime.now(timezone.utc);run='gliner25-eval-'+now.strftime('%Y%m%dT%H%M%SZ')
     root=EVIDENCE/run;root.mkdir();work=REPO/'build/gliner-runpod'/run;work.mkdir(parents=True)
@@ -75,6 +89,8 @@ def main():
     with tarfile.open(overlay,'w:gz') as archive:
         if args.publisher_audit:
             manifest=json.loads((args.publisher_audit/'publisher-audit-manifest.json').read_text())
+            expected_mode='publisher-one-head-per-call' if args.publisher_single_head else 'joint-document-heads'
+            if manifest.get('executionMode','joint-document-heads')!=expected_mode:raise ValueError('publisher execution mode differs')
             for name,expected in manifest['files'].items():
                 source=args.publisher_audit/name
                 if hashlib.file_digest(source.open('rb'),'sha256').hexdigest()!=expected:raise ValueError('publisher audit input identity differs')
@@ -112,7 +128,7 @@ def main():
     body['TagSpecifications']=[dict(ResourceType='instance',Tags=[dict(Key='Name',Value=run),dict(Key='project',Value='models-qualification'),dict(Key='campaign',Value=run),dict(Key='delete-by',Value=(now+timedelta(seconds=seconds)).strftime('%Y%m%dT%H%M%SZ'))])]
     env=dict(GLINER_URI='s3://'+BUCKET+'/'+prefix,GLINER_RESULTS='s3://'+BUCKET+'/'+results,
              GLINER_PAYLOAD_SHA=dense['sha256'] if dense else previous['payloadSha256'],GLINER_EVAL_OVERLAY_SHA=sha,
-             GLINER_ORIGINAL_BASE='1' if args.original_base else '0',GLINER_REPLICATIONS=str(args.replications),GLINER_TRAINED_RESULTS='s3://'+BUCKET+'/'+prefix+'/variant')
+             GLINER_SINGLE_HEAD='1' if args.publisher_single_head else '0',GLINER_ORIGINAL_BASE='1' if args.original_base else '0',GLINER_REPLICATIONS=str(args.replications),GLINER_TRAINED_RESULTS='s3://'+BUCKET+'/'+prefix+'/variant')
     userdata='#!/bin/bash\nset -euo pipefail\n'+'\n'.join('export '+k+'='+shlex.quote(v) for k,v in env.items())+'\n'
     userdata+="mkdir -p /work\napt-get update -qq\napt-get install -y -qq curl unzip\ncurl -fsSL --max-time 120 "+shlex.quote(s3.generate_presigned_url('get_object',Params={'Bucket':BUCKET,'Key':prefix+'/worker.sh'},ExpiresIn=5400))+" -o /work/worker.sh\nbash /work/worker.sh\n"
     # boto3 encodes UserData; unlike the CLI request it takes the plain script.
@@ -120,18 +136,19 @@ def main():
     record=dict(experiment=run,provider='EC2',region='us-east-1',plan='m6a.4xlarge',
         sourceRevision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),
         performanceReplications=args.replications if args.performance or args.quality_and_performance else 0,
-        mode='publisher-and-emotion-audit' if args.publisher_audit else 'development-diagnostics' if args.development_cases else 'quality-and-performance' if args.quality_and_performance else 'cpu-profile' if args.profile else 'paired-performance' if args.performance else 'fine-tune-quality',
+        mode='publisher-single-head-audit' if args.publisher_single_head else 'publisher-and-emotion-audit' if args.publisher_audit else 'development-diagnostics' if args.development_cases else 'quality-and-performance' if args.quality_and_performance else 'cpu-profile' if args.profile else 'paired-performance' if args.performance else 'fine-tune-quality',
         maximumAggregateRentedSeconds=aggregate_limit,
         measuredRuntimeSource=dense['sourceRevision'] if dense else previous['payloadManifest']['sourceRevision'],payloadSha256=env['GLINER_PAYLOAD_SHA'],overlaySha256=sha,
         trainedWeightSha256=next(e['sha256'] for e in trained_manifest['files'] if e['path']=='model.safetensors'),
         trainedSourceUri=training['resultUri'] if training else trained_manifest['sourceUri'],
         stagedTrainedUri=env['GLINER_TRAINED_RESULTS'],priorAggregateRentedSecondsUpperBound=prior,
-        maximumRentalSeconds=seconds,maximumAuthorizedSpendUsd=2.0 if args.publisher_audit else 1.0,expectedMinutes=60 if args.publisher_audit else 30,
+        maximumRentalSeconds=seconds,maximumAuthorizedSpendUsd=2.0 if args.publisher_audit else 1.0,expectedMinutes=30 if args.publisher_single_head else 60 if args.publisher_audit else 30,
         creationDeadline=(now+timedelta(minutes=5)).isoformat(),deletionDeadline=(now+timedelta(seconds=seconds)).isoformat(),
         resultUri='s3://'+BUCKET+'/'+results,correctnessGate='unchanged numerical parity; exact checkpoint and CPU thread budget',
-        qualityGate='original publisher public development plus complete official GoEmotions test; no changed admission gates' if args.publisher_audit else 'development-only, not qualification' if args.development_cases else 'not measured in profiling or performance mode' if args.profile or args.performance else 'all frozen fine-tune and original regression floors',
+        qualityGate='publisher example recipe: one head per call, 2900 public development heads; no changed admission gates' if args.publisher_single_head else 'original publisher public development plus complete official GoEmotions test; no changed admission gates' if args.publisher_audit else 'development-only, not qualification' if args.development_cases else 'not measured in profiling or performance mode' if args.profile or args.performance else 'all frozen fine-tune and original regression floors',
         performanceGate='complete 13-shape pairs; every pair must pass, at least three for final qualification' if args.performance or args.quality_and_performance else 'CPU cost attribution only, not qualification' if args.profile else 'not measured in this quality run',
         stopCondition='evaluation complete, failure, setup timeout or deadline',secretsOnBox='instance-scoped IAM role; no account API credentials',catalogQualified=False)
+    if overlap:record['overlappingRun']=dict(experiment=overlap['experiment'],instanceId=overlap['instanceId'],reservedMaximumSeconds=overlap['maximumRentalSeconds'],reason='Independent publisher recipe audit while full emotion audit continues; aggregate cap reserves both rentals')
     record['snapshotOrigin']='original-publisher' if args.original_base else 'fine-tuned'
     def save():(root/'control.json').write_text(json.dumps(record,indent=2)+'\n')
     save()

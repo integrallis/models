@@ -44,13 +44,15 @@ def score(cases, path):
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--directory',type=Path,required=True)
-    a=p.parse_args();cases=read_cases('publisher-development-cases.jsonl');go=read_cases('go-full-test-cases.jsonl')
+    p.add_argument('--publisher-only',action='store_true')
+    a=p.parse_args();cases=read_cases('publisher-development-cases.jsonl');go=[] if a.publisher_only else read_cases('go-full-test-cases.jsonl')
     result=dict(stage='publisher-public-data-and-full-emotion-audit',catalogQualified=False,
         publisherSplit='public development, not the private benchmark test',
         performanceClaim='none; accuracy workers run concurrently on the same host',
         publisher={arm:score(cases,a.directory/f'publisher-{arm}.jsonl') for arm in ['reference','models']},
-        goemotions={arm:measure(go,a.directory/f'go-full-{arm}.jsonl') for arm in ['reference','models']})
+        goemotions={} if a.publisher_only else {arm:measure(go,a.directory/f'go-full-{arm}.jsonl') for arm in ['reference','models']})
     for suite,prefix,inputs in [('publisher','publisher',cases),('goemotions','go-full',go)]:
+        if not inputs:continue
         left={r['id']:r for r in map(json.loads,(a.directory/f'{prefix}-models.jsonl').read_text().splitlines()[1:])}
         right={r['id']:r for r in map(json.loads,(a.directory/f'{prefix}-reference.jsonl').read_text().splitlines()[1:])}
         if result[suite]['models']['runtime']['snapshot']!=result[suite]['reference']['runtime']['snapshot']:raise ValueError('snapshot differs')

@@ -14,6 +14,7 @@ def main():
     p=argparse.ArgumentParser()
     for name in ['publisher-data','go-test','emotions','tokenizer','publisher-source','output']:
         p.add_argument('--'+name,type=Path,required=True)
+    p.add_argument('--one-head-per-call',action='store_true')
     a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
     inventory=json.loads((HERE/'publisher-dataset-inventory.json').read_text())
     for entry in inventory['files']:
@@ -67,22 +68,29 @@ def main():
             cases.append(dict(id=f'fast-decisions-{domain}-{index}',cohort=domain,sourceSplit='publisher-development',
                 kind='multi-head',request=dict(text=row['input'],tasks=tasks),expected=gold))
         suites[domain]=cases
+    if a.one_head_per_call:
+        suites={domain:[dict(case,id=case['id']+'-head-'+str(index),
+            request=dict(text=case['request']['text'],tasks=[task]),expected={task['name']:case['expected'][task['name']]})
+            for case in rows for index,task in enumerate(case['request']['tasks'])] for domain,rows in suites.items()}
     publisher=[c for rows in suites.values() for c in rows]
     labels=a.emotions.read_text().splitlines();go=[]
     for line in a.go_test.read_text().splitlines():
         text,ids,id=line.split('\t')
         go.append(make_case('goemotions-'+id,text,'emotions',labels,[labels[int(i)] for i in ids.split(',')],
             'goemotions','test',True))
+    if a.one_head_per_call:go=[]
     for case in publisher+go:case['encodedTokens']=len(encode(case['request']))
     for name,rows in [('publisher-development-cases.jsonl',publisher),('go-full-test-cases.jsonl',go)]:
         (a.output/name).write_text(''.join(json.dumps(row,ensure_ascii=False)+'\n' for row in rows))
     manifest=dict(publisherRevision=inventory['revision'],publisherPublicSplit='development',
-        publisherPublicCases=len(publisher),publisherOfficialTestAvailable=False,publisherReportedTestExactMatch=.602,
+        publisherPublicCases=len(publisher),publisherPublicDocuments=1700,
+        executionMode='publisher-one-head-per-call' if a.one_head_per_call else 'joint-document-heads',
+        publisherOfficialTestAvailable=False,publisherReportedTestExactMatch=.602,
         goTestCases=len(go),goTestSourceSha256=digest(a.go_test),tokenizerSha256=entry.get('sha256'),
         scope='Original weights only; independent accuracy audit, not admission or performance measurement',
         maximumSupportedModelsTokens=512,
         cohorts={domain:dict(cases=len(rows),overlength=sum(c['encodedTokens']>512 for c in rows),
-            maximumTokens=max(c['encodedTokens'] for c in rows)) for domain,rows in dict(suites,goemotions=go).items()},
+            maximumTokens=max(c['encodedTokens'] for c in rows)) for domain,rows in dict(suites,goemotions=go).items() if rows},
         files={name:digest(a.output/name) for name in ['publisher-development-cases.jsonl','go-full-test-cases.jsonl']})
     manifest['tokenizerSha256']=digest(a.tokenizer)
     (a.output/'publisher-audit-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
