@@ -26,8 +26,10 @@ def main():
     parser.add_argument('--dense-manifest','--runtime-manifest',dest='dense_manifest',type=Path)
     parser.add_argument('--profile',action='store_true')
     parser.add_argument('--performance',action='store_true')
+    parser.add_argument('--replications',type=int,choices=[1,3],default=1)
     parser.add_argument('--recipe',type=Path,default=HERE)
     args=parser.parse_args()
+    if args.replications!=1 and not args.performance:raise ValueError('replications require performance mode')
     if bool(args.dense_payload)!=bool(args.dense_manifest):raise ValueError('dense payload and manifest are required together')
     dense=json.loads(args.dense_manifest.read_text()) if args.dense_manifest else None
     if args.profile and (dense or args.performance):raise ValueError('profile the original runtime independently')
@@ -59,7 +61,7 @@ def main():
         s3.copy_object(Bucket=BUCKET,Key=prefix+'/variant/'+name,CopySource={'Bucket':BUCKET,'Key':trained_prefix+'/'+name})
     overlay=work/'evaluation-overlay.tar.gz'
     with tarfile.open(overlay,'w:gz') as archive:
-        for name in ['SummarizeJfr.java','common.py','run_worker.py','reference_worker.py','compare_parity.py','assess_quality.py','assess_finetune.py',
+        for name in ['run_performance_pairs.py','SummarizeJfr.java','common.py','run_worker.py','reference_worker.py','compare_parity.py','assess_quality.py','assess_finetune.py',
                      'finetune-policy.json','finetune-splits.json','finetune-qualification-cases.jsonl','policy.json','quality-cases.jsonl','parity-cases.jsonl','performance-parity-cases.jsonl','performance-cases.jsonl','performance-cohort.json','compare_performance.py','evaluate_finetune_remote.sh','download_reranker_fixture.sh']:
             source=args.recipe/name if name in ['finetune-policy.json','finetune-splits.json','finetune-qualification-cases.jsonl'] else HERE/name
             archive.add(source,arcname=name)
@@ -81,13 +83,14 @@ def main():
     body['TagSpecifications']=[dict(ResourceType='instance',Tags=[dict(Key='Name',Value=run),dict(Key='project',Value='models-qualification'),dict(Key='campaign',Value=run),dict(Key='delete-by',Value=(now+timedelta(seconds=seconds)).strftime('%Y%m%dT%H%M%SZ'))])]
     env=dict(GLINER_URI='s3://'+BUCKET+'/'+prefix,GLINER_RESULTS='s3://'+BUCKET+'/'+results,
              GLINER_PAYLOAD_SHA=dense['sha256'] if dense else previous['payloadSha256'],GLINER_EVAL_OVERLAY_SHA=sha,
-             GLINER_TRAINED_RESULTS='s3://'+BUCKET+'/'+prefix+'/variant')
+             GLINER_REPLICATIONS=str(args.replications),GLINER_TRAINED_RESULTS='s3://'+BUCKET+'/'+prefix+'/variant')
     userdata='#!/bin/bash\nset -euo pipefail\n'+'\n'.join('export '+k+'='+shlex.quote(v) for k,v in env.items())+'\n'
     userdata+="mkdir -p /work\napt-get update -qq\napt-get install -y -qq curl unzip\ncurl -fsSL --max-time 120 "+shlex.quote(s3.generate_presigned_url('get_object',Params={'Bucket':BUCKET,'Key':prefix+'/worker.sh'},ExpiresIn=5400))+" -o /work/worker.sh\nbash /work/worker.sh\n"
     # boto3 encodes UserData; unlike the CLI request it takes the plain script.
     body['UserData']=userdata
     record=dict(experiment=run,provider='EC2',region='us-east-1',plan='m6a.4xlarge',
         sourceRevision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),
+        performanceReplications=args.replications if args.performance else 0,
         mode='cpu-profile' if args.profile else 'paired-performance' if args.performance else 'fine-tune-quality',
         maximumAggregateRentedSeconds=aggregate_limit,
         measuredRuntimeSource=dense['sourceRevision'] if dense else previous['payloadManifest']['sourceRevision'],payloadSha256=env['GLINER_PAYLOAD_SHA'],overlaySha256=sha,
@@ -97,7 +100,7 @@ def main():
         creationDeadline=(now+timedelta(minutes=5)).isoformat(),deletionDeadline=(now+timedelta(seconds=seconds)).isoformat(),
         resultUri='s3://'+BUCKET+'/'+results,correctnessGate='unchanged numerical parity; exact checkpoint and CPU thread budget',
         qualityGate='not measured in profiling or performance mode' if args.profile or args.performance else 'all frozen fine-tune and original regression floors',
-        performanceGate='complete 13-shape screening pair; final qualification requires registered repetitions' if args.performance else 'CPU cost attribution only, not qualification' if args.profile else 'not measured in this quality run',
+        performanceGate='complete 13-shape pairs; every pair must pass, at least three for final qualification' if args.performance else 'CPU cost attribution only, not qualification' if args.profile else 'not measured in this quality run',
         stopCondition='evaluation complete, failure, setup timeout or deadline',secretsOnBox='instance-scoped IAM role; no account API credentials',catalogQualified=False)
     def save():(root/'control.json').write_text(json.dumps(record,indent=2)+'\n')
     save()
