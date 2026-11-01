@@ -24,10 +24,15 @@
     "POLL_BUDGET": 2097152,
     "GROUPED_GATED_DELTA_NET_F32": 4194304,
     "Q5_1_F32_BATCHED_MATMUL": 8388608,
-    "PTQ1_0_Q8_0_BATCHED_MATMUL": 16777216
+    "PTQ1_0_Q8_0_BATCHED_MATMUL": 16777216,
+    "BF16_F32_BATCHED_MATMUL": 33554432,
+    "SWIGLU_F32": 67108864,
+    "SLEEF_ACTIVATIONS_F32": 134217728
   },
   "exports": {
     "cpu": [
+      "jmodels_bf16_f32_batched_matmul",
+      "jmodels_causal_depthwise_conv_silu_f32",
       "jmodels_gated_delta_net_f32_with_context",
       "jmodels_gated_delta_net_group_f32_with_context",
       "jmodels_grouped_attention_f32_with_context",
@@ -37,17 +42,11 @@
       "jmodels_kernels_context_destroy",
       "jmodels_kernels_context_set_active_threads",
       "jmodels_kernels_context_set_poll_nanos",
-      "jmodels_q4_0_f32_batched_matmul",
-      "jmodels_q4_0_f32_batched_matmul_with_context",
-      "jmodels_q4_0_f32_grouped_batched_matmul",
-      "jmodels_q4_0_f32_grouped_batched_matmul_with_context",
-      "jmodels_q8_0_f32_batched_matmul",
-      "jmodels_q8_0_f32_batched_matmul_with_context",
-      "jmodels_q8_0_f32_grouped_batched_matmul",
-      "jmodels_q8_0_f32_grouped_batched_matmul_with_context",
       "jmodels_quantized_f32_batched_matmul_with_context",
       "jmodels_quantized_f32_grouped_batched_matmul_with_context",
-      "jmodels_quantized_f32_independent_batched_matmul_with_context"
+      "jmodels_quantized_f32_independent_batched_matmul_with_context",
+      "jmodels_sigmoid_scaled_softplus_f32",
+      "jmodels_swiglu_f32"
     ],
     "cuda": [
       "models_gqa_decode_attention",
@@ -70,7 +69,10 @@
     "cpu-attention",
     "gqa-decode-attention",
     "q4k-decode-projection",
-    "q6k-decode-projection"
+    "q6k-decode-projection",
+    "bf16-projection",
+    "swiglu-activation",
+    "arm-sleef-activations"
   ],
   "operations": [
     {
@@ -83,10 +85,9 @@
       ],
       "exports": {
         "cpu": [
-          "jmodels_q4_0_f32_batched_matmul",
-          "jmodels_q4_0_f32_batched_matmul_with_context",
-          "jmodels_q4_0_f32_grouped_batched_matmul",
-          "jmodels_q4_0_f32_grouped_batched_matmul_with_context"
+          "jmodels_quantized_f32_batched_matmul_with_context",
+          "jmodels_quantized_f32_grouped_batched_matmul_with_context",
+          "jmodels_quantized_f32_independent_batched_matmul_with_context"
         ]
       },
       "dispatch": [
@@ -155,10 +156,9 @@
       ],
       "exports": {
         "cpu": [
-          "jmodels_q8_0_f32_batched_matmul",
-          "jmodels_q8_0_f32_batched_matmul_with_context",
-          "jmodels_q8_0_f32_grouped_batched_matmul",
-          "jmodels_q8_0_f32_grouped_batched_matmul_with_context"
+          "jmodels_quantized_f32_batched_matmul_with_context",
+          "jmodels_quantized_f32_grouped_batched_matmul_with_context",
+          "jmodels_quantized_f32_independent_batched_matmul_with_context"
         ]
       },
       "dispatch": [
@@ -330,11 +330,17 @@
           "path": "benchmark-results/2026-10-08-q5-1-rust-shim/NOTES.md",
           "sha256": "99ebb2d9f4c75536d15af7abacbb125acd19b1c94e40621435148ee097bbcdf6",
           "kind": "historical"
+        },
+        {
+          "path": "docs/native-shims/bf16-swiglu-candidate-inventory.md",
+          "sha256": "e9f41a662c7e771c9cde620b18c416cf849890abb41f0ff719e4ed19742bc0d9",
+          "kind": "current"
         }
       ],
       "remaining": [
         "Reproduce the best exact Java alternative and native route with matched scheduling and actual model calls.",
-        "Identify a controlled JVM cause, qualify whole-model cost and resources on every retained profile, then adopt or remove."
+        "Identify a controlled JVM cause, qualify whole-model cost and resources on every retained profile, then adopt or remove.",
+        "Qualify the composed AVX2/FMA/F16C and NEON row-reuse route with batches1\u201332; retain the prior allocation outlier and incomplete precision verdict."
       ],
       "sourceScope": "cpu"
     },
@@ -625,6 +631,136 @@
         "Record device compiler/runtime limitation separately from CPU Vector API comparisons."
       ],
       "sourceScope": "cuda"
+    },
+    {
+      "id": "bf16-projection",
+      "status": "UNPROVEN",
+      "summary": "Fixed-tree BF16 candidate for measured48x5120 projections; numerical and component evidence does not complete native necessity or whole-model qualification.",
+      "capabilities": [
+        "BF16_F32_BATCHED_MATMUL"
+      ],
+      "exports": {
+        "cpu": [
+          "jmodels_bf16_f32_batched_matmul"
+        ]
+      },
+      "dispatch": [
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGgufBatchedMatrixKernel.java",
+          "anchor": "case BF16 ->"
+        },
+        {
+          "path": "backend-java/src/main/java/com/integrallis/models/backend/purejava/qwen35/Qwen35ForwardPass.java",
+          "anchor": "eligibleBfloat16Pair("
+        }
+      ],
+      "requiredProfiles": [
+        "linux-x86_64",
+        "linux-aarch64",
+        "macos-x86_64",
+        "macos-aarch64",
+        "windows-x86_64",
+        "windows-aarch64"
+      ],
+      "evidence": [
+        {
+          "path": "docs/native-shims/bf16-swiglu-candidate-inventory.md",
+          "sha256": "e9f41a662c7e771c9cde620b18c416cf849890abb41f0ff719e4ed19742bc0d9",
+          "kind": "current"
+        }
+      ],
+      "remaining": [
+        "Verify actual final-model native calls and owned full-logit behavior against the exact composed artifact; retain rejected and failed controls.",
+        "Complete unchanged task-quality, cold/warm latency, allocation, RSS, startup and confidence gates against published and corrected-Java controls on every retained profile.",
+        "Review best-Java alternatives and controlled compiler evidence; complete the five necessity/retirement proof gates or remove the native operation."
+      ],
+      "sourceScope": "cpu"
+    },
+    {
+      "id": "swiglu-activation",
+      "status": "UNPROVEN",
+      "summary": "Stable F32 SwiGLU candidate motivated by measured Java cold wrapper allocation; final composed quality/resources and supported-profile proof remain incomplete.",
+      "capabilities": [
+        "SWIGLU_F32"
+      ],
+      "exports": {
+        "cpu": [
+          "jmodels_swiglu_f32"
+        ]
+      },
+      "dispatch": [
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGgufBatchedMatrixKernel.java",
+          "anchor": "public synchronized boolean trySwiGlu("
+        },
+        {
+          "path": "backend-java/src/main/java/com/integrallis/models/backend/purejava/qwen35/Qwen35ForwardPass.java",
+          "anchor": "batchedMatrixKernel.trySwiGlu("
+        }
+      ],
+      "requiredProfiles": [
+        "linux-x86_64",
+        "linux-aarch64",
+        "macos-x86_64",
+        "macos-aarch64",
+        "windows-x86_64",
+        "windows-aarch64"
+      ],
+      "evidence": [
+        {
+          "path": "docs/native-shims/bf16-swiglu-candidate-inventory.md",
+          "sha256": "e9f41a662c7e771c9cde620b18c416cf849890abb41f0ff719e4ed19742bc0d9",
+          "kind": "current"
+        }
+      ],
+      "remaining": [
+        "Verify actual final-model native calls and owned full-logit behavior against the exact composed artifact; retain rejected and failed controls.",
+        "Complete unchanged task-quality, cold/warm latency, allocation, RSS, startup and confidence gates against published and corrected-Java controls on every retained profile.",
+        "Review best-Java alternatives and controlled compiler evidence; complete the five necessity/retirement proof gates or remove the native operation."
+      ],
+      "sourceScope": "cpu"
+    },
+    {
+      "id": "arm-sleef-activations",
+      "status": "UNPROVEN",
+      "summary": "ARM128 explicit SLEEF gates and causal convolution candidate; composed caller/resource qualification remains pending.",
+      "capabilities": [
+        "SLEEF_ACTIVATIONS_F32"
+      ],
+      "exports": {
+        "cpu": [
+          "jmodels_sigmoid_scaled_softplus_f32",
+          "jmodels_causal_depthwise_conv_silu_f32"
+        ]
+      },
+      "dispatch": [
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGgufBatchedMatrixKernel.java",
+          "anchor": "public synchronized boolean trySigmoidAndScaledSoftplus("
+        },
+        {
+          "path": "backend-java/src/main/java/com/integrallis/models/backend/purejava/qwen35/Qwen35ForwardPass.java",
+          "anchor": "batchedMatrixKernel.tryCausalDepthwiseConv1dSilu("
+        }
+      ],
+      "requiredProfiles": [
+        "linux-aarch64",
+        "macos-aarch64",
+        "windows-aarch64"
+      ],
+      "evidence": [
+        {
+          "path": "docs/native-shims/arm-sleef-candidate.md",
+          "sha256": "472b95b7551ff9bf0337d277f7ba1fcfc1acad63ada23bbcf10ed5255df5c1e5",
+          "kind": "current"
+        }
+      ],
+      "remaining": [
+        "Actual-provider full-domain and graph correctness with owned full-model snapshots.",
+        "Unchanged task-quality, load, first-request, steady latency, allocation, RSS and confidence gates versus published and corrected Java on every retained platform.",
+        "Retire the optional native operation if the best supported Java implementation passes the same complete gates."
+      ],
+      "sourceScope": "cpu"
     }
   ],
   "sourceScopes": {
@@ -820,9 +956,13 @@
       "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/package-info.java",
       "backend-native/src/main/rust/model-kernels/Cargo.lock",
       "backend-native/src/main/rust/model-kernels/Cargo.toml",
+      "backend-native/src/main/rust/model-kernels/src/bfloat16.rs",
       "backend-native/src/main/rust/model-kernels/src/lib.rs",
       "backend-native/src/main/rust/model-kernels/src/neon.rs",
       "backend-native/src/main/rust/model-kernels/src/ptq.rs",
+      "backend-native/src/main/rust/model-kernels/src/q51_reuse.rs",
+      "backend-native/src/main/rust/model-kernels/src/sleef_activations.rs",
+      "backend-native/src/main/rust/model-kernels/src/swiglu.rs",
       "build.gradle.kts",
       "gradle.properties"
     ],

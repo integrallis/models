@@ -112,7 +112,13 @@ public final class PinnedReduction {
     for (; i < limit; i += LANES) {
       acc1 = load(a, aOffset + i).fma(load(b, bOffset + i), acc1);
     }
-    return reduceLanesPinned(acc1.add(acc2).add(acc3.add(acc4)));
+    // Keep the vector and its fixed lane fold in this primitive-array boundary. Passing the
+    // vector to another helper can materialize it when the caller is compiled in a different
+    // context; the arithmetic below is the unchanged eight-lane contract.
+    FloatVector vector = acc1.add(acc2).add(acc3.add(acc4));
+    float even = (vector.lane(4) + vector.lane(0)) + (vector.lane(6) + vector.lane(2));
+    float odd = (vector.lane(5) + vector.lane(1)) + (vector.lane(7) + vector.lane(3));
+    return even + odd;
   }
 
   /** Two physical vectors per logical accumulator; every FMA and addition keeps its old order. */
@@ -154,18 +160,5 @@ public final class PinnedReduction {
 
   private static FloatVector load(float[] array, int offset) {
     return FloatVector.fromArray(SPECIES, array, offset);
-  }
-
-  /**
-   * The eight-lane case of the original's lane reduction, written out rather than switched on
-   * width.
-   *
-   * <p>{@code ((l4 + l0) + (l6 + l2)) + ((l5 + l1) + (l7 + l3))}. The width switch was the bug: it
-   * is what made the answer depend on the machine.
-   */
-  private static float reduceLanesPinned(FloatVector vector) {
-    float even = (vector.lane(4) + vector.lane(0)) + (vector.lane(6) + vector.lane(2));
-    float odd = (vector.lane(5) + vector.lane(1)) + (vector.lane(7) + vector.lane(3));
-    return even + odd;
   }
 }

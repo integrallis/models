@@ -97,6 +97,105 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
         "injected kernel does not support grouped Gated DeltaNet");
   }
 
+  /** A prepared view owned by the same scratch owner as its backing array. */
+  interface FloatArrayView {
+    /** Returns the original array; preparation must not copy or replace it. */
+    float[] values();
+  }
+
+  /**
+   * Prepares an optional reusable view without retaining it in the provider. The caller owns the
+   * returned view and its lifetime together with the backing array. Java-only providers return
+   * null.
+   */
+  default FloatArrayView prepareFloatArray(float[] values) {
+    return null;
+  }
+
+  /** Prepared equivalent of {@link #trySwiGlu(float[], int, float[], int, float[], int, int)}. */
+  default boolean trySwiGlu(
+      FloatArrayView out,
+      int outAt,
+      FloatArrayView gate,
+      int gateAt,
+      FloatArrayView up,
+      int upAt,
+      int length) {
+    return false;
+  }
+
+  /**
+   * Executes the float SwiGLU contract when supported for these inputs. Returning false must leave
+   * every caller buffer untouched so the Java implementation can perform the operation.
+   */
+  default boolean trySwiGlu(
+      float[] out, int outAt, float[] gate, int gateAt, float[] up, int upAt, int length) {
+    return false;
+  }
+
+  /** Whether this provider can prepare the paired gates and convolution activations. */
+  default boolean supportsRecurrentActivations() {
+    return false;
+  }
+
+  /** Optional sigmoid and scaled softplus. A declined operation leaves every array untouched. */
+  default boolean trySigmoidAndScaledSoftplus(
+      float[] sigmoid,
+      int sigmoidAt,
+      float[] softplus,
+      int softplusAt,
+      float[] bias,
+      int biasAt,
+      float[] scale,
+      int scaleAt,
+      float[] out,
+      int outAt,
+      int length) {
+    return false;
+  }
+
+  /** Prepared counterpart; a declined operation leaves all arrays untouched. */
+  default boolean trySigmoidAndScaledSoftplus(
+      FloatArrayView sigmoid,
+      int sigmoidAt,
+      FloatArrayView softplus,
+      int softplusAt,
+      FloatArrayView bias,
+      int biasAt,
+      FloatArrayView scale,
+      int scaleAt,
+      FloatArrayView out,
+      int outAt,
+      int length) {
+    return false;
+  }
+
+  /** Optional causal convolution/SiLU. A declined operation leaves values and history untouched. */
+  default boolean tryCausalDepthwiseConv1dSilu(
+      float[] values,
+      int valuesAt,
+      float[] history,
+      int historyAt,
+      float[] weights,
+      int weightsAt,
+      int channels,
+      int kernel) {
+    return false;
+  }
+
+  /** Prepared counterpart; a declined operation leaves all arrays untouched. */
+  default boolean tryCausalDepthwiseConv1dSilu(
+      FloatArrayView values,
+      int valuesAt,
+      FloatArrayView history,
+      int historyAt,
+      FloatArrayView weights,
+      int weightsAt,
+      int channels,
+      int kernel) {
+    return false;
+  }
+
   /** Returns whether this implementation supports the given GGUF weight format. */
   boolean supports(GgufTensorType type);
 

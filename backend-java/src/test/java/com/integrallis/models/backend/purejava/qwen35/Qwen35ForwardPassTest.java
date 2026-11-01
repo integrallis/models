@@ -28,6 +28,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.SyntheticGgufBuilder;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
@@ -349,14 +350,237 @@ class Qwen35ForwardPassTest {
   }
 
   @Test
+  void activationProviderAndUntouchedFallbackPreservePrefillDecodeAndGroupedState(
+      @TempDir Path directory) throws Exception {
+    Path model = writeToyModel(directory);
+    for (boolean prepared : new boolean[] {false, true}) {
+      for (boolean serve : new boolean[] {false, true}) {
+        AtomicInteger convolutionCalls = new AtomicInteger();
+        AtomicInteger gateCalls = new AtomicInteger();
+        GgufBatchedMatrixKernel kernel =
+            new GgufBatchedMatrixKernel() {
+              @Override
+              public FloatArrayView prepareFloatArray(float[] values) {
+                return prepared ? () -> values : null;
+              }
+
+              @Override
+              public boolean supportsRecurrentActivations() {
+                return prepared;
+              }
+
+              @Override
+              public boolean tryCausalDepthwiseConv1dSilu(
+                  FloatArrayView values,
+                  int valuesAt,
+                  FloatArrayView history,
+                  int historyAt,
+                  FloatArrayView weights,
+                  int weightsAt,
+                  int channels,
+                  int taps) {
+                assertThat(prepared).isTrue();
+                convolutionCalls.incrementAndGet();
+                if (!serve) return false;
+                VectorUtil.causalDepthwiseConv1dSilu(
+                    values.values(),
+                    valuesAt,
+                    history.values(),
+                    historyAt,
+                    weights.values(),
+                    weightsAt,
+                    channels,
+                    taps);
+                return true;
+              }
+
+              @Override
+              public boolean trySigmoidAndScaledSoftplus(
+                  FloatArrayView sigmoid,
+                  int sigmoidAt,
+                  FloatArrayView softplus,
+                  int softplusAt,
+                  FloatArrayView bias,
+                  int biasAt,
+                  FloatArrayView scale,
+                  int scaleAt,
+                  FloatArrayView out,
+                  int outAt,
+                  int length) {
+                assertThat(prepared).isTrue();
+                gateCalls.incrementAndGet();
+                if (!serve) return false;
+                VectorUtil.sigmoidAndScaledSoftplus(
+                    sigmoid.values(),
+                    sigmoidAt,
+                    softplus.values(),
+                    softplusAt,
+                    bias.values(),
+                    biasAt,
+                    scale.values(),
+                    scaleAt,
+                    out.values(),
+                    outAt,
+                    length);
+                return true;
+              }
+
+              @Override
+              public boolean supports(GgufTensorType type) {
+                return false;
+              }
+
+              @Override
+              public void multiply(
+                  float[] out,
+                  float[] input,
+                  MemorySegment weights,
+                  GgufTensorType type,
+                  int batch,
+                  int rows,
+                  int cols) {
+                throw new AssertionError("unsupported projection was dispatched");
+              }
+
+              @Override
+              public boolean tryCausalDepthwiseConv1dSilu(
+                  float[] values,
+                  int valuesAt,
+                  float[] history,
+                  int historyAt,
+                  float[] weights,
+                  int weightsAt,
+                  int channels,
+                  int taps) {
+                assertThat(prepared).isFalse();
+                convolutionCalls.incrementAndGet();
+                if (!serve) return false;
+                VectorUtil.causalDepthwiseConv1dSilu(
+                    values, valuesAt, history, historyAt, weights, weightsAt, channels, taps);
+                return true;
+              }
+
+              @Override
+              public boolean trySigmoidAndScaledSoftplus(
+                  float[] sigmoid,
+                  int sigmoidAt,
+                  float[] softplus,
+                  int softplusAt,
+                  float[] bias,
+                  int biasAt,
+                  float[] scale,
+                  int scaleAt,
+                  float[] out,
+                  int outAt,
+                  int length) {
+                assertThat(prepared).isFalse();
+                gateCalls.incrementAndGet();
+                if (!serve) return false;
+                VectorUtil.sigmoidAndScaledSoftplus(
+                    sigmoid,
+                    sigmoidAt,
+                    softplus,
+                    softplusAt,
+                    bias,
+                    biasAt,
+                    scale,
+                    scaleAt,
+                    out,
+                    outAt,
+                    length);
+                return true;
+              }
+            };
+        try (Arena arena = Arena.ofConfined()) {
+          var file = GgufParser.parse(model, arena);
+          var baseline = Qwen35ForwardPass.fromGgufFile(file, 2);
+          var actual = Qwen35ForwardPass.fromGgufFile(file, 2, kernel);
+          var expectedSession = baseline.openSession(8);
+          var actualSession = actual.openSession(8);
+          int[] prefix = {1, 2, 3, 4};
+          float[] expected = baseline.prefill(expectedSession, prefix, 0).clone();
+          assertThat(actual.prefill(actualSession, prefix, 0)).containsExactly(expected);
+          assertThat(convolutionCalls).hasValueGreaterThan(0);
+          assertThat(gateCalls).hasValue(convolutionCalls.get());
+          int before = convolutionCalls.get();
+          expected = baseline.forward(expectedSession, 5, 4).clone();
+          assertThat(actual.forward(actualSession, 5, 4)).containsExactly(expected);
+          assertThat(convolutionCalls.get()).isGreaterThan(before);
+          baseline.rewind(expectedSession, 4);
+          actual.rewind(actualSession, 4);
+          expected = baseline.forward(expectedSession, 6, 4).clone();
+          assertThat(actual.forward(actualSession, 6, 4)).containsExactly(expected);
+          var baseShared = baseline.openSession(8);
+          var actualShared = actual.openSession(8);
+          baseline.prefill(baseShared, prefix, 0);
+          actual.prefill(actualShared, prefix, 0);
+          int[][] questions = {{5, 6}, {7}};
+          float[][] expectedGrouped =
+              baseline.decideGrouped(
+                  baseShared,
+                  questions,
+                  new Qwen35GroupedDecision(baseline.config(), 2, prefix.length, 2));
+          before = convolutionCalls.get();
+          float[][] actualGrouped =
+              actual.decideGrouped(
+                  actualShared,
+                  questions,
+                  new Qwen35GroupedDecision(actual.config(), 2, prefix.length, 2));
+          for (int row = 0; row < questions.length; row++) {
+            assertThat(actualGrouped[row]).containsExactly(expectedGrouped[row]);
+          }
+          assertThat(convolutionCalls.get()).isGreaterThan(before);
+          assertThat(gateCalls).hasValue(convolutionCalls.get());
+        }
+      }
+    }
+  }
+
+  @Test
   void injectedKernelExecutesEligibleQwen35Projections(@TempDir Path directory) throws Exception {
     Path model = writeToyModel(directory);
 
     AtomicInteger invocations = new AtomicInteger();
     AtomicInteger gatedDeltaNetInvocations = new AtomicInteger();
     AtomicInteger maximumBatchSize = new AtomicInteger();
+    AtomicInteger swiGluCalls = new AtomicInteger();
+    AtomicInteger swiGluAccepted = new AtomicInteger();
+    AtomicInteger swiGluFallback = new AtomicInteger();
     GgufBatchedMatrixKernel kernel =
         new GgufBatchedMatrixKernel() {
+          @Override
+          public FloatArrayView prepareFloatArray(float[] values) {
+            return () -> values;
+          }
+
+          @Override
+          public boolean trySwiGlu(
+              float[] out, int outAt, float[] gate, int gateAt, float[] up, int upAt, int length) {
+            throw new AssertionError("prepared scratch dispatch bypassed the graph observer");
+          }
+
+          @Override
+          public boolean trySwiGlu(
+              FloatArrayView outView,
+              int outAt,
+              FloatArrayView gateView,
+              int gateAt,
+              FloatArrayView upView,
+              int upAt,
+              int length) {
+            float[] out = outView.values();
+            float[] gate = gateView.values();
+            float[] up = upView.values();
+            // Alternate service and untouched rejection to exercise the graph's fallback contract.
+            if ((swiGluCalls.incrementAndGet() & 1) == 0) {
+              swiGluFallback.incrementAndGet();
+              return false;
+            }
+            swiGluAccepted.incrementAndGet();
+            VectorUtil.swiGlu(out, outAt, gate, gateAt, up, upAt, length);
+            return true;
+          }
+
           @Override
           public boolean supports(GgufTensorType type) {
             return type == GgufTensorType.F32;
@@ -430,7 +654,59 @@ class Qwen35ForwardPassTest {
       assertThat(invocations).hasValueGreaterThan(0);
       assertThat(gatedDeltaNetInvocations).hasValueGreaterThan(0);
       assertThat(maximumBatchSize).hasValueGreaterThanOrEqualTo(1);
+      assertThat(swiGluAccepted).hasValueGreaterThan(0);
+      assertThat(swiGluFallback).hasValueGreaterThan(0);
       assertThat(actual).containsExactly(expected);
+    }
+  }
+
+  @Test
+  void bfloat16GatesUseIndividualProviderForPairedPrefillAndDecode(@TempDir Path directory)
+      throws Exception {
+    Path model = writeToyModel(directory, true);
+    AtomicInteger scalarCalls = new AtomicInteger();
+    AtomicInteger batchedCalls = new AtomicInteger();
+    GgufBatchedMatrixKernel kernel =
+        new GgufBatchedMatrixKernel() {
+          @Override
+          public boolean supports(GgufTensorType type) {
+            return type == GgufTensorType.BF16;
+          }
+
+          @Override
+          public void multiply(
+              float[] output,
+              float[] input,
+              MemorySegment weights,
+              GgufTensorType type,
+              int batchSize,
+              int rows,
+              int cols) {
+            assertThat(type).isEqualTo(GgufTensorType.BF16);
+            if (batchSize == 1) scalarCalls.incrementAndGet();
+            else batchedCalls.incrementAndGet();
+            float[] rowInput = new float[cols];
+            float[] rowOutput = new float[rows];
+            for (int row = 0; row < batchSize; row++) {
+              System.arraycopy(input, row * cols, rowInput, 0, cols);
+              TensorOps.ggufMatmul(rowOutput, rowInput, weights, type, rows, cols);
+              System.arraycopy(rowOutput, 0, output, row * rows, rows);
+            }
+          }
+        };
+    try (Arena arena = Arena.ofConfined()) {
+      var file = GgufParser.parse(model, arena);
+      var baseline = Qwen35ForwardPass.fromGgufFile(file, 4);
+      var injected = Qwen35ForwardPass.fromGgufFile(file, 4, kernel);
+      var baselineSession = baseline.openSession(8);
+      var injectedSession = injected.openSession(8);
+      int[] prompt = {1, 2, 3, 4};
+      float[] expected = baseline.prefill(baselineSession, prompt, 0).clone();
+      assertThat(injected.prefill(injectedSession, prompt, 0)).containsExactly(expected);
+      assertThat(batchedCalls).hasValueGreaterThan(0);
+      expected = baseline.forward(baselineSession, 2, 4).clone();
+      assertThat(injected.forward(injectedSession, 2, 4)).containsExactly(expected);
+      assertThat(scalarCalls).hasValueGreaterThan(0);
     }
   }
 
@@ -673,6 +949,10 @@ class Qwen35ForwardPassTest {
   }
 
   private static Path writeToyModel(Path directory) throws Exception {
+    return writeToyModel(directory, false);
+  }
+
+  private static Path writeToyModel(Path directory, boolean bfloat16Gates) throws Exception {
     Random random = new Random(35);
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()
@@ -709,7 +989,7 @@ class Qwen35ForwardPassTest {
             .addTensor(
                 "output_norm.weight", GgufTensorType.F32, new long[] {DIMENSION}, ones(DIMENSION));
 
-    addGatedDeltaNetLayer(builder, random, 0);
+    addGatedDeltaNetLayer(builder, random, 0, bfloat16Gates);
     addFullAttentionLayer(builder, random, 1);
     Path model = directory.resolve("toy-qwen35.gguf");
     Files.write(model, builder.build());
@@ -717,13 +997,25 @@ class Qwen35ForwardPassTest {
   }
 
   private static void addGatedDeltaNetLayer(
-      SyntheticGgufBuilder builder, Random random, int layer) {
+      SyntheticGgufBuilder builder, Random random, int layer, boolean bfloat16Gates) {
     String prefix = "blk." + layer + ".";
     addCommonLayer(builder, random, prefix);
     addMatrix(builder, random, prefix + "attn_qkv.weight", CONVOLUTION_DIMENSION, DIMENSION);
     addMatrix(builder, random, prefix + "attn_gate.weight", VALUE_DIMENSION, DIMENSION);
-    addMatrix(builder, random, prefix + "ssm_beta.weight", VALUE_HEADS, DIMENSION);
-    addMatrix(builder, random, prefix + "ssm_alpha.weight", VALUE_HEADS, DIMENSION);
+    for (String name : List.of("ssm_beta.weight", "ssm_alpha.weight")) {
+      byte[] data = randomFloats(random, VALUE_HEADS * DIMENSION);
+      if (bfloat16Gates) {
+        ByteBuffer source = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer packed = ByteBuffer.allocate(data.length / 2).order(ByteOrder.LITTLE_ENDIAN);
+        while (source.hasRemaining()) packed.putShort((short) (source.getInt() >>> 16));
+        data = packed.array();
+      }
+      builder.addTensor(
+          prefix + name,
+          bfloat16Gates ? GgufTensorType.BF16 : GgufTensorType.F32,
+          new long[] {DIMENSION, VALUE_HEADS},
+          data);
+    }
     builder
         .addTensor(
             prefix + "ssm_conv1d.weight",

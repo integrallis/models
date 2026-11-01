@@ -218,6 +218,11 @@ class KvCacheTest {
       KvCache first = prefix.fork();
       KvCache second = prefix.fork();
 
+      assertThat(first.allocatedBytes()).isEqualTo(prefix.allocatedBytes());
+      assertThat(second.allocatedBytes()).isEqualTo(prefix.allocatedBytes());
+      first.reserveSequenceCapacity(19);
+      second.reserveSequenceCapacity(19);
+
       assertThat(prefix.allocatedBytes())
           .isEqualTo(16L * (2L * Float.BYTES + 2L * Float.BYTES + 1L));
       assertThat(source.allocatedBytes()).isEqualTo(prefix.allocatedBytes());
@@ -380,12 +385,42 @@ class KvCacheTest {
   class Growth {
 
     @Test
-    void largeLogicalContextStartsWithSmallPhysicalCapacity() {
+    void unusedCacheDoesNotAllocateTokenStorage() {
       var cache = new KvCache(2, 10_000, 4, 4);
 
+      assertThat(cache.allocatedSequenceCapacity()).isZero();
+      assertThat(cache.allocatedBytes()).isZero();
+      assertThat(cache.keyBuffer()).isEmpty();
+      assertThat(cache.valueBuffer()).isEmpty();
+      assertThat(cache.key(0, 0)).isNull();
+      assertThat(cache.value(1, 0)).isNull();
+      cache.clear();
+      cache.discardFrom(0);
+      cache.reserveSequenceCapacity(0);
+      assertThat(cache.allocatedBytes()).isZero();
+    }
+
+    @Test
+    void firstStoreAllocatesTheExistingMinimumAndPreservesLayerIsolation() {
+      var cache = new KvCache(2, 10_000, 2, 3);
+      cache.store(1, 0, new float[] {1, 2}, new float[] {3, 4, 5});
       assertThat(cache.allocatedSequenceCapacity()).isEqualTo(16);
-      assertThat(cache.keyBuffer()).hasSize(2 * 16 * 4);
-      assertThat(cache.valueBuffer()).hasSize(2 * 16 * 4);
+      assertThat(cache.key(0, 0)).isNull();
+      assertThat(cache.key(1, 0)).containsExactly(1, 2);
+      assertThat(cache.value(1, 0)).containsExactly(3, 4, 5);
+    }
+
+    @Test
+    void constructorStillRejectsAnUnrepresentableInitialShape() {
+      assertThatThrownBy(() -> new KvCache(1, 16, Integer.MAX_VALUE, 1))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("key cache is too large");
+      assertThatThrownBy(() -> new KvCache(1, 16, 1, Integer.MAX_VALUE))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("value cache is too large");
+      assertThatThrownBy(() -> new KvCache(Integer.MAX_VALUE, 16, 1, 1))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("numLayers * sequenceCapacity is too large");
     }
 
     @Test

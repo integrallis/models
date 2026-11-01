@@ -15,6 +15,9 @@
  */
 package com.integrallis.models.backend.purejava.qwen35;
 
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel.FloatArrayView;
+
 /**
  * State for answering several questions about one piece of evidence in lockstep.
  *
@@ -66,6 +69,7 @@ final class Qwen35GroupedDecision {
   /** The private state one question needs while the evidence's state is shared. */
   static final class Branch {
     private final float[][] convolutionHistory;
+    private FloatArrayView[] convolutionHistoryViews;
     private final float[][] suffixKeys;
     private final float[][] suffixValues;
     private int position;
@@ -89,6 +93,16 @@ final class Qwen35GroupedDecision {
               new float[Math.multiplyExact(config.gdnConvDim(), config.gdnConvKernel() - 1)];
         }
       }
+    }
+
+    FloatArrayView convolutionHistoryView(int layer, GgufBatchedMatrixKernel kernel) {
+      if (!kernel.supportsRecurrentActivations()) return null;
+      if (convolutionHistoryViews == null)
+        convolutionHistoryViews = new FloatArrayView[convolutionHistory.length];
+      if (convolutionHistoryViews[layer] == null) {
+        convolutionHistoryViews[layer] = kernel.prepareFloatArray(convolutionHistory[layer]);
+      }
+      return convolutionHistoryViews[layer];
     }
 
     float[] convolutionHistory(int layer) {

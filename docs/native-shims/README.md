@@ -1,7 +1,7 @@
 # Native shim evidence
 
 `registry.json` inventories every CPU capability bit and exported CPU/CUDA function, links the
-Java dispatch sites, and records the evidence status of each operation. All fifteen current
+Java dispatch sites, and records the evidence status of each operation. All seventeen current
 operation groups are **unproven**. Historical speedups and repaired correctness defects
 are not certificates that a JVM limitation requires Rust.
 
@@ -36,3 +36,7 @@ Source scopes are conservative: CPU or CUDA implementation, Java inference, disp
 configuration and dependency locks. Changing an affected file invalidates a completed proof;
 unrelated article edits do not. Supporting workers inherit justification from the compute
 operations they serve and need no invented, independent JVM limitation.
+
+The BF16 and SwiGLU candidate entries remain UNPROVEN. Their [inventory](bf16-swiglu-candidate-inventory.md) separates measured compiler/allocation mechanisms and component screens from missing final composed and supported-profile gates. Raw rejected experiments remain outside project repositories.
+
+[ABI7 symbol retirement](abi7-symbol-retirement.md) lists removed compatibility wrappers and the retained generic entry points.
