@@ -1,0 +1,18 @@
+{
+  "command": [
+    "java",
+    "--add-modules",
+    "jdk.incubator.vector",
+    "--enable-native-access=ALL-UNNAMED",
+    "-Xms2g",
+    "-Xmx10g",
+    "-cp",
+    "/home/runner/work/models/models/out/paired-x86-bonsai2-0/lib/candidate/*:/home/runner/work/models/models/out/paired-x86-bonsai2-0/classes",
+    "com.integrallis.models.backend.purejava.Bf16ModelProof",
+    "fixture",
+    "/home/runner/work/_temp/paired-models/bonsai2/model.gguf",
+    "/home/runner/work/models/models/models/backend-native/build/rust-target/release/libjmodels_kernels.so"
+  ],
+  "exitCode": 1,
+  "wallSeconds": 30.326465375999987
+}

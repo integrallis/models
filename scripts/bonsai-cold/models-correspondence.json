@@ -1,0 +1,41 @@
+{
+  "previousModelsRevision": "00782f64092a14fccb437a4e85bbd866b6c4b11a",
+  "modelsRevision": "5344b5a2ff84a27548f0f2c4840c24f22d73c32d",
+  "backendJavaSha256": "87f6b22a7a17bf1ebea98a276a9297920d64434d97a4cc0de4e1745fa0fbe94a",
+  "changeStage": "grouped-attention-and-ptq",
+  "changes": [
+    {
+      "architecture": "x86",
+      "arm": "baseline",
+      "changedEntries": [
+        "com/integrallis/models/backend/purejava/ops/GroupedQueryAttentionKernel.class",
+        "com/integrallis/models/backend/purejava/quant/TernaryDequantizer.class"
+      ]
+    },
+    {
+      "architecture": "x86",
+      "arm": "candidate",
+      "changedEntries": [
+        "com/integrallis/models/backend/purejava/ops/GroupedQueryAttentionKernel.class",
+        "com/integrallis/models/backend/purejava/quant/TernaryDequantizer.class"
+      ]
+    },
+    {
+      "architecture": "arm",
+      "arm": "baseline",
+      "changedEntries": [
+        "com/integrallis/models/backend/purejava/ops/GroupedQueryAttentionKernel.class",
+        "com/integrallis/models/backend/purejava/quant/TernaryDequantizer.class"
+      ]
+    },
+    {
+      "architecture": "arm",
+      "arm": "candidate",
+      "changedEntries": [
+        "com/integrallis/models/backend/purejava/ops/GroupedQueryAttentionKernel.class",
+        "com/integrallis/models/backend/purejava/quant/TernaryDequantizer.class"
+      ]
+    }
+  ],
+  "scope": "Both Vectors-comparison arms use this exact composed Models runtime. This isolates Vectors changes; it is not a comparison to the previous published Models runtime."
+}
