@@ -8,7 +8,7 @@ artifact, both arms sequential in one session per replication, `exclusions: {}` 
 
 | run | our decode | ollama decode | decodeRatio | verdict |
 |---|---:|---:|---:|---|
-| first run (`outlier-run-*`) | 29.23 | 36.03 | **0.8112** | QUALIFIED |
+| first run (`outlier-run-verdict.NOT-A-QUALIFICATION.json`) | 29.23 | 36.03 | **0.8112** | QUALIFIED |
 | rep1 | 27.80 | 37.64 | 0.7386 | FAILED_RELATIVE_GATE |
 | rep2 | 28.20 | 35.87 | 0.7862 | FAILED_RELATIVE_GATE |
 | rep3 | 27.76 | 36.32 | 0.7643 | FAILED_RELATIVE_GATE |

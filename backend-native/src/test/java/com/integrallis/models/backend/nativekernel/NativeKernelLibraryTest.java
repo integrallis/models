@@ -1498,6 +1498,138 @@ class NativeKernelLibraryTest {
   }
 
   /**
+   * A mixed Q4_0/Q8_0 group is BIT-IDENTICAL to the per-matrix route it replaces.
+   *
+   * <p>The companion safety check to the Q5_0 one. {@code compatibleGroup} feeds {@code
+   * supportsDual} and {@code supportsTriple}, which is how the Llama path decides whether Q/K/V
+   * become one dispatch -- and that path carries most of the catalog. Widening it to formats that
+   * merely agree on their activation means a qualified artifact whose projections mix Q4_0 and Q8_0
+   * starts grouping where it did not.
+   *
+   * <p>Grouping shares one quantized activation across the group where the per-matrix route
+   * quantized the same input once per call. Those should agree exactly, because it is the same
+   * input through the same quantizer -- but "should" is how published bytes move, so it is asserted
+   * rather than assumed.
+   */
+  @Test
+  void aMixedQ4_0Q8_0GroupIsBitIdenticalToThePerMatrixRoute() {
+    int batchSize = 1;
+    int cols = 256;
+    int matrixCount = 4;
+    int[] rowCounts = {4, 6, 8, 10};
+    GgufTensorType[] types = {
+      GgufTensorType.Q4_0, GgufTensorType.Q8_0, GgufTensorType.Q4_0, GgufTensorType.Q8_0
+    };
+    float[] input = inputs(batchSize, cols);
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment[] weights = new MemorySegment[matrixCount];
+      float[][] grouped = new float[matrixCount][];
+      float[][] perMatrix = new float[matrixCount][];
+      for (int index = 0; index < matrixCount; index++) {
+        int rows = rowCounts[index];
+        int blocksPerRow = cols / 32;
+        if (types[index] == GgufTensorType.Q4_0) {
+          weights[index] = arena.allocate((long) rows * blocksPerRow * 18);
+          fillWeights(weights[index], rows, cols);
+        } else {
+          weights[index] = arena.allocate((long) rows * blocksPerRow * 34);
+          fillQ8_0Weights(weights[index], rows, cols);
+        }
+        grouped[index] = new float[batchSize * rows];
+        perMatrix[index] = new float[batchSize * rows];
+      }
+
+      kernel.multiplyGrouped(
+          grouped, weights, types, rowCounts, matrixCount, input, batchSize, cols);
+      for (int index = 0; index < matrixCount; index++) {
+        kernel.multiply(
+            perMatrix[index],
+            input,
+            weights[index],
+            types[index],
+            batchSize,
+            rowCounts[index],
+            cols);
+      }
+
+      for (int index = 0; index < matrixCount; index++) {
+        assertThat(grouped[index])
+            .as("matrix %d (%s) must be bit-identical to its per-matrix route", index, types[index])
+            .containsExactly(perMatrix[index]);
+      }
+    }
+  }
+
+  /**
+   * The Q5_0 independent dispatch is BIT-IDENTICAL to the per-matrix path it replaces.
+   *
+   * <p>This is the test that decides whether widening independent eligibility to Q5_0 is safe for
+   * models that are already qualified. {@code multiplyIndependent} is reached from expert
+   * down-projections in {@code FlintForwardPass} and {@code Gemma4ForwardPass} as well as the Llama
+   * path, and flint and gemma4 both carry qualification records. A Q4_K_M artifact routinely stores
+   * some expert down-projections as Q5_0 -- mellum's are Q5_0 in 14 of its 28 blocks -- so a
+   * qualified flint or gemma4 file plausibly has them too, and its dispatch changes the moment this
+   * eligibility widens.
+   *
+   * <p>A qualification record is a claim about the bytes a model produced and cannot be retracted,
+   * so "close enough" is not the standard here. The sibling test checks values against the
+   * reference within a reduction tolerance, which would pass on a route that shifted the last bits
+   * and silently moved a published greedy output. This one asserts exact equality against {@code
+   * multiply}, the single-matrix route each of these projections took before.
+   */
+  @Test
+  void theQ5_0IndependentDispatchIsBitIdenticalToThePerMatrixRoute() {
+    int batchSize = 1;
+    int cols = 256;
+    int matrixCount = 4;
+    int[] rowCounts = {4, 6, 8, 10};
+    GgufTensorType[] types = new GgufTensorType[matrixCount];
+    java.util.Arrays.fill(types, GgufTensorType.Q5_0);
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment[] weights = new MemorySegment[matrixCount];
+      float[][] inputs = new float[matrixCount][];
+      float[][] grouped = new float[matrixCount][];
+      float[][] perMatrix = new float[matrixCount][];
+      for (int index = 0; index < matrixCount; index++) {
+        int rows = rowCounts[index];
+        weights[index] = arena.allocate((long) rows * cols / 32 * 22);
+        fillQ5_0Weights(weights[index], rows, cols);
+        inputs[index] = inputs(batchSize, cols);
+        grouped[index] = new float[batchSize * rows];
+        perMatrix[index] = new float[batchSize * rows];
+      }
+
+      kernel.multiplyIndependent(
+          grouped, weights, types, rowCounts, matrixCount, inputs, batchSize, cols);
+
+      // The route each of these projections took before the widening: one call per matrix.
+      for (int index = 0; index < matrixCount; index++) {
+        kernel.multiply(
+            perMatrix[index],
+            inputs[index],
+            weights[index],
+            GgufTensorType.Q5_0,
+            batchSize,
+            rowCounts[index],
+            cols);
+      }
+
+      for (int index = 0; index < matrixCount; index++) {
+        assertThat(grouped[index])
+            .as(
+                "matrix %d must be bit-identical, or widening this eligibility is an epoch change"
+                    + " for every qualified flint and gemma4 artifact with Q5_0 experts",
+                index)
+            .containsExactly(perMatrix[index]);
+      }
+    }
+  }
+
+  /**
    * Q5_0 may take an INDEPENDENT dispatch, though it still may not group.
    *
    * <p>The two are different questions and were answered as one. Grouping shares a single quantized
