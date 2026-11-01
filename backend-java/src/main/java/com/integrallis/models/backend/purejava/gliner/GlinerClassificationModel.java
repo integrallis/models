@@ -20,7 +20,6 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.integrallis.models.api.SchemaClassificationModel;
 import com.integrallis.models.backend.purejava.deberta.DebertaV2Config;
 import com.integrallis.models.backend.purejava.deberta.DebertaV2Encoder;
-import com.integrallis.models.backend.purejava.deberta.DebertaV2Projection;
 import com.integrallis.models.backend.purejava.safetensors.SafetensorsBundle;
 import com.integrallis.models.backend.purejava.tensor.SafetensorsTensorSource;
 import com.integrallis.models.backend.purejava.tensor.TensorSource;
@@ -34,7 +33,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Function;
 
 /** GLiNER span-checkpoint classification head over the shared DeBERTa encoder. */
@@ -67,19 +65,6 @@ public final class GlinerClassificationModel implements SchemaClassificationMode
   /** Loads F32 GLiNER weights; the caller owns the supplied piece tokenizer's lifecycle. */
   public static GlinerClassificationModel load(Path snapshot, Function<String, int[]> tokenizer)
       throws IOException {
-    return loadInternal(snapshot, tokenizer, null);
-  }
-
-  /** Uses a caller-owned dense projector; its lifecycle must enclose this model's lifecycle. */
-  public static GlinerClassificationModel loadWithProjection(
-      Path snapshot, Function<String, int[]> tokenizer, DebertaV2Projection projection)
-      throws IOException {
-    return loadInternal(snapshot, tokenizer, Objects.requireNonNull(projection, "projection"));
-  }
-
-  private static GlinerClassificationModel loadInternal(
-      Path snapshot, Function<String, int[]> tokenizer, DebertaV2Projection projection)
-      throws IOException {
     validateConfig(snapshot.resolve("config.json"));
     DebertaV2Config config =
         DebertaV2Config.parseEncoder(snapshot.resolve("encoder_config/config.json"));
@@ -87,9 +72,7 @@ public final class GlinerClassificationModel implements SchemaClassificationMode
       TensorSource source = new SafetensorsTensorSource(SafetensorsBundle.open(snapshot, arena));
       int dim = config.hiddenSize();
       return new GlinerClassificationModel(
-          projection == null
-              ? DebertaV2Encoder.load(source, config, "encoder.")
-              : DebertaV2Encoder.loadWithProjection(source, config, "encoder.", projection),
+          DebertaV2Encoder.load(source, config, "encoder."),
           new GlinerSchemaCompiler(tokenizer, config.maxPositions()),
           dim,
           f32(source, "classifier.0.weight", dim * 2, dim),
