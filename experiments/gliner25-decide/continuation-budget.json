@@ -2,8 +2,17 @@
   "authorization": "User instruction on 2026-11-01: proceed until it is qualified, don't waste time",
   "previousAggregateLimitSeconds": 7200,
   "previousRentedSecondsUpperBound": 5962,
-  "maximumAggregateRentedSeconds": 14400,
+  "maximumAggregateRentedSeconds": 18000,
   "additionalAllocationSeconds": 7200,
   "purpose": "Bounded continuation: CPU profiling, measured runtime fixes and further development-selected training",
-  "rules": "Count every prior and overlapping rental; each worker has its own deletion deadline; accuracy and performance floors remain unchanged"
+  "rules": "Count every prior and overlapping rental; each worker has its own deletion deadline; accuracy and performance floors remain unchanged",
+  "continuations": [
+    {
+      "previousLimitSeconds": 14400,
+      "newLimitSeconds": 18000,
+      "additionalAllocationSeconds": 3600,
+      "reason": "User-authorized continued qualification: complete prepared-weight performance measurement and development-directed balanced training; v2 development scores did not clear quality floors",
+      "authorization": "User instruction on 2026-11-01: proceed until it is qualified, don't waste time"
+    }
+  ]
 }
