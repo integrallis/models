@@ -51,7 +51,7 @@ def main():
     overlay=work/'evaluation-overlay.tar.gz'
     with tarfile.open(overlay,'w:gz') as archive:
         for name in ['common.py','run_worker.py','reference_worker.py','compare_parity.py','assess_quality.py','assess_finetune.py',
-                     'finetune-policy.json','finetune-splits.json','finetune-qualification-cases.jsonl','policy.json','quality-cases.jsonl','parity-cases.jsonl']:
+                     'finetune-policy.json','finetune-splits.json','finetune-qualification-cases.jsonl','policy.json','quality-cases.jsonl','parity-cases.jsonl','performance-parity-cases.jsonl']:
             archive.add(HERE/name,arcname=name)
     sha=hashlib.file_digest(overlay.open('rb'),'sha256').hexdigest()
     s3.copy_object(Bucket=BUCKET,Key=prefix+'/payload.tar.gz',CopySource={'Bucket':BUCKET,'Key':previous['payloadUri'].split(BUCKET+'/')[1]+'/payload.tar.gz'})

@@ -32,6 +32,9 @@ models() {
 reference parity-cases.jsonl variant-parity-reference /work/variant /work/variant-manifest.json
 models parity-cases.jsonl variant-parity-models
 /work/python/bin/python compare_parity.py --cases parity-cases.jsonl --candidate /work/out/variant-parity-models.jsonl --reference /work/out/variant-parity-reference.jsonl --output /work/out/variant-parity-report.json
+reference performance-parity-cases.jsonl variant-shape-reference /work/variant /work/variant-manifest.json
+models performance-parity-cases.jsonl variant-shape-models
+/work/python/bin/python compare_parity.py --cases performance-parity-cases.jsonl --candidate /work/out/variant-shape-models.jsonl --reference /work/out/variant-shape-reference.jsonl --output /work/out/variant-shape-report.json
 reference finetune-qualification-cases.jsonl fresh-base /work/snapshot snapshot.json
 reference finetune-qualification-cases.jsonl fresh-reference /work/variant /work/variant-manifest.json
 models finetune-qualification-cases.jsonl fresh-models

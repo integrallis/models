@@ -118,3 +118,33 @@ The original 529 cases remain regression evidence and must still pass all origin
 floors. Checkpoint selection never uses either qualification suite. Numerical parity, three
 passing performance pairs, ModelJars integration and a released-runtime repeat remain separate
 requirements. A passing fine-tune quality report never grants catalog admission by itself.
+
+## Remote lifecycle
+
+`runpod_train_controller.py` runs locally with `boto3` and reads only the RunPod key from the
+specified environment file. AWS uses the caller's existing credential chain. The controller
+packages the pinned publisher Git bundle, trainer, locks and training/development data; no
+qualification cases enter that payload. The pod gets expiring, object-scoped S3 URLs, including
+write access only to its own result objects. `runpod_train_worker.py` installs hash-verified
+dependencies, trains, exports and uploads the checkpoint. Model weights stay remote.
+
+Before creating a pod, the controller records its plan, price, source/payload hashes, deadlines,
+budget, stop conditions and evidence destination. It checks live stock and caps the quoted GPU
+rate at $3/hour. The 35-minute maximum rental fits inside the original aggregate cap. Completion,
+worker failure, a ten-minute setup timeout or the deadline triggers deletion and verification.
+The controller must stay running until deletion is verified; provider API errors are surfaced.
+
+```sh
+python runpod_train_controller.py --env-file /path/to/projects/.env \
+  --publisher-bundle /path/to/pinned-publisher.bundle \
+  --gpu 'NVIDIA RTX PRO 6000 Blackwell Server Edition' --launch
+```
+
+`evaluate_finetune_controller.py --training-control /path/to/control.json` requires completed
+uploads and verified pod deletion. It then provisions one disposable EC2 CPU worker for the
+matched-checkpoint comparison, reusing the original hash-identified development runtime.
+The evaluation overlay is independently hashed. It measures numerical parity, the base and
+fine-tuned publisher on the fresh holdout, Models on the same fresh holdout, and the original
+regression suite. Both inference arms use eight CPU threads on the same host. This is quality
+evidence, not GPU-versus-CPU performance evidence. Every prior rental is counted, and the worker
+and controller both enforce the remaining deadline. Results are retained even when a gate fails.
