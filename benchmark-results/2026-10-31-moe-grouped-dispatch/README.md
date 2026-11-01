@@ -18,6 +18,27 @@ Same host (RunPod `cpu3c`, 16 vCPU AMD EPYC 7713, AVX2, no AVX-512), same compar
 | **mellum** Q4_K | 64 / 8 | **grouped** | **15.11** | 29.91 | **0.5052** |
 | **maple** TQ1_0 | 256 / 8 | per-expert | 13.02 | 62.43 | 0.2085 |
 | **maple** TQ1_0 | 256 / 8 | **grouped** | 12.14 | 58.21 | 0.2086 |
+| **mellum** Q4_K | 64 / 8 | **grouped, decoupled** | **17.26** | 29.79 | **0.5794** |
+
+The last row is a second fix. `routeExpertsGrouped` originally required **both** the gate/up group
+and the down group to be eligible and fell back wholesale otherwise. mellum's `ffn_down_exps` is
+**Q5_0 on 14 of its 28 layers** and Q8_0 on the rest, and Q5_0 is the one quantisation the shim
+groups neither way — so fourteen layers were losing the gate and up grouping too, although both are
+Q4_K on every layer and eligible on every layer. Deciding the two groups separately recovered them.
+
+**Cumulative on mellum: 11.34 to 17.26 tok/s, +52%, ratio 0.3771 to 0.5794.** The comparator sat at
+30.06, 29.91 and 29.79 tok/s across the three runs, so the movement is on our side and not host
+drift.
+
+Expert tensor types, read from the artifact rather than assumed:
+
+```
+ffn_gate_exps  Q4_K x28     ffn_down_exps  Q5_0 x14, Q8_0 x14
+ffn_up_exps    Q4_K x28     ffn_gate_inp   F32  x28
+
+isGroupedEligible / isIndependentEligible
+  Q4_K true/true   Q4_0 true/true   Q6_K true/true   Q8_0 true/true   Q5_0 false/false
+```
 
 The comparator held at ~30 tok/s across mellum's two runs, so the 34% is attributable to our arm
 rather than to host drift.
