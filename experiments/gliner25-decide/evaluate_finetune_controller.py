@@ -135,6 +135,8 @@ def main():
     body['UserData']=userdata
     record=dict(experiment=run,provider='EC2',region='us-east-1',plan='m6a.4xlarge',
         sourceRevision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),
+        runtimeKind=dense.get('runtimeKind','candidate-source') if dense else 'candidate-source',
+        releasedVersion=dense.get('releasedVersion') if dense else None,
         performanceReplications=args.replications if args.performance or args.quality_and_performance else 0,
         mode='publisher-single-head-audit' if args.publisher_single_head else 'publisher-and-emotion-audit' if args.publisher_audit else 'development-diagnostics' if args.development_cases else 'quality-and-performance' if args.quality_and_performance else 'cpu-profile' if args.profile else 'paired-performance' if args.performance else 'fine-tune-quality',
         maximumAggregateRentedSeconds=aggregate_limit,

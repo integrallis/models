@@ -29,9 +29,24 @@ curl -fL --retry 3 --max-time 900 'https://github.com/adoptium/temurin25-binarie
 printf '%s  %s\n' 69264a7a211bf5029830d07bc3370f879769d62ebc5b5488e90c9343a2da0e1f /work/jdk.tar.gz | sha256sum -c -
 tar -xzf /work/jdk.tar.gz -C /work/jdk --strip-components=1
 export PATH="/work/jdk/bin:/root/.cargo/bin:$PATH"
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /work/rustup.sh
-sh /work/rustup.sh -y --profile minimal --default-toolchain 1.96.0
-cargo build --locked --release --manifest-path /work/payload/rust/Cargo.toml
+if [[ -f /work/payload/released-runtime.json ]]; then
+  python3 - <<'VERIFY_RELEASE'
+import hashlib,json,pathlib
+root=pathlib.Path('/work/payload')
+receipt=json.loads((root/'released-runtime.json').read_text())
+assert receipt['kind']=='central-release'
+for name,expected in receipt['runtimeFiles'].items():
+    path=root/'lib'/name
+    assert path.parent==root/'lib'
+    assert hashlib.sha256(path.read_bytes()).hexdigest()==expected
+assert hashlib.sha256((root/'rust/target/release/libjmodels_kernels.so').read_bytes()).hexdigest()==receipt['nativeSha256']
+VERIFY_RELEASE
+  cp /work/payload/released-runtime.json /work/out/released-runtime.json
+else
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /work/rustup.sh
+  sh /work/rustup.sh -y --profile minimal --default-toolchain 1.96.0
+  cargo build --locked --release --manifest-path /work/payload/rust/Cargo.toml
+fi
 python3 -m venv /work/python
 /work/python/bin/pip install --require-hashes --extra-index-url https://download.pytorch.org/whl/cpu -r /work/payload/experiment/requirements.lock
 git clone https://github.com/fastino-ai/GLiNER2.git /work/reference
