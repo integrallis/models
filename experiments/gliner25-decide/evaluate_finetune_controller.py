@@ -25,11 +25,13 @@ def main():
     parser.add_argument('--dense-payload','--runtime-payload',dest='dense_payload',type=Path)
     parser.add_argument('--dense-manifest','--runtime-manifest',dest='dense_manifest',type=Path)
     parser.add_argument('--profile',action='store_true')
+    parser.add_argument('--development-cases',type=Path)
     parser.add_argument('--performance',action='store_true')
     parser.add_argument('--quality-and-performance',action='store_true')
     parser.add_argument('--replications',type=int,choices=[1,3],default=1)
     parser.add_argument('--recipe',type=Path,default=HERE)
     args=parser.parse_args()
+    if args.development_cases and (args.profile or args.performance or args.quality_and_performance):raise ValueError('development is a separate mode')
     if args.replications!=1 and not (args.performance or args.quality_and_performance):raise ValueError('replications require performance mode')
     if bool(args.dense_payload)!=bool(args.dense_manifest):raise ValueError('dense payload and manifest are required together')
     dense=json.loads(args.dense_manifest.read_text()) if args.dense_manifest else None
@@ -63,6 +65,12 @@ def main():
         s3.copy_object(Bucket=BUCKET,Key=prefix+'/variant/'+name,CopySource={'Bucket':BUCKET,'Key':trained_prefix+'/'+name})
     overlay=work/'evaluation-overlay.tar.gz'
     with tarfile.open(overlay,'w:gz') as archive:
+        if args.development_cases:
+            cases=[json.loads(line) for line in args.development_cases.read_text().splitlines()]
+            if not cases or any(c['cohort']!='goemotions' or c['sourceSplit']!='train' for c in cases):
+                raise ValueError('development diagnostics require training-source emotion cases')
+            archive.add(args.development_cases,arcname='development-diagnostic-cases.jsonl')
+            archive.add(HERE/'development_diagnostics.py',arcname='development_diagnostics.py')
         for name in ['performance_remote.sh','run_performance_pairs.py','SummarizeJfr.java','common.py','run_worker.py','reference_worker.py','compare_parity.py','assess_quality.py','assess_finetune.py',
                      'finetune-policy.json','finetune-splits.json','finetune-qualification-cases.jsonl','policy.json','quality-cases.jsonl','parity-cases.jsonl','performance-parity-cases.jsonl','performance-cases.jsonl','performance-cohort.json','compare_performance.py','evaluate_finetune_remote.sh','download_reranker_fixture.sh']:
             source=args.recipe/name if name in ['finetune-policy.json','finetune-splits.json','finetune-qualification-cases.jsonl'] else HERE/name
@@ -73,7 +81,7 @@ def main():
     else:
         s3.copy_object(Bucket=BUCKET,Key=prefix+'/payload.tar.gz',CopySource={'Bucket':BUCKET,'Key':previous['payloadUri'].split(BUCKET+'/')[1]+'/payload.tar.gz'})
     s3.upload_file(str(overlay),BUCKET,prefix+'/evaluation-overlay.tar.gz')
-    job='quality_and_performance_remote.sh' if args.quality_and_performance else 'profile_remote.sh' if args.profile else 'performance_remote.sh' if args.performance else 'evaluate_finetune_remote.sh'
+    job='development_remote.sh' if args.development_cases else 'quality_and_performance_remote.sh' if args.quality_and_performance else 'profile_remote.sh' if args.profile else 'performance_remote.sh' if args.performance else 'evaluate_finetune_remote.sh'
     s3.upload_file(str(HERE/job),BUCKET,prefix+'/jobs/evaluate.sh')
     s3.put_object(Bucket=BUCKET,Key=prefix+'/next-job.json',Body=b'{"id":"evaluate"}')
     worker=(HERE/'remote-worker.sh').read_text().replace('shutdown -h +110','shutdown -h +'+str(seconds//60))
@@ -93,7 +101,7 @@ def main():
     record=dict(experiment=run,provider='EC2',region='us-east-1',plan='m6a.4xlarge',
         sourceRevision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),
         performanceReplications=args.replications if args.performance or args.quality_and_performance else 0,
-        mode='quality-and-performance' if args.quality_and_performance else 'cpu-profile' if args.profile else 'paired-performance' if args.performance else 'fine-tune-quality',
+        mode='development-diagnostics' if args.development_cases else 'quality-and-performance' if args.quality_and_performance else 'cpu-profile' if args.profile else 'paired-performance' if args.performance else 'fine-tune-quality',
         maximumAggregateRentedSeconds=aggregate_limit,
         measuredRuntimeSource=dense['sourceRevision'] if dense else previous['payloadManifest']['sourceRevision'],payloadSha256=env['GLINER_PAYLOAD_SHA'],overlaySha256=sha,
         trainedWeightSha256=training['workerResult']['mergedWeightSha256'],trainedSourceUri=training['resultUri'],
@@ -101,7 +109,7 @@ def main():
         maximumRentalSeconds=seconds,maximumAuthorizedSpendUsd=1.0,expectedMinutes=30,
         creationDeadline=(now+timedelta(minutes=5)).isoformat(),deletionDeadline=(now+timedelta(seconds=seconds)).isoformat(),
         resultUri='s3://'+BUCKET+'/'+results,correctnessGate='unchanged numerical parity; exact checkpoint and CPU thread budget',
-        qualityGate='not measured in profiling or performance mode' if args.profile or args.performance else 'all frozen fine-tune and original regression floors',
+        qualityGate='development-only, not qualification' if args.development_cases else 'not measured in profiling or performance mode' if args.profile or args.performance else 'all frozen fine-tune and original regression floors',
         performanceGate='complete 13-shape pairs; every pair must pass, at least three for final qualification' if args.performance or args.quality_and_performance else 'CPU cost attribution only, not qualification' if args.profile else 'not measured in this quality run',
         stopCondition='evaluation complete, failure, setup timeout or deadline',secretsOnBox='instance-scoped IAM role; no account API credentials',catalogQualified=False)
     def save():(root/'control.json').write_text(json.dumps(record,indent=2)+'\n')
@@ -111,6 +119,8 @@ def main():
     instance=launched['InstanceId']
     volumes=[m['Ebs']['VolumeId'] for m in launched.get('BlockDeviceMappings',[]) if 'Ebs' in m]
     (root/'volume-ids.json').write_text(json.dumps(volumes,indent=2)+'\n')
+    if args.development_cases:
+        record['developmentCasesSha256']=hashlib.file_digest(args.development_cases.open('rb'),'sha256').hexdigest()
     record.update(instanceId=instance,launchTime=launched['LaunchTime'].isoformat(),state='running');save()
     print('created '+instance,flush=True)
     try:
@@ -120,7 +130,11 @@ def main():
                 s3.download_file(BUCKET,key,str(root/key.rsplit('/',1)[1]))
             if (root/'evaluate.done').exists():
                 record['evaluationExitCode']=(root/'evaluate.done').read_text().strip();break
-            state=ec2.describe_instances(InstanceIds=[instance])['Reservations'][0]['Instances'][0]['State']['Name']
+            observed=ec2.describe_instances(InstanceIds=[instance])['Reservations'][0]['Instances'][0]
+            state=observed['State']['Name']
+            if not volumes:
+                volumes=[m['Ebs']['VolumeId'] for m in observed.get('BlockDeviceMappings',[]) if 'Ebs' in m]
+                (root/'volume-ids.json').write_text(json.dumps(volumes,indent=2)+'\n')
             if state=='terminated':break
             if (datetime.now(timezone.utc)-now).total_seconds()>600 and not (root/'STATUS').exists():
                 record['stopReason']='setup exceeded ten minutes';break
