@@ -1,8 +1,6 @@
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.integrallis.models.api.SchemaClassificationModel;
-import com.integrallis.models.backend.nativekernel.NativeHuggingFaceTokenizer;
-import com.integrallis.models.backend.nativekernel.NativeDebertaKernels;
 import com.integrallis.models.backend.purejava.gliner.GlinerClassificationModel;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -32,12 +30,9 @@ public class GlinerWorker {
       }
     }
     long start = System.nanoTime();
-    try (var tokenizer = NativeHuggingFaceTokenizer.load(nativeLibrary, snapshot.resolve("tokenizer.json"));
-         var projection = NativeDebertaKernels.load(nativeLibrary, Integer.parseInt(System.getProperty("models.deberta.threads")));
-         var model = GlinerClassificationModel.loadWithKernels(snapshot, tokenizer::encodePiece,
-             projection);
+    try (var model = com.integrallis.models.backend.nativekernel.RustGlinerClassificationModel.load(snapshot, nativeLibrary);
          var input = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
-      emit(Map.of("type", "ready", "backend", "java-deberta-rust-matrix-attention-tokenizer", "snapshot", manifest,
+      emit(Map.of("type", "ready", "backend", "rust-ffm-gliner", "snapshot", manifest,
           "device", List.of("cpu"), "dtype", List.of("float32"),
           "threads", Integer.parseInt(System.getProperty("models.deberta.threads")),
           "nativeSha256", digest(nativeLibrary), "javaVersion", System.getProperty("java.version"),
@@ -69,8 +64,8 @@ public class GlinerWorker {
           }
           output.put("selected", selected);
           output.put("raw", result);
-          output.put("denseProjectionCalls", projection.projectCalls());
-          output.put("attentionCalls", projection.attentionCalls());
+          output.put("denseProjectionCalls", model.projectionCalls());
+          output.put("attentionCalls", model.attentionCalls());
           emit(output);
         } catch (Exception failure) {
           failure.printStackTrace(System.err);

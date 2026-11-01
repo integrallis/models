@@ -88,7 +88,7 @@
     "worker-context",
     "tq1_0-projection",
     "hf-tokenizer-adapter",
-    "f32-dense-projection-experiment"
+    "deberta-f32-kernels"
   ],
   "operations": [
     {
@@ -928,9 +928,9 @@
       "sourceScope": "hf-tokenizer"
     },
     {
-      "id": "f32-dense-projection-experiment",
-      "status": "INACTIVE_EXPERIMENT",
-      "summary": "Profile-driven matrix and disentangled-attention candidate; public default adoption awaits full measured validation.",
+      "id": "deberta-f32-kernels",
+      "status": "UNPROVEN",
+      "summary": "Default candidate GLiNER F32 projection and disentangled-attention kernels. Numerical checks pass; complete speed and quality gates remain required. This is not a claim of a JVM limitation.",
       "capabilities": [],
       "exports": {
         "cpu": [
@@ -963,7 +963,7 @@
           "anchor": "jmodels_deberta_attend"
         }
       ],
-      "sourceScope": "f32-dense-projection",
+      "sourceScope": "deberta-f32-kernels",
       "requiredProfiles": [
         "linux-x86_64",
         "linux-aarch64",
@@ -1398,7 +1398,7 @@
       "backend-java/src/main/java/com/integrallis/models/backend/purejava/gliner/GlinerSchemaCompiler.java",
       "backend-native/build.gradle.kts"
     ],
-    "f32-dense-projection": [
+    "deberta-f32-kernels": [
       "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
       "backend-native/src/main/rust/model-kernels/src/deberta_kernels.rs",
       "backend-native/src/main/rust/model-kernels/src/lib.rs",

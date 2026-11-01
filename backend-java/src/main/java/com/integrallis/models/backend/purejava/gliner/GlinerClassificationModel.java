@@ -64,22 +64,13 @@ public final class GlinerClassificationModel implements SchemaClassificationMode
     this.outputBias = outputBias;
   }
 
-  /** Loads F32 GLiNER weights; the caller owns the supplied piece tokenizer's lifecycle. */
-  public static GlinerClassificationModel load(Path snapshot, Function<String, int[]> tokenizer)
+  /**
+   * Loads F32 weights using caller-owned tokenizer and kernels whose lifetimes enclose this model.
+   */
+  public static GlinerClassificationModel load(
+      Path snapshot, Function<String, int[]> tokenizer, DebertaV2Kernels kernels)
       throws IOException {
-    return loadInternal(snapshot, tokenizer, null);
-  }
-
-  /** Uses a caller-owned dense projector; its lifecycle must enclose this model's lifecycle. */
-  public static GlinerClassificationModel loadWithKernels(
-      Path snapshot, Function<String, int[]> tokenizer, DebertaV2Kernels projection)
-      throws IOException {
-    return loadInternal(snapshot, tokenizer, Objects.requireNonNull(projection, "projection"));
-  }
-
-  private static GlinerClassificationModel loadInternal(
-      Path snapshot, Function<String, int[]> tokenizer, DebertaV2Kernels projection)
-      throws IOException {
+    Objects.requireNonNull(kernels, "kernels");
     validateConfig(snapshot.resolve("config.json"));
     DebertaV2Config config =
         DebertaV2Config.parseEncoder(snapshot.resolve("encoder_config/config.json"));
@@ -87,9 +78,7 @@ public final class GlinerClassificationModel implements SchemaClassificationMode
       TensorSource source = new SafetensorsTensorSource(SafetensorsBundle.open(snapshot, arena));
       int dim = config.hiddenSize();
       return new GlinerClassificationModel(
-          projection == null
-              ? DebertaV2Encoder.load(source, config, "encoder.")
-              : DebertaV2Encoder.loadWithKernels(source, config, "encoder.", projection),
+          DebertaV2Encoder.loadWithKernels(source, config, "encoder.", kernels),
           new GlinerSchemaCompiler(tokenizer, config.maxPositions()),
           dim,
           f32(source, "classifier.0.weight", dim * 2, dim),
