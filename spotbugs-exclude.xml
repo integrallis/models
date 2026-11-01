@@ -142,4 +142,11 @@
         </Or>
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
+    <!-- models-backend-onnx: Tensor is the value type on every operator's hot path and hands out its
+         backing array by reference on purpose; records of decoded graph structure keep the lists and
+         arrays the parser built. Copying per operator call would defeat the module. -->
+    <Match>
+        <Package name="com.integrallis.models.backend.onnx"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
 </FindBugsFilter>
