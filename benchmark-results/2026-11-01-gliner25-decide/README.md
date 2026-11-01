@@ -1,7 +1,7 @@
 # GLiNER2.5-Decide CPU qualification experiment
 
-Status: **FAILED_ABSOLUTE_QUALITY** for the pinned base checkpoint. No catalog admission.
-The first performance screening pair also fails.
+Status: **FAILED_ABSOLUTE_QUALITY** for both the pinned base and fine-tuned checkpoint.
+No catalog admission. The base performance pair and the isolated native projection screen fail.
 
 The tested development runtime is Models `6add46ee740f8acd80295741fc8e22bae34f845f`,
 Vectors 0.1.32, Java 25.0.3, Rust tokenizer 0.22.2, F32 encoder/head. The runtime jars
@@ -110,11 +110,50 @@ No threshold fitting or test-set checkpoint selection was performed.
 
 An isolated native batched F32 projection candidate is on
 `experiment/gliner25-batched-projection` at `6bb9a050edc0884faeb75ea80bf034854be50b47`.
-Its local synthetic, FFM lifecycle, Rust, and Java static checks pass. It is not the public
-default; a bounded same-host parity/performance screen is pending. A passing screen would still
-need full task-quality regression and default-route validation before adoption, followed by the
-required three passing final pairs. ModelJars integration, a released-runtime repeat, native
-packaging checks across advertised platforms, and catalog publication remain outstanding.
+Its local synthetic, FFM lifecycle, Rust, and Java static checks passed, but the whole-model
+screen failed. The candidate implementation was removed in `47be23e1`; it was never adopted
+as the public default. Its immutable source and payload hashes remain in the experiment evidence.
+ModelJars integration, a released-runtime repeat, native packaging checks across advertised
+platforms, and catalog publication remain outstanding.
+
+## Native projection screen: stopped after a measured failure
+
+`gliner25-eval-20261101T202353Z/` records the same fine-tuned checkpoint in both CPU arms,
+eight threads, and a single m6a.4xlarge host. All nine diagnostic and thirteen shape parity cases
+pass; the maximum shape logit error is 0.0000185336. Native call counters prove the candidate
+executed. The existing F16 reranker regression also passes.
+
+| Completed bucket | Throughput / publisher | p95 latency / publisher | Result |
+| --- | --- | --- | --- |
+| 32 tokens, 2 labels | 0.8045 | 1.2140 | Pass |
+| 32 tokens, 8 labels | 0.8232 | 1.3092 | Pass |
+| 128 tokens, 2 labels | 0.4678 | 2.2366 | Fail |
+| 128 tokens, 8 labels | 0.5025 | 1.8461 | Fail |
+| 128 tokens, 32 labels | 0.4849 | 2.1908 | Fail |
+
+Every completed bucket contains 3 warmups and 30 timed requests in each arm. The worker was
+terminated after the first complete failing bucket was observed, following the campaign's early
+stop rule. The final upload retains 182 candidate requests and all 429 publisher requests;
+five paired buckets are complete and eight are incomplete. `stopped-performance-report.json`
+lists both groups. This is **not** a completed thirteen-bucket pair or a final qualification.
+Reproduce it with:
+
+```sh
+python3 experiments/gliner25-decide/summarize_stopped_screen.py \
+  benchmark-results/2026-11-01-gliner25-decide/gliner25-eval-20261101T202353Z
+```
+
+Timing includes native dispatch and copies. These ratios compare the experimental native route
+against the publisher. The older Java timings used another host and the base checkpoint, so they
+cannot establish a controlled native-versus-Java speedup. No full task-quality repeat or public
+loader validation is claimed for the rejected native candidate.
+
+All owned GPU/CPU rentals are verified deleted/terminated, including the final CPU root volume.
+Aggregate rented-time upper bound: **5,962 seconds (99 minutes 22 seconds)** of the original
+7,200-second cap. The remaining 1,238 seconds are below the controller's 1,500-second minimum
+for another complete CPU evaluation, even before its cleanup reserve. No additional rental was
+launched. The failed native implementation was removed; its raw results and historical commit
+remain inspectable.
 
 ## Accuracy follow-up, not yet executed
 

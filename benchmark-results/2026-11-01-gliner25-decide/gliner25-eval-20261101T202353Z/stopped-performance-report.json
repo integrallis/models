@@ -1,0 +1,309 @@
+{
+  "policy": "schema-classification-v1",
+  "stage": "early-stopped-performance-screen",
+  "passed": false,
+  "candidateRuntime": {
+    "threads": 8,
+    "nativeSha256": "8a690505933dce1daa88f3c236038eecf35ece8f946ea6a6e7883caa7cc1f267",
+    "javaVersion": "25.0.3",
+    "type": "ready",
+    "device": [
+      "cpu"
+    ],
+    "backend": "java-deberta-rust-dense-tokenizer",
+    "dtype": [
+      "float32"
+    ],
+    "snapshot": {
+      "id": "modeljars-gliner25-decide-general-v1",
+      "sourceUri": "unpublished-training-output",
+      "revision": "d1ca5a14b0b535987ce6333680d0de2c963100cbff91745620e8455ec731caf5",
+      "files": [
+        {
+          "path": "config.json",
+          "role": "configuration",
+          "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+          "sizeBytes": 1612
+        },
+        {
+          "path": "encoder_config/config.json",
+          "role": "configuration",
+          "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+          "sizeBytes": 920
+        },
+        {
+          "path": "model.safetensors",
+          "role": "classification-model",
+          "sha256": "d1ca5a14b0b535987ce6333680d0de2c963100cbff91745620e8455ec731caf5",
+          "sizeBytes": 1945828140
+        },
+        {
+          "path": "special_tokens_map.json",
+          "role": "tokenizer",
+          "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+          "sizeBytes": 2414
+        },
+        {
+          "path": "tokenizer.json",
+          "role": "tokenizer",
+          "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+          "sizeBytes": 8333952
+        },
+        {
+          "path": "tokenizer_config.json",
+          "role": "tokenizer",
+          "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+          "sizeBytes": 3356
+        }
+      ],
+      "derivedFrom": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90"
+    },
+    "loadMs": 22735.243908,
+    "driverHostname": "ip-172-31-1-7",
+    "driverCpuAffinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ]
+  },
+  "referenceRuntime": {
+    "type": "ready",
+    "backend": "publisher-gliner2",
+    "snapshot": {
+      "id": "modeljars-gliner25-decide-general-v1",
+      "sourceUri": "unpublished-training-output",
+      "revision": "d1ca5a14b0b535987ce6333680d0de2c963100cbff91745620e8455ec731caf5",
+      "files": [
+        {
+          "path": "config.json",
+          "role": "configuration",
+          "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+          "sizeBytes": 1612
+        },
+        {
+          "path": "encoder_config/config.json",
+          "role": "configuration",
+          "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+          "sizeBytes": 920
+        },
+        {
+          "path": "model.safetensors",
+          "role": "classification-model",
+          "sha256": "d1ca5a14b0b535987ce6333680d0de2c963100cbff91745620e8455ec731caf5",
+          "sizeBytes": 1945828140
+        },
+        {
+          "path": "special_tokens_map.json",
+          "role": "tokenizer",
+          "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+          "sizeBytes": 2414
+        },
+        {
+          "path": "tokenizer.json",
+          "role": "tokenizer",
+          "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+          "sizeBytes": 8333952
+        },
+        {
+          "path": "tokenizer_config.json",
+          "role": "tokenizer",
+          "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+          "sizeBytes": 3356
+        }
+      ],
+      "derivedFrom": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90"
+    },
+    "sourceRevision": "ca4f68235b50fe4c3ecf3876851d748fe4b15c6c",
+    "device": [
+      "cpu"
+    ],
+    "dtype": [
+      "torch.float32"
+    ],
+    "threads": 8,
+    "versions": {
+      "torch": "2.9.1+cpu",
+      "transformers": "4.57.6",
+      "tokenizers": "0.22.2",
+      "safetensors": "0.7.0"
+    },
+    "hostname": "ip-172-31-1-7",
+    "loadMs": 4619.791453000005,
+    "api": "extract",
+    "driverHostname": "ip-172-31-1-7",
+    "driverCpuAffinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ]
+  },
+  "buckets": {
+    "tokens32-labels2-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 230.72337349998406,
+        "p95Ms": 239.79892800002744,
+        "requestsPerSecond": 4.420715816124304,
+        "meanInferenceMs": 225.1572585,
+        "peakRssKiB": 5694484
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 179.221210999998,
+        "p95Ms": 197.52182700000276,
+        "requestsPerSecond": 5.494852592065767,
+        "meanInferenceMs": 181.70259500000347,
+        "peakRssKiB": 4240244
+      },
+      "throughputRatio": 0.8045194556278995,
+      "p95LatencyRatio": 1.214037616207469,
+      "passed": true
+    },
+    "tokens32-labels8-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 212.99263699995663,
+        "p95Ms": 237.14724199999182,
+        "requestsPerSecond": 4.585710133072387,
+        "meanInferenceMs": 217.00497086666667,
+        "peakRssKiB": 5694484
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 178.93564700000297,
+        "p95Ms": 181.1438280000175,
+        "requestsPerSecond": 5.570730091245701,
+        "meanInferenceMs": 179.2092520000002,
+        "peakRssKiB": 4240244
+      },
+      "throughputRatio": 0.8231793782791137,
+      "p95LatencyRatio": 1.3091654549774057,
+      "passed": true
+    },
+    "tokens128-labels2-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 602.204152000013,
+        "p95Ms": 629.8842790000663,
+        "requestsPerSecond": 1.6887825559287086,
+        "meanInferenceMs": 591.3431214666666,
+        "peakRssKiB": 5694484
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 276.5255245000162,
+        "p95Ms": 281.62667399999464,
+        "requestsPerSecond": 3.610139363046198,
+        "meanInferenceMs": 276.69582843333086,
+        "peakRssKiB": 4240244
+      },
+      "throughputRatio": 0.46778874334195547,
+      "p95LatencyRatio": 2.2365931112053623,
+      "passed": false
+    },
+    "tokens128-labels8-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 562.428829000055,
+        "p95Ms": 589.8987530000568,
+        "requestsPerSecond": 1.769361575886322,
+        "meanInferenceMs": 564.2830014666666,
+        "peakRssKiB": 5694484
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 279.4247374999941,
+        "p95Ms": 319.54135199998746,
+        "requestsPerSecond": 3.520911307652841,
+        "meanInferenceMs": 283.72818490000594,
+        "peakRssKiB": 4240244
+      },
+      "throughputRatio": 0.502529436637766,
+      "p95LatencyRatio": 1.8460795427819305,
+      "passed": false
+    },
+    "tokens128-labels32-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 566.7464649999943,
+        "p95Ms": 616.2205940000831,
+        "requestsPerSecond": 1.7310477259884305,
+        "meanInferenceMs": 576.7981038,
+        "peakRssKiB": 5694484
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 279.2629399999953,
+        "p95Ms": 281.2790080000127,
+        "requestsPerSecond": 3.5701986949314293,
+        "meanInferenceMs": 279.77939403333494,
+        "peakRssKiB": 4240244
+      },
+      "throughputRatio": 0.4848603324083837,
+      "p95LatencyRatio": 2.1907806003072055,
+      "passed": false
+    }
+  },
+  "failures": [
+    "tokens128-labels2-tasks1",
+    "tokens128-labels8-tasks1",
+    "tokens128-labels32-tasks1"
+  ],
+  "catalogQualified": false,
+  "fullCoverage": false,
+  "completedBuckets": [
+    "tokens32-labels2-tasks1",
+    "tokens32-labels8-tasks1",
+    "tokens128-labels2-tasks1",
+    "tokens128-labels8-tasks1",
+    "tokens128-labels32-tasks1"
+  ],
+  "incompleteBuckets": [
+    "tokens256-labels2-tasks1",
+    "tokens256-labels8-tasks1",
+    "tokens256-labels32-tasks1",
+    "tokens512-labels2-tasks1",
+    "tokens512-labels8-tasks1",
+    "tokens512-labels32-tasks1",
+    "tokens128-labels8-tasks2",
+    "tokens512-labels8-tasks2"
+  ],
+  "recordedRequests": {
+    "models": 182,
+    "reference": 429
+  },
+  "nativeProjectionCalls": 26256,
+  "stopReason": "completed bucket failed fixed relative gate; remaining buckets not evaluated",
+  "sources": {
+    "dense-performance-models.jsonl": "f4faa04ef9c01f80da708b79a7f9f2f3d7c0e8ab11db8352652ebdc746994199",
+    "dense-performance-reference.jsonl": "0346e67dcdc6d0260b1a53f3a855aafed6a154ee350d9d54964ef2de711e2c25",
+    "performance-cases.jsonl": "24944973c5db9276bbbb641aa469d5ec8e62a7f7afedb71796540020a719b6f5",
+    "summarize_stopped_screen.py": "1cf4ddfc49a096bd05ceb1e8717b7215c243885ba553c27abec0d73afd852d82"
+  }
+}
