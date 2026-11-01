@@ -47,6 +47,47 @@ class Lfm2RewindTest {
   /** Within the toy vocabulary, which is only four tokens wide. */
   private static final int[] CONTINUATION = {2, 0};
 
+  /**
+   * Prefill returns exactly what advancing token by token returns.
+   *
+   * <p>Pinned because prefill no longer projects logits for every token: only the last token's are
+   * ever returned, and the output projection is {@code vocab_size x embedding_length} -- the widest
+   * matmul in the pass, about 21% of the weight bytes a token reads. Computing it 190 times for a
+   * 190-token prompt and discarding 189 results was most of why lfm2moe's prefill measured 0.2076
+   * of its comparator against decode's 0.4674.
+   *
+   * <p>The other tests here compare a rewound decoder against a fresh one, so both run this same
+   * path and would agree even if it returned consistently wrong logits. This one compares against
+   * {@code forward} per token, which always projects, so it fails if skipping changes the answer or
+   * if the skipped tokens stop advancing the convolution state.
+   */
+  @Test
+  void prefillReturnsWhatAdvancingTokenByTokenReturns() {
+    Lfm2DecoderAdapter batched = adapter();
+    Lfm2DecoderAdapter perToken = adapter();
+
+    float[] fromPrefill = batched.prefill(PROMPT, 0).clone();
+
+    float[] fromForward = null;
+    for (int index = 0; index < PROMPT.length; index++) {
+      fromForward = perToken.forward(PROMPT[index], index);
+    }
+
+    assertThat(fromPrefill).containsExactly(fromForward);
+  }
+
+  /**
+   * A prefill with no tokens has no logits to return, so it is refused rather than returning null.
+   */
+  @Test
+  void anEmptyPrefillIsRefused() {
+    Lfm2DecoderAdapter decoder = adapter();
+
+    assertThatThrownBy(() -> decoder.prefill(new int[0], 0))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("at least one token");
+  }
+
   @Test
   void aRewoundDecoderProducesExactlyWhatAFreshOneDoes() {
     Lfm2DecoderAdapter rewound = adapter();

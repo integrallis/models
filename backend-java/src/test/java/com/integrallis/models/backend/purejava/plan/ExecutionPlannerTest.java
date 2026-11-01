@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.plan;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
@@ -32,6 +33,74 @@ import org.junit.jupiter.api.Test;
 
 @Tag("unit")
 class ExecutionPlannerTest {
+
+  /**
+   * A decoder that does not route projections through this planner gets no claims about its file.
+   *
+   * <p>{@link ModelTopology#mappedArchitecture} hands the planner all-F32 placeholder layers on
+   * purpose, so that it does not advertise a batched path the decoder has not got. The planner then
+   * evaluated every projection-kernel decision against those placeholders and wrote the outcome as
+   * a fact about the artifact: an lfm2moe report carried {@code q4-kernel: UNSUPPORTED "the loaded
+   * model has no Q4_0 projection tensors"} for a file whose 132 projection tensors are all Q4_0,
+   * and {@code grouped-projections ... qkv: independent} while grouping engaged on every call.
+   *
+   * <p>Two diagnoses went the wrong way on those lines before the GGUF was read by hand, which is
+   * why they are replaced rather than softened, and replaced by something rather than dropped: a
+   * reader who finds nothing cannot tell "not planned here" from "not reported".
+   */
+  @Test
+  void aSyntheticTopologyMakesNoClaimsAboutTheModelsProjections() {
+    ModelTopology synthetic = ModelTopology.mappedArchitecture("lfm2moe", 2048, 512, 512, 24);
+
+    assertThat(synthetic.projectionTypesDescribeTheModel()).isFalse();
+
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime("hotspot-c2"), synthetic, PureJavaPlanConfiguration.defaults());
+
+    List<String> ids =
+        plan.diagnostics().optimizations().stream().map(OptimizationDecision::id).toList();
+    assertThat(ids)
+        .as("no decision may be reported that was derived from placeholder layer types")
+        .doesNotContain(
+            "q4-kernel",
+            "grouped-projections",
+            "mixed-k-projections",
+            "q6-batched-kernel",
+            "batched-prefill",
+            "staged-quantized-ffn",
+            "block-major-q8-activations");
+    assertThat(ids).contains("projection-kernel-planning");
+
+    OptimizationDecision stated =
+        plan.diagnostics().optimizations().stream()
+            .filter(decision -> "projection-kernel-planning".equals(decision.id()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(stated.reason())
+        .contains("does not route projections through the shared planner")
+        .contains("lfm2moe");
+    assertThat(stated.settings()).containsEntry("layer-types", "placeholder");
+
+    // Decisions that do not read layer types are still reported, because they were really made.
+    assertThat(ids).contains("mapped-model-weights", "vector-fma");
+  }
+
+  /** A real topology keeps every decision: the filter must not fire on a model we did read. */
+  @Test
+  void aTopologyReadFromTheModelStillReportsEveryProjectionDecision() {
+    ModelTopology real = uniformTopology(GgufTensorType.Q8_0);
+
+    assertThat(real.projectionTypesDescribeTheModel()).isTrue();
+
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(runtime("hotspot-c2"), real, PureJavaPlanConfiguration.defaults());
+
+    List<String> ids =
+        plan.diagnostics().optimizations().stream().map(OptimizationDecision::id).toList();
+    assertThat(ids).contains("q4-kernel", "grouped-projections", "batched-prefill");
+    assertThat(ids).doesNotContain("projection-kernel-planning");
+  }
 
   @Test
   void plansQ8GroupingAndBatchedPrefillFromTopology() {

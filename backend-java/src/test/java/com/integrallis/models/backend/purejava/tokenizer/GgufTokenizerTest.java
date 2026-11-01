@@ -120,6 +120,75 @@ class GgufTokenizerTest {
     }
   }
 
+  /**
+   * A byte-level BPE model whose own chat template opens with the BOS gets one, flag or no flag.
+   *
+   * <p>MEASURED 2026-11-01. lfm2moe is byte-level BPE, declares no {@code add_bos_token}, and its
+   * chat template opens {@code bos_token}. llama.cpp renders that template so its prompt carries
+   * the id; ours did not, and every case in a qualification ran with one fewer input token than the
+   * comparator -- 189 against 190 on all nine. A local greedy continuation without it degenerated
+   * to " France is France is" where with it the output matched the oracle byte for byte.
+   *
+   * <p>Keyed on the template rather than on an architecture name because the template is the
+   * model's own statement about its envelope, which is the same source this class already uses to
+   * resolve the assistant end-of-turn marker -- and because a family whitelist is exactly what let
+   * this model through.
+   */
+  @Test
+  void byteLevelBpeTakesTheBosItsOwnChatTemplateDeclares() {
+    Map<String, GgufMetadataValue> entries =
+        new LinkedHashMap<>(createByteLevelMetadata().entries());
+    entries.remove("tokenizer.ggml.add_bos_token");
+
+    // No template at all: byte-level BPE adds no BOS, which is the long-standing default.
+    assertThat(GgufTokenizer.fromMetadata(new GgufMetadata(entries)).encode("hi"))
+        .containsExactly(4);
+
+    // A template that emits it.
+    entries.put(
+        "tokenizer.chat_template",
+        new GgufMetadataValue.StringValue(
+            "{{- bos_token -}}{% for m in messages %}{{ m }}{% endfor %}"));
+    assertThat(GgufTokenizer.fromMetadata(new GgufMetadata(entries)).encode("hi"))
+        .containsExactly(8, 4);
+
+    // An explicit flag still wins over the template, in both directions.
+    entries.put("tokenizer.ggml.add_bos_token", new GgufMetadataValue.BoolValue(false));
+    assertThat(GgufTokenizer.fromMetadata(new GgufMetadata(entries)).encode("hi"))
+        .containsExactly(4);
+  }
+
+  /**
+   * A template that never emits the BOS does not get one, even when it names the variable.
+   *
+   * <p>The detection is a substring test over the Jinja source, so the obvious false positive is a
+   * template that mentions {@code bos_token} inside a branch it does not take. This records that
+   * the heuristic DOES fire on such a template -- the decoder cannot evaluate Jinja -- so the limit
+   * is written down rather than discovered later by a model that silently gains a token. A model
+   * that guards its BOS this way must declare {@code add_bos_token} explicitly, which wins.
+   */
+  @Test
+  void theTemplateSignalIsASubstringTestAndSaysSoWhenItIsWrong() {
+    Map<String, GgufMetadataValue> entries =
+        new LinkedHashMap<>(createByteLevelMetadata().entries());
+    entries.remove("tokenizer.ggml.add_bos_token");
+    entries.put(
+        "tokenizer.chat_template",
+        new GgufMetadataValue.StringValue(
+            "{% if add_bos_token %}{{ bos_token }}{% endif %}{{ m }}"));
+
+    // Known limit, pinned deliberately: the guard is not evaluated, so the BOS is added.
+    assertThat(GgufTokenizer.fromMetadata(new GgufMetadata(entries)).encode("hi"))
+        .containsExactly(8, 4);
+
+    // A template with no mention of it at all is unaffected.
+    entries.put(
+        "tokenizer.chat_template",
+        new GgufMetadataValue.StringValue("{% for m in messages %}{{ m }}{% endfor %}"));
+    assertThat(GgufTokenizer.fromMetadata(new GgufMetadata(entries)).encode("hi"))
+        .containsExactly(4);
+  }
+
   private GgufMetadata createByteLevelMetadata() {
     return createByteLevelMetadata(false, false);
   }

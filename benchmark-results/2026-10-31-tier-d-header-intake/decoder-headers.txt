@@ -1,0 +1,71 @@
+
+##### mellum-q4km-thinking  HTTP 200  8071295040 bytes  tensors 339
+  version = 3
+  tensor_count = 339
+  kv_count = 43
+  general.architecture = "mellum"
+  general.type = "model"
+  general.name = "Mellum2 12B A2.5B Thinking"
+  general.finetune = "Thinking"
+  general.basename = "Mellum2"
+  general.size_label = "12B-A2.5B"
+  general.license = "apache-2.0"
+  mellum.block_count = 28
+  mellum.context_length = 131072
+  mellum.embedding_length = 2304
+  mellum.feed_forward_length = 7168
+  mellum.attention.head_count = 32
+  mellum.attention.head_count_kv = 4
+  mellum.rope.scaling.type = "yarn"
+  mellum.rope.scaling.factor = 16
+  mellum.rope.scaling.original_context_length = 8192
+  mellum.rope.scaling.yarn_attn_factor = 1.2772588729858398
+  mellum.rope.scaling.yarn_beta_fast = 32
+  mellum.rope.scaling.yarn_beta_slow = 1
+  mellum.rope.freq_base = 500000
+  mellum.rope.freq_base_swa = 500000
+  mellum.attention.layer_norm_rms_epsilon = 9.999999974752427e-7
+  mellum.expert_count = 64
+  mellum.expert_used_count = 8
+  mellum.attention.key_length = 128
+  mellum.attention.value_length = 128
+  mellum.expert_feed_forward_length = 896
+  mellum.attention.sliding_window = 1024
+  general.quantization_version = 2
+  general.file_type = 15
+  TENSOR ROOTS: blk.attn_k.weight blk.attn_k_norm.weight blk.attn_norm.weight blk.attn_output.weight blk.attn_q.weight blk.attn_q_norm.weight blk.attn_v.weight blk.ffn_down_exps.weight blk.ffn_gate_exps.weight blk.ffn_gate_inp.weight blk.ffn_norm.weight blk.ffn_up_exps.weight
+  TOP: output.weight output_norm.weight token_embd.weight
+
+##### lfm2moe-q4_0  HTTP 200  4844678368 bytes  tensors 256
+  version = 3
+  tensor_count = 256
+  kv_count = 39
+  general.architecture = "lfm2moe"
+  general.type = "model"
+  general.name = "Feb5E04Da4910Dd56D33F0Cd03747Ff298C1E801"
+  general.size_label = "32x959M"
+  general.license = "other"
+  general.license.name = "lfm1.0"
+  general.license.link = "LICENSE"
+  general.base_model.count = 1
+  general.base_model.0.name = "LFM2.5 8B A1B Base"
+  general.base_model.0.organization = "LiquidAI"
+  general.base_model.0.repo_url = "https://huggingface.co/LiquidAI/LFM2.5-8B-A1B-Base"
+  lfm2moe.block_count = 24
+  lfm2moe.context_length = 128000
+  lfm2moe.embedding_length = 2048
+  lfm2moe.feed_forward_length = 7168
+  lfm2moe.attention.head_count = 32
+  lfm2moe.rope.freq_base = 5000000
+  lfm2moe.attention.layer_norm_rms_epsilon = 0.000009999999747378752
+  lfm2moe.expert_count = 32
+  lfm2moe.expert_used_count = 4
+  lfm2moe.expert_feed_forward_length = 1792
+  lfm2moe.leading_dense_block_count = 2
+  lfm2moe.expert_gating_func = 2
+  lfm2moe.vocab_size = 128000
+  lfm2moe.shortconv.l_cache = 3
+  general.quantization_version = 2
+  general.file_type = 2
+  TENSOR ROOTS: blk.attn_k.weight blk.attn_k_norm.weight blk.attn_norm.weight blk.attn_output.weight blk.attn_q.weight blk.attn_q_norm.weight blk.attn_v.weight blk.exp_probs_b.bias blk.ffn_down.weight blk.ffn_down_exps.weight blk.ffn_gate.weight blk.ffn_gate_exps.weight blk.ffn_gate_inp.weight blk.ffn_norm.weight blk.ffn_up.weight blk.ffn_up_exps.weight blk.shortconv.conv.weight blk.shortconv.in_proj.weight blk.shortconv.out_proj.weight
+  TOP: token_embd.weight token_embd_norm.weight

@@ -118,6 +118,14 @@ class NativeKernelLibraryTest {
       assertThat(kernels.supports(NativeKernelCapability.Q5_1_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q8_0_F32_GROUPED_BATCHED_MATMUL)).isTrue();
+      // Advertised so the caller can detect the mixed-activation grouping the kernel always did.
+      assertThat(
+              kernels.supports(
+                  NativeKernelCapability.MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL))
+          .isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL))
+          .isTrue();
+      assertThat(kernels.supports(NativeKernelCapability.Q5_0_INDEPENDENT_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q4_K_F32_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q4_K_F32_GROUPED_BATCHED_MATMUL)).isTrue();
       assertThat(kernels.supports(NativeKernelCapability.Q5_K_F32_BATCHED_MATMUL)).isTrue();
@@ -971,6 +979,103 @@ class NativeKernelLibraryTest {
         .isLessThan(quantizedWorst);
   }
 
+  @Test
+  void theExactActivationQ8_0RouteMatchesTheShippedJavaPathBitForBit() {
+    // #292's acceptance criterion, and what the kernel's own javadoc claims: this route folds
+    // "exactly as Java's PinnedReduction.dot folds", so the assertion is EQUALITY and not a
+    // tolerance. The reference is TensorOps.ggufExactBatchedMatmul -- the real shipped Java path a
+    // typed-decision model runs, not a reducer written for this test. A tolerance here would pass
+    // for a kernel that merely folds *closely*, which is the failure this test exists to catch:
+    // Laya's output is an argmax, so a last-bit difference in fold order is a flipped answer.
+    //
+    // The Rust tests compare the AVX2 variant against the Rust scalar one; nothing there asserts
+    // that the Rust scalar matches JAVA, which is the claim the route rests on. That is this test.
+    // Which variant runs is the library's choice, pinned on the Rust side by
+    // q8f32_reuse_matches_scalar_through_real_worker_dispatch: AVX2+FMA hosts get
+    // Q8F32ActivationAvx2 and everything else the scalar kernel, so across hosts both are checked
+    // against Java and neither can drift from it unnoticed.
+    //
+    // Shapes vary the axis fold order actually depends on. One Q8_0 block is thirty-two elements,
+    // which is exactly one PinnedReduction step, so 32 columns never exercises a second round of
+    // the four accumulators and could not fail on fold order at all. 64, 96, 160 and 256 do, and
+    // 96 and 160 are deliberately not powers of two.
+    int[] columnCounts = {32, 64, 96, 160, 256};
+    int[] batchSizes = {1, 2, 5};
+
+    try (RustGgufBatchedMatrixKernel kernel =
+        RustGgufBatchedMatrixKernel.openExactActivations(libraryPath(), 1)) {
+      for (int cols : columnCounts) {
+        for (int batchSize : batchSizes) {
+          int rows = 7;
+          float[] input = inputs(batchSize, cols);
+          float[] fromKernel = new float[batchSize * rows];
+          float[] fromJava = new float[batchSize * rows];
+
+          try (Arena arena = Arena.ofConfined()) {
+            MemorySegment weights = arena.allocate(rows * cols / 32L * 34L);
+            fillQ8_0Weights(weights, rows, cols);
+            kernel.multiply(fromKernel, input, weights, GgufTensorType.Q8_0, batchSize, rows, cols);
+            TensorOps.ggufExactBatchedMatmul(
+                fromJava,
+                input,
+                weights,
+                GgufTensorType.Q8_0,
+                batchSize,
+                rows,
+                cols,
+                new float[cols]);
+          }
+
+          assertThat(fromKernel)
+              .as(
+                  "Q8_0 F32-activation kernel vs TensorOps.ggufExactBatchedMatmul at %d"
+                      + " columns, batch %d",
+                  cols, batchSize)
+              .containsExactly(fromJava);
+        }
+      }
+    }
+  }
+
+  @Test
+  void theQ8_0FixturesDoNotHoldTheFoldOrderAxisConstant() {
+    // A negative control for the test above. If every row reduced to the same value, or if widening
+    // the column count did not change the result, the parity assertion would hold for a kernel that
+    // got fold order wrong -- the fixture would be hiding the axis under test. Assert the fixture
+    // varies along both axes before trusting an equality that depends on them.
+    int rows = 7;
+    float[] narrow = new float[rows];
+    float[] wide = new float[rows];
+
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment narrowWeights = arena.allocate(rows * 64 / 32L * 34L);
+      MemorySegment wideWeights = arena.allocate(rows * 256 / 32L * 34L);
+      fillQ8_0Weights(narrowWeights, rows, 64);
+      fillQ8_0Weights(wideWeights, rows, 256);
+      TensorOps.ggufExactBatchedMatmul(
+          narrow, inputs(1, 64), narrowWeights, GgufTensorType.Q8_0, 1, rows, 64, new float[64]);
+      TensorOps.ggufExactBatchedMatmul(
+          wide, inputs(1, 256), wideWeights, GgufTensorType.Q8_0, 1, rows, 256, new float[256]);
+    }
+
+    assertThat(distinctCount(narrow))
+        .as("rows must not all reduce to the same value, or row indexing is untested")
+        .isGreaterThan(1);
+    assertThat(distinctCount(wide)).isGreaterThan(1);
+    assertThat(wide[0])
+        .as(
+            "widening the reduction must change the result, or the fold-order axis is held constant")
+        .isNotEqualTo(narrow[0]);
+  }
+
+  private static long distinctCount(float[] values) {
+    return new java.util.HashSet<>(
+            java.util.stream.IntStream.range(0, values.length)
+                .mapToObj(index -> values[index])
+                .toList())
+        .size();
+  }
+
   /** Dequantizes Q8_0 weights and reduces in F32, which is what the activations are spared. */
   private static void referenceQ8_0F32ActivationBatchedMatmul(
       MemorySegment weights, float[] input, int batchSize, int rows, int cols, float[] output) {
@@ -1245,10 +1350,16 @@ class NativeKernelLibraryTest {
               kernel.isDualEligible(
                   GgufTensorType.Q8_0, firstRows, GgufTensorType.Q8_0, secondRows, batchSize, cols))
           .isTrue();
+      // Was asserted false, pinning a restriction this side invented rather than one the kernel
+      // has: multiplyDual dispatches through invokeGrouped, the same entry point as
+      // multiplyGrouped, whose only format requirement is that the group agrees on the activation
+      // format. Q4_0 and Q8_0 both quantize activations to Q8_0, so the group is valid and always
+      // was. Values for a mixed group are checked in
+      // groupedKernelMixesQ4_0AndQ8_0BecauseBothQuantizeActivationsToQ8_0.
       assertThat(
               kernel.isDualEligible(
                   GgufTensorType.Q4_0, firstRows, GgufTensorType.Q8_0, secondRows, batchSize, cols))
-          .isFalse();
+          .isTrue();
       kernel.multiplyDual(
           actualFirst,
           firstWeights,
@@ -1383,6 +1494,272 @@ class NativeKernelLibraryTest {
       assertClose(actualFirst, expectedFirst, K_QUANT_REDUCTION_TOLERANCE);
       assertClose(actualSecond, expectedSecond, K_QUANT_REDUCTION_TOLERANCE);
       assertClose(actualThird, expectedThird, K_QUANT_REDUCTION_TOLERANCE);
+    }
+  }
+
+  /**
+   * A mixed Q4_0/Q8_0 group is BIT-IDENTICAL to the per-matrix route it replaces.
+   *
+   * <p>The companion safety check to the Q5_0 one. {@code compatibleGroup} feeds {@code
+   * supportsDual} and {@code supportsTriple}, which is how the Llama path decides whether Q/K/V
+   * become one dispatch -- and that path carries most of the catalog. Widening it to formats that
+   * merely agree on their activation means a qualified artifact whose projections mix Q4_0 and Q8_0
+   * starts grouping where it did not.
+   *
+   * <p>Grouping shares one quantized activation across the group where the per-matrix route
+   * quantized the same input once per call. Those should agree exactly, because it is the same
+   * input through the same quantizer -- but "should" is how published bytes move, so it is asserted
+   * rather than assumed.
+   */
+  @Test
+  void aMixedQ4_0Q8_0GroupIsBitIdenticalToThePerMatrixRoute() {
+    int batchSize = 1;
+    int cols = 256;
+    int matrixCount = 4;
+    int[] rowCounts = {4, 6, 8, 10};
+    GgufTensorType[] types = {
+      GgufTensorType.Q4_0, GgufTensorType.Q8_0, GgufTensorType.Q4_0, GgufTensorType.Q8_0
+    };
+    float[] input = inputs(batchSize, cols);
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment[] weights = new MemorySegment[matrixCount];
+      float[][] grouped = new float[matrixCount][];
+      float[][] perMatrix = new float[matrixCount][];
+      for (int index = 0; index < matrixCount; index++) {
+        int rows = rowCounts[index];
+        int blocksPerRow = cols / 32;
+        if (types[index] == GgufTensorType.Q4_0) {
+          weights[index] = arena.allocate((long) rows * blocksPerRow * 18);
+          fillWeights(weights[index], rows, cols);
+        } else {
+          weights[index] = arena.allocate((long) rows * blocksPerRow * 34);
+          fillQ8_0Weights(weights[index], rows, cols);
+        }
+        grouped[index] = new float[batchSize * rows];
+        perMatrix[index] = new float[batchSize * rows];
+      }
+
+      kernel.multiplyGrouped(
+          grouped, weights, types, rowCounts, matrixCount, input, batchSize, cols);
+      for (int index = 0; index < matrixCount; index++) {
+        kernel.multiply(
+            perMatrix[index],
+            input,
+            weights[index],
+            types[index],
+            batchSize,
+            rowCounts[index],
+            cols);
+      }
+
+      for (int index = 0; index < matrixCount; index++) {
+        assertThat(grouped[index])
+            .as("matrix %d (%s) must be bit-identical to its per-matrix route", index, types[index])
+            .containsExactly(perMatrix[index]);
+      }
+    }
+  }
+
+  /**
+   * The Q5_0 independent dispatch is BIT-IDENTICAL to the per-matrix path it replaces.
+   *
+   * <p>This is the test that decides whether widening independent eligibility to Q5_0 is safe for
+   * models that are already qualified. {@code multiplyIndependent} is reached from expert
+   * down-projections in {@code FlintForwardPass} and {@code Gemma4ForwardPass} as well as the Llama
+   * path, and flint and gemma4 both carry qualification records. A Q4_K_M artifact routinely stores
+   * some expert down-projections as Q5_0 -- mellum's are Q5_0 in 14 of its 28 blocks -- so a
+   * qualified flint or gemma4 file plausibly has them too, and its dispatch changes the moment this
+   * eligibility widens.
+   *
+   * <p>A qualification record is a claim about the bytes a model produced and cannot be retracted,
+   * so "close enough" is not the standard here. The sibling test checks values against the
+   * reference within a reduction tolerance, which would pass on a route that shifted the last bits
+   * and silently moved a published greedy output. This one asserts exact equality against {@code
+   * multiply}, the single-matrix route each of these projections took before.
+   */
+  @Test
+  void theQ5_0IndependentDispatchIsBitIdenticalToThePerMatrixRoute() {
+    int batchSize = 1;
+    int cols = 256;
+    int matrixCount = 4;
+    int[] rowCounts = {4, 6, 8, 10};
+    GgufTensorType[] types = new GgufTensorType[matrixCount];
+    java.util.Arrays.fill(types, GgufTensorType.Q5_0);
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment[] weights = new MemorySegment[matrixCount];
+      float[][] inputs = new float[matrixCount][];
+      float[][] grouped = new float[matrixCount][];
+      float[][] perMatrix = new float[matrixCount][];
+      for (int index = 0; index < matrixCount; index++) {
+        int rows = rowCounts[index];
+        weights[index] = arena.allocate((long) rows * cols / 32 * 22);
+        fillQ5_0Weights(weights[index], rows, cols);
+        inputs[index] = inputs(batchSize, cols);
+        grouped[index] = new float[batchSize * rows];
+        perMatrix[index] = new float[batchSize * rows];
+      }
+
+      kernel.multiplyIndependent(
+          grouped, weights, types, rowCounts, matrixCount, inputs, batchSize, cols);
+
+      // The route each of these projections took before the widening: one call per matrix.
+      for (int index = 0; index < matrixCount; index++) {
+        kernel.multiply(
+            perMatrix[index],
+            inputs[index],
+            weights[index],
+            GgufTensorType.Q5_0,
+            batchSize,
+            rowCounts[index],
+            cols);
+      }
+
+      for (int index = 0; index < matrixCount; index++) {
+        assertThat(grouped[index])
+            .as(
+                "matrix %d must be bit-identical, or widening this eligibility is an epoch change"
+                    + " for every qualified flint and gemma4 artifact with Q5_0 experts",
+                index)
+            .containsExactly(perMatrix[index]);
+      }
+    }
+  }
+
+  /**
+   * Q5_0 may take an INDEPENDENT dispatch, though it still may not group.
+   *
+   * <p>The two are different questions and were answered as one. Grouping shares a single quantized
+   * activation across the group, and that sharing measured slower for Q5_0 -- 37.33 against 38.94
+   * tok/s -- which is why the grouped Q5_0 capability was retired. An independent dispatch
+   * quantizes per matrix, so the measurement that retired grouping says nothing about it, and the
+   * native row dispatch carries the Q5/Q5Avx2/Q5Neon arms either way. The guard refusing Q5_0 on
+   * the independent entry point was a copy of the grouped one.
+   *
+   * <p>It costs a real file: {@code Mellum2-12B-A2.5B-Thinking-Q4_K_M} stores expert down
+   * projections as Q8_0 in 14 of 28 blocks and Q5_0 in the other 14 -- read from the artifact's
+   * tensor table. The Q8_0 half took one dispatch per layer; the Q5_0 half fell back to one per
+   * expert, 8 a layer and 112 a token.
+   *
+   * <p>Grouping stays refused, asserted here so widening one does not quietly widen the other.
+   */
+  @Test
+  void independentKernelAcceptsQ5_0EvenThoughGroupingStillRefusesIt() {
+    int batchSize = 1;
+    int cols = 256;
+    int matrixCount = 4;
+    int[] rowCounts = {4, 6, 8, 10};
+    GgufTensorType[] types = new GgufTensorType[matrixCount];
+    java.util.Arrays.fill(types, GgufTensorType.Q5_0);
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      assertThat(kernel.isGroupedEligible(types, rowCounts, matrixCount, batchSize, cols))
+          .as("sharing one activation across Q5_0 matrices measured slower and stays refused")
+          .isFalse();
+      assertThat(kernel.isIndependentEligible(types, rowCounts, matrixCount, batchSize, cols))
+          .as("an independent dispatch quantizes per matrix, so Q5_0 is admissible")
+          .isTrue();
+
+      MemorySegment[] weights = new MemorySegment[matrixCount];
+      float[][] expected = new float[matrixCount][];
+      float[][] actual = new float[matrixCount][];
+      float[][] inputs = new float[matrixCount][];
+      for (int index = 0; index < matrixCount; index++) {
+        int rows = rowCounts[index];
+        weights[index] = arena.allocate((long) rows * cols / 32 * 22);
+        fillQ5_0Weights(weights[index], rows, cols);
+        inputs[index] = inputs(batchSize, cols);
+        expected[index] = new float[batchSize * rows];
+        referenceQ5_0F32BatchedMatmul(
+            weights[index], inputs[index], batchSize, rows, cols, expected[index]);
+        actual[index] = new float[expected[index].length];
+      }
+
+      kernel.multiplyIndependent(
+          actual, weights, types, rowCounts, matrixCount, inputs, batchSize, cols);
+
+      for (int index = 0; index < matrixCount; index++) {
+        assertClose(actual[index], expected[index], K_QUANT_REDUCTION_TOLERANCE);
+      }
+    }
+  }
+
+  /**
+   * A group mixing Q4_0 and Q8_0 is eligible, because both quantize activations to Q8_0.
+   *
+   * <p>Pinned because this side used to be stricter than the kernel it guards. Grouping shares one
+   * quantized activation, so the real requirement is that the group agrees on the activation format
+   * -- which is all {@code quantized_f32_mixed_grouped_batched_matmul} ever checked, and why it
+   * carries "mixed" in its name. {@code compatibleGroup} nonetheless demanded identical weight
+   * formats, or K-quants under {@code MIXED_K}, and refused everything else.
+   *
+   * <p>A file whose projections are all one type already grouped on the identity arm, so this
+   * changes nothing for it -- verified on LFM2.5-8B-A1B-Q4_0, which is uniformly Q4_0 across its
+   * 132 projection tensors and measured flat. What it reaches is a file that mixes formats wanting
+   * the same activation, and TQ1_0 models whose ternary projections share a Q8_K activation with a
+   * K-quant head yet matched no previous rule.
+   *
+   * <p>Values are checked against the per-matrix reference, so this fails if the shared activation
+   * is wrong for either format rather than merely if eligibility flips.
+   */
+  @Test
+  void groupedKernelMixesQ4_0AndQ8_0BecauseBothQuantizeActivationsToQ8_0() {
+    int batchSize = 1;
+    int cols = 256;
+    int matrixCount = 4;
+    int[] rowCounts = {4, 6, 8, 10};
+    GgufTensorType[] types = {
+      GgufTensorType.Q4_0, GgufTensorType.Q8_0, GgufTensorType.Q4_0, GgufTensorType.Q8_0
+    };
+    float[] input = inputs(batchSize, cols);
+
+    try (Arena arena = Arena.ofConfined();
+        RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      MemorySegment[] weights = new MemorySegment[matrixCount];
+      float[][] expected = new float[matrixCount][];
+      float[][] actual = new float[matrixCount][];
+      for (int index = 0; index < matrixCount; index++) {
+        int rows = rowCounts[index];
+        int blocksPerRow = cols / 32;
+        if (types[index] == GgufTensorType.Q4_0) {
+          weights[index] = arena.allocate((long) rows * blocksPerRow * 18);
+          fillWeights(weights[index], rows, cols);
+        } else {
+          weights[index] = arena.allocate((long) rows * blocksPerRow * 34);
+          fillQ8_0Weights(weights[index], rows, cols);
+        }
+        expected[index] =
+            tensorOpsReference(weights[index], types[index], input, batchSize, rows, cols);
+        actual[index] = new float[expected[index].length];
+      }
+
+      assertThat(kernel.isGroupedEligible(types, rowCounts, matrixCount, batchSize, cols))
+          .as("Q4_0 and Q8_0 share one Q8_0 activation, so the group is valid")
+          .isTrue();
+      kernel.multiplyGrouped(
+          actual, weights, types, rowCounts, matrixCount, input, batchSize, cols);
+
+      for (int index = 0; index < matrixCount; index++) {
+        assertClose(actual[index], expected[index], K_QUANT_REDUCTION_TOLERANCE);
+      }
+    }
+  }
+
+  /** Q5_1 wants F32 activations, so it may not join a group that shares a quantized one. */
+  @Test
+  void groupedKernelStillRefusesFormatsThatDisagreeOnTheActivation() {
+    int cols = 256;
+    int[] rowCounts = {4, 6};
+    GgufTensorType[] types = {GgufTensorType.Q4_0, GgufTensorType.Q5_1};
+
+    try (RustGgufBatchedMatrixKernel kernel = RustGgufBatchedMatrixKernel.open(libraryPath())) {
+      assertThat(kernel.isGroupedEligible(types, rowCounts, 2, 1, cols))
+          .as("Q5_1 dots against F32 activations, so there is nothing for it to share")
+          .isFalse();
     }
   }
 

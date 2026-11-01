@@ -245,6 +245,18 @@ public final class LlamaForwardPass {
   private final float[] moeActivated;
   private final FloatArrayView moeActivatedView;
   private final float[] moeExpertOut;
+
+  // Grouped expert dispatch scratch. Null on a dense model and when the kernel cannot group, which
+  // is what routeExpertsGrouped checks before using any of it.
+  private final float[][] moeGroupedGateUpOutputs;
+  private final MemorySegment[] moeGroupedGateUpWeights;
+  private final GgufTensorType[] moeGroupedGateUpTypes;
+  private final int[] moeGroupedGateUpRows;
+  private final float[][] moeGroupedActivations;
+  private final float[][] moeGroupedDownOutputs;
+  private final MemorySegment[] moeGroupedDownWeights;
+  private final GgufTensorType[] moeGroupedDownTypes;
+  private final int[] moeGroupedDownRows;
   private final int[] moeSelected;
   private final float[] moeRoutingWeights;
   private final float[] logits;
@@ -528,6 +540,31 @@ public final class LlamaForwardPass {
     this.moeActivated = new float[expertHiddenDim];
     this.moeActivatedView = prepareActivationArray(moeActivated);
     this.moeExpertOut = new float[config.usesMixtureOfExperts() ? dim : 0];
+    // One buffer per selected expert, allocated once rather than per token: a routed layer runs
+    // this every token of every layer, so an allocation here is an allocation in the hot path.
+    if (config.usesMixtureOfExperts()) {
+      int used = config.numExpertsUsed();
+      int hidden = config.expertHiddenDim();
+      this.moeGroupedGateUpOutputs = new float[2 * used][hidden];
+      this.moeGroupedGateUpWeights = new MemorySegment[2 * used];
+      this.moeGroupedGateUpTypes = new GgufTensorType[2 * used];
+      this.moeGroupedGateUpRows = new int[2 * used];
+      this.moeGroupedActivations = new float[used][hidden];
+      this.moeGroupedDownOutputs = new float[used][dim];
+      this.moeGroupedDownWeights = new MemorySegment[used];
+      this.moeGroupedDownTypes = new GgufTensorType[used];
+      this.moeGroupedDownRows = new int[used];
+    } else {
+      this.moeGroupedGateUpOutputs = null;
+      this.moeGroupedGateUpWeights = null;
+      this.moeGroupedGateUpTypes = null;
+      this.moeGroupedGateUpRows = null;
+      this.moeGroupedActivations = null;
+      this.moeGroupedDownOutputs = null;
+      this.moeGroupedDownWeights = null;
+      this.moeGroupedDownTypes = null;
+      this.moeGroupedDownRows = null;
+    }
     this.moeSelected = new int[config.numExpertsUsed()];
     this.moeRoutingWeights = new float[config.numExpertsUsed()];
     this.logits = new float[vocabSize];
@@ -597,9 +634,13 @@ public final class LlamaForwardPass {
     // about bytes and cannot be retracted once published, so widening this is an epoch change --
     // every pinned oracle re-run and the tier band re-derived -- not a default flip.
     this.attentionTemperatureScaling = config.usesAttentionTemperatureScaling();
-    this.fusedGroupedAttention =
-        (executionPlan.fusedGroupedAttention() || config.usesGraniteScaling())
-            && attentionGroupSize > 1;
+    // The plan decides, and it is now the only thing that decides. This used to read
+    // `executionPlan.fusedGroupedAttention() || config.usesGraniteScaling()`, so Granite fused
+    // while `fused-grouped-attention` reported DISABLED in the same report -- a diagnostic that
+    // contradicted the route it was describing. The architecture gate lives in ExecutionPlanner
+    // now, which is where it can be stated; this narrows it only by the thing the planner cannot
+    // see, which is whether there is a group to fuse at all.
+    this.fusedGroupedAttention = executionPlan.fusedGroupedAttention() && attentionGroupSize > 1;
     reportAttentionCliffs(config, loadedMatrixKernel, attentionGroupSize);
     reportBatchedPrefillCliff(config, actualTopology);
     this.headAttentionPlan =
@@ -2342,39 +2383,162 @@ public final class LlamaForwardPass {
     selectExperts(moeRouterLogits, config.numExperts(), used, moeSelected, moeRoutingWeights);
 
     java.util.Arrays.fill(destination, destinationOffset, destinationOffset + dim, 0.0f);
+    if (routeExpertsGrouped(destination, destinationOffset, moe, layer, dim, hidden, used)) {
+      return;
+    }
     for (int slot = 0; slot < used; slot++) {
       int expert = moeSelected[slot];
       float weight = moeRoutingWeights[slot];
       matmulDispatch(moeGate, moeInput, moe.gate()[expert], moe.gateType(), hidden, dim);
       matmulDispatch(moeUp, moeInput, moe.up()[expert], moe.upType(), hidden, dim);
-      // The same activation policy as the dense path, so a routed model honours usesGeluFfn and the
-      // Granite sigmoid rather than hardcoding SwiGLU here.
-      // swiglu_clamp_exp applies to the EXPERT FFN only -- the reference keeps a separate
-      // swiglu_clamp_shexp for shared experts -- so the clamp is applied here and not in the dense
-      // path. Above the reference's 1e-6 epsilon it takes the scalar clamped route, because the
-      // vectorized SwiGLU kernels do not clamp and silently returning their unclamped result is
-      // the failure this fixes.
-      float clampLimit = config.swigluClampExp(layer);
-      if (clampLimit > 1.0e-6f) {
-        TensorOps.swiGluClamped(moeActivated, 0, moeGate, 0, moeUp, 0, hidden, clampLimit);
-      } else {
-        activateFfn(
-            moeActivated,
-            0,
-            moeGate,
-            0,
-            moeUp,
-            0,
-            hidden,
-            moeActivatedView,
-            moeGateView,
-            moeUpView);
-      }
+      activateExpert(moeActivated, moeGate, moeUp, hidden, layer);
       matmulDispatch(moeExpertOut, moeActivated, moe.down()[expert], moe.downType(), dim, hidden);
       for (int index = 0; index < dim; index++) {
         destination[destinationOffset + index] += weight * moeExpertOut[index];
       }
     }
+  }
+
+  /**
+   * The expert feed-forward activation, shared by the grouped and per-expert routes.
+   *
+   * <p>The same activation policy as the dense path, so a routed model honours {@code usesGeluFfn}
+   * and the Granite sigmoid rather than hardcoding SwiGLU. {@code swiglu_clamp_exp} applies to the
+   * EXPERT feed-forward only -- the reference keeps a separate {@code swiglu_clamp_shexp} for
+   * shared experts -- so the clamp is applied here and not in the dense path. Above the reference's
+   * 1e-6 epsilon it takes the scalar clamped route, because the vectorized SwiGLU kernels do not
+   * clamp and silently returning their unclamped result is the failure that fixed.
+   *
+   * <p>Shared rather than copied: two routes that activate differently would qualify a model on
+   * arithmetic the other route does not reproduce, and which route runs depends on whether a kernel
+   * happens to accept a group.
+   */
+  private void activateExpert(float[] activated, float[] gate, float[] up, int hidden, int layer) {
+    float clampLimit = config.swigluClampExp(layer);
+    if (clampLimit > 1.0e-6f) {
+      TensorOps.swiGluClamped(activated, 0, gate, 0, up, 0, hidden, clampLimit);
+      return;
+    }
+    if (activated == moeActivated && gate == moeGate && up == moeUp) {
+      activateFfn(activated, 0, gate, 0, up, 0, hidden, moeActivatedView, moeGateView, moeUpView);
+      return;
+    }
+    activateFfn(activated, 0, gate, 0, up, 0, hidden, null, null, null);
+  }
+
+  /**
+   * Runs the selected experts in two native dispatches instead of {@code 3 * used}.
+   *
+   * <p><b>Why this exists.</b> The per-expert loop below calls {@code matmulDispatch} once per
+   * projection per expert — twenty-four batch-1 dispatches per routed layer per token at {@code
+   * expert_used_count = 8} — where ggml issues one {@code mul_mat_id} over the selected rows. The
+   * catalog's 80 qualified entries contain exactly one MoE model and it has its own decoder. The
+   * expert projections were reaching the kernel — all four quantisations report eligible at batch 1
+   * for these shapes — so the cost was dispatch count, not a silent fallback.
+   *
+   * <p><b>What is measured.</b> The ratios first quoted here (maple 0.2085, mellum 0.3771, lfm2moe
+   * 0.1410) were withdrawn: they were computed by hand from two reports whose comparator arm
+   * carried no artifact SHA-256, which the policy excludes, so no gate had admitted any of them.
+   * The one admitted comparison, lfm2moe against ollama on 2026-11-01 at warmups 1 and iterations
+   * 3, is {@code decodeThroughputRatio} 0.3974 and {@code endToEndLatencyRatio} 2.8670 --
+   * FAILED_RELATIVE_GATE, with its contribution gate passing at 0.4444 and 1.0000. Prefill is the
+   * worse half at 0.1833, and this grouping does not address prefill: it batches the experts
+   * selected for one token, while prefill walks tokens one at a time.
+   *
+   * <p><b>Why this shape.</b> {@code flint} already does exactly this and is qualified ({@code
+   * FlintForwardPass:425-470}): the gate and up projections share one input, so they go through
+   * {@code multiplyGrouped}; the down projections each take their own activated vector, so they go
+   * through {@code multiplyIndependent}. Copying a qualified arrangement is worth more than
+   * inventing one.
+   *
+   * <p>Returns false when the kernel declines either group, leaving the per-expert loop to run. The
+   * activation policy is the loop's, not a second copy: {@link #activateExpert} is shared, so
+   * {@code usesGeluFfn}, the Granite sigmoid and {@code swiglu_clamp_exp} behave identically either
+   * way.
+   */
+  private boolean routeExpertsGrouped(
+      float[] destination,
+      int destinationOffset,
+      LlamaWeights.MoeWeights moe,
+      int layer,
+      int dim,
+      int hidden,
+      int used) {
+    if (moeGroupedGateUpOutputs == null) {
+      return false;
+    }
+    for (int slot = 0; slot < used; slot++) {
+      int expert = moeSelected[slot];
+      moeGroupedGateUpWeights[2 * slot] = moe.gate()[expert];
+      moeGroupedGateUpWeights[2 * slot + 1] = moe.up()[expert];
+      moeGroupedGateUpTypes[2 * slot] = moe.gateType();
+      moeGroupedGateUpTypes[2 * slot + 1] = moe.upType();
+      moeGroupedGateUpRows[2 * slot] = hidden;
+      moeGroupedGateUpRows[2 * slot + 1] = hidden;
+      moeGroupedDownWeights[slot] = moe.down()[expert];
+      moeGroupedDownTypes[slot] = moe.downType();
+      moeGroupedDownRows[slot] = dim;
+    }
+    // The two groups are decided SEPARATELY. Requiring both cost mellum half its layers: its
+    // ffn_down_exps is Q5_0 on 14 of 28 layers and Q8_0 on the rest, and Q5_0 is the one
+    // quantisation the kernel groups neither way (measured: Q4_K, Q4_0, Q6_K and Q8_0 all group,
+    // Q5_0 does not). Those 14 layers were falling back wholesale and losing the gate and up
+    // grouping as well, even though both are Q4_K on every layer and eligible on every layer.
+    if (!batchedMatrixKernel.isGroupedEligible(
+        moeGroupedGateUpTypes, moeGroupedGateUpRows, 2 * used, 1, dim)) {
+      return false;
+    }
+    boolean groupDown =
+        batchedMatrixKernel.isIndependentEligible(
+            moeGroupedDownTypes, moeGroupedDownRows, used, 1, hidden);
+    batchedMatrixKernel.multiplyGrouped(
+        moeGroupedGateUpOutputs,
+        moeGroupedGateUpWeights,
+        moeGroupedGateUpTypes,
+        moeGroupedGateUpRows,
+        2 * used,
+        moeInput,
+        1,
+        dim);
+    for (int slot = 0; slot < used; slot++) {
+      activateExpert(
+          moeGroupedActivations[slot],
+          moeGroupedGateUpOutputs[2 * slot],
+          moeGroupedGateUpOutputs[2 * slot + 1],
+          hidden,
+          layer);
+    }
+    if (groupDown) {
+      batchedMatrixKernel.multiplyIndependent(
+          moeGroupedDownOutputs,
+          moeGroupedDownWeights,
+          moeGroupedDownTypes,
+          moeGroupedDownRows,
+          used,
+          moeGroupedActivations,
+          1,
+          hidden);
+    } else {
+      // One dispatch each, which is what the per-expert loop would have done -- but the gate and up
+      // projections above were still grouped, which is the half this recovers.
+      for (int slot = 0; slot < used; slot++) {
+        matmulDispatch(
+            moeGroupedDownOutputs[slot],
+            moeGroupedActivations[slot],
+            moeGroupedDownWeights[slot],
+            moeGroupedDownTypes[slot],
+            dim,
+            hidden);
+      }
+    }
+    for (int slot = 0; slot < used; slot++) {
+      float weight = moeRoutingWeights[slot];
+      float[] contribution = moeGroupedDownOutputs[slot];
+      for (int index = 0; index < dim; index++) {
+        destination[destinationOffset + index] += weight * contribution[index];
+      }
+    }
+    return true;
   }
 
   /**
@@ -3019,9 +3183,26 @@ public final class LlamaForwardPass {
     return usesVectorizedSwiGlu() ? batchedMatrixKernel.prepareFloatArray(values) : null;
   }
 
+  /**
+   * Which architectures take the vectorised SwiGLU.
+   *
+   * <p>This is an <b>output-parity</b> whitelist, not a performance one. The vectorised form
+   * evaluates {@code exp} by polynomial rather than by {@code Math.exp}, so an architecture moved
+   * onto it stops reproducing the greedy outputs its published records were measured with. Every
+   * architecture here therefore keeps the activation it was qualified on, and one is added only
+   * when nothing published depends on its current arithmetic.
+   *
+   * <p>MELLUM is admitted on exactly that basis: the catalog carries no mellum entry -- checked
+   * against all 80 qualified records, not assumed -- so there is no published output to preserve.
+   * It is worth admitting because mellum routes 8 of 64 experts across 28 blocks, which is 224
+   * SwiGLU calls per token over {@code expert_feed_forward_length} 896 each, every one of them a
+   * scalar {@code Math.exp} per element. mellum declares no {@code swiglu_clamp_exp}, so {@link
+   * #activateExpert} does not intercept it with the clamped scalar route first.
+   */
   private boolean usesVectorizedSwiGlu() {
     return config.architecture() == DecoderArchitecture.QWEN2
-        || config.architecture() == DecoderArchitecture.QWEN3;
+        || config.architecture() == DecoderArchitecture.QWEN3
+        || config.architecture() == DecoderArchitecture.MELLUM;
   }
 
   private static void scaleActive(float[] values, int offset, int length, float scale) {

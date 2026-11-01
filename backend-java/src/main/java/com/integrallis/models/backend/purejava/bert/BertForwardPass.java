@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.SequenceEncoder;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.Arrays;
@@ -56,6 +57,11 @@ public final class BertForwardPass implements SequenceEncoder {
   private int capacity;
 
   BertForwardPass(BertConfig config, BertWeights weights) {
+    this(config, weights, GgufBatchedMatrixKernel.none());
+  }
+
+  BertForwardPass(BertConfig config, BertWeights weights, GgufBatchedMatrixKernel matrixKernel) {
+    this.matrixKernel = Objects.requireNonNull(matrixKernel, "matrixKernel");
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     this.tokenEmbedding = new float[config.embeddingDim()];
@@ -69,7 +75,13 @@ public final class BertForwardPass implements SequenceEncoder {
 
   /** Loads a complete bidirectional encoder from an already parsed GGUF. */
   public static BertForwardPass fromGgufFile(GgufFile file, BertConfig config) {
-    return new BertForwardPass(config, BertWeights.load(file, config));
+    return fromGgufFile(file, config, GgufBatchedMatrixKernel.none());
+  }
+
+  /** Loads an encoder that projects through the injected kernel where it is eligible. */
+  public static BertForwardPass fromGgufFile(
+      GgufFile file, BertConfig config, GgufBatchedMatrixKernel matrixKernel) {
+    return new BertForwardPass(config, BertWeights.load(file, config), matrixKernel);
   }
 
   @Override
@@ -263,6 +275,20 @@ public final class BertForwardPass implements SequenceEncoder {
     }
   }
 
+  /**
+   * The injected batched matrix kernel, or {@link GgufBatchedMatrixKernel#none()}.
+   *
+   * <p>This pass had no kernel seam: projections went straight to {@code TensorOps} and the kernel
+   * the caller injected was never consulted, so it ran unaccelerated while diagnostics reported one
+   * was loaded. Found by audit on 2026-11-01 after the same gap cost {@code lfm2moe} 166% of its
+   * decode throughput -- 8.94 to 23.80 tok/s, our own arm before and after on one host. (The gate
+   * ratios first reported beside those figures were withdrawn: the comparator arm carried no
+   * artifact SHA-256 and the policy had excluded it. The admitted ollama comparison of 2026-11-01
+   * is decodeThroughputRatio 0.3974.) No qualified catalog entry used this pass, so no published
+   * number moved; the cost was that a future run here would read "the model is slow".
+   */
+  private final GgufBatchedMatrixKernel matrixKernel;
+
   private void project(
       float[] output, float[] input, int sequenceLength, BertWeights.Matrix matrix) {
     if (matrix.type() == GgufTensorType.Q5_1) {
@@ -290,6 +316,21 @@ public final class BertForwardPass implements SequenceEncoder {
           matrix.columns() == config.hiddenDim()
               ? exactFeedForwardWeightRow
               : exactHiddenWeightRow);
+      return;
+    }
+    // The kernel only on the GENERAL path. The Q5_1 and rotary/Q4_1 branches above are
+    // deliberately exact -- BertQ51Projection and ggufExactBatchedMatmul keep F32 activations --
+    // and routing them through a quantising kernel would change embeddings those models were
+    // qualified on.
+    if (matrixKernel.isEligible(matrix.type(), sequenceLength, matrix.rows(), matrix.columns())) {
+      matrixKernel.multiply(
+          output,
+          input,
+          matrix.data(),
+          matrix.type(),
+          sequenceLength,
+          matrix.rows(),
+          matrix.columns());
       return;
     }
     TensorOps.ggufBatchedMatmul(

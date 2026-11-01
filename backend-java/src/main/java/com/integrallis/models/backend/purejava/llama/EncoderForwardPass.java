@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.SequenceEncoder;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
@@ -51,6 +52,17 @@ public final class EncoderForwardPass implements SequenceEncoder {
 
   /** Overrides how many positions are computed at once; mainly so tests can pin it to one. */
   public static final String PARALLELISM_PROPERTY = "models.encoder.threads";
+
+  /**
+   * The injected batched matrix kernel, or {@link GgufBatchedMatrixKernel#none()}.
+   *
+   * <p>This pass had no kernel seam: projections went straight to {@code TensorOps.ggufMatmul} and
+   * the kernel the caller injected was never consulted, so an embedding model ran unaccelerated
+   * while diagnostics reported one was loaded. Found by audit on 2026-11-01 after the same gap cost
+   * {@code lfm2moe} 166% of its decode throughput -- 8.94 to 23.80 tok/s once the seam was added.
+   * No qualified catalog entry used this pass, so no published number moved.
+   */
+  private final GgufBatchedMatrixKernel matrixKernel;
 
   private final LlamaConfig config;
   private final LlamaWeights weights;
@@ -131,6 +143,16 @@ public final class EncoderForwardPass implements SequenceEncoder {
    */
   public EncoderForwardPass(
       LlamaConfig config, LlamaWeights weights, DenseProjectionHead denseHead) {
+    this(config, weights, denseHead, GgufBatchedMatrixKernel.none());
+  }
+
+  /** Builds an encoder that projects through the injected kernel where it is eligible. */
+  public EncoderForwardPass(
+      LlamaConfig config,
+      LlamaWeights weights,
+      DenseProjectionHead denseHead,
+      GgufBatchedMatrixKernel matrixKernel) {
+    this.matrixKernel = Objects.requireNonNull(matrixKernel, "matrixKernel");
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     this.denseHead = denseHead;
@@ -579,6 +601,14 @@ public final class EncoderForwardPass implements SequenceEncoder {
     // The kernels write from index zero, so a projection landing inside a per-position buffer goes
     // through a scratch row first.
     float[] destination = outOffset == 0 ? out : scratch.projection(rows);
+    // The injected kernel first, as LlamaForwardPass.matmulDispatch does.
+    if (matrixKernel.isEligible(type, 1, rows, cols)) {
+      matrixKernel.multiply(destination, input, weight, type, 1, rows, cols);
+      if (destination != out) {
+        System.arraycopy(destination, 0, out, outOffset, rows);
+      }
+      return;
+    }
     TensorOps.ggufMatmul(
         destination,
         input,

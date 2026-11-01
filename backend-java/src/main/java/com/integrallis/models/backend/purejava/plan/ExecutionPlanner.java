@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** Selects a deterministic plan from model topology, runtime identity, and explicit overrides. */
 public final class ExecutionPlanner {
@@ -68,7 +69,7 @@ public final class ExecutionPlanner {
         finalLayerKvOnlyPrefill(topology, configuration, finalLayerPrefillPruning, decisions);
     boolean batchedAttentionScores = batchedAttentionScores(topology, configuration, decisions);
     boolean batchedAttentionValues = batchedAttentionValues(topology, configuration, decisions);
-    boolean fusedGroupedAttention = fusedGroupedAttention(configuration, decisions);
+    boolean fusedGroupedAttention = fusedGroupedAttention(topology, configuration, decisions);
     boolean stagedQuantizedFfn =
         stagedQuantizedFfn(runtime, topology, configuration, prefillBatchSize, decisions);
     boolean stagedQuantizedLayer =
@@ -115,7 +116,11 @@ public final class ExecutionPlanner {
     environment.put("model-architecture", topology.architecture());
     environment.put("projection-layers", Integer.toString(topology.layers().size()));
     BackendDiagnostics diagnostics =
-        new BackendDiagnostics("pure-java", PLAN_VERSION, environment, decisions);
+        new BackendDiagnostics(
+            "pure-java",
+            PLAN_VERSION,
+            environment,
+            withoutClaimsAboutProjectionsWeNeverRead(topology, decisions));
     return new PureJavaExecutionPlan(
         runtime,
         topology,
@@ -137,6 +142,74 @@ public final class ExecutionPlanner {
         parallelQ8FfnPreparation,
         diagnostics);
   }
+
+  /**
+   * Decisions a synthetic topology cannot support, phrased as what they are.
+   *
+   * <p>A decoder that does not route projections through this planner is given a neutral topology
+   * by {@link ModelTopology#mappedArchitecture} -- all-F32 placeholder layers, deliberately, so the
+   * planner does not advertise a batched path the decoder has not got. The planner then evaluated
+   * every projection-kernel decision against those placeholders and recorded the outcome in
+   * language that reads as a fact about the artifact.
+   *
+   * <p>It was not a fact. An lfm2moe report carried {@code q4-kernel: UNSUPPORTED "the loaded model
+   * has no Q4_0 projection tensors"} and {@code grouped-projections: UNSUPPORTED ... qkv:
+   * independent} for a file whose 132 projection tensors are every one of them Q4_0, with grouping
+   * engaging on every call. Two separate diagnoses went the wrong way on those lines before anyone
+   * read the GGUF's tensor table by hand. A diagnostic that contradicts the route is worse than no
+   * diagnostic, which is why these are replaced rather than merely softened.
+   *
+   * <p>They are replaced by one decision naming the real situation, rather than dropped: silence
+   * invites the same wrong inference in the other direction, and a reader who finds nothing about
+   * grouping cannot tell "not planned here" from "not reported".
+   */
+  private static List<OptimizationDecision> withoutClaimsAboutProjectionsWeNeverRead(
+      ModelTopology topology, List<OptimizationDecision> decisions) {
+    if (topology.projectionTypesDescribeTheModel()) {
+      return decisions;
+    }
+    List<OptimizationDecision> kept = new ArrayList<>();
+    for (OptimizationDecision decision : decisions) {
+      if (!PROJECTION_TYPE_DECISIONS.contains(decision.id())) {
+        kept.add(decision);
+      }
+    }
+    kept.add(
+        new OptimizationDecision(
+            "projection-kernel-planning",
+            OptimizationStatus.UNSUPPORTED,
+            "architecture "
+                + topology.architecture()
+                + " does not route projections through the shared planner, so no projection-kernel"
+                + " decision was evaluated; this decoder chooses per call and its own report is the"
+                + " only account of what it ran",
+            Map.of("evaluated-decisions", "none", "layer-types", "placeholder")));
+    return kept;
+  }
+
+  /**
+   * Decisions whose outcome is derived from the topology's per-layer projection types.
+   *
+   * <p>Each of these reads {@code topology.layers()}, so each is meaningless when those layers are
+   * placeholders. Adding a decision that consults layer types without adding it here reintroduces
+   * the defect, which is what {@code ExecutionPlannerSyntheticTopologyTest} fails on.
+   */
+  private static final Set<String> PROJECTION_TYPE_DECISIONS =
+      Set.of(
+          "grouped-projections",
+          "mixed-k-projections",
+          "q4-kernel",
+          "q6-batched-kernel",
+          "batched-prefill",
+          "final-layer-prefill-pruning",
+          "final-layer-kv-only-prefill",
+          "batched-attention-scores",
+          "batched-attention-values",
+          "staged-quantized-ffn",
+          "staged-quantized-layer",
+          "block-major-q8-activations",
+          "q8-block-major-kernel",
+          "parallel-q8-ffn-preparation");
 
   private static GgufQ6BatchedKernel q6BatchedKernel(
       RuntimeFingerprint runtime,
@@ -522,24 +595,67 @@ public final class ExecutionPlanner {
   /**
    * Whether grouped-query attention runs through the fused kernels.
    *
-   * <p>No topology gate: the fused kernels take the group size, head stride and scale as arguments
-   * and are not tied to an architecture. Whether a model has anything to fuse is a property of its
-   * head counts, which the decoder knows and this planner does not, so the forward pass narrows
-   * this to models whose group size exceeds one.
+   * <p>The fused kernels take the group size, head stride and scale as arguments and are not tied
+   * to an architecture. Whether a model has anything to fuse is a property of its head counts,
+   * which the decoder knows and this planner does not, so the forward pass narrows this to models
+   * whose group size exceeds one.
+   *
+   * <p><b>The architecture gate here reports a decision the decoder was already making.</b> {@code
+   * LlamaForwardPass} fuses when {@code executionPlan.fusedGroupedAttention() ||
+   * config.usesGraniteScaling()}, so Granite has always fused regardless of the property -- and
+   * this decision nonetheless reported {@code DISABLED by models.purejava.fusedGroupedAttention}
+   * for it. A diagnostic that contradicts the route is worse than no diagnostic, so the gate moved
+   * here where it can be stated.
+   *
+   * <p>An architecture is listed only when nothing published depends on the bytes it currently
+   * produces. Fusing perturbs the attention output by about 1.4e-6, which a greedy argmax turns
+   * into an occasional different token, so for an architecture with qualification records this
+   * remains an epoch change rather than a default. Granite is listed because it already fused.
+   * MELLUM is listed because the catalog's 80 qualified records contain no mellum -- checked, not
+   * assumed -- and because fusing measured decode 23.87 -> 27.72 tok/s and prefill 29.10 -> 39.00
+   * on Mellum2-12B-A2.5B-Thinking-Q4_K_M, at an unchanged contribution of 0.7778 and 1.0000, where
+   * its grouped-query group size is 8.
    */
   private static boolean fusedGroupedAttention(
-      PureJavaPlanConfiguration configuration, List<OptimizationDecision> decisions) {
-    boolean enabled = configuration.fusedGroupedAttention();
+      ModelTopology topology,
+      PureJavaPlanConfiguration configuration,
+      List<OptimizationDecision> decisions) {
+    boolean requested = configuration.fusedGroupedAttention();
+    boolean architectureFuses = FUSES_GROUPED_ATTENTION.contains(topology.architecture());
+    boolean enabled = requested || architectureFuses;
+    String reason;
+    if (requested) {
+      reason = "one pass over each cached key and value row per group rather than per query head";
+    } else if (architectureFuses) {
+      reason =
+          "architecture "
+              + topology.architecture()
+              + " carries no qualification record that fixes its generated bytes, so it fuses"
+              + " without waiting for a measurement epoch";
+    } else {
+      reason = "disabled by models.purejava.fusedGroupedAttention";
+    }
     decisions.add(
         new OptimizationDecision(
             "fused-grouped-attention",
             enabled ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED,
-            enabled
-                ? "one pass over each cached key and value row per group rather than per query head"
-                : "disabled by models.purejava.fusedGroupedAttention",
-            Map.of("cache-passes-per-group", enabled ? "1" : "group-size")));
+            reason,
+            Map.of(
+                "cache-passes-per-group",
+                enabled ? "1" : "group-size",
+                "architecture-default",
+                Boolean.toString(architectureFuses))));
     return enabled;
   }
+
+  /**
+   * Architectures that fuse grouped attention without the property being set.
+   *
+   * <p>Membership is a claim that no published qualification record fixes the architecture's
+   * generated bytes. Adding one to this set for an architecture that has records is an epoch
+   * change: every pinned greedy oracle has to be re-run and the tier band re-derived.
+   */
+  private static final Set<String> FUSES_GROUPED_ATTENTION = Set.of("granite", "mellum");
 
   private static boolean batchedAttentionValues(
       ModelTopology topology,

@@ -1,0 +1,1913 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-11-01T09:06:05.281420946Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "q6two-dbc0974c",
+  "modelId" : "mellum2_12b_a2_5b_thinking_q4_k_m",
+  "model" : "/root/models/Mellum2-12B-A2.5B-Thinking-Q4_K_M.gguf",
+  "artifactSha256" : "489cf0d7ca86ef4683e34e2efe8a46a9b52573bfe994a6ad9c86bf57c7173ccb",
+  "artifactSizeBytes" : 8071295040,
+  "settings" : {
+    "corpusSha256" : "6841c286837b4c45c06fe8d103b2e044b61a1bfe75a61b64fa04c7ca31b20e45",
+    "workload" : "coding",
+    "caseIds" : [ "list-copy-null-handling", "compute-if-absent-null", "virtual-thread-executor", "record-compact-validation", "gradle-java-25", "http-retry-rules", "migration-lock-expiry", "jackson-module-and-feature", "unsupported-cuda-kernel" ],
+    "promptTemplate" : "chatml-no-think",
+    "retrievalTopK" : 1,
+    "maxOutputTokens" : 256,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v24",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "temperature" : "0.0",
+      "repetitionPenalty" : "1.0",
+      "topK" : "1",
+      "seed" : "42",
+      "promptCache" : "longest-common-prefix",
+      "topP" : "1.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "dcbe27f2d275",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-147-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7713 64-Core Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 32000000000,
+    "maxHeapBytes" : 8002732032,
+    "javaVersion" : "25.0.5",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v14",
+    "environment" : {
+      "gguf-threads" : "16",
+      "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+      "kernel-implementation" : "rust-ffm-quantized-v14",
+      "os" : "Linux",
+      "tokenizer.pre" : "mellum2",
+      "native-kernel-abi" : "7",
+      "native-kernel-poll-millis" : "5",
+      "end-of-generation.chat-template" : "resolved:28",
+      "native-quantized-decode" : "true",
+      "compiler" : "hotspot-c2",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "sve" : "false",
+      "model-architecture" : "mellum",
+      "java-feature" : "25",
+      "transformer-runtime" : "java",
+      "q4-unsigned-pairwise-supported" : "true",
+      "java-executor-poll-millis" : "0",
+      "active-vector-bits" : "256",
+      "q4-short-pairwise-supported" : "true",
+      "native-q5-0-grouped" : "false",
+      "native-gated-delta-net" : "true",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "end-of-generation.28" : "tokenizer.ggml.eos_token_id,vocabulary-text,chat-template-end-of-turn",
+      "projection-layers" : "28",
+      "cpu-model" : "AMD EPYC 7713 64-Core Processor",
+      "native-kernel-threads" : "16",
+      "tokenizer.pre.implemented" : "true",
+      "kernel-runtime" : "rust-ffm",
+      "preferred-vector-bits" : "256",
+      "java-version" : "25.0.5",
+      "end-of-generation.0" : "vocabulary-text",
+      "processors" : "16",
+      "fast-scalar-fma" : "true",
+      "end-of-generation-token-ids" : "0,28",
+      "native-kernel-decode-threads" : "16",
+      "gguf-chunks-per-thread" : "2",
+      "vm-vendor" : "Eclipse Adoptium",
+      "native-grouped-attention" : "true",
+      "vector-api" : "true",
+      "architecture" : "amd64",
+      "gguf-executor" : "persistent",
+      "fast-vector-fma" : "true",
+      "vm-version" : "25.0.5+8-LTS",
+      "gguf-parallel" : "true"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "qkv" : "grouped",
+        "gate-up" : "grouped",
+        "implementation" : "rust-ffm-quantized-v14"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "eligible-layers" : "14",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "unsigned-supported" : "true",
+        "active-vector-bits" : "256",
+        "java-feature" : "25",
+        "short-supported" : "true",
+        "requested" : "widened",
+        "compiler" : "hotspot-c2",
+        "architecture" : "amd64",
+        "os" : "Linux"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "ENABLED",
+      "reason" : "Q6_K weight vectors are reused across two prompt queries",
+      "settings" : {
+        "architecture" : "amd64",
+        "kernel" : "two-query-block",
+        "requested-kernel" : "two-query-block",
+        "active-vector-bits" : "256",
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q8_0",
+        "output-rows" : "all"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "unused-rows" : "full-attention",
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "ENABLED",
+      "reason" : "architecture mellum carries no qualification record that fixes its generated bytes, so it fuses without waiting for a measurement epoch",
+      "settings" : {
+        "architecture-default" : "true",
+        "cache-passes-per-group" : "1"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "2",
+        "parallel" : "true",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "executor" : "persistent",
+        "stages" : "7",
+        "parallel" : "true",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "32"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "kernel" : "scattered",
+        "requested-kernel" : "scattered",
+        "active-vector-bits" : "256",
+        "compiler" : "hotspot-c2",
+        "floating-point-order" : "scalar-block-order"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "eligible-layers" : "0",
+        "partitions" : "16",
+        "partition" : "batch-rows"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "persistent",
+        "chunks-per-thread" : "2",
+        "threads" : "16"
+      }
+    }, {
+      "id" : "sliding-window-attention",
+      "status" : "ENABLED",
+      "reason" : "attention is bounded to the declared window on the layers the checkpoint marks local",
+      "settings" : {
+        "pattern-source" : "declared-per-layer",
+        "local-layers" : "21/28",
+        "declared-window" : "1024"
+      }
+    }, {
+      "id" : "expert-swiglu-clamp",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no expert SwiGLU clamp",
+      "settings" : {
+        "clamped-layers" : "0/28"
+      }
+    }, {
+      "id" : "rust-ptq1-0-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+      "settings" : {
+        "weight" : "PTQ1_0",
+        "activation" : "Q8_0",
+        "transformer" : "java"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "transformer" : "java",
+        "abi" : "7",
+        "boundary" : "panama-ffm"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+      "settings" : {
+        "state" : "caller-owned-java-array",
+        "abi" : "7",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "independent recurrent state slots share one native worker dispatch",
+      "settings" : {
+        "state" : "branch-major-caller-owned-java-array",
+        "abi" : "7",
+        "boundary" : "panama-ffm-critical"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+      "settings" : {
+        "evidence" : "benchmark-results/2026-10-12-q5-production/"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 575.824836,
+    "retrievalMillis" : {
+      "p50" : 2.348259,
+      "p95" : 4.3229665
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 2.8950410000002194,
+      "p95" : 5.235688400000116
+    },
+    "ttftMillis" : {
+      "p50" : 1842.015611,
+      "p95" : 2781.8523925
+    },
+    "tpotMillis" : {
+      "p50" : 35.1339749,
+      "p95" : 41.52702020000004
+    },
+    "endToEndMillis" : {
+      "p50" : 2888.282622,
+      "p95" : 4090.9379522
+    },
+    "p50PrefillTokensPerSecond" : 37.135586649992085,
+    "p50DecodeTokensPerSecond" : 28.462478351688013,
+    "peakRssBytes" : 8262074368,
+    "totalCpuMillis" : 1269810.0,
+    "totalInputTokens" : 4959,
+    "totalCacheReadInputTokens" : 3078,
+    "totalCacheWriteInputTokens" : 1881,
+    "totalOutputTokens" : 825,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 1.0,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 1.0,
+    "rawCorrectAnswerRate" : 0.8888888888888888,
+    "modelAnswerRate" : 0.7777777777777778,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.1111111111111111,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "PERFORMANCE_REDUCED",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "09543f6f0f0ae0c52cc60f020a6ed9ac62eb7b4695f7e6ba43412fe6e2febff9",
+    "retrievalMillis" : 7.926673,
+    "frameworkOverheadMillis" : 3.9358400000000984,
+    "endToEndMillis" : 2012.802749,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values) and throws NullPointerException when any element is null. [java-list-copy]",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 156,
+      "cacheWriteInputTokens" : 34,
+      "outputTokens" : 31,
+      "ttftMillis" : 961.521306,
+      "totalMillis" : 2000.940236,
+      "prefillTokensPerSecond" : 35.42065278148255,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8254570496,
+      "cpuMillis" : 31610.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values) and throws NullPointerException when any element is null. [java-list-copy]",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values) and throws NullPointerException when any element is null. [java-list-copy]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "42095437bc87b30666b99db8a09c4e7b5a1969961e42ec50a99a4adc093238ac",
+    "retrievalMillis" : 3.864848,
+    "frameworkOverheadMillis" : 2.992295000000013,
+    "endToEndMillis" : 5602.012973,
+    "generation" : {
+      "text" : "The map operation that initializes SessionCache entries is ConcurrentHashMap.computeIfAbsent. When its mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 185,
+      "cacheReadInputTokens" : 110,
+      "cacheWriteInputTokens" : 75,
+      "outputTokens" : 40,
+      "ttftMillis" : 4225.010089,
+      "totalMillis" : 5595.15583,
+      "prefillTokensPerSecond" : 17.755727552631576,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8256090112,
+      "cpuMillis" : 84920.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The map operation that initializes SessionCache entries is ConcurrentHashMap.computeIfAbsent. When its mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "text" : "The map operation that initializes SessionCache entries is ConcurrentHashMap.computeIfAbsent. When its mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a078556bdc7ff8f73f9e01271cffd74058f30276deba2e9c2e0fb9d757c9b2c0",
+    "retrievalMillis" : 2.636151,
+    "frameworkOverheadMillis" : 5.57529199999999,
+    "endToEndMillis" : 2675.365076,
+    "generation" : {
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 182,
+      "cacheReadInputTokens" : 110,
+      "cacheWriteInputTokens" : 72,
+      "outputTokens" : 31,
+      "ttftMillis" : 1613.134386,
+      "totalMillis" : 2667.153633,
+      "prefillTokensPerSecond" : 44.6593853797987,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8256147456,
+      "cpuMillis" : 42470.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "aefa6cf77e1e738f7d2f2206fe795a2e0f8f8f74bde74594b983764255963115",
+    "retrievalMillis" : 2.287837,
+    "frameworkOverheadMillis" : 6.553311000000122,
+    "endToEndMillis" : 2267.409657,
+    "generation" : {
+      "text" : "ServiceConfig validates its endpoint in the compact constructor, and a blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 173,
+      "cacheReadInputTokens" : 110,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 25,
+      "ttftMillis" : 1408.795287,
+      "totalMillis" : 2258.568509,
+      "prefillTokensPerSecond" : 44.76162722966591,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8257556480,
+      "cpuMillis" : 35910.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "ServiceConfig validates its endpoint in the compact constructor, and a blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "text" : "ServiceConfig validates its endpoint in the compact constructor, and a blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cd1bc6b98e117751f663aa940daeb531689432ec5966e3e5a131dfd0ddba85f0",
+    "retrievalMillis" : 2.457864,
+    "frameworkOverheadMillis" : 3.134690000000319,
+    "endToEndMillis" : 3402.435425,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 82,
+      "outputTokens" : 45,
+      "ttftMillis" : 1836.187588,
+      "totalMillis" : 3396.842871,
+      "prefillTokensPerSecond" : 44.6858776638847,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8258121728,
+      "cpuMillis" : 54050.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The expression that selects the Gradle Java toolchain is `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))`, and the compilation targets release 25. [gradle-java-toolchain]",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a4a19c1e4e926b4b64190ffd1d7cacb5afc7958062cd420aba4302a8675db04a",
+    "retrievalMillis" : 2.497895,
+    "frameworkOverheadMillis" : 3.501103999999941,
+    "endToEndMillis" : 3154.573215,
+    "generation" : {
+      "text" : "GET and HEAD are retried up to three attempts, and the Idempotency-Key header permits retrying POST. [http-retry-idempotency]",
+      "inputTokens" : 182,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 74,
+      "outputTokens" : 29,
+      "ttftMillis" : 2148.086702,
+      "totalMillis" : 3148.574216,
+      "prefillTokensPerSecond" : 34.47075295217043,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8260456448,
+      "cpuMillis" : 49510.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "GET and HEAD are retried up to three attempts, and the Idempotency-Key header permits retrying POST. [http-retry-idempotency]",
+      "text" : "GET and HEAD are retried up to three attempts, and the Idempotency-Key header permits retrying POST. [http-retry-idempotency]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "dccd256c39fe0254b3904578339d6a76e072448febdb9f0a77f1579deb5c20a7",
+    "retrievalMillis" : 2.6225,
+    "frameworkOverheadMillis" : 4.443280000000414,
+    "endToEndMillis" : 2570.589757,
+    "generation" : {
+      "text" : "The migration lease is stored in the schema_history_lock table and expires after 90 seconds. [database-migration-lock]",
+      "inputTokens" : 181,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 73,
+      "outputTokens" : 28,
+      "ttftMillis" : 1630.156975,
+      "totalMillis" : 2563.523977,
+      "prefillTokensPerSecond" : 44.80714033625018,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8260980736,
+      "cpuMillis" : 40830.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration lease is stored in the schema_history_lock table and expires after 90 seconds. [database-migration-lock]",
+      "text" : "The migration lease is stored in the schema_history_lock table and expires after 90 seconds. [database-migration-lock]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "06a856d587dfbf0d30b841f127b5be5510a452dcf0058308137d143cd12a19f8",
+    "retrievalMillis" : 2.348259,
+    "frameworkOverheadMillis" : 2.8485279999995328,
+    "endToEndMillis" : 4209.368381,
+    "generation" : {
+      "text" : "The wire mapper calls findAndRegisterModules to register Java time support, and it disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "inputTokens" : 187,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 79,
+      "outputTokens" : 41,
+      "ttftMillis" : 2808.29419,
+      "totalMillis" : 4204.171594,
+      "prefillTokensPerSecond" : 28.140033762946814,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261267456,
+      "cpuMillis" : 65690.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The wire mapper calls findAndRegisterModules to register Java time support, and it disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "text" : "The wire mapper calls findAndRegisterModules to register Java time support, and it disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0eb41e61ba036e2d0b78238055bd5ebe58303dca1a677e3fb5eb32bef31164ef",
+    "retrievalMillis" : 1.764528,
+    "frameworkOverheadMillis" : 3.077096999999867,
+    "endToEndMillis" : 2350.354412,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 183,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 75,
+      "outputTokens" : 5,
+      "ttftMillis" : 2178.742812,
+      "totalMillis" : 2345.512787,
+      "prefillTokensPerSecond" : 34.43808858805879,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261316608,
+      "cpuMillis" : 36730.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "INSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "09543f6f0f0ae0c52cc60f020a6ed9ac62eb7b4695f7e6ba43412fe6e2febff9",
+    "retrievalMillis" : 4.519303,
+    "frameworkOverheadMillis" : 3.849166999999852,
+    "endToEndMillis" : 2032.036844,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values) and throws NullPointerException when any element is null. [java-list-copy]",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 156,
+      "cacheWriteInputTokens" : 34,
+      "outputTokens" : 31,
+      "ttftMillis" : 948.7669,
+      "totalMillis" : 2023.668374,
+      "prefillTokensPerSecond" : 35.88678053853854,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261365760,
+      "cpuMillis" : 31990.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values) and throws NullPointerException when any element is null. [java-list-copy]",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values) and throws NullPointerException when any element is null. [java-list-copy]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "42095437bc87b30666b99db8a09c4e7b5a1969961e42ec50a99a4adc093238ac",
+    "retrievalMillis" : 2.425362,
+    "frameworkOverheadMillis" : 3.344357999999829,
+    "endToEndMillis" : 3177.577763,
+    "generation" : {
+      "text" : "The map operation that initializes SessionCache entries is ConcurrentHashMap.computeIfAbsent. When its mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 185,
+      "cacheReadInputTokens" : 110,
+      "cacheWriteInputTokens" : 75,
+      "outputTokens" : 40,
+      "ttftMillis" : 1803.945208,
+      "totalMillis" : 3171.808043,
+      "prefillTokensPerSecond" : 41.606906505048826,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261451776,
+      "cpuMillis" : 50220.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The map operation that initializes SessionCache entries is ConcurrentHashMap.computeIfAbsent. When its mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "text" : "The map operation that initializes SessionCache entries is ConcurrentHashMap.computeIfAbsent. When its mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a078556bdc7ff8f73f9e01271cffd74058f30276deba2e9c2e0fb9d757c9b2c0",
+    "retrievalMillis" : 1.3061,
+    "frameworkOverheadMillis" : 2.353990000000067,
+    "endToEndMillis" : 3142.339489,
+    "generation" : {
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 182,
+      "cacheReadInputTokens" : 110,
+      "cacheWriteInputTokens" : 72,
+      "outputTokens" : 31,
+      "ttftMillis" : 2082.880384,
+      "totalMillis" : 3138.679399,
+      "prefillTokensPerSecond" : 34.58116201679149,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261472256,
+      "cpuMillis" : 49440.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "aefa6cf77e1e738f7d2f2206fe795a2e0f8f8f74bde74594b983764255963115",
+    "retrievalMillis" : 1.449766,
+    "frameworkOverheadMillis" : 2.5610069999997904,
+    "endToEndMillis" : 2296.083221,
+    "generation" : {
+      "text" : "ServiceConfig validates its endpoint in the compact constructor, and a blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 173,
+      "cacheReadInputTokens" : 110,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 25,
+      "ttftMillis" : 1458.90324,
+      "totalMillis" : 2292.072448,
+      "prefillTokensPerSecond" : 43.20776244488526,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261500928,
+      "cpuMillis" : 36420.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "ServiceConfig validates its endpoint in the compact constructor, and a blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "text" : "ServiceConfig validates its endpoint in the compact constructor, and a blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cd1bc6b98e117751f663aa940daeb531689432ec5966e3e5a131dfd0ddba85f0",
+    "retrievalMillis" : 3.013505,
+    "frameworkOverheadMillis" : 2.5621680000003835,
+    "endToEndMillis" : 3673.560792,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 82,
+      "outputTokens" : 45,
+      "ttftMillis" : 2061.616192,
+      "totalMillis" : 3667.985119,
+      "prefillTokensPerSecond" : 39.78718421297632,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261517312,
+      "cpuMillis" : 58040.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The expression that selects the Gradle Java toolchain is `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))`, and the compilation targets release 25. [gradle-java-toolchain]",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a4a19c1e4e926b4b64190ffd1d7cacb5afc7958062cd420aba4302a8675db04a",
+    "retrievalMillis" : 1.893812,
+    "frameworkOverheadMillis" : 2.686522999999852,
+    "endToEndMillis" : 3335.49313,
+    "generation" : {
+      "text" : "GET and HEAD are retried up to three attempts, and the Idempotency-Key header permits retrying POST. [http-retry-idempotency]",
+      "inputTokens" : 182,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 74,
+      "outputTokens" : 29,
+      "ttftMillis" : 2334.86404,
+      "totalMillis" : 3330.912795,
+      "prefillTokensPerSecond" : 31.70512603996252,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261599232,
+      "cpuMillis" : 51990.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "GET and HEAD are retried up to three attempts, and the Idempotency-Key header permits retrying POST. [http-retry-idempotency]",
+      "text" : "GET and HEAD are retried up to three attempts, and the Idempotency-Key header permits retrying POST. [http-retry-idempotency]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "dccd256c39fe0254b3904578339d6a76e072448febdb9f0a77f1579deb5c20a7",
+    "retrievalMillis" : 2.988314,
+    "frameworkOverheadMillis" : 2.47778500000004,
+    "endToEndMillis" : 3012.41472,
+    "generation" : {
+      "text" : "The migration lease is stored in the schema_history_lock table and expires after 90 seconds. [database-migration-lock]",
+      "inputTokens" : 181,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 73,
+      "outputTokens" : 28,
+      "ttftMillis" : 2041.466213,
+      "totalMillis" : 3006.948621,
+      "prefillTokensPerSecond" : 35.7707854248589,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261709824,
+      "cpuMillis" : 47310.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration lease is stored in the schema_history_lock table and expires after 90 seconds. [database-migration-lock]",
+      "text" : "The migration lease is stored in the schema_history_lock table and expires after 90 seconds. [database-migration-lock]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "06a856d587dfbf0d30b841f127b5be5510a452dcf0058308137d143cd12a19f8",
+    "retrievalMillis" : 2.456104,
+    "frameworkOverheadMillis" : 2.3805099999999584,
+    "endToEndMillis" : 3152.510676,
+    "generation" : {
+      "text" : "The wire mapper calls findAndRegisterModules to register Java time support, and it disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "inputTokens" : 187,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 79,
+      "outputTokens" : 41,
+      "ttftMillis" : 1780.604827,
+      "totalMillis" : 3147.674062,
+      "prefillTokensPerSecond" : 44.38436362241602,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261750784,
+      "cpuMillis" : 50150.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The wire mapper calls findAndRegisterModules to register Java time support, and it disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "text" : "The wire mapper calls findAndRegisterModules to register Java time support, and it disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0eb41e61ba036e2d0b78238055bd5ebe58303dca1a677e3fb5eb32bef31164ef",
+    "retrievalMillis" : 1.771508,
+    "frameworkOverheadMillis" : 1.7925880000002508,
+    "endToEndMillis" : 2888.282622,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 183,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 75,
+      "outputTokens" : 5,
+      "ttftMillis" : 2720.154865,
+      "totalMillis" : 2884.718526,
+      "prefillTokensPerSecond" : 27.57755446736609,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261771264,
+      "cpuMillis" : 44430.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "INSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "list-copy-null-handling",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 8.866645,
+      "rank" : 1
+    } ],
+    "promptSha256" : "09543f6f0f0ae0c52cc60f020a6ed9ac62eb7b4695f7e6ba43412fe6e2febff9",
+    "retrievalMillis" : 3.778754,
+    "frameworkOverheadMillis" : 2.1315510000001723,
+    "endToEndMillis" : 1909.774797,
+    "generation" : {
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values) and throws NullPointerException when any element is null. [java-list-copy]",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 156,
+      "cacheWriteInputTokens" : 34,
+      "outputTokens" : 31,
+      "ttftMillis" : 853.328668,
+      "totalMillis" : 1903.864492,
+      "prefillTokensPerSecond" : 39.87510357587474,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261799936,
+      "cpuMillis" : 30210.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values) and throws NullPointerException when any element is null. [java-list-copy]",
+      "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values) and throws NullPointerException when any element is null. [java-list-copy]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "compute-if-absent-null",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-map-compute",
+        "title" : "Atomic session cache initialization",
+        "text" : "SessionCache initializes entries with ConcurrentHashMap.computeIfAbsent. If the mapping function returns null, computeIfAbsent returns null and records no mapping for that key."
+      },
+      "score" : 7.198123,
+      "rank" : 1
+    } ],
+    "promptSha256" : "42095437bc87b30666b99db8a09c4e7b5a1969961e42ec50a99a4adc093238ac",
+    "retrievalMillis" : 2.684512,
+    "frameworkOverheadMillis" : 2.2107750000000124,
+    "endToEndMillis" : 3702.971345,
+    "generation" : {
+      "text" : "The map operation that initializes SessionCache entries is ConcurrentHashMap.computeIfAbsent. When its mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "inputTokens" : 185,
+      "cacheReadInputTokens" : 110,
+      "cacheWriteInputTokens" : 75,
+      "outputTokens" : 40,
+      "ttftMillis" : 2351.929472,
+      "totalMillis" : 3698.076058,
+      "prefillTokensPerSecond" : 31.899881926244902,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261832704,
+      "cpuMillis" : 57960.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The map operation that initializes SessionCache entries is ConcurrentHashMap.computeIfAbsent. When its mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "text" : "The map operation that initializes SessionCache entries is ConcurrentHashMap.computeIfAbsent. When its mapping function returns null, computeIfAbsent returns null and records no mapping for that key. [java-map-compute]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "virtual-thread-executor",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-virtual-threads",
+        "title" : "Link checker task execution",
+        "text" : "LinkChecker creates its task executor with Executors.newVirtualThreadPerTaskExecutor. Closing that executor waits for all submitted tasks to finish."
+      },
+      "score" : 5.199474,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a078556bdc7ff8f73f9e01271cffd74058f30276deba2e9c2e0fb9d757c9b2c0",
+    "retrievalMillis" : 1.299109,
+    "frameworkOverheadMillis" : 2.6704429999999775,
+    "endToEndMillis" : 2879.100732,
+    "generation" : {
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "inputTokens" : 182,
+      "cacheReadInputTokens" : 110,
+      "cacheWriteInputTokens" : 72,
+      "outputTokens" : 31,
+      "ttftMillis" : 1842.015611,
+      "totalMillis" : 2875.13118,
+      "prefillTokensPerSecond" : 39.10461617230602,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261890048,
+      "cpuMillis" : 45470.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "text" : "LinkChecker uses Executors.newVirtualThreadPerTaskExecutor, and closing the executor waits for all submitted tasks to finish. [java-virtual-threads]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "record-compact-validation",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-record-validation",
+        "title" : "Service configuration validation",
+        "text" : "The ServiceConfig record validates its endpoint in the compact constructor. A blank endpoint causes IllegalArgumentException."
+      },
+      "score" : 6.102337,
+      "rank" : 1
+    } ],
+    "promptSha256" : "aefa6cf77e1e738f7d2f2206fe795a2e0f8f8f74bde74594b983764255963115",
+    "retrievalMillis" : 1.466606,
+    "frameworkOverheadMillis" : 1.87843200000043,
+    "endToEndMillis" : 2644.255629,
+    "generation" : {
+      "text" : "ServiceConfig validates its endpoint in the compact constructor, and a blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "inputTokens" : 173,
+      "cacheReadInputTokens" : 110,
+      "cacheWriteInputTokens" : 63,
+      "outputTokens" : 25,
+      "ttftMillis" : 1808.97188,
+      "totalMillis" : 2640.910591,
+      "prefillTokensPerSecond" : 34.837297068369175,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261935104,
+      "cpuMillis" : 41560.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "ServiceConfig validates its endpoint in the compact constructor, and a blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "text" : "ServiceConfig validates its endpoint in the compact constructor, and a blank endpoint causes IllegalArgumentException. [java-record-validation]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "gradle-java-25",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "gradle-java-toolchain",
+        "title" : "Java build toolchain",
+        "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25."
+      },
+      "score" : 4.226921,
+      "rank" : 1
+    } ],
+    "promptSha256" : "cd1bc6b98e117751f663aa940daeb531689432ec5966e3e5a131dfd0ddba85f0",
+    "retrievalMillis" : 1.339241,
+    "frameworkOverheadMillis" : 3.84537599999976,
+    "endToEndMillis" : 3814.600285,
+    "generation" : {
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "inputTokens" : 190,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 82,
+      "outputTokens" : 45,
+      "ttftMillis" : 2247.817539,
+      "totalMillis" : 3809.415668,
+      "prefillTokensPerSecond" : 36.49730149100806,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8261984256,
+      "cpuMillis" : 60160.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The expression that selects the Gradle Java toolchain is `java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))`, and the compilation targets release 25. [gradle-java-toolchain]",
+      "text" : "The build selects JDK 25 with java.toolchain.languageVersion.set(JavaLanguageVersion.of(25)). Java compilation also sets options.release to 25. [gradle-java-toolchain]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 0.5,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "http-retry-rules",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "http-retry-idempotency",
+        "title" : "HTTP retry rules",
+        "text" : "The SDK retries GET and HEAD requests up to three attempts. A POST is retried only when it carries an Idempotency-Key header."
+      },
+      "score" : 7.348507,
+      "rank" : 1
+    } ],
+    "promptSha256" : "a4a19c1e4e926b4b64190ffd1d7cacb5afc7958062cd420aba4302a8675db04a",
+    "retrievalMillis" : 0.911324,
+    "frameworkOverheadMillis" : 3.5540359999999964,
+    "endToEndMillis" : 2683.053009,
+    "generation" : {
+      "text" : "GET and HEAD are retried up to three attempts, and the Idempotency-Key header permits retrying POST. [http-retry-idempotency]",
+      "inputTokens" : 182,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 74,
+      "outputTokens" : 29,
+      "ttftMillis" : 1704.719781,
+      "totalMillis" : 2678.587649,
+      "prefillTokensPerSecond" : 43.42389736475964,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8262004736,
+      "cpuMillis" : 42680.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "GET and HEAD are retried up to three attempts, and the Idempotency-Key header permits retrying POST. [http-retry-idempotency]",
+      "text" : "GET and HEAD are retried up to three attempts, and the Idempotency-Key header permits retrying POST. [http-retry-idempotency]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "migration-lock-expiry",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "database-migration-lock",
+        "title" : "Database migration lease",
+        "text" : "The migration coordinator stores its lease in the schema_history_lock table. A lease expires after 90 seconds unless the owner renews it."
+      },
+      "score" : 6.2913165,
+      "rank" : 1
+    } ],
+    "promptSha256" : "dccd256c39fe0254b3904578339d6a76e072448febdb9f0a77f1579deb5c20a7",
+    "retrievalMillis" : 1.792399,
+    "frameworkOverheadMillis" : 2.546726999999919,
+    "endToEndMillis" : 2848.568197,
+    "generation" : {
+      "text" : "The migration lease is stored in the schema_history_lock table and expires after 90 seconds. [database-migration-lock]",
+      "inputTokens" : 181,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 73,
+      "outputTokens" : 28,
+      "ttftMillis" : 1911.915769,
+      "totalMillis" : 2844.229071,
+      "prefillTokensPerSecond" : 38.19474966453159,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8262033408,
+      "cpuMillis" : 44960.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The migration lease is stored in the schema_history_lock table and expires after 90 seconds. [database-migration-lock]",
+      "text" : "The migration lease is stored in the schema_history_lock table and expires after 90 seconds. [database-migration-lock]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "jackson-module-and-feature",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "jackson-wire-format",
+        "title" : "JSON wire mapper",
+        "text" : "The wire mapper calls findAndRegisterModules so Java time values use registered modules. It disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input."
+      },
+      "score" : 3.0640106,
+      "rank" : 1
+    } ],
+    "promptSha256" : "06a856d587dfbf0d30b841f127b5be5510a452dcf0058308137d143cd12a19f8",
+    "retrievalMillis" : 0.946466,
+    "frameworkOverheadMillis" : 2.8950410000002194,
+    "endToEndMillis" : 3191.38554,
+    "generation" : {
+      "text" : "The wire mapper calls findAndRegisterModules to register Java time support, and it disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "inputTokens" : 187,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 79,
+      "outputTokens" : 41,
+      "ttftMillis" : 1755.938856,
+      "totalMillis" : 3187.544033,
+      "prefillTokensPerSecond" : 45.01699282070594,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8262049792,
+      "cpuMillis" : 50740.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "The wire mapper calls findAndRegisterModules to register Java time support, and it disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "text" : "The wire mapper calls findAndRegisterModules to register Java time support, and it disables DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES for forward-compatible input. [jackson-wire-format]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "Mellum2 12B A2.5B Thinking",
+    "caseId" : "unsupported-cuda-kernel",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "java-list-copy",
+        "title" : "Freezing parsed values",
+        "text" : "The CatalogLoader freezes parsed SKU values by calling List.copyOf(values). The method throws NullPointerException when any element is null, and the returned list is unmodifiable."
+      },
+      "score" : 1.9112885,
+      "rank" : 1
+    } ],
+    "promptSha256" : "0eb41e61ba036e2d0b78238055bd5ebe58303dca1a677e3fb5eb32bef31164ef",
+    "retrievalMillis" : 1.496097,
+    "frameworkOverheadMillis" : 3.9221099999995204,
+    "endToEndMillis" : 2194.812286,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 183,
+      "cacheReadInputTokens" : 108,
+      "cacheWriteInputTokens" : 75,
+      "outputTokens" : 5,
+      "ttftMillis" : 2020.340777,
+      "totalMillis" : 2189.394079,
+      "prefillTokensPerSecond" : 37.135586649992085,
+      "loadMillis" : 575.824836,
+      "peakRssBytes" : 8262074368,
+      "cpuMillis" : 34360.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "INSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

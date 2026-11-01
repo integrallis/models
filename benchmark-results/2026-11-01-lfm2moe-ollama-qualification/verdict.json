@@ -1,0 +1,37 @@
+{
+  "schemaVersion" : 1,
+  "policyId" : "production-rag-model-contribution-v6",
+  "candidate" : {
+    "path" : "/root/out/lfm2moe-ollama/candidate.json",
+    "sha256" : "d20333ffb5c9bc993a223638d52c860c9d425496a9d151c698357bc9eaa5ac5d"
+  },
+  "comparators" : [ {
+    "path" : "/root/out/lfm2moe-ollama/comparator.json",
+    "sha256" : "0c2109ccaf9289788e39b77453581585bf0f6f8d87cd018b3c1c54338d50f4ec"
+  } ],
+  "qualification" : {
+    "modelId" : "lfm2_5_8b_a1b_q4_0",
+    "candidateBackend" : "rust-ffm",
+    "artifactSha256" : "48ed1465d761311b2fd57b7fb46cf969a20b3a8281945b04e10f52bd1609e715",
+    "absoluteTier" : "PERFORMANCE_REDUCED",
+    "verdict" : "FAILED_RELATIVE_GATE",
+    "qualified" : false,
+    "modelAnswerCount" : 12,
+    "modelAnswerRate" : 0.4444444444444444,
+    "modelAnswerCorrectRate" : 1.0,
+    "minimumModelAnswerRate" : 0.3333333333333333,
+    "minimumModelAnswerCorrectRate" : 0.9,
+    "qualifyingComparators" : [ ],
+    "comparisons" : [ {
+      "comparatorBackend" : "ollama",
+      "decodeThroughputRatio" : 0.39744549697797266,
+      "endToEndLatencyRatio" : 2.8669855008066576,
+      "timeToFirstTokenRatio" : 6.446429233146777,
+      "minimumDecodeThroughputRatio" : 0.8,
+      "maximumEndToEndLatencyRatio" : 1.5,
+      "qualified" : false,
+      "failures" : [ "decode throughput below relative floor", "end-to-end latency above relative ceiling" ]
+    } ],
+    "exclusions" : { }
+  }
+}

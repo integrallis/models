@@ -1,0 +1,36 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Nov 01, 2026 4:12:41 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 01, 2026 4:12:41 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Nov 01, 2026 4:12:42 AM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=256; FMA enabled
+iteration 1/3 case=auto-glass-deadline correct=true retrieval=4.8ms ttft=6759.6ms decode=27.47 tok/s e2e=8224.1ms
+iteration 1/3 case=travel-limit correct=true retrieval=3.0ms ttft=7685.1ms decode=28.10 tok/s e2e=8866.3ms
+iteration 1/3 case=telemedicine-benefit correct=true retrieval=3.3ms ttft=6113.8ms decode=28.01 tok/s e2e=7120.5ms
+iteration 1/3 case=claim-payment-times correct=true retrieval=3.4ms ttft=5939.6ms decode=28.11 tok/s e2e=6978.8ms
+iteration 1/3 case=chargeback-evidence correct=true retrieval=4.5ms ttft=6142.8ms decode=27.89 tok/s e2e=7584.7ms
+iteration 1/3 case=break-glass correct=true retrieval=2.5ms ttft=6039.7ms decode=28.08 tok/s e2e=6900.4ms
+iteration 1/3 case=idempotency correct=true retrieval=2.4ms ttft=6683.5ms decode=28.33 tok/s e2e=8030.8ms
+iteration 1/3 case=priority-one correct=true retrieval=2.7ms ttft=7818.6ms decode=26.22 tok/s e2e=8968.5ms
+iteration 1/3 case=unsupported-lunar-vehicle correct=true retrieval=2.0ms ttft=6252.8ms decode=28.15 tok/s e2e=7395.0ms
+iteration 2/3 case=auto-glass-deadline correct=true retrieval=2.8ms ttft=6406.2ms decode=28.39 tok/s e2e=7819.6ms
+iteration 2/3 case=travel-limit correct=true retrieval=2.3ms ttft=6323.4ms decode=27.97 tok/s e2e=7507.5ms
+iteration 2/3 case=telemedicine-benefit correct=true retrieval=2.1ms ttft=6635.1ms decode=27.62 tok/s e2e=7653.4ms
+iteration 2/3 case=claim-payment-times correct=true retrieval=1.7ms ttft=9624.1ms decode=28.13 tok/s e2e=10658.8ms
+iteration 2/3 case=chargeback-evidence correct=true retrieval=2.0ms ttft=7285.6ms decode=23.33 tok/s e2e=9005.7ms
+iteration 2/3 case=break-glass correct=true retrieval=3.1ms ttft=6539.6ms decode=27.57 tok/s e2e=7415.7ms
+iteration 2/3 case=idempotency correct=true retrieval=2.1ms ttft=6620.1ms decode=28.17 tok/s e2e=7973.7ms
+iteration 2/3 case=priority-one correct=true retrieval=2.2ms ttft=5937.1ms decode=27.42 tok/s e2e=7035.6ms
+iteration 2/3 case=unsupported-lunar-vehicle correct=true retrieval=1.1ms ttft=17747.1ms decode=28.12 tok/s e2e=18888.3ms
+iteration 3/3 case=auto-glass-deadline correct=true retrieval=4.4ms ttft=6417.4ms decode=26.75 tok/s e2e=7919.6ms
+iteration 3/3 case=travel-limit correct=true retrieval=2.6ms ttft=7491.1ms decode=26.75 tok/s e2e=8729.9ms
+iteration 3/3 case=telemedicine-benefit correct=true retrieval=1.7ms ttft=6060.2ms decode=28.10 tok/s e2e=7060.4ms
+iteration 3/3 case=claim-payment-times correct=true retrieval=1.7ms ttft=6254.7ms decode=28.21 tok/s e2e=7287.0ms
+iteration 3/3 case=chargeback-evidence correct=true retrieval=1.8ms ttft=6883.2ms decode=28.40 tok/s e2e=8295.7ms
+iteration 3/3 case=break-glass correct=true retrieval=2.5ms ttft=8522.2ms decode=28.03 tok/s e2e=9383.0ms
+iteration 3/3 case=idempotency correct=true retrieval=2.3ms ttft=6608.8ms decode=14.95 tok/s e2e=9155.0ms
+iteration 3/3 case=priority-one correct=true retrieval=1.4ms ttft=14943.5ms decode=28.14 tok/s e2e=16013.4ms
+iteration 3/3 case=unsupported-lunar-vehicle correct=true retrieval=1.5ms ttft=6184.2ms decode=28.24 tok/s e2e=7320.9ms
+plain-java/rust-ffm/lfm2_5_8b_a1b_q4_0: tier=PERFORMANCE_REDUCED success=27/27 p95-retrieval=4.5ms p95-ttft=13347.7ms p50-decode=28.08 tok/s p95-e2e=14407.1ms correct=100.0% model-answered=44.4% of-those-correct=100.0% extractive-fallback=44.4% truncated=0.0%
+report: /root/out/lfm2moe-perf2.json
