@@ -55,6 +55,23 @@ class EnglishTokenizerTest {
   }
 
   @Test
+  void tagsThatByWhatFollowsItAndAllCapsWordsAsProperNouns() {
+    // Complementizer and relative "that" are the lexicon's unstressed default; the determiner is
+    // stressed. The tagger decides by the next token, as the first exact-match pass showed.
+    assertThat(tags("He writes that the tomb lies there."))
+        .containsExactly("PRP", "NN", "IN", "DT", "NN", "NN", "RB", ".");
+    assertThat(tags("an act that gives an advantage"))
+        .containsExactly("DT", "NN", "IN", "NN", "DT", "NN");
+    assertThat(tags("I want that tomb.")).containsExactly("PRP", "NN", "DT", "NN", ".");
+    assertThat(tags("That was it.")).containsExactly("DT", "VBD", "PRP", ".");
+    // "US" in mixed-case text is a proper noun, not the pronoun; in all-caps text capitals mean
+    // nothing and the function words keep their tags.
+    assertThat(tags("The US Secretary met us."))
+        .containsExactly("DT", "NNP", "NNP", "NN", "PRP", ".");
+    assertThat(tags("THE END IS NEAR")).containsExactly("DT", "NNP", "VBZ", "NNP");
+  }
+
+  @Test
   void assignsTheTagsTheLexiconRulesRead() {
     assertThat(tags("I am the one to blame."))
         .containsExactly("PRP", "VBP", "DT", "NN", "TO", "NN", ".");
