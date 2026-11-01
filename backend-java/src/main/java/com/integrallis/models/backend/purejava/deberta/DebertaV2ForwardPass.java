@@ -36,7 +36,7 @@ final class DebertaV2ForwardPass {
   private final float[] tokenEmbedding;
   private final float[] pooled;
   private final Worker[] workers;
-  private final DebertaV2Projection projection;
+  private final DebertaV2Kernels projection;
 
   private float[] hidden = new float[0];
   private float[] queries = new float[0];
@@ -48,13 +48,15 @@ final class DebertaV2ForwardPass {
   private float[] feedForward = new float[0];
   private float[] feedForwardProjected = new float[0];
   private int capacity;
+  private int[] relativeIndices = new int[0];
+  private int relativeIndexLength;
 
   DebertaV2ForwardPass(DebertaV2Config config, DebertaV2Weights weights) {
     this(config, weights, null);
   }
 
   DebertaV2ForwardPass(
-      DebertaV2Config config, DebertaV2Weights weights, DebertaV2Projection projection) {
+      DebertaV2Config config, DebertaV2Weights weights, DebertaV2Kernels projection) {
     this.projection = projection;
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
@@ -123,6 +125,23 @@ final class DebertaV2ForwardPass {
     int sequenceLength = tokens.length;
     int dim = config.hiddenSize();
     ensureCapacity(sequenceLength);
+    if (relativeIndexLength != sequenceLength) {
+      relativeIndices = new int[Math.multiplyExact(sequenceLength, sequenceLength)];
+      int[] byDistance = new int[2 * sequenceLength - 1];
+      for (int distance = 1 - sequenceLength; distance < sequenceLength; distance++) {
+        int bucket =
+            relativeBucket(distance, config.positionBuckets(), config.maxRelativePositions());
+        byDistance[distance + sequenceLength - 1] =
+            Math.max(
+                0, Math.min(config.positionBuckets() * 2 - 1, bucket + config.positionBuckets()));
+      }
+      for (int q = 0; q < sequenceLength; q++) {
+        for (int k = 0; k < sequenceLength; k++) {
+          relativeIndices[q * sequenceLength + k] = byDistance[q - k + sequenceLength - 1];
+        }
+      }
+      relativeIndexLength = sequenceLength;
+    }
     for (int position = 0; position < sequenceLength; position++) {
       weights.wordEmbedding(tokens[position], tokenEmbedding);
       TensorOps.layerNorm(
@@ -166,7 +185,12 @@ final class DebertaV2ForwardPass {
 
     project(feedForward, normalized, sequenceLength, layer.feedForwardUp());
     addBias(feedForward, sequenceLength, config.intermediateSize(), layer.feedForwardUpBias());
-    TensorOps.geluErf(feedForward, 0, feedForward, 0, sequenceLength * config.intermediateSize());
+    forEachRow(
+        sequenceLength,
+        (row, worker) -> {
+          int offset = row * config.intermediateSize();
+          TensorOps.geluErf(feedForward, offset, feedForward, offset, config.intermediateSize());
+        });
     project(feedForwardProjected, feedForward, sequenceLength, layer.feedForwardDown());
     addBias(feedForwardProjected, sequenceLength, dim, layer.feedForwardDownBias());
     for (int index = 0; index < elements; index++) {
@@ -182,8 +206,22 @@ final class DebertaV2ForwardPass {
 
   private void attend(int sequenceLength, RelativeProjections relative) {
     int dim = config.hiddenSize();
+    if (projection != null) {
+      projection.attend(
+          attention,
+          queries,
+          keys,
+          values,
+          relative.queries(),
+          relative.keys(),
+          relativeIndices,
+          sequenceLength,
+          dim,
+          config.numHeads(),
+          config.positionBuckets() * 2);
+      return;
+    }
     int headSize = config.headSize();
-    int span = config.positionBuckets();
     float scale = (float) Math.sqrt(headSize * 3.0);
     Arrays.fill(attention, 0, sequenceLength * dim, 0.0f);
     forEachRow(
@@ -204,12 +242,8 @@ final class DebertaV2ForwardPass {
                 scores,
                 0);
             for (int keyPosition = 0; keyPosition < sequenceLength; keyPosition++) {
-              int bucket =
-                  relativeBucket(
-                      queryPosition - keyPosition,
-                      config.positionBuckets(),
-                      config.maxRelativePositions());
-              int relativeOffset = (Math.max(0, Math.min(span * 2 - 1, bucket + span))) * dim;
+              int relativeOffset =
+                  relativeIndices[queryPosition * sequenceLength + keyPosition] * dim;
               float contentToPosition =
                   VectorUtil.dotProduct(
                       queries,

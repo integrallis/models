@@ -15,11 +15,24 @@
  */
 package com.integrallis.models.backend.purejava.deberta;
 
-/** Synchronous dense projection; matrices and output are row-major and caller-owned. */
-@FunctionalInterface
-public interface DebertaV2Projection {
+/** Synchronous dense projection and disentangled attention over caller-owned row-major buffers. */
+public interface DebertaV2Kernels {
   /**
    * Computes output[batch, outputs] = input[batch, inputs] * transpose(weights[outputs, inputs]).
    */
   void project(float[] output, float[] input, int batch, float[] weights, int outputs, int inputs);
+
+  /** Computes bidirectional attention with the supplied relative-position indices. */
+  void attend(
+      float[] output,
+      float[] queries,
+      float[] keys,
+      float[] values,
+      float[] relativeQueries,
+      float[] relativeKeys,
+      int[] relativeIndices,
+      int sequenceLength,
+      int dimension,
+      int heads,
+      int relativeRows);
 }

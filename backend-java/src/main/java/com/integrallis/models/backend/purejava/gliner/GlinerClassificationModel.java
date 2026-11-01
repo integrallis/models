@@ -20,7 +20,7 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.integrallis.models.api.SchemaClassificationModel;
 import com.integrallis.models.backend.purejava.deberta.DebertaV2Config;
 import com.integrallis.models.backend.purejava.deberta.DebertaV2Encoder;
-import com.integrallis.models.backend.purejava.deberta.DebertaV2Projection;
+import com.integrallis.models.backend.purejava.deberta.DebertaV2Kernels;
 import com.integrallis.models.backend.purejava.safetensors.SafetensorsBundle;
 import com.integrallis.models.backend.purejava.tensor.SafetensorsTensorSource;
 import com.integrallis.models.backend.purejava.tensor.TensorSource;
@@ -71,14 +71,14 @@ public final class GlinerClassificationModel implements SchemaClassificationMode
   }
 
   /** Uses a caller-owned dense projector; its lifecycle must enclose this model's lifecycle. */
-  public static GlinerClassificationModel loadWithProjection(
-      Path snapshot, Function<String, int[]> tokenizer, DebertaV2Projection projection)
+  public static GlinerClassificationModel loadWithKernels(
+      Path snapshot, Function<String, int[]> tokenizer, DebertaV2Kernels projection)
       throws IOException {
     return loadInternal(snapshot, tokenizer, Objects.requireNonNull(projection, "projection"));
   }
 
   private static GlinerClassificationModel loadInternal(
-      Path snapshot, Function<String, int[]> tokenizer, DebertaV2Projection projection)
+      Path snapshot, Function<String, int[]> tokenizer, DebertaV2Kernels projection)
       throws IOException {
     validateConfig(snapshot.resolve("config.json"));
     DebertaV2Config config =
@@ -89,7 +89,7 @@ public final class GlinerClassificationModel implements SchemaClassificationMode
       return new GlinerClassificationModel(
           projection == null
               ? DebertaV2Encoder.load(source, config, "encoder.")
-              : DebertaV2Encoder.loadWithProjection(source, config, "encoder.", projection),
+              : DebertaV2Encoder.loadWithKernels(source, config, "encoder.", projection),
           new GlinerSchemaCompiler(tokenizer, config.maxPositions()),
           dim,
           f32(source, "classifier.0.weight", dim * 2, dim),

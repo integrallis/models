@@ -36,10 +36,11 @@
     "cpu": [
       "jmodels_bf16_f32_batched_matmul",
       "jmodels_causal_depthwise_conv_silu_f32",
-      "jmodels_dense_f32_abi",
-      "jmodels_dense_f32_create",
-      "jmodels_dense_f32_destroy",
-      "jmodels_dense_f32_project",
+      "jmodels_deberta_abi",
+      "jmodels_deberta_attend",
+      "jmodels_deberta_create",
+      "jmodels_deberta_destroy",
+      "jmodels_deberta_project",
       "jmodels_gated_delta_net_f32_with_context",
       "jmodels_gated_delta_net_group_f32_with_context",
       "jmodels_grouped_attention_f32_with_context",
@@ -929,32 +930,37 @@
     {
       "id": "f32-dense-projection-experiment",
       "status": "INACTIVE_EXPERIMENT",
-      "summary": "Isolated dense projection candidate; no public runtime selects it until whole-model evidence supports adoption.",
+      "summary": "Profile-driven matrix and disentangled-attention candidate; public default adoption awaits full measured validation.",
       "capabilities": [],
       "exports": {
         "cpu": [
-          "jmodels_dense_f32_abi",
-          "jmodels_dense_f32_create",
-          "jmodels_dense_f32_destroy",
-          "jmodels_dense_f32_project"
+          "jmodels_deberta_abi",
+          "jmodels_deberta_create",
+          "jmodels_deberta_destroy",
+          "jmodels_deberta_project",
+          "jmodels_deberta_attend"
         ]
       },
       "dispatch": [
         {
-          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDenseProjection.java",
-          "anchor": "jmodels_dense_f32_abi"
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_deberta_abi"
         },
         {
-          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDenseProjection.java",
-          "anchor": "jmodels_dense_f32_create"
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_deberta_create"
         },
         {
-          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDenseProjection.java",
-          "anchor": "jmodels_dense_f32_destroy"
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_deberta_destroy"
         },
         {
-          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDenseProjection.java",
-          "anchor": "jmodels_dense_f32_project"
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_deberta_project"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_deberta_attend"
         }
       ],
       "sourceScope": "f32-dense-projection",
@@ -1393,12 +1399,12 @@
       "backend-native/build.gradle.kts"
     ],
     "f32-dense-projection": [
-      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDenseProjection.java",
-      "backend-native/src/main/rust/model-kernels/src/dense_f32.rs",
+      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+      "backend-native/src/main/rust/model-kernels/src/deberta_kernels.rs",
       "backend-native/src/main/rust/model-kernels/src/lib.rs",
       "backend-native/src/main/rust/model-kernels/Cargo.toml",
       "backend-native/src/main/rust/model-kernels/Cargo.lock",
-      "backend-java/src/main/java/com/integrallis/models/backend/purejava/deberta/DebertaV2Projection.java",
+      "backend-java/src/main/java/com/integrallis/models/backend/purejava/deberta/DebertaV2Kernels.java",
       "backend-java/src/main/java/com/integrallis/models/backend/purejava/deberta/DebertaV2ForwardPass.java"
     ]
   },

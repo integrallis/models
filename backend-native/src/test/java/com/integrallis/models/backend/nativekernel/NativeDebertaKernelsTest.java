@@ -25,11 +25,73 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
-class NativeDenseProjectionTest {
+class NativeDebertaKernelsTest {
+  @Test
+  void disentangledAttentionMatchesIndependentScalarCalculationAndRejectsBadIndices() {
+    try (var kernels =
+        NativeDebertaKernels.load(
+            Path.of(System.getProperty("models.native.kernels.library")), 3)) {
+      var random = new Random(341);
+      int dim = 15, heads = 3, width = 5, relativeRows = 18;
+      for (int length : new int[] {1, 7, 33, 3}) {
+        float[] q = new float[length * dim], k = q.clone(), v = q.clone();
+        float[] rq = new float[relativeRows * dim], rk = rq.clone();
+        for (float[] a : new float[][] {q, k, v, rq, rk}) {
+          for (int i = 0; i < a.length; i++) a[i] = random.nextFloat() - .5f;
+        }
+        int[] indices = new int[length * length];
+        for (int i = 0; i < length; i++)
+          for (int j = 0; j < length; j++)
+            indices[i * length + j] = Math.max(0, Math.min(relativeRows - 1, i - j + 8));
+        float[] actual = new float[length * dim + 3];
+        Arrays.fill(actual, 99f);
+        kernels.attend(actual, q, k, v, rq, rk, indices, length, dim, heads, relativeRows);
+        for (int i = 0; i < length; i++)
+          for (int h = 0; h < heads; h++) {
+            double[] scores = new double[length];
+            for (int j = 0; j < length; j++) {
+              int b = indices[i * length + j];
+              for (int c = 0; c < width; c++) {
+                int ho = h * width + c;
+                scores[j] +=
+                    (double) q[i * dim + ho] * k[j * dim + ho]
+                        + (double) q[i * dim + ho] * rk[b * dim + ho]
+                        + (double) k[j * dim + ho] * rq[b * dim + ho];
+              }
+              scores[j] /= Math.sqrt(width * 3.0);
+            }
+            double maximum = Arrays.stream(scores).max().orElseThrow();
+            double sum = 0;
+            for (int j = 0; j < length; j++) {
+              scores[j] = Math.exp(scores[j] - maximum);
+              sum += scores[j];
+            }
+            for (int c = 0; c < width; c++) {
+              double expected = 0;
+              for (int j = 0; j < length; j++)
+                expected += scores[j] / sum * v[j * dim + h * width + c];
+              assertThat((double) actual[i * dim + h * width + c])
+                  .isCloseTo(expected, within(1e-5));
+            }
+          }
+        for (int i = length * dim; i < actual.length; i++) assertThat(actual[i]).isEqualTo(99f);
+        float[] before = actual.clone();
+        indices[0] = -1;
+        assertThatThrownBy(
+                () ->
+                    kernels.attend(
+                        actual, q, k, v, rq, rk, indices, length, dim, heads, relativeRows))
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(actual).containsExactly(before);
+      }
+      assertThat(kernels.attentionCalls()).isEqualTo(4);
+    }
+  }
+
   @Test
   void projectsUnevenBatchesAndReusesBuffersWithoutWritingPastOutput() throws Exception {
     var projection =
-        NativeDenseProjection.load(Path.of(System.getProperty("models.native.kernels.library")), 3);
+        NativeDebertaKernels.load(Path.of(System.getProperty("models.native.kernels.library")), 3);
     try {
       var random = new Random(78131);
       for (int batch : new int[] {1, 7, 33, 3}) {

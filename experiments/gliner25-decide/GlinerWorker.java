@@ -2,7 +2,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.integrallis.models.api.SchemaClassificationModel;
 import com.integrallis.models.backend.nativekernel.NativeHuggingFaceTokenizer;
-import com.integrallis.models.backend.nativekernel.NativeDenseProjection;
+import com.integrallis.models.backend.nativekernel.NativeDebertaKernels;
 import com.integrallis.models.backend.purejava.gliner.GlinerClassificationModel;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -32,16 +32,12 @@ public class GlinerWorker {
       }
     }
     long start = System.nanoTime();
-    long[] denseCalls = {0};
     try (var tokenizer = NativeHuggingFaceTokenizer.load(nativeLibrary, snapshot.resolve("tokenizer.json"));
-         var projection = NativeDenseProjection.load(nativeLibrary, Integer.parseInt(System.getProperty("models.deberta.threads")));
-         var model = GlinerClassificationModel.loadWithProjection(snapshot, tokenizer::encodePiece,
-             (out, in, batch, weights, outputs, inputs) -> {
-               projection.project(out, in, batch, weights, outputs, inputs);
-               denseCalls[0]++;
-             });
+         var projection = NativeDebertaKernels.load(nativeLibrary, Integer.parseInt(System.getProperty("models.deberta.threads")));
+         var model = GlinerClassificationModel.loadWithKernels(snapshot, tokenizer::encodePiece,
+             projection);
          var input = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
-      emit(Map.of("type", "ready", "backend", "java-deberta-rust-dense-tokenizer", "snapshot", manifest,
+      emit(Map.of("type", "ready", "backend", "java-deberta-rust-matrix-attention-tokenizer", "snapshot", manifest,
           "device", List.of("cpu"), "dtype", List.of("float32"),
           "threads", Integer.parseInt(System.getProperty("models.deberta.threads")),
           "nativeSha256", digest(nativeLibrary), "javaVersion", System.getProperty("java.version"),
@@ -73,7 +69,8 @@ public class GlinerWorker {
           }
           output.put("selected", selected);
           output.put("raw", result);
-          output.put("denseProjectionCalls", denseCalls[0]);
+          output.put("denseProjectionCalls", projection.projectCalls());
+          output.put("attentionCalls", projection.attentionCalls());
           emit(output);
         } catch (Exception failure) {
           failure.printStackTrace(System.err);

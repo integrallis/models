@@ -59,7 +59,7 @@ def main():
         s3.copy_object(Bucket=BUCKET,Key=prefix+'/variant/'+name,CopySource={'Bucket':BUCKET,'Key':trained_prefix+'/'+name})
     overlay=work/'evaluation-overlay.tar.gz'
     with tarfile.open(overlay,'w:gz') as archive:
-        for name in ['common.py','run_worker.py','reference_worker.py','compare_parity.py','assess_quality.py','assess_finetune.py',
+        for name in ['SummarizeJfr.java','common.py','run_worker.py','reference_worker.py','compare_parity.py','assess_quality.py','assess_finetune.py',
                      'finetune-policy.json','finetune-splits.json','finetune-qualification-cases.jsonl','policy.json','quality-cases.jsonl','parity-cases.jsonl','performance-parity-cases.jsonl','performance-cases.jsonl','performance-cohort.json','compare_performance.py','evaluate_finetune_remote.sh','download_reranker_fixture.sh']:
             source=args.recipe/name if name in ['finetune-policy.json','finetune-splits.json','finetune-qualification-cases.jsonl'] else HERE/name
             archive.add(source,arcname=name)
@@ -96,13 +96,17 @@ def main():
         maximumRentalSeconds=seconds,maximumAuthorizedSpendUsd=1.0,expectedMinutes=30,
         creationDeadline=(now+timedelta(minutes=5)).isoformat(),deletionDeadline=(now+timedelta(seconds=seconds)).isoformat(),
         resultUri='s3://'+BUCKET+'/'+results,correctnessGate='unchanged numerical parity; exact checkpoint and CPU thread budget',
-        qualityGate='all frozen fine-tune and original regression floors',performanceGate='one screening pair; no final qualification' if dense else 'not measured in this quality run',
+        qualityGate='not measured in profiling or performance mode' if args.profile or args.performance else 'all frozen fine-tune and original regression floors',
+        performanceGate='complete 13-shape screening pair; final qualification requires registered repetitions' if args.performance else 'CPU cost attribution only, not qualification' if args.profile else 'not measured in this quality run',
         stopCondition='evaluation complete, failure, setup timeout or deadline',secretsOnBox='instance-scoped IAM role; no account API credentials',catalogQualified=False)
     def save():(root/'control.json').write_text(json.dumps(record,indent=2)+'\n')
     save()
     print(json.dumps(dict(control=str(root/'control.json'),remainingAggregateSeconds=aggregate_limit-prior,rentalLimitSeconds=seconds)),flush=True)
     launched=ec2.run_instances(**body)['Instances'][0]
-    instance=launched['InstanceId'];record.update(instanceId=instance,launchTime=launched['LaunchTime'].isoformat(),state='running');save()
+    instance=launched['InstanceId']
+    volumes=[m['Ebs']['VolumeId'] for m in launched.get('BlockDeviceMappings',[]) if 'Ebs' in m]
+    (root/'volume-ids.json').write_text(json.dumps(volumes,indent=2)+'\n')
+    record.update(instanceId=instance,launchTime=launched['LaunchTime'].isoformat(),state='running');save()
     print('created '+instance,flush=True)
     try:
         while datetime.now(timezone.utc)<datetime.fromisoformat(record['deletionDeadline']):

@@ -34,12 +34,9 @@ public final class DebertaV2Encoder {
         new DebertaV2ForwardPass(config, DebertaV2Weights.loadEncoder(source, config, namespace)));
   }
 
-  /** Loads encoder weights using a caller-owned synchronous dense projection implementation. */
-  public static DebertaV2Encoder loadWithProjection(
-      TensorSource source,
-      DebertaV2Config config,
-      String namespace,
-      DebertaV2Projection projection) {
+  /** Loads encoder weights using a caller-owned synchronous matrix and attention implementation. */
+  public static DebertaV2Encoder loadWithKernels(
+      TensorSource source, DebertaV2Config config, String namespace, DebertaV2Kernels projection) {
     Objects.requireNonNull(namespace, "namespace");
     Objects.requireNonNull(projection, "projection");
     return new DebertaV2Encoder(

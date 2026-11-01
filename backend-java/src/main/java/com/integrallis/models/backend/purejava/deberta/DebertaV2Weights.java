@@ -246,15 +246,14 @@ final class DebertaV2Weights {
     for (long dimension : shape) {
       elements = Math.multiplyExact(elements, Math.toIntExact(dimension));
     }
-    float[] values = new float[elements];
     MemorySegment data = tensor.data();
+    if (f32) {
+      return data.asSlice(0, (long) elements * Float.BYTES)
+          .toArray(ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN));
+    }
+    float[] values = new float[elements];
     for (int index = 0; index < elements; index++) {
-      values[index] =
-          f32
-              ? data.get(
-                  ValueLayout.JAVA_FLOAT_UNALIGNED.withOrder(ByteOrder.LITTLE_ENDIAN),
-                  (long) index * Float.BYTES)
-              : Float.float16ToFloat(data.get(LE_SHORT, (long) index * Short.BYTES));
+      values[index] = Float.float16ToFloat(data.get(LE_SHORT, (long) index * Short.BYTES));
     }
     return values;
   }
