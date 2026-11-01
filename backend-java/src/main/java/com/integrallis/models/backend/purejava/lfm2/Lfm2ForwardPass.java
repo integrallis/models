@@ -18,10 +18,12 @@ package com.integrallis.models.backend.purejava.lfm2;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.ExpertRouting;
+import com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
+import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 import java.util.Objects;
@@ -97,6 +99,13 @@ public final class Lfm2ForwardPass {
 
   // Grouped expert dispatch scratch, allocated once: a routed layer runs every token of every
   // layer, so an allocation here is an allocation in the hot path. Null on a dense lfm2.
+  // Q, K and V share one input, so they are one grouped dispatch. Allocated once beside the
+  // expert scratch for the same reason: a routed layer runs this every token of every sequence.
+  private final float[][] qkvOutputs;
+  private final MemorySegment[] qkvWeights;
+  private final GgufTensorType[] qkvTypes;
+  private final int[] qkvRows;
+
   private final float[][] groupedGateUp;
   private final MemorySegment[] groupedGateUpWeights;
   private final GgufTensorType[] groupedGateUpTypes;
@@ -174,7 +183,9 @@ public final class Lfm2ForwardPass {
     this.query = new float[config.queryDim()];
     this.attentionOut = new float[config.queryDim()];
     this.projected = new float[dim];
-    this.scores = new float[maxSeqLen];
+    // One row per query head: scoreGroup writes a whole group at once, so the per-head rows
+    // must coexist rather than share one buffer as the scalar loop's did.
+    this.scores = new float[config.numHeads() * maxSeqLen];
     // The dense feed-forward is feed_forward_length wide and an expert is
     // expert_feed_forward_length wide, and on lfm2moe those differ (7168 against 1792). One buffer
     // sized for the wider of the two serves both branches; sizing it from hiddenDim alone would
@@ -217,6 +228,12 @@ public final class Lfm2ForwardPass {
       this.groupedDownTypes = null;
       this.groupedDownRows = null;
     }
+    // Allocated whenever the file has attention layers at all: grouping is decided per call from
+    // the quantisations, not from the architecture, so the scratch is cheap and the check is late.
+    this.qkvOutputs = new float[3][];
+    this.qkvWeights = new MemorySegment[3];
+    this.qkvTypes = new GgufTensorType[3];
+    this.qkvRows = new int[3];
     this.convProjected = new float[3 * dim];
     this.convGated = new float[dim];
     this.logits = new float[config.vocabSize()];
@@ -321,7 +338,7 @@ public final class Lfm2ForwardPass {
       } else {
         project(layerWeights.gateProjection(), normalized, gate);
         project(layerWeights.upProjection(), normalized, up);
-        TensorOps.swiGlu(ffnOut, gate, up, config.hiddenDim());
+        activate(ffnOut, 0, gate, 0, up, 0, config.hiddenDim());
         project(layerWeights.downProjection(), ffnOut, projected);
       }
       add(state, projected, dim);
@@ -346,15 +363,63 @@ public final class Lfm2ForwardPass {
     return logits;
   }
 
+  /**
+   * Q, K and V in one grouped dispatch instead of three, since all three read {@code normalized}.
+   *
+   * <p>MEASURED 2026-11-01. In lfm2moe's decode profile the NON-grouped kernel entry, {@code
+   * NativeKernelLibrary.invokeBatched}, was the largest single consumer at 2469 native samples --
+   * more than {@code invokeGrouped}'s 1556 and more than everything in Java. At batch 1 every
+   * projection is a GEMV, so each separate downcall pays FFM crossing plus a fan-out and join
+   * across sixteen worker threads for a matrix small enough that the fan-out is a material share of
+   * the work. Fewer, larger calls is the lever; this is the same reasoning that took expert
+   * dispatch from {@code 3 * usedCount} calls down to two.
+   *
+   * <p>{@code LlamaForwardPass} has had this since it gained {@code tripleMatmulDispatch}, gated on
+   * {@code groupedProjections}. This decoder issued three {@code project} calls and so never got
+   * it, which is the same shape of omission as the missing kernel seam and the scalar attention.
+   *
+   * <p>Grouping needs one shared input and compatible quantisations, so it declines rather than
+   * forces: a file whose Q, K and V are not groupable together -- Q5_0 is grouped neither way --
+   * falls back to the three calls, which is what the kernel would have done anyway.
+   */
+  private void projectQkv(Lfm2Weights.LayerWeights layerWeights) {
+    Lfm2Weights.Matrix queryMatrix = layerWeights.queryProjection();
+    Lfm2Weights.Matrix keyMatrix = layerWeights.keyProjection();
+    Lfm2Weights.Matrix valueMatrix = layerWeights.valueProjection();
+    if (qkvOutputs != null) {
+      int columns = queryMatrix.columns();
+      qkvWeights[0] = queryMatrix.data();
+      qkvWeights[1] = keyMatrix.data();
+      qkvWeights[2] = valueMatrix.data();
+      qkvTypes[0] = queryMatrix.type();
+      qkvTypes[1] = keyMatrix.type();
+      qkvTypes[2] = valueMatrix.type();
+      qkvRows[0] = queryMatrix.rows();
+      qkvRows[1] = keyMatrix.rows();
+      qkvRows[2] = valueMatrix.rows();
+      if (keyMatrix.columns() == columns
+          && valueMatrix.columns() == columns
+          && matrixKernel.isGroupedEligible(qkvTypes, qkvRows, 3, 1, columns)) {
+        qkvOutputs[0] = query;
+        qkvOutputs[1] = key;
+        qkvOutputs[2] = value;
+        matrixKernel.multiplyGrouped(
+            qkvOutputs, qkvWeights, qkvTypes, qkvRows, 3, normalized, 1, columns);
+        return;
+      }
+    }
+    project(queryMatrix, normalized, query);
+    project(keyMatrix, normalized, key);
+    project(valueMatrix, normalized, value);
+  }
+
   private void attend(int layer, Lfm2Weights.LayerWeights layerWeights, int position) {
     int headDim = config.headDim();
     int numHeads = config.numHeads();
     int numKvHeads = config.numKvHeads(layer);
     int keyDim = config.keyDim(layer);
 
-    project(layerWeights.queryProjection(), normalized, query);
-    project(layerWeights.keyProjection(), normalized, key);
-    project(layerWeights.valueProjection(), normalized, value);
+    projectQkv(layerWeights);
 
     // Per-head norms first, then rope: the reference's order.
     for (int head = 0; head < numHeads; head++) {
@@ -382,29 +447,92 @@ public final class Lfm2ForwardPass {
     float scale = (float) (1.0 / Math.sqrt(headDim));
     float[] keys = keyCache[layer];
     float[] values = valueCache[layer];
-    for (int head = 0; head < numHeads; head++) {
-      int kvHead = head / groupSize;
-      int queryOffset = head * headDim;
-      for (int past = 0; past <= position; past++) {
-        int keyOffset = past * keyDim + kvHead * headDim;
-        float dot = 0.0f;
-        for (int index = 0; index < headDim; index++) {
-          dot += query[queryOffset + index] * keys[keyOffset + index];
-        }
-        scores[past] = dot * scale;
+    int rows = position + 1;
+    // accumulateGroup reads its output and adds into it, so the destination starts at zero. The
+    // scalar loop this replaces filled per head inside the loop; one fill up front is the same
+    // thing for a buffer whose every head is about to be written.
+    java.util.Arrays.fill(attentionOut, 0, numHeads * headDim, 0.0f);
+    // One grouped-query call per KV head, not a scalar loop per query head.
+    //
+    // MEASURED 2026-11-01. The scalar triple loop this replaces was the single hottest frame in
+    // lfm2moe's decode -- 460 of 1065 JFR self-time samples in `attend`, against 38 for every
+    // native expert matmul put together. The expert dispatch was never the cost; this was. The
+    // decoder had its own hand-rolled attention while GroupedQueryAttentionKernel, the vectorised
+    // pinned-reduction kernel the Llama path already runs, sat unused in the same package -- the
+    // same shape of defect as the missing kernel seam.
+    //
+    // Each K and V row is now read once for the whole group rather than once per query head, and
+    // both reductions are pinned to eight logical lanes, so the result does not depend on the
+    // host's vector width. It is NOT bit-identical to the scalar loop above: the score reduction
+    // folds in a different order. That is acceptable here precisely because no qualified catalog
+    // entry uses this decoder -- the catalog carries no lfm2 architecture, checked rather than
+    // assumed -- so the parity that matters is against llama.cpp and not against our own previous
+    // output, and it is re-measured on the greedy ladder after any change to this method.
+    for (int kvHead = 0; kvHead < numKvHeads; kvHead++) {
+      int headBase = kvHead * groupSize;
+      GroupedQueryAttentionKernel.scoreGroup(
+          query,
+          headBase * headDim,
+          headDim,
+          groupSize,
+          keys,
+          kvHead * headDim,
+          keyDim,
+          rows,
+          headDim,
+          scale,
+          scores,
+          headBase * maxSeqLen,
+          maxSeqLen);
+      for (int offset = 0; offset < groupSize; offset++) {
+        GroupedQueryAttentionKernel.softmax(scores, (headBase + offset) * maxSeqLen, rows);
       }
-      TensorOps.softmax(scores, 0, position + 1);
-      int outOffset = head * headDim;
-      java.util.Arrays.fill(attentionOut, outOffset, outOffset + headDim, 0.0f);
-      for (int past = 0; past <= position; past++) {
-        float weight = scores[past];
-        int valueOffset = past * keyDim + kvHead * headDim;
-        for (int index = 0; index < headDim; index++) {
-          attentionOut[outOffset + index] += weight * values[valueOffset + index];
-        }
-      }
+      GroupedQueryAttentionKernel.accumulateGroup(
+          attentionOut,
+          headBase * headDim,
+          headDim,
+          groupSize,
+          values,
+          kvHead * headDim,
+          keyDim,
+          rows,
+          headDim,
+          scores,
+          headBase * maxSeqLen,
+          maxSeqLen);
     }
     project(layerWeights.attentionOutputProjection(), attentionOut, projected);
+  }
+
+  /**
+   * SwiGLU through the native kernel, falling back to the vectorised Java one.
+   *
+   * <p>MEASURED 2026-11-01: {@code TensorOps.swiGlu} is a scalar loop calling {@code Math.exp} once
+   * per element, and it was 351 of 1065 JFR self-time samples in lfm2moe's decode -- second only to
+   * attention, and nine times every native expert matmul combined. This decoder called it at all
+   * three of its activation sites while the Rust kernel's {@code trySwiGlu} and {@code
+   * VectorUtil.swiGlu} were both already reachable.
+   *
+   * <p>On the Llama path the same choice is gated by {@code usesVectorizedSwiGlu()} to QWEN2 and
+   * QWEN3. That whitelist is about output parity, not speed: the vectorised form evaluates {@code
+   * exp} by polynomial rather than by {@code Math.exp}, so an architecture switched onto it stops
+   * reproducing the greedy outputs its published records were measured with, and every architecture
+   * there keeps the activation it was qualified on. lfm2 is under no such constraint -- the catalog
+   * carries no lfm2 entry -- so it takes the fast path, and the greedy ladder against llama.cpp is
+   * what holds it, that being the reference that actually matters.
+   */
+  private void activate(
+      float[] out,
+      int outOffset,
+      float[] gate,
+      int gateOffset,
+      float[] up,
+      int upOffset,
+      int size) {
+    if (matrixKernel.trySwiGlu(out, outOffset, gate, gateOffset, up, upOffset, size)) {
+      return;
+    }
+    VectorUtil.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
   }
 
   /**
@@ -439,7 +567,7 @@ public final class Lfm2ForwardPass {
       int expert = selectedExperts[slot];
       project(layerWeights.expertGate()[expert], normalized, gate);
       project(layerWeights.expertUp()[expert], normalized, up);
-      TensorOps.swiGlu(ffnOut, gate, up, expertWidth);
+      activate(ffnOut, 0, gate, 0, up, 0, expertWidth);
       project(layerWeights.expertDown()[expert], ffnOut, expertOut);
       float weight = routingWeights[slot];
       for (int i = 0; i < dim; i++) {
@@ -503,10 +631,13 @@ public final class Lfm2ForwardPass {
         1,
         dim);
     for (int slot = 0; slot < used; slot++) {
-      TensorOps.swiGlu(
+      activate(
           groupedActivations[slot],
+          0,
           groupedGateUp[2 * slot],
+          0,
           groupedGateUp[2 * slot + 1],
+          0,
           expertWidth);
     }
     if (groupDown) {
