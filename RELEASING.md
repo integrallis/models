@@ -26,7 +26,9 @@ can opt into it and read the gates.
 
 ## Cut a release
 
-1. Set a non-snapshot version in `gradle.properties`.
+1. Run `scripts/prepare-release.sh <current-version> <next-version>` to update every
+   version-bearing file and verify the release metadata. Changing `gradle.properties`
+   alone leaves the documentation package, native crate, and notebook defaults stale.
 2. Update `CHANGELOG.md` and open a release-preparation pull request.
 3. Merge only after the normal CI and integration workflows pass.
 4. Run **Actions → Release** with `dry_run` enabled.

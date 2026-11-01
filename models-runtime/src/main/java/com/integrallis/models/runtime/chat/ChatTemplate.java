@@ -41,6 +41,8 @@ public enum ChatTemplate {
   SMOLLM3_NO_THINK("smollm3-no-think", ToolSyntax.SMOLLM3),
   ZEPHYR("zephyr", ToolSyntax.NONE),
   LLAMA3("llama3", ToolSyntax.LLAMA3),
+  MISTRAL("mistral", ToolSyntax.NONE),
+  MATHSTRAL("mathstral", ToolSyntax.NONE),
   MOBILE_MOE("mobilemoe", ToolSyntax.NONE),
   GPT_OSS("gpt-oss", ToolSyntax.HARMONY),
   FLINT("flint", ToolSyntax.FLINT),
@@ -50,6 +52,7 @@ public enum ChatTemplate {
   GEMMA4("gemma4", ToolSyntax.GEMMA4),
   PHI3("phi3", ToolSyntax.NONE),
   DEEPSEEK("deepseek", ToolSyntax.NONE),
+  DEEPSEEK_R1("deepseek-r1", ToolSyntax.NONE),
   H2O("h2o", ToolSyntax.NONE),
   H2O_DIRECT("h2o-direct", ToolSyntax.NONE),
   MINICPM5_NO_THINK("minicpm5-no-think", ToolSyntax.MINICPM5),
@@ -173,7 +176,7 @@ public enum ChatTemplate {
               MINICPM5_NO_THINK,
               EDGEROCK ->
               "<|im_end|>";
-          case ZEPHYR, H2O, H2O_DIRECT -> "</s>";
+          case ZEPHYR, H2O, H2O_DIRECT, MISTRAL, MATHSTRAL -> "</s>";
           case LLAMA3 -> "<|eot_id|>";
           case MOBILE_MOE -> "<|eot|>";
           case GPT_OSS -> "<|return|>";
@@ -182,6 +185,7 @@ public enum ChatTemplate {
           case GEMMA4 -> "<turn|>";
           case PHI3 -> "<|end|>";
           case DEEPSEEK -> "<|EOT|>";
+          case DEEPSEEK_R1 -> "<｜end▁of▁sentence｜>";
           case GRANITE -> "<|end_of_text|>";
         });
   }
@@ -258,6 +262,8 @@ public enum ChatTemplate {
       case SMOLLM3_NO_THINK -> renderChatMl(conversation, "", "<think>\n\n</think>\n");
       case ZEPHYR -> renderZephyr(conversation);
       case LLAMA3 -> renderLlama3(conversation);
+      case MISTRAL -> renderMistral(conversation, true);
+      case MATHSTRAL -> renderMistral(conversation, false);
       case MOBILE_MOE -> renderMobileMoe(conversation);
       case GPT_OSS -> renderGptOss(conversation, List.of());
       case FLINT -> FlintToolProtocol.render(conversation, List.of());
@@ -267,6 +273,7 @@ public enum ChatTemplate {
       case GEMMA4 -> renderGemma4(conversation);
       case PHI3 -> renderPhi3(conversation);
       case DEEPSEEK -> renderDeepSeek(conversation);
+      case DEEPSEEK_R1 -> renderDeepSeekR1(conversation);
       case H2O -> renderH2o(conversation, "");
       case H2O_DIRECT -> renderH2o(conversation, "The context states that ");
       case MINICPM5_NO_THINK -> renderChatMl(conversation, "<s>", "<think>\n\n</think>\n\n");
@@ -338,6 +345,64 @@ public enum ChatTemplate {
       }
     }
     throw new IllegalArgumentException("Unknown chat template: " + value);
+  }
+
+  // Text-only envelope shared by Mistral 7B Instruct v0.3 and Mathstral 7B v0.1.
+  // Their publisher templates inject the optional system message into the final user turn.
+  private static ModelPrompt renderMistral(List<ChatMessage> messages, boolean trimAssistant) {
+    // Tokenizers own their configured BOS, as they do for LLAMA3 and GEMMA.
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
+    int start = messages.getFirst().role() == ChatRole.SYSTEM ? 1 : 0;
+    if (start == messages.size()) {
+      throw new IllegalArgumentException("mistral requires a user turn");
+    }
+    for (int i = start; i < messages.size(); i++) {
+      ChatMessage message = messages.get(i);
+      boolean userTurn = (i - start) % 2 == 0;
+      if (message.hasToolCalls()
+          || message.role() != (userTurn ? ChatRole.USER : ChatRole.ASSISTANT)) {
+        throw new IllegalArgumentException("mistral requires alternating user and assistant turns");
+      }
+      if (userTurn) {
+        prompt.control("[INST] ");
+        if (i == messages.size() - 1 && start == 1) {
+          prompt.text(messages.getFirst().text()).control("\n\n");
+        }
+        prompt.text(message.text()).control("[/INST]");
+      } else {
+        prompt
+            .control(" ")
+            .text(trimAssistant ? message.text().strip() : message.text())
+            .control("</s>");
+      }
+    }
+    return prompt.build();
+  }
+
+  private static ModelPrompt renderDeepSeekR1(List<ChatMessage> messages) {
+    ModelPrompt.Builder prompt = ModelPrompt.builder();
+    for (int i = 0; i < messages.size(); i++) {
+      ChatMessage message = messages.get(i);
+      if (message.hasToolCalls() || message.role() == ChatRole.TOOL) {
+        throw new IllegalArgumentException("deepseek-r1 text template does not render tools");
+      }
+      switch (message.role()) {
+        case SYSTEM -> {
+          if (i != 0)
+            throw new IllegalArgumentException("deepseek-r1 system message must be first");
+          prompt.text(message.text());
+        }
+        case USER -> prompt.control("<｜User｜>").text(message.text());
+        case ASSISTANT -> {
+          String content = message.text();
+          int closedThought = content.lastIndexOf("</think>");
+          if (closedThought >= 0) content = content.substring(closedThought + "</think>".length());
+          prompt.control("<｜Assistant｜>").text(content).control("<｜end▁of▁sentence｜>");
+        }
+        default -> throw new IllegalArgumentException("unsupported deepseek-r1 role");
+      }
+    }
+    return prompt.control("<｜Assistant｜><think>\n").build();
   }
 
   private static ModelPrompt renderChatMlWithTools(

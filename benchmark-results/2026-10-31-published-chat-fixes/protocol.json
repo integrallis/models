@@ -1,0 +1,23 @@
+{
+  "purpose": "Validate tokenizer BOS repair and default conversation templates against independent raw-prompt reference. Exact prompts and input token counts retained. No admission verdict; source-built candidates.",
+  "models": [
+    "unsloth_qwen3_5_0_8b_gguf_q5_k_m",
+    "bartowski_llama_3_2_1b_instruct_gguf_q5_k_m",
+    "bartowski_llama_3_2_1b_instruct_gguf_q6_k",
+    "qwen2_5_math_1_5b_instruct_q4_k_m",
+    "eurollm_1_7b_instruct_q4_k_m",
+    "huggingfacetb_smollm2_1_7b_instruct_gguf_q4_k_m",
+    "bartowski_deepseek_r1_distill_qwen_1_5b_gguf_q4_k_m",
+    "hkust_aaron_edgerock_4b_gguf_q4_k_m",
+    "bartowski_mathstral_7b_v0_1_gguf_q4_k_m",
+    "maziyarpanahi_mistral_7b_instruct_v0_3_gguf_q4_k_m"
+  ],
+  "maxTokens": 512,
+  "reference": "Ollama 0.40.13 for ordinary GGUF; EdgeRock is default demo only, its publisher-reference RAG evidence is a separate existing record.",
+  "predictions": {
+    "Llama": "BOS restores input positions and removes observed invented context facts; exact UNKNOWN format not assumed.",
+    "Mistral/Mathstral": "Canonical INST envelope should remove literal Llama EOT output.",
+    "Qwen35": "Closed thinking block resolves observed missing answer.",
+    "DeepSeek": "Publisher role markers replace incorrect ChatML envelope; final-answer budget remains a measured risk."
+  }
+}

@@ -33,6 +33,7 @@ public enum RagPromptTemplate {
   EDGEROCK("edgerock"),
   ZEPHYR("zephyr"),
   LLAMA3("llama3"),
+  MISTRAL("mistral"),
   MOBILE_MOE("mobilemoe"),
   GEMMA("gemma"),
   GEMMA4("gemma4"),
@@ -68,6 +69,7 @@ public enum RagPromptTemplate {
     return switch (this) {
       case RAW -> result.text(prompt).build();
       case FLINT -> ChatTemplate.FLINT.render(List.of(ChatMessage.user(prompt)));
+      case MISTRAL -> ChatTemplate.MISTRAL.render(List.of(ChatMessage.user(prompt)));
       case CHATML ->
           result
               .control("<|im_start|>user\n")
@@ -193,6 +195,9 @@ public enum RagPromptTemplate {
     return switch (this) {
       case FLINT ->
           ChatTemplate.FLINT.render(
+              List.of(ChatMessage.system(systemPrompt), ChatMessage.user(userPrompt)));
+      case MISTRAL ->
+          ChatTemplate.MISTRAL.render(
               List.of(ChatMessage.system(systemPrompt), ChatMessage.user(userPrompt)));
       case RAW -> result.text(systemPrompt).text(userPrompt).build();
       case CHATML, CHATML_DIRECT, CHATML_ANSWER, CHATML_NO_THINK, EDGEROCK -> {
