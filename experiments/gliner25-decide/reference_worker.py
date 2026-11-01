@@ -18,6 +18,7 @@ def main():
     parser.add_argument('--snapshot', type=Path, required=True)
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--threads', type=int, default=8)
+    parser.add_argument('--api', choices=['extract', 'classify-text'], default='extract')
     args = parser.parse_args()
     policy = json.loads((HERE / 'policy.json').read_text())
     revision = subprocess.check_output(['git', '-C', str(args.source), 'rev-parse', 'HEAD'], text=True).strip()
@@ -49,7 +50,7 @@ def main():
         raise ValueError('tokenizers version differs from native shim')
     emit(dict(type='ready', backend='publisher-gliner2', snapshot=manifest, sourceRevision=revision,
               device=placements, dtype=dtypes, threads=torch.get_num_threads(), versions=versions,
-              hostname=platform.node(), loadMs=load_ms))
+              hostname=platform.node(), loadMs=load_ms, api=args.api))
     for line in sys.stdin:
         envelope = json.loads(line)
         try:
@@ -69,7 +70,15 @@ def main():
             try:
                 start = time.perf_counter()
                 with torch.inference_mode(), contextlib.redirect_stdout(sys.stderr):
-                    result = model.extract(request['text'], schema, format_results=False, include_confidence=True)
+                    if args.api == 'extract':
+                        result = model.extract(request['text'], schema, format_results=False, include_confidence=True)
+                    else:
+                        tasks = {t['name']: dict(
+                            labels=({l['name']: l['description'] for l in t['labels']}
+                                    if any(l['description'] for l in t['labels'])
+                                    else [l['name'] for l in t['labels']]),
+                            multi_label=t['multiLabel'], cls_threshold=t['threshold']) for t in request['tasks']}
+                        result = model.classify_text(request['text'], tasks, format_results=False, include_confidence=True)
                 elapsed = (time.perf_counter() - start) * 1000
             finally:
                 for hook in hooks:

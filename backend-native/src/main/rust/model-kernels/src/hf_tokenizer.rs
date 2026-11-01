@@ -17,6 +17,9 @@ pub extern "C" fn jmodels_tokenizer_abi() -> i32 {
 }
 
 /// Returns zero on invalid JSON or a panic. Input must address `length` readable bytes.
+///
+/// # Safety
+/// `data` must address `length` readable bytes for the duration of the call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn jmodels_tokenizer_create(data: *const u8, length: usize) -> u64 {
     catch_unwind(AssertUnwindSafe(|| {
@@ -47,6 +50,10 @@ pub unsafe extern "C" fn jmodels_tokenizer_create(data: *const u8, length: usize
 
 /// Returns token count, or -1 for an invalid handle/input. If capacity is too small, returns
 /// required count without writing. Pointers must address the stated readable/writable lengths.
+///
+/// # Safety
+/// `data` must address `length` readable bytes. A non-null `output` must be aligned for u32,
+/// writable for `capacity` elements, and must not alias input or tokenizer-owned memory.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn jmodels_tokenizer_encode(
     handle: u64,
@@ -126,6 +133,59 @@ mod tests {
             unsafe { jmodels_tokenizer_encode(handle, b"".as_ptr(), 0, std::ptr::null_mut(), 0) },
             -1
         );
+        jmodels_tokenizer_destroy(handle);
+    }
+
+    #[test]
+    fn insufficient_buffers_utf8_and_concurrent_calls() {
+        let json = br#"{"version":"1.0","truncation":null,"padding":null,"added_tokens":[],"normalizer":null,"pre_tokenizer":{"type":"WhitespaceSplit"},"post_processor":null,"decoder":null,"model":{"type":"WordLevel","vocab":{"[UNK]":0,"hello":1},"unk_token":"[UNK]"}}"#;
+        let handle = unsafe { jmodels_tokenizer_create(json.as_ptr(), json.len()) };
+        assert_ne!(handle, 0);
+        let mut output = [99u32; 2];
+        assert_eq!(
+            unsafe {
+                jmodels_tokenizer_encode(
+                    handle,
+                    b"hello hello".as_ptr(),
+                    11,
+                    output.as_mut_ptr(),
+                    1,
+                )
+            },
+            2
+        );
+        assert_eq!(output, [99, 99]);
+        assert_eq!(
+            unsafe {
+                jmodels_tokenizer_encode(handle, [255u8].as_ptr(), 1, output.as_mut_ptr(), 2)
+            },
+            -1
+        );
+        let workers: Vec<_> = (0..8)
+            .map(|_| {
+                std::thread::spawn(move || {
+                    let mut output = [99u32; 2];
+                    for _ in 0..20 {
+                        assert_eq!(
+                            unsafe {
+                                jmodels_tokenizer_encode(
+                                    handle,
+                                    b"hello hello".as_ptr(),
+                                    11,
+                                    output.as_mut_ptr(),
+                                    2,
+                                )
+                            },
+                            2
+                        );
+                        assert_eq!(output, [1, 1]);
+                    }
+                })
+            })
+            .collect();
+        for worker in workers {
+            worker.join().unwrap();
+        }
         jmodels_tokenizer_destroy(handle);
     }
 }
