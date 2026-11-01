@@ -4,6 +4,29 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+- Execute ONNX graphs in process, in pure Java, with no ONNX Runtime: `models-backend-onnx` gains a
+  protobuf wire reader, a tensor type with float, double, 64-bit integer and byte stores, an eager
+  graph executor with constant folding and an injectable noise source, and the 56 operators the
+  Paradee-8M graphs use (1-D `Conv` and `ConvTranspose`, bidirectional `LSTM`, `MatMul`, `Gemm`,
+  `LayerNormalization`, `InstanceNormalization`, nearest `Resize`, reflect `Pad`,
+  `DequantizeLinear`, `RandomNormalLike`, and the elementwise, structural and reduction set). A
+  structural integration test checks the decoded Paradee-8M v1.2 graphs against their header
+  triage: 2,117 nodes over 53 operator types in fp32 and 2,535 over 56 in int8, with 8,581,449 and
+  7,867,227 initializer elements. Operators are implemented in scalar Java and are not yet
+  optimized; no throughput claim is made.
+- Add a Java port of misaki's English grapheme-to-phoneme path
+  (`com.integrallis.models.audio.phonemizer`): the gold and silver dictionaries at misaki revision
+  `fba1236`, the stem, number, currency and stress rules, and compound handling. The spaCy
+  tokenizer and tagger are replaced by a rule-based approximation and there is no eSpeak fallback,
+  because eSpeak NG is GPL-licensed; unresolved words are reported rather than guessed. Agreement
+  with misaki itself is to be measured in the Paradee qualification record, not assumed.
+- Add `ParadeeTextToSpeechModel`, the publisher's own pipeline for Paradee-8M v1.2 over the two:
+  sentence splitting, accent-matched phonemization, a 510-phoneme cap with pad tokens, the `speed`
+  and `voice` inputs, sentence-level streaming, a seedable noise draw, and a phoneme-level entry
+  point for feeding the publisher's phonemes. Paradee is **not qualified** by this change: the
+  frozen protocol in `experiments/paradee-8m-tts/README.md` names the comparator arm, the judge
+  and the gates, and none of its numbers exist yet.
+
 ## [0.5.10] - 2026-10-31
 
 - Restore the publisher's default beginning-of-sequence token for GGUF Llama 3 BPE

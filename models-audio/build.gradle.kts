@@ -30,6 +30,7 @@ dependencies {
     implementation(project(":models-runtime"))
     implementation(project(":backend-java"))
     implementation(project(":backend-native"))
+    implementation(project(":models-backend-onnx"))
 }
 
 val sopranoNativeLibraryName =
