@@ -69,6 +69,148 @@ class LlamaForwardPassTest {
   private static final int CONTEXT = 64;
   private static final float SIMD_REDUCTION_TOLERANCE = 2.0e-7f;
 
+  @Nested
+  class InjectedSwiGlu {
+    @Test
+    void qwenDecodeAndPrefillUseInjectedActivationAndRetainExactLogits() {
+      for (String arch : new String[] {"qwen2", "qwen3"}) {
+        for (boolean accepted : new boolean[] {false, true}) {
+          GgufFile file = buildNanoModel(new Random(62), arch);
+          assertRoute(file, false, accepted, true);
+        }
+      }
+    }
+
+    @Test
+    void unrelatedActivationContractsDoNotInvokeSwiGluProvider() {
+      for (String arch : new String[] {"llama", "granite", "gemma"}) {
+        assertRoute(buildNanoModel(new Random(62), arch), false, true, false);
+      }
+    }
+
+    @Test
+    void stagedQwenQuantizedFfnRetainsJavaActivationAndExactState() {
+      try (Arena arena = Arena.ofShared()) {
+        GgufFile original =
+            copyToSharedArena(
+                buildQuantizedNanoModel(
+                    new Random(63),
+                    GgufTensorType.Q4_0,
+                    32,
+                    1024,
+                    count -> randomQ4(new Random(64), count)),
+                arena);
+        java.util.Map<String, com.integrallis.models.backend.purejava.gguf.GgufMetadataValue>
+            entries = new java.util.LinkedHashMap<>();
+        original
+            .metadata()
+            .entries()
+            .forEach((key, value) -> entries.put(key.replace("llama.", "qwen2."), value));
+        entries.put(
+            "general.architecture",
+            new com.integrallis.models.backend.purejava.gguf.GgufMetadataValue.StringValue(
+                "qwen2"));
+        GgufFile file =
+            new GgufFile(
+                original.header(),
+                new com.integrallis.models.backend.purejava.gguf.GgufMetadata(entries),
+                original.tensorInfos(),
+                original.tensorDataOffset(),
+                original.fileSegment());
+        assertRoute(file, true, true, false);
+        assertRoute(file, true, false, false);
+      }
+    }
+
+    private void assertRoute(
+        GgufFile file, boolean staged, boolean accepted, boolean expectedCalls) {
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      PureJavaPlanConfiguration configuration =
+          new PureJavaPlanConfiguration(
+              true,
+              true,
+              GgufQ4Kernel.WIDENED,
+              GgufQ6BatchedKernel.ONE_QUERY_BLOCK,
+              4,
+              false,
+              false,
+              false,
+              false,
+              false,
+              staged,
+              false,
+              false,
+              GgufQ8BlockMajorKernel.SCATTERED,
+              false,
+              PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT);
+      PureJavaExecutionPlan plan =
+          ExecutionPlanner.plan(
+              RuntimeFingerprint.capture(),
+              ModelTopology.from(config.architecture().metadataId(), config, weights),
+              configuration);
+      AtomicInteger calls = new AtomicInteger();
+      GgufBatchedMatrixKernel provider =
+          new GgufBatchedMatrixKernel() {
+            @Override
+            public boolean supports(GgufTensorType type) {
+              return false;
+            }
+
+            @Override
+            public void multiply(
+                float[] out,
+                float[] input,
+                MemorySegment matrix,
+                GgufTensorType type,
+                int batch,
+                int rows,
+                int cols) {
+              throw new AssertionError("projection provider must not execute");
+            }
+
+            @Override
+            public boolean trySwiGlu(
+                float[] out,
+                int outAt,
+                float[] gate,
+                int gateAt,
+                float[] up,
+                int upAt,
+                int length) {
+              calls.incrementAndGet();
+              if (accepted)
+                com.integrallis.vectors.core.VectorUtil.swiGlu(
+                    out, outAt, gate, gateAt, up, upAt, length);
+              return accepted;
+            }
+          };
+      KvCache expectedCache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+      KvCache actualCache =
+          new KvCache(
+              config.numLayers(), config.contextLength(), config.keyDim(), config.valueDim());
+      LlamaForwardPass baseline = new LlamaForwardPass(config, weights, expectedCache, plan);
+      LlamaForwardPass candidate =
+          new LlamaForwardPass(config, weights, actualCache, plan, provider);
+      assertThat(candidate.usesStagedQuantizedFfn()).isEqualTo(staged);
+      int[] prompt = {5, 7, 11, 13, 17, 19, 23, 29};
+      float[] expected = baseline.prefill(prompt, 0).clone();
+      assertThat(candidate.prefill(prompt, 0)).containsExactly(expected);
+      if (expectedCalls) assertThat(calls.get()).isGreaterThan(0);
+      else assertThat(calls.get()).isZero();
+      int priorCalls = calls.get();
+      int next = argmax(expected);
+      assertThat(candidate.forward(next, prompt.length))
+          .containsExactly(baseline.forward(next, prompt.length));
+      if (expectedCalls || staged) assertThat(calls.get()).isGreaterThan(priorCalls);
+      else assertThat(calls.get()).isZero();
+      assertThat(actualCache.keyBuffer()).containsExactly(expectedCache.keyBuffer());
+      assertThat(actualCache.valueBuffer()).containsExactly(expectedCache.valueBuffer());
+    }
+  }
+
   private GgufFile buildNanoModel(Random rng) {
     return buildNanoModel(rng, "llama");
   }
@@ -108,6 +250,12 @@ class LlamaForwardPassTest {
             .addUint32(arch + ".vocab_size", VOCAB_SIZE)
             .addUint32(arch + ".context_length", CONTEXT)
             .addUint32(arch + ".feed_forward_length", HIDDEN_DIM);
+    if (arch.equals("granite")) {
+      builder.addFloat32("granite.embedding_scale", 1.0f);
+      builder.addFloat32("granite.attention.scale", 0.5f);
+      builder.addFloat32("granite.residual_scale", 1.0f);
+      builder.addFloat32("granite.logit_scale", 1.0f);
+    }
     if (attnSoftcap != 0.0f) {
       builder.addFloat32(arch + ".attn_logit_softcapping", attnSoftcap);
     }

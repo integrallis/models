@@ -551,8 +551,7 @@ public final class Qwen35ForwardPass {
             batch.projectionScratch);
         for (int row = 0; row < rows; row++) {
           int offset = row * config.hiddenDim();
-          VectorUtil.swiGlu(
-              batch.ffn, offset, batch.ffnGate, offset, batch.ffnUp, offset, config.hiddenDim());
+          swiGlu(batch.ffn, offset, batch.ffnGate, offset, batch.ffnUp, offset, config.hiddenDim());
         }
         projectBatched(
             batch.projected,
@@ -788,7 +787,7 @@ public final class Qwen35ForwardPass {
             headDimension,
             config.rmsNormEpsilon());
       }
-      VectorUtil.swiGlu(
+      swiGlu(
           batch.recurrent,
           valueBase,
           batch.outputGate,
@@ -962,7 +961,7 @@ public final class Qwen35ForwardPass {
         routedFeedForward(projected, normalized, layer.moe(), moeScratch, session.scratch);
       } else {
         dualProject(ffnGate, layer.ffnGate(), ffnUp, layer.ffnUp(), normalized, session.scratch);
-        VectorUtil.swiGlu(ffn, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim());
+        swiGlu(ffn, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim());
         project(projected, ffn, layer.ffnDown(), session.scratch);
       }
       add(state, projected);
@@ -1015,7 +1014,7 @@ public final class Qwen35ForwardPass {
           moe.up()[expert],
           normalized,
           scratch);
-      VectorUtil.swiGlu(
+      swiGlu(
           moeScratch.expertActivated,
           0,
           moeScratch.expertGate,
@@ -1036,7 +1035,7 @@ public final class Qwen35ForwardPass {
         moe.sharedUpProjection(),
         normalized,
         scratch);
-    VectorUtil.swiGlu(
+    swiGlu(
         moeScratch.sharedActivated,
         0,
         moeScratch.sharedGate,
@@ -1132,8 +1131,7 @@ public final class Qwen35ForwardPass {
           batch.projectionScratch);
       for (int index = 0; index < batchSize; index++) {
         int offset = index * config.hiddenDim();
-        VectorUtil.swiGlu(
-            batch.ffn, offset, batch.ffnGate, offset, batch.ffnUp, offset, config.hiddenDim());
+        swiGlu(batch.ffn, offset, batch.ffnGate, offset, batch.ffnUp, offset, config.hiddenDim());
       }
       projectBatched(
           batch.projected,
@@ -1350,7 +1348,7 @@ public final class Qwen35ForwardPass {
             headDimension,
             config.rmsNormEpsilon());
       }
-      VectorUtil.swiGlu(
+      swiGlu(
           batch.recurrent,
           valueBase,
           batch.outputGate,
@@ -1610,8 +1608,15 @@ public final class Qwen35ForwardPass {
           headDimension,
           config.rmsNormEpsilon());
     }
-    VectorUtil.swiGlu(recurrent, 0, outputGate, 0, recurrent, 0, valueDimension);
+    swiGlu(recurrent, 0, outputGate, 0, recurrent, 0, valueDimension);
     project(output, recurrent, weights.output(), session.scratch);
+  }
+
+  private void swiGlu(
+      float[] out, int outAt, float[] gate, int gateAt, float[] up, int upAt, int length) {
+    if (!batchedMatrixKernel.trySwiGlu(out, outAt, gate, gateAt, up, upAt, length)) {
+      VectorUtil.swiGlu(out, outAt, gate, gateAt, up, upAt, length);
+    }
   }
 
   private void applyGatedDeltaNetRecurrence(
@@ -1956,6 +1961,13 @@ public final class Qwen35ForwardPass {
           firstWeights.columns());
       return;
     }
+    // The BF16 provider serves individual projections, not the grouped quantized ABI.
+    // Preserve the paired Java route for all other formats and unqualified BF16 shapes.
+    if (eligibleBfloat16Pair(firstWeights, secondWeights, 1)) {
+      project(firstOutput, input, firstWeights, scratch);
+      project(secondOutput, input, secondWeights, scratch);
+      return;
+    }
     TensorOps.ggufDualMatmul(
         firstOutput,
         firstWeights.data(),
@@ -2144,6 +2156,11 @@ public final class Qwen35ForwardPass {
           firstWeights.columns());
       return;
     }
+    if (eligibleBfloat16Pair(firstWeights, secondWeights, batchSize)) {
+      projectBatched(firstOutput, input, firstWeights, batchSize, scalarScratch, batchScratch);
+      projectBatched(secondOutput, input, secondWeights, batchSize, scalarScratch, batchScratch);
+      return;
+    }
     if (!TensorOps.supportsBatchedMatmul(firstWeights.type())
         || !TensorOps.supportsBatchedMatmul(secondWeights.type())) {
       projectBatched(firstOutput, input, firstWeights, batchSize, scalarScratch, batchScratch);
@@ -2169,6 +2186,14 @@ public final class Qwen35ForwardPass {
         batchScratch.q4LaneScratch,
         q4Kernel,
         q6BatchedKernel);
+  }
+
+  private boolean eligibleBfloat16Pair(Matrix first, Matrix second, int batchSize) {
+    return first.type() == GgufTensorType.BF16
+        && second.type() == GgufTensorType.BF16
+        && batchedMatrixKernel.isEligible(first.type(), batchSize, first.rows(), first.columns())
+        && batchedMatrixKernel.isEligible(
+            second.type(), batchSize, second.rows(), second.columns());
   }
 
   private void tripleProjectBatched(

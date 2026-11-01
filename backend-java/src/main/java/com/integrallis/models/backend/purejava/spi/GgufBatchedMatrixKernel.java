@@ -97,6 +97,15 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
         "injected kernel does not support grouped Gated DeltaNet");
   }
 
+  /**
+   * Executes the float SwiGLU contract when supported for these inputs. Returning false must leave
+   * every caller buffer untouched so the Java implementation can perform the operation.
+   */
+  default boolean trySwiGlu(
+      float[] out, int outAt, float[] gate, int gateAt, float[] up, int upAt, int length) {
+    return false;
+  }
+
   /** Returns whether this implementation supports the given GGUF weight format. */
   boolean supports(GgufTensorType type);
 
