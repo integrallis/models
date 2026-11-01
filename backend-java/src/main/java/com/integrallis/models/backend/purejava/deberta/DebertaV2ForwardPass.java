@@ -36,6 +36,7 @@ final class DebertaV2ForwardPass {
   private final float[] tokenEmbedding;
   private final float[] pooled;
   private final Worker[] workers;
+  private final DebertaV2Projection projection;
 
   private float[] hidden = new float[0];
   private float[] queries = new float[0];
@@ -49,6 +50,12 @@ final class DebertaV2ForwardPass {
   private int capacity;
 
   DebertaV2ForwardPass(DebertaV2Config config, DebertaV2Weights weights) {
+    this(config, weights, null);
+  }
+
+  DebertaV2ForwardPass(
+      DebertaV2Config config, DebertaV2Weights weights, DebertaV2Projection projection) {
+    this.projection = projection;
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     this.tokenEmbedding = new float[config.hiddenSize()];
@@ -276,6 +283,10 @@ final class DebertaV2ForwardPass {
   }
 
   private void project(float[] output, float[] input, int rows, DebertaV2Weights.Matrix matrix) {
+    if (projection != null) {
+      projection.project(output, input, rows, matrix.values(), matrix.rows(), matrix.columns());
+      return;
+    }
     forEachRow(
         rows,
         (row, worker) ->
