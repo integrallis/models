@@ -17,6 +17,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--snapshot', type=Path, required=True)
     parser.add_argument('--source', type=Path, required=True)
+    parser.add_argument('--manifest', type=Path, default=HERE/'snapshot.json')
     parser.add_argument('--threads', type=int, default=8)
     parser.add_argument('--api', choices=['extract', 'classify-text'], default='extract')
     args = parser.parse_args()
@@ -26,7 +27,7 @@ def main():
         raise ValueError('wrong publisher source revision')
     if subprocess.check_output(['git', '-C', str(args.source), 'status', '--porcelain'], text=True).strip():
         raise ValueError('publisher checkout must be clean')
-    manifest = verify_snapshot(args.snapshot)
+    manifest = verify_snapshot(args.snapshot, args.manifest)
     os.environ['HF_HUB_OFFLINE'] = '1'
     os.environ['TRANSFORMERS_OFFLINE'] = '1'
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'

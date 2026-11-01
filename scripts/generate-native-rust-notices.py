@@ -22,7 +22,7 @@ def generate():
         selected.update((m[1], m[2]) for line in output.splitlines() if (m := re.match(r'(\S+) v(\S+)', line)))
     metadata = json.loads(subprocess.check_output(['cargo', 'metadata', '--locked', '--format-version', '1',
                                                    '--manifest-path', str(MANIFEST)], text=True))
-    parts = ['Rust native dependency license notices\n\nDependencies reachable on the six advertised native targets, including build-time crates.\nGenerated from the pinned Cargo.lock; license texts are copied verbatim from the crate archives.\n']
+    parts = ['Rust native dependency license notices\n\nDependencies reachable on the six advertised native targets, including build-time crates.\nGenerated from the pinned Cargo.lock; license wording is copied from the crate archives, with trailing whitespace normalized.\n']
     for package in sorted(metadata['packages'], key=lambda p: (p['name'], p['version'])):
         if not package['source'] or (package['name'], package['version']) not in selected:
             continue
@@ -37,7 +37,7 @@ def generate():
                      '\nRepository: '+str(package['repository'])+'\n')
         for file in files:
             parts.append('\n--- '+str(file.relative_to(root))+' ---\n'+file.read_text())
-    return '\n'.join(parts)+'\n'
+    return '\n'.join(line.rstrip() for line in '\n'.join(parts).splitlines()).rstrip()+'\n'
 
 
 if __name__ == '__main__':

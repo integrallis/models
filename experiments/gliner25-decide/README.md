@@ -65,3 +65,56 @@ cargo test --manifest-path backend-native/src/main/rust/model-kernels/Cargo.toml
 
 Native tokenizer reference API: https://docs.rs/tokenizers/0.22.2/tokenizers/tokenizer/struct.TokenizerImpl.html
 Publisher source: https://github.com/fastino-ai/GLiNER2/tree/ca4f68235b50fe4c3ecf3876851d748fe4b15c6c
+
+## General classification accuracy experiment
+
+The base checkpoint failed the frozen JevBench yes/no and GoEmotions floors in both runtimes.
+The user authorized fine-tuning for qualification **and general usage**. The resulting candidate
+has a separate identity, `modeljars-gliner25-decide-general-v1`; no trained artifact or improved
+accuracy is claimed yet. Its scope remains English schema classification, not generative chat.
+
+`finetune-policy.json` freezes the training recipe and evaluation requirements before training.
+The dataset mix covers all ten CLINC intent domains, all 28 GoEmotions labels, and BoolQ
+passage-conditioned yes/no decisions. `finetune-sources.json` pins source revisions, downloads,
+hashes and licenses: CLINC CC-BY-3.0, GoEmotions Apache-2.0, and BoolQ CC-BY-SA-3.0. Any derived
+artifact publication must carry its own provenance and applicable attribution; the original
+publisher checkpoint and qualification record are not replaced.
+
+`prepare_finetune.py` only reads dataset files and tokenizer metadata. It verifies the pinned
+tokenizer against real publisher input-ID fixtures, rejects inputs beyond 512 tokens before
+selection, and prevents normalized text overlap across training, development, qualification,
+and the original 529 cases. Its deterministic split contains 65,656 training cases, 990
+development cases, and 1,001 fresh qualification cases. Exclusion counts and every split digest
+are in `finetune-splits.json`. The fresh holdout is fresh to this fine-tuning experiment; the
+base model's pretraining exposure to these public datasets is unknown.
+
+On an ephemeral Linux BF16-capable GPU, install `requirements-training.lock` with hash checking
+and run the pinned publisher trainer through the bounded wrapper:
+
+```sh
+uv pip sync --python /work/venv/bin/python --require-hashes experiments/gliner25-decide/requirements-training.lock
+/work/venv/bin/python experiments/gliner25-decide/train_general.py \
+  --snapshot /work/base-snapshot --source /work/publisher \
+  --data /work/training-data --output /work/training-output
+```
+
+Prepare the source checkout, verified base snapshot and the two hash-verified training/development
+JSONL files before starting. Never copy qualification cases into the trainer's data directory.
+The output directory must be empty, so a previous run's `best` checkpoint cannot be selected.
+The 20-minute training deadline is checked between optimizer steps; a final development evaluation
+and export can extend beyond it. Provisioning, training, export and evaluation all count against
+the original aggregate two-hour rental cap, enforced separately by the remote lifecycle controller.
+No GPU worker is provisioned by this script, and no local real-model inference is permitted.
+
+The selected adapter minimizes development loss. The wrapper reloads that adapter on the original
+base, merges to F32, validates all tensor names/shapes/dtypes, copies the original tokenizer and
+configuration, and writes a new snapshot manifest and training receipt. Both CPU runtimes must
+then load that exact manifest (`reference_worker.py --manifest` and the third positional
+argument to `GlinerWorker`).
+
+`assess_finetune.py` requires fresh holdout accuracy, per-domain intent F1, emotion micro/macro F1,
+non-regression against the original base, and matched-checkpoint publisher parity in quality.
+The original 529 cases remain regression evidence and must still pass all original absolute
+floors. Checkpoint selection never uses either qualification suite. Numerical parity, three
+passing performance pairs, ModelJars integration and a released-runtime repeat remain separate
+requirements. A passing fine-tune quality report never grants catalog admission by itself.

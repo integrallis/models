@@ -1,0 +1,454 @@
+{
+  "policy": "schema-classification-v1",
+  "stage": "performance-pair",
+  "passed": false,
+  "candidateRuntime": {
+    "dtype": [
+      "float32"
+    ],
+    "backend": "java-deberta-rust-tokenizer",
+    "device": [
+      "cpu"
+    ],
+    "type": "ready",
+    "javaVersion": "25.0.3",
+    "nativeSha256": "6b096db00201092e9b116b63ac8c7aef2a6a9503dcbde084056d70c8dd1f6d00",
+    "threads": 8,
+    "loadMs": 22910.317858,
+    "snapshot": {
+      "id": "fastino_gliner2_5_decide_f32",
+      "sourceUri": "https://huggingface.co/fastino/GLiNER2.5-Decide",
+      "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+      "files": [
+        {
+          "path": "config.json",
+          "role": "configuration",
+          "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+          "sizeBytes": 1612
+        },
+        {
+          "path": "encoder_config/config.json",
+          "role": "configuration",
+          "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+          "sizeBytes": 920
+        },
+        {
+          "path": "model.safetensors",
+          "role": "classification-model",
+          "sha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+          "sizeBytes": 1945828140
+        },
+        {
+          "path": "special_tokens_map.json",
+          "role": "tokenizer",
+          "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+          "sizeBytes": 2414
+        },
+        {
+          "path": "tokenizer.json",
+          "role": "tokenizer",
+          "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+          "sizeBytes": 8333952
+        },
+        {
+          "path": "tokenizer_config.json",
+          "role": "tokenizer",
+          "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+          "sizeBytes": 3356
+        }
+      ]
+    },
+    "driverHostname": "ip-172-31-6-86",
+    "driverCpuAffinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ]
+  },
+  "referenceRuntime": {
+    "type": "ready",
+    "backend": "publisher-gliner2",
+    "snapshot": {
+      "id": "fastino_gliner2_5_decide_f32",
+      "sourceUri": "https://huggingface.co/fastino/GLiNER2.5-Decide",
+      "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+      "files": [
+        {
+          "path": "config.json",
+          "role": "configuration",
+          "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+          "sizeBytes": 1612
+        },
+        {
+          "path": "encoder_config/config.json",
+          "role": "configuration",
+          "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+          "sizeBytes": 920
+        },
+        {
+          "path": "model.safetensors",
+          "role": "classification-model",
+          "sha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+          "sizeBytes": 1945828140
+        },
+        {
+          "path": "special_tokens_map.json",
+          "role": "tokenizer",
+          "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+          "sizeBytes": 2414
+        },
+        {
+          "path": "tokenizer.json",
+          "role": "tokenizer",
+          "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+          "sizeBytes": 8333952
+        },
+        {
+          "path": "tokenizer_config.json",
+          "role": "tokenizer",
+          "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+          "sizeBytes": 3356
+        }
+      ]
+    },
+    "sourceRevision": "ca4f68235b50fe4c3ecf3876851d748fe4b15c6c",
+    "device": [
+      "cpu"
+    ],
+    "dtype": [
+      "torch.float32"
+    ],
+    "threads": 8,
+    "versions": {
+      "torch": "2.9.1+cpu",
+      "transformers": "4.57.6",
+      "tokenizers": "0.22.2",
+      "safetensors": "0.7.0"
+    },
+    "hostname": "ip-172-31-6-86",
+    "loadMs": 4643.2131119998985,
+    "api": "extract",
+    "driverHostname": "ip-172-31-6-86",
+    "driverCpuAffinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ]
+  },
+  "buckets": {
+    "tokens32-labels2-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 223.02401450008347,
+        "p95Ms": 249.61791399982758,
+        "requestsPerSecond": 4.373016319534471,
+        "meanInferenceMs": 227.6524386,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 177.7938660000018,
+        "p95Ms": 178.74249999999847,
+        "requestsPerSecond": 5.622702971914794,
+        "meanInferenceMs": 177.56962926666802,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.7777427229177025,
+      "p95LatencyRatio": 1.3965224498920499,
+      "passed": false
+    },
+    "tokens32-labels8-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 221.86771999997745,
+        "p95Ms": 243.4528170001613,
+        "requestsPerSecond": 4.432489749045405,
+        "meanInferenceMs": 224.59799426666666,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 178.63369750000402,
+        "p95Ms": 197.76783100007833,
+        "requestsPerSecond": 5.364159992615909,
+        "meanInferenceMs": 186.13372660000778,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.8263157242041614,
+      "p95LatencyRatio": 1.2310031200173546,
+      "passed": true
+    },
+    "tokens128-labels2-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 753.2000359999529,
+        "p95Ms": 814.4435329998032,
+        "requestsPerSecond": 1.310106320667419,
+        "meanInferenceMs": 762.5171551666666,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 275.57896349998146,
+        "p95Ms": 280.60044799997286,
+        "requestsPerSecond": 3.6254708708997394,
+        "meanInferenceMs": 275.5323849999968,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.361361700953975,
+      "p95LatencyRatio": 2.9025026111144414,
+      "passed": false
+    },
+    "tokens128-labels8-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 753.860005500087,
+        "p95Ms": 864.8422849998951,
+        "requestsPerSecond": 1.3074025980642907,
+        "meanInferenceMs": 764.0562524,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 278.63152299994454,
+        "p95Ms": 282.1561669999255,
+        "requestsPerSecond": 3.5851841689158155,
+        "meanInferenceMs": 278.6261759000051,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.36466818340873636,
+      "p95LatencyRatio": 3.065119200460798,
+      "passed": false
+    },
+    "tokens128-labels32-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 759.3192704999865,
+        "p95Ms": 783.3389449999686,
+        "requestsPerSecond": 1.3035576528519364,
+        "meanInferenceMs": 766.2980218,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 279.0142504999835,
+        "p95Ms": 288.3054879999918,
+        "requestsPerSecond": 3.5745367460251365,
+        "meanInferenceMs": 279.4236870000039,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.3646787669203526,
+      "p95LatencyRatio": 2.7170448624966546,
+      "passed": false
+    },
+    "tokens256-labels2-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 1611.439836499926,
+        "p95Ms": 1677.7963299998646,
+        "requestsPerSecond": 0.6162382272876933,
+        "meanInferenceMs": 1622.0288126,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 510.2424410000026,
+        "p95Ms": 511.9749990000173,
+        "requestsPerSecond": 1.9608056966320595,
+        "meanInferenceMs": 509.6861082333324,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.31427806862564867,
+      "p95LatencyRatio": 3.2771059783718224,
+      "passed": false
+    },
+    "tokens256-labels8-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 1609.4672675000083,
+        "p95Ms": 1642.8557980000278,
+        "requestsPerSecond": 0.6182594218488994,
+        "meanInferenceMs": 1616.7635698,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 511.36837199999263,
+        "p95Ms": 557.287118999966,
+        "requestsPerSecond": 1.9409813876868192,
+        "meanInferenceMs": 514.8862068000009,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.3185292892404884,
+      "p95LatencyRatio": 2.947952217069148,
+      "passed": false
+    },
+    "tokens256-labels32-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 1615.3703789999554,
+        "p95Ms": 1812.0513830001528,
+        "requestsPerSecond": 0.6126271506581578,
+        "meanInferenceMs": 1631.5560101333333,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 511.31447150004306,
+        "p95Ms": 513.0317279999872,
+        "requestsPerSecond": 1.9558013873771416,
+        "meanInferenceMs": 510.95410730000594,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.31323587078529025,
+      "p95LatencyRatio": 3.5320454547017763,
+      "passed": false
+    },
+    "tokens512-labels2-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 4031.553905500118,
+        "p95Ms": 4251.0702340000535,
+        "requestsPerSecond": 0.24611891063923003,
+        "meanInferenceMs": 4062.4303997666666,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 1343.3727384999656,
+        "p95Ms": 1350.6536009999763,
+        "requestsPerSecond": 0.7421029648239906,
+        "meanInferenceMs": 1347.1646302666802,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.33165062303396625,
+      "p95LatencyRatio": 3.147417095584472,
+      "passed": false
+    },
+    "tokens512-labels8-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 4032.0505925000134,
+        "p95Ms": 4284.458879000113,
+        "requestsPerSecond": 0.24605390975992986,
+        "meanInferenceMs": 4063.4852938,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 1344.1408719999117,
+        "p95Ms": 1388.6396249999962,
+        "requestsPerSecond": 0.7403584209866004,
+        "meanInferenceMs": 1350.3450979666393,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.33234431159983135,
+      "p95LatencyRatio": 3.0853641231792768,
+      "passed": false
+    },
+    "tokens512-labels32-tasks1": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 4035.374936500034,
+        "p95Ms": 4279.470591999825,
+        "requestsPerSecond": 0.24567409203117452,
+        "meanInferenceMs": 4069.6592307333335,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 1343.1244579999202,
+        "p95Ms": 1427.5842080000984,
+        "requestsPerSecond": 0.7395456797332718,
+        "meanInferenceMs": 1351.7953196000008,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.3321959667451246,
+      "p95LatencyRatio": 2.9977009888579054,
+      "passed": false
+    },
+    "tokens128-labels8-tasks2": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 773.7784159999137,
+        "p95Ms": 839.6826420000707,
+        "requestsPerSecond": 1.2762260136956423,
+        "meanInferenceMs": 782.8889911666666,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 269.47505950010964,
+        "p95Ms": 270.411594000052,
+        "requestsPerSecond": 3.711154128305557,
+        "meanInferenceMs": 269.11995973332523,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.34388925104502277,
+      "p95LatencyRatio": 3.1052020720676246,
+      "passed": false
+    },
+    "tokens512-labels8-tasks2": {
+      "candidate": {
+        "samples": 30,
+        "p50Ms": 4044.614805999913,
+        "p95Ms": 4275.902575999908,
+        "requestsPerSecond": 0.24520353931257022,
+        "meanInferenceMs": 4077.646482933333,
+        "peakRssKiB": 5721324
+      },
+      "reference": {
+        "samples": 30,
+        "p50Ms": 1344.854651999981,
+        "p95Ms": 1391.086204000203,
+        "requestsPerSecond": 0.7387807859249093,
+        "meanInferenceMs": 1353.2092468000353,
+        "peakRssKiB": 4240304
+      },
+      "throughputRatio": 0.3319029730931484,
+      "p95LatencyRatio": 3.0737869182399598,
+      "passed": false
+    }
+  },
+  "failures": [
+    "tokens32-labels2-tasks1",
+    "tokens128-labels2-tasks1",
+    "tokens128-labels8-tasks1",
+    "tokens128-labels32-tasks1",
+    "tokens256-labels2-tasks1",
+    "tokens256-labels8-tasks1",
+    "tokens256-labels32-tasks1",
+    "tokens512-labels2-tasks1",
+    "tokens512-labels8-tasks1",
+    "tokens512-labels32-tasks1",
+    "tokens128-labels8-tasks2",
+    "tokens512-labels8-tasks2"
+  ],
+  "catalogQualified": false
+}

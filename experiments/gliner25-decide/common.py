@@ -14,8 +14,8 @@ def digest(path):
     return h.hexdigest()
 
 
-def verify_snapshot(directory):
-    manifest = json.loads((HERE / 'snapshot.json').read_text())
+def verify_snapshot(directory, manifest_path=None):
+    manifest = json.loads(Path(manifest_path or HERE/'snapshot.json').read_text())
     for entry in manifest['files']:
         path = Path(directory) / entry['path']
         if path.stat().st_size != entry['sizeBytes'] or digest(path) != entry['sha256']:

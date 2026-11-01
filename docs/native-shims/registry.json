@@ -49,7 +49,11 @@
       "jmodels_quantized_f32_grouped_batched_matmul_with_context",
       "jmodels_quantized_f32_independent_batched_matmul_with_context",
       "jmodels_sigmoid_scaled_softplus_f32",
-      "jmodels_swiglu_f32"
+      "jmodels_swiglu_f32",
+      "jmodels_tokenizer_abi",
+      "jmodels_tokenizer_create",
+      "jmodels_tokenizer_destroy",
+      "jmodels_tokenizer_encode"
     ],
     "cuda": [
       "models_gqa_decode_attention",
@@ -77,7 +81,8 @@
     "q8_0-projection",
     "swiglu-activation",
     "worker-context",
-    "tq1_0-projection"
+    "tq1_0-projection",
+    "hf-tokenizer-adapter"
   ],
   "operations": [
     {
@@ -859,6 +864,62 @@
         "No AVX2 variant yet: the scalar kernel accumulates one exact i32 per block, which is bit-exact and unvectorized."
       ],
       "sourceScope": "cpu"
+    },
+    {
+      "id": "hf-tokenizer-adapter",
+      "status": "UNPROVEN",
+      "summary": "User-authorized integration adapter for pinned Hugging Face tokenizer semantics. Parity evidence is not a JVM-limitation or catalog-admission certificate.",
+      "capabilities": [],
+      "exports": {
+        "cpu": [
+          "jmodels_tokenizer_abi",
+          "jmodels_tokenizer_create",
+          "jmodels_tokenizer_destroy",
+          "jmodels_tokenizer_encode"
+        ]
+      },
+      "dispatch": [
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeHuggingFaceTokenizer.java",
+          "anchor": "jmodels_tokenizer_abi"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeHuggingFaceTokenizer.java",
+          "anchor": "jmodels_tokenizer_create"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeHuggingFaceTokenizer.java",
+          "anchor": "jmodels_tokenizer_destroy"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeHuggingFaceTokenizer.java",
+          "anchor": "jmodels_tokenizer_encode"
+        }
+      ],
+      "requiredProfiles": [
+        "linux-x86_64",
+        "linux-aarch64",
+        "macos-x86_64",
+        "macos-aarch64",
+        "windows-x86_64",
+        "windows-aarch64"
+      ],
+      "evidence": [
+        {
+          "path": "benchmark-results/2026-11-01-gliner25-decide/results-restart-1/parity-1-report.json",
+          "sha256": "75da486dc14048c99b42e4368c379b8656e890cd9b9779e457c097fb53ed11bb"
+        },
+        {
+          "path": "benchmark-results/2026-11-01-gliner25-decide/results-restart-1/shape-parity-report.json",
+          "sha256": "23bf298ca37c92687e9a95c9171bf23aa322a509319d6512d7807ccf404d4022"
+        }
+      ],
+      "remaining": [
+        "Complete released-artifact tokenizer parity and ownership checks on each advertised platform; current real-model evidence covers Linux x86_64 only.",
+        "Review integration-adapter necessity separately from compute-kernel JVM-causality claims; no PROVEN_REQUIRED claim is made.",
+        "Retain or replace this adapter only with equivalent pinned preprocessing semantics and repeated end-to-end qualification."
+      ],
+      "sourceScope": "hf-tokenizer"
     }
   ],
   "sourceScopes": {
@@ -1268,6 +1329,16 @@
       "backend-native/gradle.lockfile",
       "build.gradle.kts",
       "gradle.properties"
+    ],
+    "hf-tokenizer": [
+      "backend-native/src/main/rust/model-kernels/src/hf_tokenizer.rs",
+      "backend-native/src/main/rust/model-kernels/src/lib.rs",
+      "backend-native/src/main/rust/model-kernels/Cargo.toml",
+      "backend-native/src/main/rust/model-kernels/Cargo.lock",
+      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeHuggingFaceTokenizer.java",
+      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGlinerClassificationModel.java",
+      "backend-java/src/main/java/com/integrallis/models/backend/purejava/gliner/GlinerSchemaCompiler.java",
+      "backend-native/build.gradle.kts"
     ]
   },
   "retiredCapabilityBits": {

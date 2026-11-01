@@ -8,7 +8,7 @@ from pathlib import Path
 from common import HERE, read_cases
 
 
-def assess(cases, path):
+def measure(cases, path):
     rows = [json.loads(line) for line in Path(path).read_text().splitlines()]
     if not rows or rows[0].get('type') != 'ready' or rows[0].get('device') != ['cpu']:
         raise ValueError('missing CPU runtime identity')
@@ -76,6 +76,12 @@ def assess(cases, path):
                 precision=counts[0]/(counts[0]+counts[1]) if counts[0]+counts[1] else 0.0,
                 recall=counts[0]/(counts[0]+counts[2]) if counts[0]+counts[2] else 0.0)
                 for label,counts in label_counts.items()})
+    return dict(runtime=rows[0], cohorts=summaries, outcomes=dict(groups))
+
+
+def assess(cases, path):
+    measured = measure(cases, path)
+    summaries = measured['cohorts']
     policy = json.loads((HERE/'policy.json').read_text())['quality']
     required = {'jevbench', 'clinc-banking', 'goemotions'}
     if set(summaries) != required:
@@ -92,7 +98,7 @@ def assess(cases, path):
     for name,value,floor in gates:
         if value < floor: failures.append(f'{name}: {value:.6f} < {floor}')
     return dict(policy='schema-classification-v1',stage='absolute-quality',passed=not failures,
-                runtime=rows[0], cohorts=summaries,failures=failures,outcomes=dict(groups),catalogQualified=False)
+                **measured,failures=failures,catalogQualified=False)
 
 
 def compare_quality(cases, candidate, reference):
