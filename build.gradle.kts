@@ -58,6 +58,7 @@ val publishedModuleNames =
         "backend-native",
         "backend-cuda",
         "backend-apple",
+        "models-backend-onnx",
         "models-langchain4j",
         "models-spring-ai",
         "models-spring-boot-starter",

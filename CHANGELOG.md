@@ -13,7 +13,8 @@ All notable changes to models are documented here.
   structural integration test checks the decoded Paradee-8M v1.2 graphs against their header
   triage: 2,117 nodes over 53 operator types in fp32 and 2,535 over 56 in int8, with 8,581,449 and
   7,867,227 initializer elements. Operators are implemented in scalar Java and are not yet
-  optimized; no throughput claim is made.
+  optimized; no throughput claim is made. The module is published as
+  `com.integrallis:models-backend-onnx`, because `models-audio` now depends on it.
 - Add a Java port of misaki's English grapheme-to-phoneme path
   (`com.integrallis.models.audio.phonemizer`): the gold and silver dictionaries at misaki revision
   `fba1236`, the stem, number, currency and stress rules, and compound handling. The spaCy
