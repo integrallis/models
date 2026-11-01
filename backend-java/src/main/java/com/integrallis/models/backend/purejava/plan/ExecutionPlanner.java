@@ -116,7 +116,11 @@ public final class ExecutionPlanner {
     environment.put("model-architecture", topology.architecture());
     environment.put("projection-layers", Integer.toString(topology.layers().size()));
     BackendDiagnostics diagnostics =
-        new BackendDiagnostics("pure-java", PLAN_VERSION, environment, decisions);
+        new BackendDiagnostics(
+            "pure-java",
+            PLAN_VERSION,
+            environment,
+            withoutClaimsAboutProjectionsWeNeverRead(topology, decisions));
     return new PureJavaExecutionPlan(
         runtime,
         topology,
@@ -138,6 +142,74 @@ public final class ExecutionPlanner {
         parallelQ8FfnPreparation,
         diagnostics);
   }
+
+  /**
+   * Decisions a synthetic topology cannot support, phrased as what they are.
+   *
+   * <p>A decoder that does not route projections through this planner is given a neutral topology
+   * by {@link ModelTopology#mappedArchitecture} -- all-F32 placeholder layers, deliberately, so the
+   * planner does not advertise a batched path the decoder has not got. The planner then evaluated
+   * every projection-kernel decision against those placeholders and recorded the outcome in
+   * language that reads as a fact about the artifact.
+   *
+   * <p>It was not a fact. An lfm2moe report carried {@code q4-kernel: UNSUPPORTED "the loaded model
+   * has no Q4_0 projection tensors"} and {@code grouped-projections: UNSUPPORTED ... qkv:
+   * independent} for a file whose 132 projection tensors are every one of them Q4_0, with grouping
+   * engaging on every call. Two separate diagnoses went the wrong way on those lines before anyone
+   * read the GGUF's tensor table by hand. A diagnostic that contradicts the route is worse than no
+   * diagnostic, which is why these are replaced rather than merely softened.
+   *
+   * <p>They are replaced by one decision naming the real situation, rather than dropped: silence
+   * invites the same wrong inference in the other direction, and a reader who finds nothing about
+   * grouping cannot tell "not planned here" from "not reported".
+   */
+  private static List<OptimizationDecision> withoutClaimsAboutProjectionsWeNeverRead(
+      ModelTopology topology, List<OptimizationDecision> decisions) {
+    if (topology.projectionTypesDescribeTheModel()) {
+      return decisions;
+    }
+    List<OptimizationDecision> kept = new ArrayList<>();
+    for (OptimizationDecision decision : decisions) {
+      if (!PROJECTION_TYPE_DECISIONS.contains(decision.id())) {
+        kept.add(decision);
+      }
+    }
+    kept.add(
+        new OptimizationDecision(
+            "projection-kernel-planning",
+            OptimizationStatus.UNSUPPORTED,
+            "architecture "
+                + topology.architecture()
+                + " does not route projections through the shared planner, so no projection-kernel"
+                + " decision was evaluated; this decoder chooses per call and its own report is the"
+                + " only account of what it ran",
+            Map.of("evaluated-decisions", "none", "layer-types", "placeholder")));
+    return kept;
+  }
+
+  /**
+   * Decisions whose outcome is derived from the topology's per-layer projection types.
+   *
+   * <p>Each of these reads {@code topology.layers()}, so each is meaningless when those layers are
+   * placeholders. Adding a decision that consults layer types without adding it here reintroduces
+   * the defect, which is what {@code ExecutionPlannerSyntheticTopologyTest} fails on.
+   */
+  private static final Set<String> PROJECTION_TYPE_DECISIONS =
+      Set.of(
+          "grouped-projections",
+          "mixed-k-projections",
+          "q4-kernel",
+          "q6-batched-kernel",
+          "batched-prefill",
+          "final-layer-prefill-pruning",
+          "final-layer-kv-only-prefill",
+          "batched-attention-scores",
+          "batched-attention-values",
+          "staged-quantized-ffn",
+          "staged-quantized-layer",
+          "block-major-q8-activations",
+          "q8-block-major-kernel",
+          "parallel-q8-ffn-preparation");
 
   private static GgufQ6BatchedKernel q6BatchedKernel(
       RuntimeFingerprint runtime,

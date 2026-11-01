@@ -35,7 +35,32 @@ public record ModelTopology(
     int keyRows,
     int valueRows,
     List<LayerTopology> layers,
-    boolean threadShareableProjectionWeights) {
+    boolean threadShareableProjectionWeights,
+    boolean projectionTypesDescribeTheModel) {
+
+  /**
+   * A topology whose layer types are the loaded model's own.
+   *
+   * <p>Retained so the existing six-argument form keeps compiling: every caller that reads real
+   * tensor types out of a file is describing the model, and only {@link #mappedArchitecture} is
+   * not.
+   */
+  public ModelTopology(
+      String architecture,
+      int queryRows,
+      int keyRows,
+      int valueRows,
+      List<LayerTopology> layers,
+      boolean threadShareableProjectionWeights) {
+    this(
+        architecture,
+        queryRows,
+        keyRows,
+        valueRows,
+        layers,
+        threadShareableProjectionWeights,
+        true);
+  }
 
   private static final Thread ACCESS_PROBE = Thread.ofPlatform().unstarted(() -> {});
 
@@ -198,7 +223,14 @@ public record ModelTopology(
         keyRows,
         valueRows,
         java.util.Collections.nCopies(layerCount, neutral),
-        true);
+        true,
+        // These F32 layers are a placeholder, not the file's types, so every projection-kernel
+        // decision derived from them is about this topology and not about the model. Saying so
+        // here is what lets ExecutionPlanner avoid phrasing those decisions as facts about the
+        // artifact -- it reported "the loaded model has no Q4_0 projection tensors" for an lfm2moe
+        // file whose 132 projection tensors are all Q4_0, which sent a diagnosis the wrong way
+        // twice before anyone read the GGUF by hand.
+        false);
   }
 
   /**
