@@ -1,6 +1,8 @@
 """Bounded JSONL process driver: preserve readiness, errors, every case and wall time."""
 import argparse
 import json
+import os
+import platform
 import queue
 from pathlib import Path
 import subprocess
@@ -33,6 +35,8 @@ def run(command, cases, output, timeout=180):
             ready = response()
             if ready.get('type') != 'ready' or ready.get('device') != ['cpu']:
                 raise ValueError('worker did not attest CPU readiness')
+            ready['driverHostname'] = platform.node()
+            ready['driverCpuAffinity'] = sorted(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else None
             results.write(json.dumps(ready) + '\n'); results.flush()
             for case in cases:
                 start = time.perf_counter()
@@ -42,6 +46,11 @@ def run(command, cases, output, timeout=180):
                 if result.get('id') != case['id']:
                     raise ValueError('response id mismatch')
                 result['wallMs'] = (time.perf_counter() - start) * 1000
+                status = Path(f'/proc/{process.pid}/status')
+                if status.exists():
+                    for line in status.read_text().splitlines():
+                        if line.startswith('VmHWM:'):
+                            result['peakRssKiB'] = int(line.split()[1])
                 results.write(json.dumps(result) + '\n'); results.flush()
             process.stdin.close()
             if process.wait(timeout=30) != 0:

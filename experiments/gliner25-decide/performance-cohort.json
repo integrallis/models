@@ -1,0 +1,28 @@
+{
+  "policy": "schema-classification-v1",
+  "status": "frozen-before-performance-runs",
+  "caseSha256": "24944973c5db9276bbbb641aa469d5ec8e62a7f7afedb71796540020a719b6f5",
+  "cases": 429,
+  "buckets": {
+    "tokens32-labels2-tasks1": 33,
+    "tokens32-labels8-tasks1": 33,
+    "tokens128-labels2-tasks1": 33,
+    "tokens128-labels8-tasks1": 33,
+    "tokens128-labels32-tasks1": 33,
+    "tokens256-labels2-tasks1": 33,
+    "tokens256-labels8-tasks1": 33,
+    "tokens256-labels32-tasks1": 33,
+    "tokens512-labels2-tasks1": 33,
+    "tokens512-labels8-tasks1": 33,
+    "tokens512-labels32-tasks1": 33,
+    "tokens128-labels8-tasks2": 33,
+    "tokens512-labels8-tasks2": 33
+  },
+  "description": "Synthetic shapes with real topic labels and one-token filler; rotates label order; batch 1, concurrency 1. These are performance inputs, not accuracy evidence.",
+  "unsupported": [
+    "32 tokens with 32 labels (schema alone exceeds budget)",
+    "batch greater than 1 (no public batching API)"
+  ],
+  "warmupsPerBucket": 3,
+  "timedSamplesPerBucket": 30
+}

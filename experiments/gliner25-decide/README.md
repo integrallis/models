@@ -30,14 +30,29 @@ The runtime is Java encoder plus Rust tokenizer; it is not advertised as a pure-
   record IDs, structural marker positions and raw logits. Normal requests measure classify().
 - `run_worker.py`: bounded subprocess driver, case identity, readiness, errors and wall times.
 - `compare_parity.py`: fail-closed parity report. Passing parity is never catalog qualification.
+- `quality-cases.jsonl` / `cohorts.json`: 529 frozen cases (120 JevBench, 150 domain-scoped
+  CLINC banking, 259 GoEmotions), with deterministic selection and source hashes/licenses.
+- `assess_quality.py`: absolute accuracy/F1, coverage, per-label precision/recall, single-label
+  ECE and paired oracle loss. Calibration is reported without granting a confidence claim.
+- `GeneratePerformanceCases.java`: metadata-only generator for 13 fixed shape buckets,
+  32/128/256/512 encoded tokens, 2/8/32 labels where they fit, and one/two tasks. Each bucket
+  has three warmups and thirty timed requests. These synthetic shapes are not accuracy data.
+- `performance-cohort.json`: frozen performance matrix and its digest; batch/concurrency one.
+- `compare_performance.py`: same-host CPU pair comparison with wall latency and peak RSS.
+  One passing pair cannot satisfy the required three final paired replications.
 - `remote-worker.sh`: disposable CPU bootstrap; 110-minute shutdown, incremental result upload,
   isolated Python environment, immutable snapshot and one source checkout. No weights or real
   model inference run on the developer laptop.
 
 The first evidence stage is correctness/parity. `parity-cases.jsonl` is a diagnostic suite, not
-an accuracy benchmark. External held-out cohorts and final performance buckets must be frozen
-before those gates run. A library built from this branch is development evidence; final catalog
+an accuracy benchmark. Both held-out cohorts and performance buckets are frozen before their
+respective runs. A library built from this branch is development evidence; final catalog
 admission still requires a released-runtime repeat and ModelJars integration.
+
+The initial remote parity run passed all nine diagnostic requests on Linux x86_64 CPU, with
+maximum absolute logit error 0.0000038316. This does not establish quality or performance.
+The inference payload is source revision `6add46ee740f8acd80295741fc8e22bae34f845f`; later
+harness/reporting changes do not silently replace that measured runtime.
 
 ## Local checks (no real weights)
 

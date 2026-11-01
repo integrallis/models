@@ -9,7 +9,7 @@ finish() {
   rc=$?
   trap - EXIT
   if command -v aws >/dev/null; then
-    aws s3 sync /work/out "$GLINER_URI/results" --only-show-errors || true
+    aws s3 cp --recursive /work/out "$GLINER_RESULTS" --only-show-errors || true
   fi
   shutdown -h now
   exit "$rc"
@@ -20,7 +20,7 @@ apt-get install -y -qq curl unzip git build-essential python3-venv pkg-config
 curl -fL --retry 3 --max-time 300 https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /work/awscli.zip
 unzip -q /work/awscli.zip -d /work
 /work/aws/install
-(while sleep 30; do aws s3 sync /work/out "$GLINER_URI/results" --only-show-errors || true; done) &
+(while sleep 30; do aws s3 cp --recursive /work/out "$GLINER_RESULTS" --only-show-errors || true; done) &
 aws s3 cp "$GLINER_URI/payload.tar.gz" /work/payload.tar.gz --only-show-errors
 printf '%s  %s\n' "$GLINER_PAYLOAD_SHA" /work/payload.tar.gz | sha256sum -c -
 mkdir -p /work/payload /work/jdk /work/snapshot
@@ -54,7 +54,7 @@ free -b > /work/out/memory.txt
 java -version > /work/out/java-version.txt 2>&1
 /work/python/bin/pip freeze > /work/out/python-freeze.txt
 printf 'ready\n' > /work/out/STATUS
-aws s3 sync /work/out "$GLINER_URI/results" --only-show-errors
+aws s3 cp --recursive /work/out "$GLINER_RESULTS" --only-show-errors
 while [[ ! -f /work/STOP ]]; do
   if aws s3 cp "$GLINER_URI/next-job.json" /work/next-job.json --only-show-errors 2>/dev/null; then
     job=$(python3 -c 'import json; print(json.load(open("/work/next-job.json"))["id"])')
@@ -66,7 +66,7 @@ while [[ ! -f /work/STOP ]]; do
       rc=$?
       set -e
       printf '%s\n' "$rc" > "/work/out/$job.done"
-      aws s3 sync /work/out "$GLINER_URI/results" --only-show-errors
+      aws s3 cp --recursive /work/out "$GLINER_RESULTS" --only-show-errors
     fi
   fi
   sleep 10
