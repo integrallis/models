@@ -266,8 +266,18 @@ public final class Tensor {
       return this;
     }
     float[] values = new float[size()];
-    for (int i = 0; i < values.length; i++) {
-      values[i] = floatAt(i);
+    if (doubles != null) {
+      for (int i = 0; i < values.length; i++) {
+        values[i] = (float) doubles[i];
+      }
+    } else if (longs != null) {
+      for (int i = 0; i < values.length; i++) {
+        values[i] = (float) longs[i];
+      }
+    } else {
+      for (int i = 0; i < values.length; i++) {
+        values[i] = floatAt(i);
+      }
     }
     return new Tensor(OnnxDataType.FLOAT, shape, values, null, null, null);
   }

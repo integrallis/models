@@ -76,20 +76,21 @@ final class Recurrent {
           }
         }
         int length = sequenceLens == null ? seq : (int) sequenceLens.longAt(n);
-        for (int step = 0; step < length; step++) {
-          int t = reverse ? length - 1 - step : step;
+        // The input projection does not depend on the recurrence: compute it for every step up
+        // front, bias included, so the per-step work is only the recurrent product.
+        float[][] projected = new float[length][4 * hidden];
+        for (int t = 0; t < length; t++) {
           int xBase = (t * batch + n) * input;
           for (int gate = 0; gate < 4 * hidden; gate++) {
             float acc = bs == null ? 0f : bs[bBase + gate] + bs[bBase + 4 * hidden + gate];
-            int wRow = wBase + gate * input;
-            for (int i = 0; i < input; i++) {
-              acc += ws[wRow + i] * xs[xBase + i];
-            }
-            int rRow = rBase + gate * hidden;
-            for (int j = 0; j < hidden; j++) {
-              acc += rs[rRow + j] * h[j];
-            }
-            gates[gate] = acc;
+            projected[t][gate] = acc + Simd.dot(ws, wBase + gate * input, xs, xBase, input);
+          }
+        }
+        for (int step = 0; step < length; step++) {
+          int t = reverse ? length - 1 - step : step;
+          float[] xw = projected[t];
+          for (int gate = 0; gate < 4 * hidden; gate++) {
+            gates[gate] = xw[gate] + Simd.dot(rs, rBase + gate * hidden, h, 0, hidden);
           }
           for (int j = 0; j < hidden; j++) {
             float ig = sigmoid(gates[j]);
