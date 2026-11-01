@@ -634,9 +634,13 @@ public final class LlamaForwardPass {
     // about bytes and cannot be retracted once published, so widening this is an epoch change --
     // every pinned oracle re-run and the tier band re-derived -- not a default flip.
     this.attentionTemperatureScaling = config.usesAttentionTemperatureScaling();
-    this.fusedGroupedAttention =
-        (executionPlan.fusedGroupedAttention() || config.usesGraniteScaling())
-            && attentionGroupSize > 1;
+    // The plan decides, and it is now the only thing that decides. This used to read
+    // `executionPlan.fusedGroupedAttention() || config.usesGraniteScaling()`, so Granite fused
+    // while `fused-grouped-attention` reported DISABLED in the same report -- a diagnostic that
+    // contradicted the route it was describing. The architecture gate lives in ExecutionPlanner
+    // now, which is where it can be stated; this narrows it only by the thing the planner cannot
+    // see, which is whether there is a group to fuse at all.
+    this.fusedGroupedAttention = executionPlan.fusedGroupedAttention() && attentionGroupSize > 1;
     reportAttentionCliffs(config, loadedMatrixKernel, attentionGroupSize);
     reportBatchedPrefillCliff(config, actualTopology);
     this.headAttentionPlan =
