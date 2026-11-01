@@ -1,0 +1,181 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/Users/briansam-bodden/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :spotlessInternalRegisterDependencies UP-TO-DATE
+> Task :backend-java:spotlessJava
+> Task :backend-java:spotlessJavaApply
+> Task :backend-java:spotlessApply
+> Task :models-api:compileJava UP-TO-DATE
+> Task :backend-java:compileJava
+> Task :writeReleaseDependencyManifest UP-TO-DATE
+> Task :backend-java:processResources UP-TO-DATE
+> Task :backend-java:classes
+> Task :backend-java:jar
+> Task :models-runtime:compileJava UP-TO-DATE
+> Task :backend-java:compileTestJava
+> Task :backend-java:processTestResources UP-TO-DATE
+> Task :backend-java:testClasses
+> Task :models-api:processResources UP-TO-DATE
+> Task :models-api:classes UP-TO-DATE
+> Task :models-api:jar UP-TO-DATE
+> Task :models-runtime:processResources UP-TO-DATE
+> Task :models-runtime:classes UP-TO-DATE
+> Task :models-runtime:jar UP-TO-DATE
+
+> Task :backend-java:test
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: Using incubator modules: jdk.incubator.vector
+
+TensorOpsTest > aThreadedMxfp4ProjectionWritesEveryRowWhenChunksAreUneven() PASSED
+
+TensorOpsTest > ggufMatmulRefusesAnMxfp4RowThatIsNotAWholeNumberOfBlocks() PASSED
+
+TensorOpsTest > ggufMatmulMultipliesMxfp4WeightsInsteadOfRefusingThem() PASSED
+
+TensorOpsTest > aConfinedMxfp4SegmentIsProjectedOnTheCallingThread() PASSED
+
+TensorOpsTest > aThreadedMxfp4ProjectionIsBitIdenticalToTheSerialOne() PASSED
+
+TensorOpsTest > geluIsFiniteAndContinuousForValuesAtTheTanhTableBoundary() PASSED
+
+TensorOpsTest > GeluGlu > lookupApproximationStaysWithinFloatPrecisionAcrossTheActivationRange() PASSED
+
+TensorOpsTest > GeluGlu > operatesOnBatchBufferOffsets() PASSED
+
+TensorOpsTest > GeluGlu > matchesLlamaCppTanhApproximation() PASSED
+
+TensorOpsTest > Gelu > matchesTheErfExactBertActivation() PASSED
+
+TensorOpsTest > Gelu > matchesLlamaCppTanhApproximation() PASSED
+
+TensorOpsTest > SwiGlu > positiveGateScalesUp() PASSED
+
+TensorOpsTest > SwiGlu > knownValues() PASSED
+
+TensorOpsTest > SwiGlu > operatesOnBatchBufferOffsets() PASSED
+
+TensorOpsTest > Rope > offsetAwareSingleVectorRopeMatchesCopiedHeadSemantics() PASSED
+
+TensorOpsTest > Rope > appliesFrequencyScaleToNormalAndNeoxRope() PASSED
+
+TensorOpsTest > Rope > positionZeroIsIdentity() PASSED
+
+TensorOpsTest > Rope > offsetAwareRopeMatchesCopiedHeadSemantics() PASSED
+
+TensorOpsTest > Rope > preservesNorm() PASSED
+
+TensorOpsTest > Rope > neoxLayoutRotatesPairsSeparatedByHalfAHead() PASSED
+
+TensorOpsTest > Softmax > rejectsAnAllMaskedRow() PASSED
+
+TensorOpsTest > Softmax > rejectsEmptyAndNegativeSizes() PASSED
+
+TensorOpsTest > Softmax > uniformInputProducesUniform() PASSED
+
+TensorOpsTest > Softmax > zeroValueSinkMatchesFreeTokenOnlineSoftmaxInitialization() PASSED
+
+TensorOpsTest > Softmax > zeroValueSinkHandlesACompletelyMaskedKeyRange() PASSED
+
+TensorOpsTest > Softmax > numericallyStableWithLargeValues() PASSED
+
+TensorOpsTest > Softmax > preservesNegativeInfinityAsAZeroProbabilityMask() PASSED
+
+TensorOpsTest > Softmax > respectsOffset() PASSED
+
+TensorOpsTest > Softmax > sumsToOne() PASSED
+
+TensorOpsTest > Softmax > rejectsNaNAndPositiveInfinity() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_0DualMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_1SingleTokenAndBatchedPathsAgree() PASSED
+
+TensorOpsTest > QuantizedMatmul > mixedQ4_KQ6_KTripleMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q8_0BatchedMatmulMatchesIndependentQueries() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_KBatchedMatmulMatchesIndependentQueries() PASSED
+
+TensorOpsTest > QuantizedMatmul > q6_KBatchedMatmulMatchesIndependentQueries() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_KTripleMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_1SingleTokenAndBatchedPathsAgree() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_KDualMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q6_KMatchesVectorsGgmlQ8_KActivationSemantics() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_KDualBatchedMatmulMatchesSeparateBatchedProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_0MatchesVectorsGgmlQ8_0ActivationSemantics() PASSED
+
+TensorOpsTest > QuantizedMatmul > rejectsNonBlockAlignedQ8_0Dimensions() PASSED
+
+TensorOpsTest > QuantizedMatmul > groupedMatmulSupportIncludesKQuantProjectionTypes() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_0BatchedMatmulMatchesIndependentQueries() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_KTripleMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_KMatchesVectorsGgmlQ8_KActivationSemantics() PASSED
+
+TensorOpsTest > QuantizedMatmul > q8_0DualBatchedMatmulMatchesSeparateBatchedProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_KDualMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_0MatchesVectorsGgmlQ8_0ActivationSemantics() PASSED
+
+TensorOpsTest > QuantizedMatmul > rejectsNonBlockAlignedQ4_0Dimensions() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_KBatchedMatmulMatchesIndependentQueries() PASSED
+
+TensorOpsTest > QuantizedMatmul > q8_0MatchesVectorsGgmlQ8_0ActivationSemantics() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_0TripleMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > explicitQ4KernelPolicyReachesTheVectorKernel() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_KMatchesVectorsGgmlQ8_KActivationSemantics() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_0BatchedMatmulMatchesIndependentQueries() PASSED
+
+TensorOpsTest > QuantizedMatmul > q8_0DualMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > groupedTriplePlanRetainsMatchingPairInMixedKQuantLayers() PASSED
+
+TensorOpsTest > QuantizedMatmul > mixedQ4_KQ6_KTripleBatchedMatmulMatchesSeparateBatchedProjectionsExactly() PASSED
+
+TensorOpsTest > Matmul > exactMappedProjectionRetainsF32Activations() PASSED
+
+TensorOpsTest > Matmul > bf16MatrixUsesMappedVectorsKernelForSingleAndBatchedActivations() PASSED
+
+TensorOpsTest > Matmul > f16MatrixSupportsBatchedActivationsWithoutExpandingWeights() PASSED
+
+TensorOpsTest > Matmul > ggufF32MatrixIsBitIdenticalToTheOrderDefinedRowDotProduct() PASSED
+
+TensorOpsTest > Matmul > delegatesToVectorsRowMajorGemvSemantics() PASSED
+
+TensorOpsTest > Matmul > ggufF32MatrixUsesMappedVectorsKernel() PASSED
+
+TensorOpsTest > Matmul > identityMatrix() PASSED
+
+TensorOpsTest > Matmul > known3x2Product() PASSED
+
+TensorOpsTest > LayerNorm > centersScalesAndBiasesTheRow() PASSED
+
+TensorOpsTest > LayerNorm > supportsOffsetsAndInPlaceNormalization() PASSED
+
+TensorOpsTest > RmsNorm > identityWeightNormalizesCorrectly() PASSED
+
+TensorOpsTest > RmsNorm > weightScalesOutput() PASSED
+
+BertQ51ProjectionTest > injectedExactProjectionIsExecutedAndUnsupportedShapesRetainJava(Path) PASSED
+
+BUILD SUCCESSFUL in 1m 17s
+16 actionable tasks: 6 executed, 10 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.4.1/userguide/configuration_cache_enabling.html
