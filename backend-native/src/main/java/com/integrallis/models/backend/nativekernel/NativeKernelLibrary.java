@@ -57,6 +57,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   static final long DEFAULT_POLL_MILLIS = 5;
 
   private static final int STATUS_OK = 0;
+  private static final int STATUS_INVALID_SHAPE = 2;
   private static final int FORMAT_Q4_0 = 0;
   private static final int FORMAT_Q8_0 = 1;
   private static final int FORMAT_Q4_K = 2;
@@ -67,12 +68,39 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private static final int FORMAT_PTQ1_0 = 7;
   private static final Linker LINKER = Linker.nativeLinker();
   private static final MethodHandle FLOAT_ARRAY_SEGMENT = floatArraySegment();
+  private static final FunctionDescriptor BF16_BATCHED_DESCRIPTOR =
+      FunctionDescriptor.of(
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT);
   private static final FunctionDescriptor ABI_VERSION_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_INT);
   private static final FunctionDescriptor CAPABILITIES_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_LONG);
   private static final FunctionDescriptor CONTEXT_CREATE_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
+  private static final FunctionDescriptor SWIGLU_DESCRIPTOR =
+      FunctionDescriptor.of(
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT);
   private static final FunctionDescriptor SET_ACTIVE_THREADS_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
   private static final FunctionDescriptor SET_POLL_NANOS_DESCRIPTOR =
@@ -210,6 +238,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private final MethodHandle groupedGatedDeltaNetHandle;
   private final MethodHandle setActiveThreadsHandle;
   private final MethodHandle groupedAttentionHandle;
+  private final MethodHandle bfloat16Handle;
+  private final MethodHandle swiGluHandle;
   private final int threadCount;
   private final int decodeThreadCount;
   private final long pollMillis;
@@ -228,6 +258,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MethodHandle groupedGatedDeltaNetHandle,
       MethodHandle setActiveThreadsHandle,
       MethodHandle groupedAttentionHandle,
+      MethodHandle bfloat16Handle,
+      MethodHandle swiGluHandle,
       int threadCount,
       int decodeThreadCount,
       long pollMillis) {
@@ -242,6 +274,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
     this.groupedGatedDeltaNetHandle = groupedGatedDeltaNetHandle;
     this.setActiveThreadsHandle = setActiveThreadsHandle;
     this.groupedAttentionHandle = groupedAttentionHandle;
+    this.bfloat16Handle = bfloat16Handle;
+    this.swiGluHandle = swiGluHandle;
     this.pollMillis = pollMillis;
     this.threadCount = threadCount;
     this.decodeThreadCount = decodeThreadCount;
@@ -331,6 +365,19 @@ public final class NativeKernelLibrary implements AutoCloseable {
                   "jmodels_grouped_attention_f32_with_context",
                   GROUPED_ATTENTION_DESCRIPTOR)
               : null;
+      MethodHandle bfloat16 =
+          (capabilityMask & NativeKernelCapability.BF16_F32_BATCHED_MATMUL.mask()) != 0
+              ? withFloatArrays(
+                  downcallCritical(
+                      lookup, "jmodels_bf16_f32_batched_matmul", BF16_BATCHED_DESCRIPTOR),
+                  2,
+                  4)
+              : null;
+      MethodHandle swiGlu =
+          (capabilityMask & NativeKernelCapability.SWIGLU_F32.mask()) != 0
+              ? withFloatArrays(
+                  downcallCritical(lookup, "jmodels_swiglu_f32", SWIGLU_DESCRIPTOR), 0, 3, 6)
+              : null;
       MethodHandle setPollNanos =
           (capabilityMask & NativeKernelCapability.POLL_BUDGET.mask()) != 0
               ? downcall(
@@ -355,6 +402,8 @@ public final class NativeKernelLibrary implements AutoCloseable {
           groupedGatedDeltaNet,
           setActiveThreads,
           groupedAttention,
+          bfloat16,
+          swiGlu,
           threadCount,
           decodeThreadCount,
           pollMillis);
@@ -398,6 +447,91 @@ public final class NativeKernelLibrary implements AutoCloseable {
   public boolean supports(NativeKernelCapability capability) {
     Objects.requireNonNull(capability, "capability");
     return (capabilities & capability.mask()) != 0;
+  }
+
+  /** Executes the supported fixed-shape BF16 projection without copying caller arrays. */
+  synchronized void bfloat16F32BatchedMatmul(
+      MemorySegment weights,
+      float[] input,
+      float[] output,
+      int batchSize,
+      int rows,
+      int columns,
+      int lanes,
+      boolean fused) {
+    if (closed) throw new IllegalStateException("native kernel library is closed");
+    Objects.requireNonNull(weights, "weights");
+    Objects.requireNonNull(input, "input");
+    Objects.requireNonNull(output, "output");
+    if (bfloat16Handle == null) throw new UnsupportedOperationException("native BF16 unavailable");
+    if (rows != 48
+        || columns != 5120
+        || batchSize < 1
+        || batchSize > 32
+        || (lanes != 4 && lanes != 8)
+        || !weights.isNative()
+        || input == output) {
+      throw new IllegalArgumentException("unsupported BF16 projection shape, storage or alias");
+    }
+    requireCapacity(input, Math.multiplyExact(batchSize, columns), "input");
+    requireCapacity(output, Math.multiplyExact(batchSize, rows), "output");
+    if (weights.byteSize() < (long) rows * columns * Short.BYTES)
+      throw new IllegalArgumentException("BF16 weight buffer is too small");
+    try {
+      int status =
+          (int)
+              bfloat16Handle.invokeExact(
+                  weights,
+                  weights.byteSize(),
+                  input,
+                  (long) input.length,
+                  output,
+                  (long) output.length,
+                  batchSize,
+                  rows,
+                  columns,
+                  lanes,
+                  fused ? 1 : 0);
+      if (status != STATUS_OK)
+        throw new IllegalStateException("native BF16 projection failed: " + statusName(status));
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Throwable failure) {
+      throw bridgeFailure("BF16 projection", failure);
+    }
+  }
+
+  /** Returns false without writing when the native arithmetic cannot serve these inputs. */
+  synchronized boolean trySwiGlu(
+      float[] out, int outAt, float[] gate, int gateAt, float[] up, int upAt, int length) {
+    if (closed) throw new IllegalStateException("native kernel library is closed");
+    Objects.checkFromIndexSize(outAt, length, out.length);
+    Objects.checkFromIndexSize(gateAt, length, gate.length);
+    Objects.checkFromIndexSize(upAt, length, up.length);
+    if (swiGluHandle == null || length == 0 || length % 4 != 0) return false;
+    try {
+      int status =
+          (int)
+              swiGluHandle.invokeExact(
+                  out,
+                  (long) out.length,
+                  outAt,
+                  gate,
+                  (long) gate.length,
+                  gateAt,
+                  up,
+                  (long) up.length,
+                  upAt,
+                  length);
+      if (status == STATUS_INVALID_SHAPE) return false;
+      if (status != STATUS_OK)
+        throw new IllegalStateException("native SwiGLU failed: " + statusName(status));
+      return true;
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Throwable failure) {
+      throw bridgeFailure("SwiGLU", failure);
+    }
   }
 
   /** Applies the Qwen 3.5 float32 Gated DeltaNet recurrence in caller-owned arrays. */

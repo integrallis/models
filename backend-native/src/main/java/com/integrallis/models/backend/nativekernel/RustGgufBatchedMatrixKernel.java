@@ -29,7 +29,6 @@ import java.util.Objects;
 /** Reusable off-heap workspace for Models-owned Rust quantized projection kernels. */
 public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKernel {
   private static final int MAX_GROUPED_MATRICES = 16;
-  private static final boolean X86 = NativeKernelPlatform.current().id().endsWith("x86_64");
 
   private static final Map<String, String> PLAN_RECOMMENDATIONS =
       Map.of(
@@ -44,6 +43,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   private final NativeKernelLibrary library;
   private final boolean gatedDeltaNetSupported;
+  private final int bfloat16Lanes;
+  private final boolean bfloat16Fused;
   private Arena scratchArena;
   private MemorySegment nativeInput = MemorySegment.NULL;
   private MemorySegment nativeOutput = MemorySegment.NULL;
@@ -64,6 +65,8 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     // Resolve once: the diagnostic capability snapshot constructs strings and must not allocate
     // in every recurrent layer/token eligibility check.
     var capabilities = VectorUtil.runtimeCapabilities();
+    bfloat16Lanes = capabilities.vectorApi() ? capabilities.activeVectorBits() / Float.SIZE : 0;
+    bfloat16Fused = capabilities.fastVectorFma();
     gatedDeltaNetSupported =
         library.supports(NativeKernelCapability.GATED_DELTA_NET_F32)
             && capabilities.fastScalarFma()
@@ -302,11 +305,21 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   }
 
   @Override
+  public synchronized boolean trySwiGlu(
+      float[] out, int outAt, float[] gate, int gateAt, float[] up, int upAt, int length) {
+    requireOpen();
+    return bfloat16Lanes >= 4 && library.trySwiGlu(out, outAt, gate, gateAt, up, upAt, length);
+  }
+
+  @Override
   public boolean supports(GgufTensorType type) {
     if (type == null) {
       return false;
     }
     return switch (type) {
+      case BF16 ->
+          library.supports(NativeKernelCapability.BF16_F32_BATCHED_MATMUL)
+              && (bfloat16Lanes == 4 || bfloat16Lanes == 8);
       case Q4_0 -> library.supports(NativeKernelCapability.Q4_0_F32_BATCHED_MATMUL);
       case Q5_0 -> library.supports(NativeKernelCapability.Q5_0_F32_BATCHED_MATMUL);
       case Q5_1 -> library.supports(NativeKernelCapability.Q5_1_F32_BATCHED_MATMUL);
@@ -321,9 +334,12 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public boolean isEligible(GgufTensorType type, int batchSize, int rows, int cols) {
-    // Same-host Q5_1 model measurements retain native decode only on x86. Java
-    // batching wins prefill on both architectures; Java also wins ARM decode.
-    return supports(type) && (type != GgufTensorType.Q5_1 || (X86 && batchSize == 1));
+    if (type == GgufTensorType.BF16)
+      return supports(type) && rows == 48 && cols == 5120 && batchSize >= 1 && batchSize <= 32;
+    // Q5_1 capability is advertised only with AVX2/FMA/F16C or NEON. The
+    // row-reuse comparison covers decode and batches through 32; retain Java
+    // outside that measured batch range. BERT does not install this provider.
+    return supports(type) && (type != GgufTensorType.Q5_1 || (batchSize >= 1 && batchSize <= 32));
   }
 
   @Override
@@ -658,6 +674,11 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     Objects.requireNonNull(output, "output");
     Objects.requireNonNull(input, "input");
     Objects.requireNonNull(weights, "weights");
+    if (type == GgufTensorType.BF16) {
+      library.bfloat16F32BatchedMatmul(
+          weights, input, output, batchSize, rows, cols, bfloat16Lanes, bfloat16Fused);
+      return;
+    }
     int blockElements = blockElements(type);
     if (batchSize < 1 || rows < 1 || cols < 1 || cols % blockElements != 0) {
       throw new IllegalArgumentException(
