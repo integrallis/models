@@ -1,0 +1,262 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/root/bench/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.36
+# VM version: JDK 25.0.4.1, OpenJDK 64-Bit Server VM, 25.0.4.1+1-LTS
+# VM invoker: /opt/java/bin/java
+# VM options: --add-modules jdk.incubator.vector --add-modules=jdk.incubator.vector -Xms2g -Xmx8g -XX:+UseG1GC --add-modules=jdk.incubator.vector -Dmodels.bench.model=/root/gguf/m.gguf -Dmodels.purejava.maxContextLength=256 -Dmodels.purejava.prefillBatchSize=1
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.integrallis.models.bench.SpeculativeVerificationBenchmark.batched
+# Parameters: (draftLength = 1)
+
+# Run progress: 0.00% complete, ETA 00:00:42
+# Fork: 1 of 1
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/root/bench/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Oct 21, 2026 7:22:58 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 21, 2026 7:22:58 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+567.221 ms/op
+# Warmup Iteration   2: 550.087 ms/op
+Iteration   1: 548.980 ms/op
+Iteration   2: 566.815 ms/op
+Iteration   3: 559.436 ms/op
+Iteration   4: 562.610 ms/op
+Iteration   5: 566.479 ms/op
+
+
+Result "com.integrallis.models.bench.SpeculativeVerificationBenchmark.batched":
+  560.864 ±(99.9%) 28.117 ms/op [Average]
+  (min, avg, max) = (548.980, 560.864, 566.815), stdev = 7.302
+  CI (99.9%): [532.747, 588.981] (assumes normal distribution)
+
+
+# JMH version: 1.36
+# VM version: JDK 25.0.4.1, OpenJDK 64-Bit Server VM, 25.0.4.1+1-LTS
+# VM invoker: /opt/java/bin/java
+# VM options: --add-modules jdk.incubator.vector --add-modules=jdk.incubator.vector -Xms2g -Xmx8g -XX:+UseG1GC --add-modules=jdk.incubator.vector -Dmodels.bench.model=/root/gguf/m.gguf -Dmodels.purejava.maxContextLength=256 -Dmodels.purejava.prefillBatchSize=1
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.integrallis.models.bench.SpeculativeVerificationBenchmark.batched
+# Parameters: (draftLength = 8)
+
+# Run progress: 16.67% complete, ETA 00:07:21
+# Fork: 1 of 1
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/root/bench/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Oct 21, 2026 7:24:27 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 21, 2026 7:24:27 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+4497.934 ms/op
+# Warmup Iteration   2: 4477.755 ms/op
+Iteration   1: 4416.275 ms/op
+Iteration   2: 4393.807 ms/op
+Iteration   3: 4401.465 ms/op
+Iteration   4: 4404.639 ms/op
+Iteration   5: 4403.481 ms/op
+
+
+Result "com.integrallis.models.bench.SpeculativeVerificationBenchmark.batched":
+  4403.933 ±(99.9%) 31.144 ms/op [Average]
+  (min, avg, max) = (4393.807, 4403.933, 4416.275), stdev = 8.088
+  CI (99.9%): [4372.789, 4435.078] (assumes normal distribution)
+
+
+# JMH version: 1.36
+# VM version: JDK 25.0.4.1, OpenJDK 64-Bit Server VM, 25.0.4.1+1-LTS
+# VM invoker: /opt/java/bin/java
+# VM options: --add-modules jdk.incubator.vector --add-modules=jdk.incubator.vector -Xms2g -Xmx8g -XX:+UseG1GC --add-modules=jdk.incubator.vector -Dmodels.bench.model=/root/gguf/m.gguf -Dmodels.purejava.maxContextLength=256 -Dmodels.purejava.prefillBatchSize=1
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.integrallis.models.bench.SpeculativeVerificationBenchmark.batched
+# Parameters: (draftLength = 16)
+
+# Run progress: 33.33% complete, ETA 00:07:03
+# Fork: 1 of 1
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/root/bench/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Oct 21, 2026 7:26:30 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 21, 2026 7:26:30 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+8744.984 ms/op
+# Warmup Iteration   2: 8757.753 ms/op
+Iteration   1: 8746.795 ms/op
+Iteration   2: 8759.004 ms/op
+Iteration   3: 8749.666 ms/op
+Iteration   4: 8760.414 ms/op
+Iteration   5: 8739.461 ms/op
+
+
+Result "com.integrallis.models.bench.SpeculativeVerificationBenchmark.batched":
+  8751.068 ±(99.9%) 33.639 ms/op [Average]
+  (min, avg, max) = (8739.461, 8751.068, 8760.414), stdev = 8.736
+  CI (99.9%): [8717.429, 8784.707] (assumes normal distribution)
+
+
+# JMH version: 1.36
+# VM version: JDK 25.0.4.1, OpenJDK 64-Bit Server VM, 25.0.4.1+1-LTS
+# VM invoker: /opt/java/bin/java
+# VM options: --add-modules jdk.incubator.vector --add-modules=jdk.incubator.vector -Xms2g -Xmx8g -XX:+UseG1GC --add-modules=jdk.incubator.vector -Dmodels.bench.model=/root/gguf/m.gguf -Dmodels.purejava.maxContextLength=256 -Dmodels.purejava.prefillBatchSize=1
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.integrallis.models.bench.SpeculativeVerificationBenchmark.sequential
+# Parameters: (draftLength = 1)
+
+# Run progress: 50.00% complete, ETA 00:06:16
+# Fork: 1 of 1
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/root/bench/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Oct 21, 2026 7:29:15 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 21, 2026 7:29:15 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+559.790 ms/op
+# Warmup Iteration   2: 551.809 ms/op
+Iteration   1: 557.270 ms/op
+Iteration   2: 553.922 ms/op
+Iteration   3: 549.981 ms/op
+Iteration   4: 550.795 ms/op
+Iteration   5: 550.873 ms/op
+
+
+Result "com.integrallis.models.bench.SpeculativeVerificationBenchmark.sequential":
+  552.568 ±(99.9%) 11.657 ms/op [Average]
+  (min, avg, max) = (549.981, 552.568, 557.270), stdev = 3.027
+  CI (99.9%): [540.912, 564.225] (assumes normal distribution)
+
+
+# JMH version: 1.36
+# VM version: JDK 25.0.4.1, OpenJDK 64-Bit Server VM, 25.0.4.1+1-LTS
+# VM invoker: /opt/java/bin/java
+# VM options: --add-modules jdk.incubator.vector --add-modules=jdk.incubator.vector -Xms2g -Xmx8g -XX:+UseG1GC --add-modules=jdk.incubator.vector -Dmodels.bench.model=/root/gguf/m.gguf -Dmodels.purejava.maxContextLength=256 -Dmodels.purejava.prefillBatchSize=1
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.integrallis.models.bench.SpeculativeVerificationBenchmark.sequential
+# Parameters: (draftLength = 8)
+
+# Run progress: 66.67% complete, ETA 00:03:51
+# Fork: 1 of 1
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/root/bench/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Oct 21, 2026 7:30:42 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 21, 2026 7:30:42 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+4427.788 ms/op
+# Warmup Iteration   2: 4431.190 ms/op
+Iteration   1: 4411.344 ms/op
+Iteration   2: 4419.057 ms/op
+Iteration   3: 4424.166 ms/op
+Iteration   4: 4388.245 ms/op
+Iteration   5: 4400.927 ms/op
+
+
+Result "com.integrallis.models.bench.SpeculativeVerificationBenchmark.sequential":
+  4408.748 ±(99.9%) 55.543 ms/op [Average]
+  (min, avg, max) = (4388.245, 4408.748, 4424.166), stdev = 14.424
+  CI (99.9%): [4353.205, 4464.291] (assumes normal distribution)
+
+
+# JMH version: 1.36
+# VM version: JDK 25.0.4.1, OpenJDK 64-Bit Server VM, 25.0.4.1+1-LTS
+# VM invoker: /opt/java/bin/java
+# VM options: --add-modules jdk.incubator.vector --add-modules=jdk.incubator.vector -Xms2g -Xmx8g -XX:+UseG1GC --add-modules=jdk.incubator.vector -Dmodels.bench.model=/root/gguf/m.gguf -Dmodels.purejava.maxContextLength=256 -Dmodels.purejava.prefillBatchSize=1
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.integrallis.models.bench.SpeculativeVerificationBenchmark.sequential
+# Parameters: (draftLength = 16)
+
+# Run progress: 83.33% complete, ETA 00:01:57
+# Fork: 1 of 1
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/root/bench/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Oct 21, 2026 7:32:44 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Oct 21, 2026 7:32:44 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+8849.161 ms/op
+# Warmup Iteration   2: 8906.163 ms/op
+Iteration   1: 8905.742 ms/op
+Iteration   2: 8875.861 ms/op
+Iteration   3: 8867.408 ms/op
+Iteration   4: 8924.464 ms/op
+Iteration   5: 8888.506 ms/op
+
+
+Result "com.integrallis.models.bench.SpeculativeVerificationBenchmark.sequential":
+  8892.396 ±(99.9%) 88.636 ms/op [Average]
+  (min, avg, max) = (8867.408, 8892.396, 8924.464), stdev = 23.018
+  CI (99.9%): [8803.760, 8981.032] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:12:33
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                    (draftLength)  Mode  Cnt     Score    Error  Units
+SpeculativeVerificationBenchmark.batched                 1  avgt    5   560.864 ± 28.117  ms/op
+SpeculativeVerificationBenchmark.batched                 8  avgt    5  4403.933 ± 31.144  ms/op
+SpeculativeVerificationBenchmark.batched                16  avgt    5  8751.068 ± 33.639  ms/op
+SpeculativeVerificationBenchmark.sequential              1  avgt    5   552.568 ± 11.657  ms/op
+SpeculativeVerificationBenchmark.sequential              8  avgt    5  4408.748 ± 55.543  ms/op
+SpeculativeVerificationBenchmark.sequential             16  avgt    5  8892.396 ± 88.636  ms/op
+
+Benchmark result is saved to /root/bench/batch-1.json
