@@ -14,6 +14,9 @@ diagnostics, and backend configuration
 
 |`models-audio` |In-process text-to-speech runtimes, PCM streaming, and WAV encoding
 
+|`models-backend-onnx` |Pure-Java ONNX graph reader and eager executor, used by
+`models-audio` for ONNX-only speech models; no ONNX Runtime
+
 |`models-rag` |Framework-neutral guarded RAG policy
 
 |`models-semantic-order` |Pure-Java WordTour lookup and blurred
@@ -61,7 +64,6 @@ matching Vectors integration in a real retrieval-and-generation flow.
 [cols=",",options="header",]
 |===
 |Module |Intended purpose
-|`models-backend-onnx` |Planned pure-Java ONNX artifact reader and execution path
 |`models-quarkus` |Quarkus integration
 |`models-semantic-kernel` |Semantic Kernel chat adapter
 |`models-test` |Reusable downstream integration-test support
@@ -110,6 +112,7 @@ Application dependencies use:
 * `com.integrallis:backend-native`
 * `com.integrallis:backend-apple`
 * `com.integrallis:models-audio`
+* `com.integrallis:models-backend-onnx`
 * `com.integrallis:models-router`
 * `com.integrallis:models-langchain4j`
 * `com.integrallis:models-spring-ai`
