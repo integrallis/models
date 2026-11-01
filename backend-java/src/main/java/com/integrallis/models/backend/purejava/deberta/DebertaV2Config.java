@@ -96,6 +96,15 @@ public record DebertaV2Config(
 
   /** Parses and rejects graph variants not implemented by the pure-Java path. */
   public static DebertaV2Config parse(Path configPath) throws IOException {
+    return parse(configPath, true);
+  }
+
+  /** Parses an encoder configuration without requiring a sequence-classification head. */
+  public static DebertaV2Config parseEncoder(Path configPath) throws IOException {
+    return parse(configPath, false);
+  }
+
+  private static DebertaV2Config parse(Path configPath, boolean requireHead) throws IOException {
     Objects.requireNonNull(configPath, "configPath");
     Fields fields = new Fields();
     try (JsonParser parser = JSON.createParser(configPath.toFile())) {
@@ -135,7 +144,7 @@ public record DebertaV2Config(
         throw malformed("configuration has content after its root object");
       }
     }
-    return fields.build();
+    return fields.build(requireHead);
   }
 
   private static List<String> readStrings(JsonParser parser, JsonToken token, String description)
@@ -216,8 +225,8 @@ public record DebertaV2Config(
     private int typeVocabularySize;
     private int vocabSize;
 
-    private DebertaV2Config build() {
-      if (!architectures.equals(List.of("DebertaV2ForSequenceClassification"))
+    private DebertaV2Config build(boolean requireHead) {
+      if ((requireHead && !architectures.equals(List.of("DebertaV2ForSequenceClassification")))
           || !"deberta-v2".equals(modelType)
           || !"gelu".equals(hiddenActivation)
           || !"gelu".equals(poolerActivation)

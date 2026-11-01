@@ -1,3 +1,5 @@
+mod deberta_kernels;
+mod hf_tokenizer;
 mod q51_reuse;
 #[cfg(target_arch = "x86_64")]
 mod q8f32_reuse;

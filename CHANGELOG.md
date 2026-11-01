@@ -4,6 +4,22 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.10] - 2026-11-01
+
+- Add the public schema classification API and GLiNER2.5-Decide runtime, using the
+  pinned Hugging Face tokenizer, Java DeBERTa orchestration, and prepared Rust F32
+  projection and attention kernels. Multi-task and multi-label requests retain the
+  publisher's threshold and fallback behavior; scores are not calibrated confidence.
+- Join native DeBERTa workers before unloading their library and package dependency
+  license notices on every supported native platform.
+- This focused release is based on 0.5.9. GGUF tokenization and decoder changes from
+  the ongoing main-branch campaign are deferred; existing generation behavior is
+  unchanged. The GLiNER snapshot's catalog admission still requires its separate
+  released-runtime performance and accuracy evidence.
+- `backend-cuda` is unchanged. Its last recorded G1 result is exact token parity on
+  RTX 4090 at 31.26 tok/s; G4 is 6.184x against the 3.00x gate. No new device
+  measurement is claimed.
+
 ## [0.5.9] - 2026-10-31
 
 - Serve EdgeRock-4B GGUF through the Qwen3.5 hybrid decoder as a fourth architecture name. The
