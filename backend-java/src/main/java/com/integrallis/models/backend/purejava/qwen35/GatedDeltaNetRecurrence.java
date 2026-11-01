@@ -15,16 +15,15 @@
  */
 package com.integrallis.models.backend.purejava.qwen35;
 
-import com.integrallis.vectors.core.VectorUtil;
 import java.util.Arrays;
 import java.util.Objects;
 
-/** Float32 Gated DeltaNet recurrence with Java Vector API row operations. */
+/** Retained-FP64 Gated DeltaNet state with unchanged FP32 normalization and decay. */
 final class GatedDeltaNetRecurrence {
 
   private static final float NORMALIZATION_EPSILON = 1.0e-6f;
 
-  record Result(float[] output, float[] finalState) {}
+  record Result(float[] output, double[] finalState) {}
 
   private GatedDeltaNetRecurrence() {}
 
@@ -44,7 +43,7 @@ final class GatedDeltaNetRecurrence {
       float[] value,
       float[] logDecay,
       float[] beta,
-      float[] initialState,
+      double[] initialState,
       int tokenCount,
       int headCount,
       int keyDimension,
@@ -79,7 +78,7 @@ final class GatedDeltaNetRecurrence {
       float[] value,
       float[] logDecay,
       float[] beta,
-      float[] initialState,
+      double[] initialState,
       int tokenCount,
       int keyHeadCount,
       int valueHeadCount,
@@ -115,7 +114,7 @@ final class GatedDeltaNetRecurrence {
       float[] value,
       float[] logDecay,
       float[] beta,
-      float[] mutableState,
+      double[] mutableState,
       int tokenCount,
       int headCount,
       int keyDimension,
@@ -151,7 +150,7 @@ final class GatedDeltaNetRecurrence {
       float[] value,
       float[] logDecay,
       float[] beta,
-      float[] mutableState,
+      double[] mutableState,
       int tokenCount,
       int keyHeadCount,
       int valueHeadCount,
@@ -188,12 +187,12 @@ final class GatedDeltaNetRecurrence {
       float[] value,
       float[] logDecay,
       float[] beta,
-      float[] mutableState,
+      double[] mutableState,
       float[] output,
       float[] normalizedQuery,
       float[] normalizedKey,
-      float[] memory,
-      float[] delta,
+      double[] memory,
+      double[] delta,
       int tokenCount,
       int keyHeadCount,
       int valueHeadCount,
@@ -230,12 +229,12 @@ final class GatedDeltaNetRecurrence {
       float[] value,
       float[] logDecay,
       float[] beta,
-      float[] mutableState,
+      double[] mutableState,
       float[] output,
       float[] normalizedQuery,
       float[] normalizedKey,
-      float[] memory,
-      float[] delta,
+      double[] memory,
+      double[] delta,
       int tokenCount,
       int keyHeadCount,
       int valueHeadCount,
@@ -268,9 +267,8 @@ final class GatedDeltaNetRecurrence {
   /**
    * Advances one branch of a grouped decision, whose state is one slot of a shared array.
    *
-   * <p>The group holds every branch's recurrent state for a layer in one branch-major array so the
-   * native kernel can advance them all in a single launch. This is the path taken when no such
-   * kernel is present, and it must address the same slot the kernel would.
+   * <p>The group holds every branch's recurrent state for a layer in one branch-major array and
+   * this recurrence advances exactly the selected slot without touching other branches.
    */
   static void forwardSlotInPlace(
       float[] query,
@@ -278,13 +276,13 @@ final class GatedDeltaNetRecurrence {
       float[] value,
       float[] logDecay,
       float[] beta,
-      float[] groupState,
+      double[] groupState,
       int stateBase,
       float[] output,
       float[] normalizedQuery,
       float[] normalizedKey,
-      float[] memory,
-      float[] delta,
+      double[] memory,
+      double[] delta,
       int keyHeadCount,
       int valueHeadCount,
       int keyDimension,
@@ -318,7 +316,7 @@ final class GatedDeltaNetRecurrence {
       float[] value,
       float[] logDecay,
       float[] beta,
-      float[] initialState,
+      double[] initialState,
       int stateBase,
       boolean windowedState,
       int tokenCount,
@@ -330,8 +328,8 @@ final class GatedDeltaNetRecurrence {
       float[] outputWorkspace,
       float[] normalizedQueryWorkspace,
       float[] normalizedKeyWorkspace,
-      float[] memoryWorkspace,
-      float[] deltaWorkspace,
+      double[] memoryWorkspace,
+      double[] deltaWorkspace,
       boolean capacitySizedBuffers) {
     Objects.requireNonNull(query, "query");
     Objects.requireNonNull(key, "key");
@@ -367,7 +365,7 @@ final class GatedDeltaNetRecurrence {
                 + initialState.length
                 + " cannot hold "
                 + stateSize
-                + " floats at "
+                + " doubles at "
                 + stateBase);
       }
     }
@@ -376,15 +374,15 @@ final class GatedDeltaNetRecurrence {
           "a state window is only meaningful when mutating in place");
     }
 
-    float[] state =
+    double[] state =
         mutateState
             ? initialState
-            : initialState == null ? new float[stateSize] : initialState.clone();
+            : initialState == null ? new double[stateSize] : initialState.clone();
     float[] output = workspace(outputWorkspace, valueSize, "output", capacitySizedBuffers);
     float[] normalizedQuery = workspace(normalizedQueryWorkspace, keyDimension, "normalizedQuery");
     float[] normalizedKey = workspace(normalizedKeyWorkspace, keyDimension, "normalizedKey");
-    float[] memory = workspace(memoryWorkspace, valueDimension, "memory");
-    float[] delta = workspace(deltaWorkspace, valueDimension, "delta");
+    double[] memory = workspace(memoryWorkspace, valueDimension, "memory");
+    double[] delta = workspace(deltaWorkspace, valueDimension, "delta");
     float queryScale = (float) (1.0 / Math.sqrt(keyDimension));
     for (int token = 0; token < tokenCount; token++) {
       for (int head = 0; head < valueHeadCount; head++) {
@@ -404,38 +402,37 @@ final class GatedDeltaNetRecurrence {
         }
 
         int valueOffset = tokenHead * valueDimension;
-        Arrays.fill(memory, 0.0f);
+        Arrays.fill(memory, 0.0);
         for (int row = 0; row < keyDimension; row++) {
-          VectorUtil.addScaledInPlace(
-              memory,
-              0,
-              state,
-              stateOffset + row * valueDimension,
-              valueDimension,
-              normalizedKey[row]);
+          int rowOffset = stateOffset + row * valueDimension;
+          double keyValue = normalizedKey[row];
+          for (int column = 0; column < valueDimension; column++) {
+            memory[column] = Math.fma(state[rowOffset + column], keyValue, memory[column]);
+          }
         }
         for (int column = 0; column < valueDimension; column++) {
-          delta[column] = (value[valueOffset + column] - memory[column]) * beta[tokenHead];
+          delta[column] =
+              ((double) value[valueOffset + column] - memory[column]) * (double) beta[tokenHead];
         }
         for (int row = 0; row < keyDimension; row++) {
-          VectorUtil.addScaledInPlace(
-              state,
-              stateOffset + row * valueDimension,
-              delta,
-              0,
-              valueDimension,
-              normalizedKey[row]);
+          int rowOffset = stateOffset + row * valueDimension;
+          double keyValue = normalizedKey[row];
+          for (int column = 0; column < valueDimension; column++) {
+            state[rowOffset + column] =
+                Math.fma(delta[column], keyValue, state[rowOffset + column]);
+          }
         }
-
-        Arrays.fill(output, valueOffset, valueOffset + valueDimension, 0.0f);
+        // Reuse the memory workspace: only the completed graph output is rounded to float.
+        Arrays.fill(memory, 0.0);
         for (int row = 0; row < keyDimension; row++) {
-          VectorUtil.addScaledInPlace(
-              output,
-              valueOffset,
-              state,
-              stateOffset + row * valueDimension,
-              valueDimension,
-              normalizedQuery[row]);
+          int rowOffset = stateOffset + row * valueDimension;
+          double queryValue = normalizedQuery[row];
+          for (int column = 0; column < valueDimension; column++) {
+            memory[column] = Math.fma(state[rowOffset + column], queryValue, memory[column]);
+          }
+        }
+        for (int column = 0; column < valueDimension; column++) {
+          output[valueOffset + column] = (float) memory[column];
         }
       }
     }
@@ -491,6 +488,19 @@ final class GatedDeltaNetRecurrence {
       return new float[expected];
     }
     requireLength(values, expected, name, capacitySized);
+    return values;
+  }
+
+  private static void requireLength(double[] values, int expected, String name) {
+    if (values.length != expected) {
+      throw new IllegalArgumentException(
+          name + " length must be " + expected + ": " + values.length);
+    }
+  }
+
+  private static double[] workspace(double[] values, int expected, String name) {
+    if (values == null) return new double[expected];
+    requireLength(values, expected, name);
     return values;
   }
 }

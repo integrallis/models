@@ -67,7 +67,7 @@ class GatedDeltaNetRecurrenceTest {
     1.0f, 0.6f
   };
 
-  private static final float[] INITIAL_STATE = {
+  private static final double[] INITIAL_STATE = {
     0.1f, -0.2f, 0.3f, 0.4f,
     -0.5f, 0.2f, 0.1f, -0.3f
   };
@@ -87,7 +87,7 @@ class GatedDeltaNetRecurrenceTest {
     -0.305043638f
   };
 
-  private static final float[] EXPECTED_FINAL_STATE = {
+  private static final double[] EXPECTED_FINAL_STATE = {
     -0.549856126f,
     -0.20131427f,
     0.600189984f,
@@ -100,14 +100,14 @@ class GatedDeltaNetRecurrenceTest {
 
   @Test
   void matchesThePinnedFreeTokenFloat32Recurrence() {
-    float[] initialState = INITIAL_STATE.clone();
+    double[] initialState = INITIAL_STATE.clone();
 
     GatedDeltaNetRecurrence.Result actual =
         GatedDeltaNetRecurrence.forward(
             QUERY, KEY, VALUE, LOG_DECAY, BETA, initialState, TOKENS, HEADS, KEY_DIM, VALUE_DIM);
 
     assertThat(actual.output()).containsExactly(EXPECTED_OUTPUT, within(2.0e-6f));
-    assertThat(actual.finalState()).containsExactly(EXPECTED_FINAL_STATE, within(2.0e-6f));
+    assertThat(actual.finalState()).containsExactly(EXPECTED_FINAL_STATE, within(2.0e-6));
     assertThat(initialState).containsExactly(INITIAL_STATE);
   }
 
@@ -147,16 +147,16 @@ class GatedDeltaNetRecurrenceTest {
     System.arraycopy(second.output(), 0, continued, first.output().length, second.output().length);
 
     assertThat(continued).containsExactly(expected.output(), within(2.0e-6f));
-    assertThat(second.finalState()).containsExactly(expected.finalState(), within(2.0e-6f));
+    assertThat(second.finalState()).containsExactly(expected.finalState(), within(2.0e-6));
   }
 
   @Test
   void inPlaceExecutionMatchesTheReferenceWithoutReplacingState() {
-    float[] initialState = {0.2f, -0.1f, 0.05f, 0.3f, -0.2f, 0.4f, 0.1f, -0.05f};
+    double[] initialState = {0.2f, -0.1f, 0.05f, 0.3f, -0.2f, 0.4f, 0.1f, -0.05f};
     var expected =
         GatedDeltaNetRecurrence.forward(
             QUERY, KEY, VALUE, LOG_DECAY, BETA, initialState, 3, 2, 2, 2);
-    float[] mutableState = initialState.clone();
+    double[] mutableState = initialState.clone();
 
     var actual =
         GatedDeltaNetRecurrence.forwardInPlace(
@@ -168,12 +168,12 @@ class GatedDeltaNetRecurrenceTest {
 
   @Test
   void callerOwnedWorkspaceMatchesTheReferenceWithoutAllocatingAnOutput() {
-    float[] mutableState = INITIAL_STATE.clone();
+    double[] mutableState = INITIAL_STATE.clone();
     float[] output = new float[EXPECTED_OUTPUT.length];
     float[] normalizedQuery = new float[KEY_DIM];
     float[] normalizedKey = new float[KEY_DIM];
-    float[] memory = new float[VALUE_DIM];
-    float[] delta = new float[VALUE_DIM];
+    double[] memory = new double[VALUE_DIM];
+    double[] delta = new double[VALUE_DIM];
 
     GatedDeltaNetRecurrence.forwardInPlace(
         QUERY,
@@ -194,7 +194,7 @@ class GatedDeltaNetRecurrenceTest {
         VALUE_DIM);
 
     assertThat(output).containsExactly(EXPECTED_OUTPUT, within(2.0e-6f));
-    assertThat(mutableState).containsExactly(EXPECTED_FINAL_STATE, within(2.0e-6f));
+    assertThat(mutableState).containsExactly(EXPECTED_FINAL_STATE, within(2.0e-6));
   }
 
   @Test
@@ -212,8 +212,8 @@ class GatedDeltaNetRecurrenceTest {
         .containsExactly(new float[] {0.70710605f, 0.0f, 2.121318f, 0.0f}, within(2.0e-6f));
     assertThat(actual.finalState())
         .containsExactly(
-            new float[] {0.9999995f, 0.0f, 0.0f, 1.999999f, 2.9999986f, 0.0f, 0.0f, 3.999998f},
-            within(2.0e-6f));
+            new double[] {0.9999995f, 0.0f, 0.0f, 1.999999f, 2.9999986f, 0.0f, 0.0f, 3.999998f},
+            within(2.0e-6));
   }
 
   private static float[] firstTokens(float[] values, int dimension, int tokenCount) {

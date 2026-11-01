@@ -31,6 +31,7 @@ import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Layer;
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.Matrix;
 import com.integrallis.models.backend.purejava.qwen35.Qwen35Weights.MoeFeedForward;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel.FloatArrayView;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import com.integrallis.vectors.core.GgufQ6BatchedKernel;
 import com.integrallis.vectors.core.VectorUtil;
@@ -59,7 +60,13 @@ public final class Qwen35ForwardPass {
       this.owner = owner;
       this.capacity = capacity;
       this.tokenHistory = new int[capacity];
-      this.state = new SessionState(owner.config, owner.weights, capacity, owner.prefillBatchSize);
+      this.state =
+          new SessionState(
+              owner.config,
+              owner.weights,
+              capacity,
+              owner.prefillBatchSize,
+              owner.batchedMatrixKernel);
     }
 
     public int checkpoint() {
@@ -73,7 +80,7 @@ public final class Qwen35ForwardPass {
     private final int checkpoint;
     private final int[] tokenPrefix;
     private final float[][] convolutionHistory;
-    private final float[][] recurrentState;
+    private final double[][] recurrentState;
     private final long bytes;
 
     private LinearStateSnapshot(Session session) {
@@ -101,6 +108,10 @@ public final class Qwen35ForwardPass {
   private final GgufQ4Kernel q4Kernel;
   private final GgufQ6BatchedKernel q6BatchedKernel;
   private final GgufBatchedMatrixKernel batchedMatrixKernel;
+  private final ActivationWeightViews[] activationWeightViews;
+
+  private record ActivationWeightViews(
+      FloatArrayView convolution, FloatArrayView bias, FloatArrayView scale) {}
 
   private Qwen35ForwardPass(
       Qwen35Config config,
@@ -126,6 +137,20 @@ public final class Qwen35ForwardPass {
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     this.q6BatchedKernel = Objects.requireNonNull(q6BatchedKernel, "q6BatchedKernel");
     this.batchedMatrixKernel = Objects.requireNonNull(batchedMatrixKernel, "batchedMatrixKernel");
+    activationWeightViews =
+        batchedMatrixKernel.supportsRecurrentActivations()
+            ? new ActivationWeightViews[config.numLayers()]
+            : null;
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      GatedDeltaNet gdn = weights.layer(layer).gatedDeltaNet();
+      if (gdn != null && activationWeightViews != null) {
+        activationWeightViews[layer] =
+            new ActivationWeightViews(
+                batchedMatrixKernel.prepareFloatArray(gdn.convolution()),
+                batchedMatrixKernel.prepareFloatArray(gdn.timeStepBias()),
+                batchedMatrixKernel.prepareFloatArray(gdn.decay()));
+      }
+    }
   }
 
   public static Qwen35ForwardPass fromGgufFile(GgufFile file) {
@@ -551,8 +576,17 @@ public final class Qwen35ForwardPass {
             batch.projectionScratch);
         for (int row = 0; row < rows; row++) {
           int offset = row * config.hiddenDim();
-          VectorUtil.swiGlu(
-              batch.ffn, offset, batch.ffnGate, offset, batch.ffnUp, offset, config.hiddenDim());
+          swiGlu(
+              batch.ffn,
+              offset,
+              batch.ffnGate,
+              offset,
+              batch.ffnUp,
+              offset,
+              config.hiddenDim(),
+              batch.ffnView,
+              batch.ffnGateView,
+              batch.ffnUpView);
         }
         projectBatched(
             batch.projected,
@@ -738,7 +772,7 @@ public final class Qwen35ForwardPass {
     for (int row = 0; row < rows; row++) {
       Qwen35GroupedDecision.Branch branch = group.branch(active[row]);
       int mixedBase = row * convDimension;
-      VectorUtil.causalDepthwiseConv1dSilu(
+      causalDepthwiseConv1dSilu(
           batch.mixed,
           mixedBase,
           branch.convolutionHistory(layer),
@@ -746,7 +780,10 @@ public final class Qwen35ForwardPass {
           weights.convolution(),
           0,
           convDimension,
-          kernel);
+          kernel,
+          batch.mixedView,
+          branch.convolutionHistoryView(layer, batchedMatrixKernel),
+          activationWeightViews == null ? null : activationWeightViews[layer].convolution());
       System.arraycopy(batch.mixed, mixedBase, batch.gdnQuery, row * keyDimension, keyDimension);
       System.arraycopy(
           batch.mixed, mixedBase + keyDimension, batch.gdnKey, row * keyDimension, keyDimension);
@@ -757,7 +794,7 @@ public final class Qwen35ForwardPass {
           row * valueDimension,
           valueDimension);
       int gateBase = row * valueHeads;
-      VectorUtil.sigmoidAndScaledSoftplus(
+      sigmoidAndScaledSoftplus(
           batch.beta,
           gateBase,
           batch.alpha,
@@ -768,7 +805,12 @@ public final class Qwen35ForwardPass {
           0,
           batch.logDecay,
           gateBase,
-          valueHeads);
+          valueHeads,
+          batch.betaView,
+          batch.alphaView,
+          activationWeightViews == null ? null : activationWeightViews[layer].bias(),
+          activationWeightViews == null ? null : activationWeightViews[layer].scale(),
+          batch.logDecayView);
     }
 
     // One token per branch, each against its own state. The recurrence is what makes a question's
@@ -788,14 +830,17 @@ public final class Qwen35ForwardPass {
             headDimension,
             config.rmsNormEpsilon());
       }
-      VectorUtil.swiGlu(
+      swiGlu(
           batch.recurrent,
           valueBase,
           batch.outputGate,
           valueBase,
           batch.recurrent,
           valueBase,
-          valueDimension);
+          valueDimension,
+          batch.recurrentView,
+          batch.outputGateView,
+          batch.recurrentView);
     }
     projectBatched(
         output, batch.recurrent, weights.output(), rows, state.scratch, batch.projectionScratch);
@@ -820,28 +865,9 @@ public final class Qwen35ForwardPass {
     int valueDimension = config.gdnValueDim();
     int valueHeads = config.gdnValueHeads();
     int headDimension = config.gdnHeadDim();
-    float[] groupState = group.recurrentState(layer);
-    if (batchedMatrixKernel.supportsGroupedGatedDeltaNet()
-        && batchedMatrixKernel.supportsGatedDeltaNet(headDimension, headDimension)) {
-      batchedMatrixKernel.groupedGatedDeltaNet(
-          batch.gdnQuery,
-          batch.gdnKey,
-          batch.gdnValue,
-          batch.logDecay,
-          batch.beta,
-          groupState,
-          batch.recurrent,
-          active,
-          rows,
-          group.groupSize(),
-          config.gdnKeyHeads(),
-          valueHeads,
-          headDimension,
-          headDimension);
-      return;
-    }
-    // No grouped kernel: step each row into its own slot of the same array the kernel would have
-    // written, so both paths address state identically and the parity test covers both.
+    double[] groupState = group.recurrentState(layer);
+
+    // Retained FP64 state has no float-native ABI. Advance only each active branch slot.
     int elements = group.recurrentStateElements();
     float[] rowOutput = batch.rowRecurrent;
     for (int row = 0; row < rows; row++) {
@@ -923,15 +949,45 @@ public final class Qwen35ForwardPass {
     return bytes;
   }
 
+  private static double[][] copyLinearState(double[][] source) {
+    double[][] copy = new double[source.length][];
+    for (int layer = 0; layer < source.length; layer++) {
+      copy[layer] = source[layer] == null ? null : source[layer].clone();
+    }
+    return copy;
+  }
+
+  private static void copyLinearState(double[][] source, double[][] destination) {
+    for (int layer = 0; layer < source.length; layer++) {
+      if (source[layer] != null) {
+        System.arraycopy(source[layer], 0, destination[layer], 0, source[layer].length);
+      }
+    }
+  }
+
+  private static long linearStateBytes(double[][] state) {
+    long bytes = 0L;
+    for (double[] layer : state) {
+      if (layer != null) {
+        bytes = Math.addExact(bytes, Math.multiplyExact((long) layer.length, Double.BYTES));
+      }
+    }
+    return bytes;
+  }
+
   private float[] forwardToken(int token, int position, SessionState session) {
     int embeddingDimension = config.embeddingDim();
     float[] state = new float[embeddingDimension];
     float[] normalized = new float[embeddingDimension];
     float[] projected = new float[embeddingDimension];
     float[] ffnGate = new float[config.hiddenDim()];
+    FloatArrayView ffnGateView = batchedMatrixKernel.prepareFloatArray(ffnGate);
     float[] ffnUp = new float[config.hiddenDim()];
+    FloatArrayView ffnUpView = batchedMatrixKernel.prepareFloatArray(ffnUp);
     float[] ffn = new float[config.hiddenDim()];
-    MoeScratch moeScratch = config.usesMixtureOfExperts() ? new MoeScratch(config) : null;
+    FloatArrayView ffnView = batchedMatrixKernel.prepareFloatArray(ffn);
+    MoeScratch moeScratch =
+        config.usesMixtureOfExperts() ? new MoeScratch(config, batchedMatrixKernel) : null;
     weights.embedToken(token, state);
 
     for (int layerIndex = 0; layerIndex < config.numLayers(); layerIndex++) {
@@ -962,7 +1018,7 @@ public final class Qwen35ForwardPass {
         routedFeedForward(projected, normalized, layer.moe(), moeScratch, session.scratch);
       } else {
         dualProject(ffnGate, layer.ffnGate(), ffnUp, layer.ffnUp(), normalized, session.scratch);
-        VectorUtil.swiGlu(ffn, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim());
+        swiGlu(ffn, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim(), ffnView, ffnGateView, ffnUpView);
         project(projected, ffn, layer.ffnDown(), session.scratch);
       }
       add(state, projected);
@@ -1015,14 +1071,17 @@ public final class Qwen35ForwardPass {
           moe.up()[expert],
           normalized,
           scratch);
-      VectorUtil.swiGlu(
+      swiGlu(
           moeScratch.expertActivated,
           0,
           moeScratch.expertGate,
           0,
           moeScratch.expertUp,
           0,
-          config.expertHiddenDim());
+          config.expertHiddenDim(),
+          moeScratch.expertActivatedView,
+          moeScratch.expertGateView,
+          moeScratch.expertUpView);
       project(moeScratch.contribution, moeScratch.expertActivated, moe.down()[expert], scratch);
       accumulateScaled(output, moeScratch.contribution, moeScratch.routingWeights[slot], dimension);
     }
@@ -1036,14 +1095,17 @@ public final class Qwen35ForwardPass {
         moe.sharedUpProjection(),
         normalized,
         scratch);
-    VectorUtil.swiGlu(
+    swiGlu(
         moeScratch.sharedActivated,
         0,
         moeScratch.sharedGate,
         0,
         moeScratch.sharedUp,
         0,
-        config.sharedExpertHiddenDim());
+        config.sharedExpertHiddenDim(),
+        moeScratch.sharedActivatedView,
+        moeScratch.sharedGateView,
+        moeScratch.sharedUpView);
     project(
         moeScratch.contribution, moeScratch.sharedActivated, moe.sharedDownProjection(), scratch);
     accumulateScaled(output, moeScratch.contribution, sharedWeight, dimension);
@@ -1061,25 +1123,37 @@ public final class Qwen35ForwardPass {
     private final int[] selected;
     private final float[] routingWeights;
     private final float[] expertGate;
+    private final FloatArrayView expertGateView;
     private final float[] expertUp;
+    private final FloatArrayView expertUpView;
     private final float[] expertActivated;
+    private final FloatArrayView expertActivatedView;
     private final float[] sharedScore;
     private final float[] sharedGate;
+    private final FloatArrayView sharedGateView;
     private final float[] sharedUp;
+    private final FloatArrayView sharedUpView;
     private final float[] sharedActivated;
+    private final FloatArrayView sharedActivatedView;
     private final float[] contribution;
 
-    private MoeScratch(Qwen35Config config) {
+    private MoeScratch(Qwen35Config config, GgufBatchedMatrixKernel kernel) {
       routerLogits = new float[config.numExperts()];
       selected = new int[config.numExpertsUsed()];
       routingWeights = new float[config.numExpertsUsed()];
       expertGate = new float[config.expertHiddenDim()];
+      expertGateView = kernel.prepareFloatArray(expertGate);
       expertUp = new float[config.expertHiddenDim()];
+      expertUpView = kernel.prepareFloatArray(expertUp);
       expertActivated = new float[config.expertHiddenDim()];
+      expertActivatedView = kernel.prepareFloatArray(expertActivated);
       sharedScore = new float[1];
       sharedGate = new float[config.sharedExpertHiddenDim()];
+      sharedGateView = kernel.prepareFloatArray(sharedGate);
       sharedUp = new float[config.sharedExpertHiddenDim()];
+      sharedUpView = kernel.prepareFloatArray(sharedUp);
       sharedActivated = new float[config.sharedExpertHiddenDim()];
+      sharedActivatedView = kernel.prepareFloatArray(sharedActivated);
       contribution = new float[config.embeddingDim()];
     }
   }
@@ -1132,8 +1206,17 @@ public final class Qwen35ForwardPass {
           batch.projectionScratch);
       for (int index = 0; index < batchSize; index++) {
         int offset = index * config.hiddenDim();
-        VectorUtil.swiGlu(
-            batch.ffn, offset, batch.ffnGate, offset, batch.ffnUp, offset, config.hiddenDim());
+        swiGlu(
+            batch.ffn,
+            offset,
+            batch.ffnGate,
+            offset,
+            batch.ffnUp,
+            offset,
+            config.hiddenDim(),
+            batch.ffnView,
+            batch.ffnGateView,
+            batch.ffnUpView);
       }
       projectBatched(
           batch.projected,
@@ -1294,8 +1377,18 @@ public final class Qwen35ForwardPass {
     float[] history = session.convolutionHistory[layer];
     for (int token = 0; token < batchSize; token++) {
       int mixedBase = token * convDimension;
-      VectorUtil.causalDepthwiseConv1dSilu(
-          batch.mixed, mixedBase, history, 0, weights.convolution(), 0, convDimension, kernel);
+      causalDepthwiseConv1dSilu(
+          batch.mixed,
+          mixedBase,
+          history,
+          0,
+          weights.convolution(),
+          0,
+          convDimension,
+          kernel,
+          batch.mixedView,
+          session.convolutionHistoryViews == null ? null : session.convolutionHistoryViews[layer],
+          activationWeightViews == null ? null : activationWeightViews[layer].convolution());
       System.arraycopy(batch.mixed, mixedBase, batch.gdnQuery, token * keyDimension, keyDimension);
       System.arraycopy(
           batch.mixed, mixedBase + keyDimension, batch.gdnKey, token * keyDimension, keyDimension);
@@ -1306,7 +1399,7 @@ public final class Qwen35ForwardPass {
           token * valueDimension,
           valueDimension);
       int gateBase = token * valueHeads;
-      VectorUtil.sigmoidAndScaledSoftplus(
+      sigmoidAndScaledSoftplus(
           batch.beta,
           gateBase,
           batch.alpha,
@@ -1317,7 +1410,12 @@ public final class Qwen35ForwardPass {
           0,
           batch.logDecay,
           gateBase,
-          valueHeads);
+          valueHeads,
+          batch.betaView,
+          batch.alphaView,
+          activationWeightViews == null ? null : activationWeightViews[layer].bias(),
+          activationWeightViews == null ? null : activationWeightViews[layer].scale(),
+          batch.logDecayView);
     }
 
     applyGatedDeltaNetRecurrence(
@@ -1350,14 +1448,17 @@ public final class Qwen35ForwardPass {
             headDimension,
             config.rmsNormEpsilon());
       }
-      VectorUtil.swiGlu(
+      swiGlu(
           batch.recurrent,
           valueBase,
           batch.outputGate,
           valueBase,
           batch.recurrent,
           valueBase,
-          valueDimension);
+          valueDimension,
+          batch.recurrentView,
+          batch.outputGateView,
+          batch.recurrentView);
     }
     projectBatched(
         output,
@@ -1569,8 +1670,18 @@ public final class Qwen35ForwardPass {
 
     int kernel = config.gdnConvKernel();
     float[] history = session.convolutionHistory[layer];
-    VectorUtil.causalDepthwiseConv1dSilu(
-        mixed, 0, history, 0, weights.convolution(), 0, convDimension, kernel);
+    causalDepthwiseConv1dSilu(
+        mixed,
+        0,
+        history,
+        0,
+        weights.convolution(),
+        0,
+        convDimension,
+        kernel,
+        workspace.mixedView,
+        session.convolutionHistoryViews == null ? null : session.convolutionHistoryViews[layer],
+        activationWeightViews == null ? null : activationWeightViews[layer].convolution());
     float[] query = workspace.query;
     float[] key = workspace.key;
     float[] value = workspace.value;
@@ -1578,8 +1689,23 @@ public final class Qwen35ForwardPass {
     System.arraycopy(mixed, keyDimension, key, 0, keyDimension);
     System.arraycopy(mixed, 2 * keyDimension, value, 0, valueDimension);
     float[] logDecay = workspace.logDecay;
-    VectorUtil.sigmoidAndScaledSoftplus(
-        beta, 0, alpha, 0, weights.timeStepBias(), 0, weights.decay(), 0, logDecay, 0, heads);
+    sigmoidAndScaledSoftplus(
+        beta,
+        0,
+        alpha,
+        0,
+        weights.timeStepBias(),
+        0,
+        weights.decay(),
+        0,
+        logDecay,
+        0,
+        heads,
+        workspace.betaView,
+        workspace.alphaView,
+        activationWeightViews == null ? null : activationWeightViews[layer].bias(),
+        activationWeightViews == null ? null : activationWeightViews[layer].scale(),
+        workspace.logDecayView);
 
     float[] recurrent = workspace.recurrent;
     applyGatedDeltaNetRecurrence(
@@ -1610,8 +1736,132 @@ public final class Qwen35ForwardPass {
           headDimension,
           config.rmsNormEpsilon());
     }
-    VectorUtil.swiGlu(recurrent, 0, outputGate, 0, recurrent, 0, valueDimension);
+    swiGlu(
+        recurrent,
+        0,
+        outputGate,
+        0,
+        recurrent,
+        0,
+        valueDimension,
+        workspace.recurrentView,
+        workspace.outputGateView,
+        workspace.recurrentView);
     project(output, recurrent, weights.output(), session.scratch);
+  }
+
+  private void sigmoidAndScaledSoftplus(
+      float[] sigmoid,
+      int sigmoidAt,
+      float[] softplus,
+      int softplusAt,
+      float[] bias,
+      int biasAt,
+      float[] scale,
+      int scaleAt,
+      float[] out,
+      int outAt,
+      int length,
+      FloatArrayView sigmoidView,
+      FloatArrayView softplusView,
+      FloatArrayView biasView,
+      FloatArrayView scaleView,
+      FloatArrayView outView) {
+    boolean accepted =
+        sigmoidView != null
+                && softplusView != null
+                && biasView != null
+                && scaleView != null
+                && outView != null
+            ? batchedMatrixKernel.trySigmoidAndScaledSoftplus(
+                sigmoidView,
+                sigmoidAt,
+                softplusView,
+                softplusAt,
+                biasView,
+                biasAt,
+                scaleView,
+                scaleAt,
+                outView,
+                outAt,
+                length)
+            : batchedMatrixKernel.trySigmoidAndScaledSoftplus(
+                sigmoid,
+                sigmoidAt,
+                softplus,
+                softplusAt,
+                bias,
+                biasAt,
+                scale,
+                scaleAt,
+                out,
+                outAt,
+                length);
+    if (!accepted) {
+      VectorUtil.sigmoidAndScaledSoftplus(
+          sigmoid,
+          sigmoidAt,
+          softplus,
+          softplusAt,
+          bias,
+          biasAt,
+          scale,
+          scaleAt,
+          out,
+          outAt,
+          length);
+    }
+  }
+
+  private void causalDepthwiseConv1dSilu(
+      float[] values,
+      int valuesAt,
+      float[] history,
+      int historyAt,
+      float[] weights,
+      int weightsAt,
+      int channels,
+      int kernel,
+      FloatArrayView valuesView,
+      FloatArrayView historyView,
+      FloatArrayView weightsView) {
+    boolean accepted =
+        valuesView != null && historyView != null && weightsView != null
+            ? batchedMatrixKernel.tryCausalDepthwiseConv1dSilu(
+                valuesView,
+                valuesAt,
+                historyView,
+                historyAt,
+                weightsView,
+                weightsAt,
+                channels,
+                kernel)
+            : batchedMatrixKernel.tryCausalDepthwiseConv1dSilu(
+                values, valuesAt, history, historyAt, weights, weightsAt, channels, kernel);
+    if (!accepted) {
+      VectorUtil.causalDepthwiseConv1dSilu(
+          values, valuesAt, history, historyAt, weights, weightsAt, channels, kernel);
+    }
+  }
+
+  private void swiGlu(
+      float[] out,
+      int outAt,
+      float[] gate,
+      int gateAt,
+      float[] up,
+      int upAt,
+      int length,
+      FloatArrayView outView,
+      FloatArrayView gateView,
+      FloatArrayView upView) {
+    boolean accepted =
+        outView != null && gateView != null && upView != null
+            ? batchedMatrixKernel.trySwiGlu(outView, outAt, gateView, gateAt, upView, upAt, length)
+            : batchedMatrixKernel.trySwiGlu(out, outAt, gate, gateAt, up, upAt, length);
+    if (!accepted) {
+      VectorUtil.swiGlu(out, outAt, gate, gateAt, up, upAt, length);
+    }
   }
 
   private void applyGatedDeltaNetRecurrence(
@@ -1620,38 +1870,18 @@ public final class Qwen35ForwardPass {
       float[] value,
       float[] logDecay,
       float[] beta,
-      float[] state,
+      double[] state,
       float[] output,
       float[] normalizedQuery,
       float[] normalizedKey,
-      float[] memory,
-      float[] delta,
+      double[] memory,
+      double[] delta,
       int tokenCount,
       int keyHeadCount,
       int valueHeadCount,
       int keyDimension,
       int valueDimension) {
-    if (batchedMatrixKernel.supportsGatedDeltaNet(keyDimension, valueDimension)) {
-      batchedMatrixKernel.gatedDeltaNet(
-          query,
-          key,
-          value,
-          logDecay,
-          beta,
-          state,
-          output,
-          tokenCount,
-          keyHeadCount,
-          valueHeadCount,
-          keyDimension,
-          valueDimension);
-      return;
-    }
-    if (batchedMatrixKernel != GgufBatchedMatrixKernel.none()) {
-      PerformanceCliffs.report(
-          PerformanceCliff.NATIVE_GATED_DELTA_NET_UNAVAILABLE,
-          "architecture=qwen35, kernel=" + batchedMatrixKernel.implementation());
-    }
+
     if (tokenCount == 1) {
       GatedDeltaNetRecurrence.forwardInPlace(
           query,
@@ -1695,20 +1925,27 @@ public final class Qwen35ForwardPass {
     private final float[][] keys;
     private final float[][] values;
     private final float[][] convolutionHistory;
-    private final float[][] recurrentState;
+    private final FloatArrayView[] convolutionHistoryViews;
+    private final double[][] recurrentState;
     private final ProjectionScratch scratch;
     private final GatedDeltaNetScratch gatedDeltaNetScratch;
     private final BatchScratch batchScratch;
 
     private SessionState(
-        Qwen35Config config, Qwen35Weights weights, int capacity, int prefillBatchSize) {
+        Qwen35Config config,
+        Qwen35Weights weights,
+        int capacity,
+        int prefillBatchSize,
+        GgufBatchedMatrixKernel kernel) {
       keys = new float[config.numLayers()][];
       values = new float[config.numLayers()][];
       convolutionHistory = new float[config.numLayers()][];
-      recurrentState = new float[config.numLayers()][];
+      convolutionHistoryViews =
+          kernel.supportsRecurrentActivations() ? new FloatArrayView[config.numLayers()] : null;
+      recurrentState = new double[config.numLayers()][];
       scratch = new ProjectionScratch(weights);
-      gatedDeltaNetScratch = new GatedDeltaNetScratch(config);
-      batchScratch = new BatchScratch(config, weights, capacity, prefillBatchSize);
+      gatedDeltaNetScratch = new GatedDeltaNetScratch(config, kernel);
+      batchScratch = new BatchScratch(config, weights, capacity, prefillBatchSize, kernel);
       for (int layer = 0; layer < config.numLayers(); layer++) {
         if (config.usesFullAttention(layer)) {
           keys[layer] = new float[Math.multiplyExact(capacity, config.attentionKeyDim())];
@@ -1716,8 +1953,11 @@ public final class Qwen35ForwardPass {
         } else {
           convolutionHistory[layer] =
               new float[Math.multiplyExact(config.gdnConvDim(), config.gdnConvKernel() - 1)];
+          if (convolutionHistoryViews != null) {
+            convolutionHistoryViews[layer] = kernel.prepareFloatArray(convolutionHistory[layer]);
+          }
           recurrentState[layer] =
-              new float
+              new double
                   [Math.multiplyExact(
                       Math.multiplyExact(config.gdnValueHeads(), config.gdnHeadDim()),
                       config.gdnHeadDim())];
@@ -1738,7 +1978,7 @@ public final class Qwen35ForwardPass {
           Arrays.fill(history, 0.0f);
         }
       }
-      for (float[] state : recurrentState) {
+      for (double[] state : recurrentState) {
         if (state != null) {
           Arrays.fill(state, 0.0f);
         }
@@ -1752,8 +1992,11 @@ public final class Qwen35ForwardPass {
     private final float[] normalized;
     private final float[] projected;
     private final float[] ffnGate;
+    private final FloatArrayView ffnGateView;
     private final float[] ffnUp;
+    private final FloatArrayView ffnUpView;
     private final float[] ffn;
+    private final FloatArrayView ffnView;
     private final float[] queryGate;
     private final float[] query;
     private final float[] key;
@@ -1761,29 +2004,43 @@ public final class Qwen35ForwardPass {
     private final float[] attended;
     private final float[] attentionScores;
     private final float[] mixed;
+    private final FloatArrayView mixedView;
     private final float[] outputGate;
+    private final FloatArrayView outputGateView;
     private final float[] beta;
+    private final FloatArrayView betaView;
     private final float[] alpha;
+    private final FloatArrayView alphaView;
     private final float[] logDecay;
+    private final FloatArrayView logDecayView;
     private final float[] gdnQuery;
     private final float[] gdnKey;
     private final float[] gdnValue;
     private final float[] recurrent;
+    private final FloatArrayView recurrentView;
     private final float[] rowRecurrent;
     private final float[] normalizedQuery;
     private final float[] normalizedKey;
-    private final float[] memory;
-    private final float[] delta;
+    private final double[] memory;
+    private final double[] delta;
     private final BatchProjectionScratch projectionScratch;
 
-    private BatchScratch(Qwen35Config config, Qwen35Weights weights, int capacity, int batchSize) {
+    private BatchScratch(
+        Qwen35Config config,
+        Qwen35Weights weights,
+        int capacity,
+        int batchSize,
+        GgufBatchedMatrixKernel kernel) {
       rowState = new float[config.embeddingDim()];
       state = batchBuffer(batchSize, config.embeddingDim());
       normalized = batchBuffer(batchSize, config.embeddingDim());
       projected = batchBuffer(batchSize, config.embeddingDim());
       ffnGate = batchBuffer(batchSize, config.hiddenDim());
+      ffnGateView = kernel.prepareFloatArray(ffnGate);
       ffnUp = batchBuffer(batchSize, config.hiddenDim());
+      ffnUpView = kernel.prepareFloatArray(ffnUp);
       ffn = batchBuffer(batchSize, config.hiddenDim());
+      ffnView = kernel.prepareFloatArray(ffn);
       queryGate = batchBuffer(batchSize, 2 * config.attentionQueryDim());
       query = batchBuffer(batchSize, config.attentionQueryDim());
       key = batchBuffer(batchSize, config.attentionKeyDim());
@@ -1791,19 +2048,26 @@ public final class Qwen35ForwardPass {
       attended = batchBuffer(batchSize, config.attentionQueryDim());
       attentionScores = new float[capacity];
       mixed = batchBuffer(batchSize, config.gdnConvDim());
+      mixedView = kernel.supportsRecurrentActivations() ? kernel.prepareFloatArray(mixed) : null;
       outputGate = batchBuffer(batchSize, config.gdnValueDim());
+      outputGateView = kernel.prepareFloatArray(outputGate);
       beta = batchBuffer(batchSize, config.gdnValueHeads());
+      betaView = kernel.supportsRecurrentActivations() ? kernel.prepareFloatArray(beta) : null;
       alpha = batchBuffer(batchSize, config.gdnValueHeads());
+      alphaView = kernel.supportsRecurrentActivations() ? kernel.prepareFloatArray(alpha) : null;
       logDecay = batchBuffer(batchSize, config.gdnValueHeads());
+      logDecayView =
+          kernel.supportsRecurrentActivations() ? kernel.prepareFloatArray(logDecay) : null;
       gdnQuery = batchBuffer(batchSize, config.gdnKeyDim());
       gdnKey = batchBuffer(batchSize, config.gdnKeyDim());
       gdnValue = batchBuffer(batchSize, config.gdnValueDim());
       recurrent = batchBuffer(batchSize, config.gdnValueDim());
+      recurrentView = kernel.prepareFloatArray(recurrent);
       rowRecurrent = new float[config.gdnValueDim()];
       normalizedQuery = new float[config.gdnHeadDim()];
       normalizedKey = new float[config.gdnHeadDim()];
-      memory = new float[config.gdnHeadDim()];
-      delta = new float[config.gdnHeadDim()];
+      memory = new double[config.gdnHeadDim()];
+      delta = new double[config.gdnHeadDim()];
       projectionScratch = new BatchProjectionScratch(config, weights, batchSize);
     }
   }
@@ -1841,25 +2105,35 @@ public final class Qwen35ForwardPass {
 
   private static final class GatedDeltaNetScratch {
     private final float[] mixed;
+    private final FloatArrayView mixedView;
     private final float[] outputGate;
+    private final FloatArrayView outputGateView;
     private final float[] beta;
+    private final FloatArrayView betaView;
     private final float[] alpha;
+    private final FloatArrayView alphaView;
     private final float[] betaAlpha;
     private final float[] query;
     private final float[] key;
     private final float[] value;
     private final float[] logDecay;
+    private final FloatArrayView logDecayView;
     private final float[] recurrent;
+    private final FloatArrayView recurrentView;
     private final float[] normalizedQuery;
     private final float[] normalizedKey;
-    private final float[] memory;
-    private final float[] delta;
+    private final double[] memory;
+    private final double[] delta;
 
-    private GatedDeltaNetScratch(Qwen35Config config) {
+    private GatedDeltaNetScratch(Qwen35Config config, GgufBatchedMatrixKernel kernel) {
       mixed = new float[config.gdnConvDim()];
+      mixedView = kernel.supportsRecurrentActivations() ? kernel.prepareFloatArray(mixed) : null;
       outputGate = new float[config.gdnValueDim()];
+      outputGateView = kernel.prepareFloatArray(outputGate);
       beta = new float[config.gdnValueHeads()];
+      betaView = kernel.supportsRecurrentActivations() ? kernel.prepareFloatArray(beta) : null;
       alpha = new float[config.gdnValueHeads()];
+      alphaView = kernel.supportsRecurrentActivations() ? kernel.prepareFloatArray(alpha) : null;
       // Holds one fused ssm_ba projection before it is split; empty when the model has separate
       // beta and alpha tensors, which is every Qwen3.5 file.
       betaAlpha = new float[2 * config.gdnValueHeads()];
@@ -1867,11 +2141,14 @@ public final class Qwen35ForwardPass {
       key = new float[config.gdnKeyDim()];
       value = new float[config.gdnValueDim()];
       logDecay = new float[config.gdnValueHeads()];
+      logDecayView =
+          kernel.supportsRecurrentActivations() ? kernel.prepareFloatArray(logDecay) : null;
       recurrent = new float[config.gdnValueDim()];
+      recurrentView = kernel.prepareFloatArray(recurrent);
       normalizedQuery = new float[config.gdnHeadDim()];
       normalizedKey = new float[config.gdnHeadDim()];
-      memory = new float[config.gdnHeadDim()];
-      delta = new float[config.gdnHeadDim()];
+      memory = new double[config.gdnHeadDim()];
+      delta = new double[config.gdnHeadDim()];
     }
   }
 
@@ -1954,6 +2231,13 @@ public final class Qwen35ForwardPass {
           input,
           1,
           firstWeights.columns());
+      return;
+    }
+    // The BF16 provider serves individual projections, not the grouped quantized ABI.
+    // Preserve the paired Java route for all other formats and unqualified BF16 shapes.
+    if (eligibleBfloat16Pair(firstWeights, secondWeights, 1)) {
+      project(firstOutput, input, firstWeights, scratch);
+      project(secondOutput, input, secondWeights, scratch);
       return;
     }
     TensorOps.ggufDualMatmul(
@@ -2144,6 +2428,11 @@ public final class Qwen35ForwardPass {
           firstWeights.columns());
       return;
     }
+    if (eligibleBfloat16Pair(firstWeights, secondWeights, batchSize)) {
+      projectBatched(firstOutput, input, firstWeights, batchSize, scalarScratch, batchScratch);
+      projectBatched(secondOutput, input, secondWeights, batchSize, scalarScratch, batchScratch);
+      return;
+    }
     if (!TensorOps.supportsBatchedMatmul(firstWeights.type())
         || !TensorOps.supportsBatchedMatmul(secondWeights.type())) {
       projectBatched(firstOutput, input, firstWeights, batchSize, scalarScratch, batchScratch);
@@ -2169,6 +2458,14 @@ public final class Qwen35ForwardPass {
         batchScratch.q4LaneScratch,
         q4Kernel,
         q6BatchedKernel);
+  }
+
+  private boolean eligibleBfloat16Pair(Matrix first, Matrix second, int batchSize) {
+    return first.type() == GgufTensorType.BF16
+        && second.type() == GgufTensorType.BF16
+        && batchedMatrixKernel.isEligible(first.type(), batchSize, first.rows(), first.columns())
+        && batchedMatrixKernel.isEligible(
+            second.type(), batchSize, second.rows(), second.columns());
   }
 
   private void tripleProjectBatched(

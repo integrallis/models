@@ -15,6 +15,9 @@
  */
 package com.integrallis.models.backend.purejava.qwen35;
 
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel.FloatArrayView;
+
 /**
  * State for answering several questions about one piece of evidence in lockstep.
  *
@@ -66,6 +69,7 @@ final class Qwen35GroupedDecision {
   /** The private state one question needs while the evidence's state is shared. */
   static final class Branch {
     private final float[][] convolutionHistory;
+    private FloatArrayView[] convolutionHistoryViews;
     private final float[][] suffixKeys;
     private final float[][] suffixValues;
     private int position;
@@ -89,6 +93,16 @@ final class Qwen35GroupedDecision {
               new float[Math.multiplyExact(config.gdnConvDim(), config.gdnConvKernel() - 1)];
         }
       }
+    }
+
+    FloatArrayView convolutionHistoryView(int layer, GgufBatchedMatrixKernel kernel) {
+      if (!kernel.supportsRecurrentActivations()) return null;
+      if (convolutionHistoryViews == null)
+        convolutionHistoryViews = new FloatArrayView[convolutionHistory.length];
+      if (convolutionHistoryViews[layer] == null) {
+        convolutionHistoryViews[layer] = kernel.prepareFloatArray(convolutionHistory[layer]);
+      }
+      return convolutionHistoryViews[layer];
     }
 
     float[] convolutionHistory(int layer) {
@@ -143,20 +157,16 @@ final class Qwen35GroupedDecision {
     }
   }
 
-  private final Qwen35Config config;
   private final Branch[] branches;
   private final int suffixCapacity;
 
   /**
    * Recurrent state for every branch of a layer in one array, branch-major.
    *
-   * <p>Held here rather than on the branch so a step is a single kernel call. A kernel told to
-   * advance one sequence by one token has nothing to spread across a thread pool and runs on the
-   * caller; told to advance twenty, it has twenty independent recurrences. MEASURED 2026-09-24:
-   * calling the recurrence once per branch made twenty grouped questions cost 12.4 s, and one call
-   * for the whole group brought that to 10.8 s.
+   * <p>Each branch owns an independent FP64 slot. The Java recurrence advances active slots
+   * individually; no float-native grouped call consumes this storage.
    */
-  private final float[][] recurrentState;
+  private final double[][] recurrentState;
 
   private final int recurrentStateElements;
 
@@ -168,7 +178,6 @@ final class Qwen35GroupedDecision {
     if (suffixCapacity < 1) {
       throw new IllegalArgumentException("suffixCapacity must be >= 1: " + suffixCapacity);
     }
-    this.config = config;
     this.suffixCapacity = suffixCapacity;
     this.branches = new Branch[groupSize];
     for (int index = 0; index < groupSize; index++) {
@@ -177,20 +186,20 @@ final class Qwen35GroupedDecision {
     this.recurrentStateElements =
         Math.multiplyExact(
             Math.multiplyExact(config.gdnValueHeads(), config.gdnHeadDim()), config.gdnHeadDim());
-    this.recurrentState = new float[config.numLayers()][];
+    this.recurrentState = new double[config.numLayers()][];
     for (int layer = 0; layer < config.numLayers(); layer++) {
       if (!config.usesFullAttention(layer)) {
-        recurrentState[layer] = new float[Math.multiplyExact(groupSize, recurrentStateElements)];
+        recurrentState[layer] = new double[Math.multiplyExact(groupSize, recurrentStateElements)];
       }
     }
   }
 
   /** Every branch's recurrent state for one layer, branch-major, or null on attention layers. */
-  float[] recurrentState(int layer) {
+  double[] recurrentState(int layer) {
     return recurrentState[layer];
   }
 
-  /** Floats one branch occupies in a layer's recurrent state. */
+  /** Elements one branch occupies in a layer's recurrent state. */
   int recurrentStateElements() {
     return recurrentStateElements;
   }
@@ -203,7 +212,7 @@ final class Qwen35GroupedDecision {
    */
   void forkBranch(
       int index,
-      float[][] evidenceRecurrent,
+      double[][] evidenceRecurrent,
       float[][] evidenceConvolution,
       float[][] evidenceKeys,
       float[][] evidenceValues,
@@ -233,23 +242,5 @@ final class Qwen35GroupedDecision {
 
   Branch branch(int index) {
     return branches[index];
-  }
-
-  Qwen35Config config() {
-    return config;
-  }
-
-  /** Bytes of private state a group holds, which is what bounds how many questions run at once. */
-  long stateBytes() {
-    long bytes = 0L;
-    for (float[] layer : recurrentState) {
-      bytes += layer == null ? 0L : (long) layer.length * Float.BYTES;
-    }
-    for (Branch branch : branches) {
-      for (float[] layer : branch.suffixKeys) {
-        bytes += layer == null ? 0L : 2L * layer.length * Float.BYTES;
-      }
-    }
-    return bytes;
   }
 }

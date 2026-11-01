@@ -55,7 +55,7 @@ class EvidenceGateTest(unittest.TestCase):
         self.registry['operations'][0]['proof'] = {'path': 'decision.json', 'sha256': V.sha(path)}
 
     def test_inventory_reports_gaps_instead_of_certifying_them(self):
-        self.assertEqual(15, len(self.verify()['unresolved']))
+        self.assertEqual(17, len(self.verify()['unresolved']))
 
     def test_new_export_requires_inventory_and_operation(self):
         with (self.root / V.RUST / 'lib.rs').open('a') as stream:
@@ -95,7 +95,7 @@ class EvidenceGateTest(unittest.TestCase):
 
     def test_structurally_complete_fixture_is_accepted(self):
         self.proof()
-        self.assertEqual(14, len(self.verify()['unresolved']))
+        self.assertEqual(16, len(self.verify()['unresolved']))
 
     def test_native_jar_presence_without_native_calls_is_rejected(self):
         self.proof()

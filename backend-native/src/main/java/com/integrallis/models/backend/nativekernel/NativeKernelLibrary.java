@@ -57,6 +57,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   static final long DEFAULT_POLL_MILLIS = 5;
 
   private static final int STATUS_OK = 0;
+  private static final int STATUS_INVALID_SHAPE = 2;
   private static final int FORMAT_Q4_0 = 0;
   private static final int FORMAT_Q8_0 = 1;
   private static final int FORMAT_Q4_K = 2;
@@ -67,12 +68,73 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private static final int FORMAT_PTQ1_0 = 7;
   private static final Linker LINKER = Linker.nativeLinker();
   private static final MethodHandle FLOAT_ARRAY_SEGMENT = floatArraySegment();
+  private static final FunctionDescriptor BF16_BATCHED_DESCRIPTOR =
+      FunctionDescriptor.of(
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT);
   private static final FunctionDescriptor ABI_VERSION_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_INT);
   private static final FunctionDescriptor CAPABILITIES_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_LONG);
   private static final FunctionDescriptor CONTEXT_CREATE_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
+  private static final FunctionDescriptor SWIGLU_DESCRIPTOR =
+      FunctionDescriptor.of(
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT);
+  private static final FunctionDescriptor SIGMOID_SOFTPLUS_DESCRIPTOR =
+      FunctionDescriptor.of(
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT);
+  private static final FunctionDescriptor CONV_SILU_DESCRIPTOR =
+      FunctionDescriptor.of(
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT);
   private static final FunctionDescriptor SET_ACTIVE_THREADS_DESCRIPTOR =
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT);
   private static final FunctionDescriptor SET_POLL_NANOS_DESCRIPTOR =
@@ -206,10 +268,14 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private final MethodHandle quantizedBatchedHandle;
   private final MethodHandle quantizedGroupedBatchedHandle;
   private final MethodHandle quantizedIndependentBatchedHandle;
-  private final MethodHandle gatedDeltaNetHandle;
-  private final MethodHandle groupedGatedDeltaNetHandle;
+  private final DeferredCriticalCall gatedDeltaNetHandle;
+  private final DeferredCriticalCall groupedGatedDeltaNetHandle;
   private final MethodHandle setActiveThreadsHandle;
-  private final MethodHandle groupedAttentionHandle;
+  private final DeferredCriticalCall groupedAttentionHandle;
+  private final DeferredCriticalCall bfloat16Handle;
+  private final DeferredCriticalCall swiGluHandle;
+  private final DeferredCriticalCall sigmoidSoftplusHandle;
+  private final DeferredCriticalCall convolutionSiluHandle;
   private final int threadCount;
   private final int decodeThreadCount;
   private final long pollMillis;
@@ -224,10 +290,14 @@ public final class NativeKernelLibrary implements AutoCloseable {
       MethodHandle quantizedBatchedHandle,
       MethodHandle quantizedGroupedBatchedHandle,
       MethodHandle quantizedIndependentBatchedHandle,
-      MethodHandle gatedDeltaNetHandle,
-      MethodHandle groupedGatedDeltaNetHandle,
+      DeferredCriticalCall gatedDeltaNetHandle,
+      DeferredCriticalCall groupedGatedDeltaNetHandle,
       MethodHandle setActiveThreadsHandle,
-      MethodHandle groupedAttentionHandle,
+      DeferredCriticalCall groupedAttentionHandle,
+      DeferredCriticalCall bfloat16Handle,
+      DeferredCriticalCall swiGluHandle,
+      DeferredCriticalCall sigmoidSoftplusHandle,
+      DeferredCriticalCall convolutionSiluHandle,
       int threadCount,
       int decodeThreadCount,
       long pollMillis) {
@@ -242,6 +312,10 @@ public final class NativeKernelLibrary implements AutoCloseable {
     this.groupedGatedDeltaNetHandle = groupedGatedDeltaNetHandle;
     this.setActiveThreadsHandle = setActiveThreadsHandle;
     this.groupedAttentionHandle = groupedAttentionHandle;
+    this.bfloat16Handle = bfloat16Handle;
+    this.swiGluHandle = swiGluHandle;
+    this.sigmoidSoftplusHandle = sigmoidSoftplusHandle;
+    this.convolutionSiluHandle = convolutionSiluHandle;
     this.pollMillis = pollMillis;
     this.threadCount = threadCount;
     this.decodeThreadCount = decodeThreadCount;
@@ -297,12 +371,11 @@ public final class NativeKernelLibrary implements AutoCloseable {
               lookup,
               "jmodels_quantized_f32_independent_batched_matmul_with_context",
               QUANTIZED_INDEPENDENT_BATCHED_WITH_CONTEXT_DESCRIPTOR);
-      MethodHandle gatedDeltaNet =
-          withFloatArrays(
-              downcallCritical(
-                  lookup,
-                  "jmodels_gated_delta_net_f32_with_context",
-                  GATED_DELTA_NET_WITH_CONTEXT_DESCRIPTOR),
+      DeferredCriticalCall gatedDeltaNet =
+          deferredCritical(
+              lookup,
+              "jmodels_gated_delta_net_f32_with_context",
+              GATED_DELTA_NET_WITH_CONTEXT_DESCRIPTOR,
               1,
               3,
               5,
@@ -310,9 +383,9 @@ public final class NativeKernelLibrary implements AutoCloseable {
               9,
               11,
               13);
-      MethodHandle groupedGatedDeltaNet =
+      DeferredCriticalCall groupedGatedDeltaNet =
           (capabilityMask & NativeKernelCapability.GROUPED_GATED_DELTA_NET_F32.mask()) != 0
-              ? downcallCritical(
+              ? deferredCritical(
                   lookup,
                   "jmodels_gated_delta_net_group_f32_with_context",
                   GROUPED_GATED_DELTA_NET_WITH_CONTEXT_DESCRIPTOR)
@@ -324,12 +397,40 @@ public final class NativeKernelLibrary implements AutoCloseable {
                   "jmodels_kernels_context_set_active_threads",
                   SET_ACTIVE_THREADS_DESCRIPTOR)
               : null;
-      MethodHandle groupedAttention =
+      DeferredCriticalCall groupedAttention =
           (capabilityMask & NativeKernelCapability.GROUPED_ATTENTION_F32.mask()) != 0
-              ? downcallCritical(
+              ? deferredCritical(
                   lookup,
                   "jmodels_grouped_attention_f32_with_context",
                   GROUPED_ATTENTION_DESCRIPTOR)
+              : null;
+      DeferredCriticalCall bfloat16 =
+          (capabilityMask & NativeKernelCapability.BF16_F32_BATCHED_MATMUL.mask()) != 0
+              ? deferredCritical(
+                  lookup, "jmodels_bf16_f32_batched_matmul", BF16_BATCHED_DESCRIPTOR, 2, 4)
+              : null;
+      DeferredCriticalCall swiGlu =
+          (capabilityMask & NativeKernelCapability.SWIGLU_F32.mask()) != 0
+              ? deferredCritical(lookup, "jmodels_swiglu_f32", SWIGLU_DESCRIPTOR, 0, 3, 6)
+              : null;
+      boolean sleefActivations =
+          (capabilityMask & NativeKernelCapability.SLEEF_ACTIVATIONS_F32.mask()) != 0;
+      DeferredCriticalCall sigmoidSoftplus =
+          sleefActivations
+              ? deferredCritical(
+                  lookup,
+                  "jmodels_sigmoid_scaled_softplus_f32",
+                  SIGMOID_SOFTPLUS_DESCRIPTOR,
+                  0,
+                  3,
+                  6,
+                  9,
+                  12)
+              : null;
+      DeferredCriticalCall convolutionSilu =
+          sleefActivations
+              ? deferredCritical(
+                  lookup, "jmodels_causal_depthwise_conv_silu_f32", CONV_SILU_DESCRIPTOR, 0, 3, 6)
               : null;
       MethodHandle setPollNanos =
           (capabilityMask & NativeKernelCapability.POLL_BUDGET.mask()) != 0
@@ -355,6 +456,10 @@ public final class NativeKernelLibrary implements AutoCloseable {
           groupedGatedDeltaNet,
           setActiveThreads,
           groupedAttention,
+          bfloat16,
+          swiGlu,
+          sigmoidSoftplus,
+          convolutionSilu,
           threadCount,
           decodeThreadCount,
           pollMillis);
@@ -398,6 +503,338 @@ public final class NativeKernelLibrary implements AutoCloseable {
   public boolean supports(NativeKernelCapability capability) {
     Objects.requireNonNull(capability, "capability");
     return (capabilities & capability.mask()) != 0;
+  }
+
+  /** Executes the supported fixed-shape BF16 projection without copying caller arrays. */
+  synchronized void bfloat16F32BatchedMatmul(
+      MemorySegment weights,
+      float[] input,
+      float[] output,
+      int batchSize,
+      int rows,
+      int columns,
+      int lanes,
+      boolean fused) {
+    if (closed) throw new IllegalStateException("native kernel library is closed");
+    Objects.requireNonNull(weights, "weights");
+    Objects.requireNonNull(input, "input");
+    Objects.requireNonNull(output, "output");
+    if (bfloat16Handle == null) throw new UnsupportedOperationException("native BF16 unavailable");
+    if (rows != 48
+        || columns != 5120
+        || batchSize < 1
+        || batchSize > 32
+        || (lanes != 4 && lanes != 8)
+        || !weights.isNative()
+        || input == output) {
+      throw new IllegalArgumentException("unsupported BF16 projection shape, storage or alias");
+    }
+    requireCapacity(input, Math.multiplyExact(batchSize, columns), "input");
+    requireCapacity(output, Math.multiplyExact(batchSize, rows), "output");
+    if (weights.byteSize() < (long) rows * columns * Short.BYTES)
+      throw new IllegalArgumentException("BF16 weight buffer is too small");
+    try {
+      int status =
+          (int)
+              bfloat16Handle
+                  .handle()
+                  .invokeExact(
+                      weights,
+                      weights.byteSize(),
+                      input,
+                      (long) input.length,
+                      output,
+                      (long) output.length,
+                      batchSize,
+                      rows,
+                      columns,
+                      lanes,
+                      fused ? 1 : 0);
+      if (status != STATUS_OK)
+        throw new IllegalStateException("native BF16 projection failed: " + statusName(status));
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Throwable failure) {
+      throw bridgeFailure("BF16 projection", failure);
+    }
+  }
+
+  /** Returns false without writing when the native arithmetic cannot serve these inputs. */
+  synchronized boolean trySwiGlu(
+      float[] out, int outAt, float[] gate, int gateAt, float[] up, int upAt, int length) {
+    if (closed) throw new IllegalStateException("native kernel library is closed");
+    Objects.checkFromIndexSize(outAt, length, out.length);
+    Objects.checkFromIndexSize(gateAt, length, gate.length);
+    Objects.checkFromIndexSize(upAt, length, up.length);
+    if (swiGluHandle == null
+        || length == 0
+        || (length % 4 != 0 && !supports(NativeKernelCapability.SLEEF_ACTIVATIONS_F32)))
+      return false;
+    try {
+      int status =
+          (int)
+              swiGluHandle
+                  .handle()
+                  .invokeExact(
+                      out,
+                      (long) out.length,
+                      outAt,
+                      gate,
+                      (long) gate.length,
+                      gateAt,
+                      up,
+                      (long) up.length,
+                      upAt,
+                      length);
+      if (status == STATUS_INVALID_SHAPE) return false;
+      if (status != STATUS_OK)
+        throw new IllegalStateException("native SwiGLU failed: " + statusName(status));
+      return true;
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Throwable failure) {
+      throw bridgeFailure("SwiGLU", failure);
+    }
+  }
+
+  /** Returns false without writing when the native arithmetic cannot serve these inputs. */
+  synchronized boolean trySwiGlu(
+      MemorySegment out,
+      int outAt,
+      MemorySegment gate,
+      int gateAt,
+      MemorySegment up,
+      int upAt,
+      int length) {
+    if (closed) throw new IllegalStateException("native kernel library is closed");
+    Objects.checkFromIndexSize(outAt, length, (out.byteSize() / Float.BYTES));
+    Objects.checkFromIndexSize(gateAt, length, (gate.byteSize() / Float.BYTES));
+    Objects.checkFromIndexSize(upAt, length, (up.byteSize() / Float.BYTES));
+    if (swiGluHandle == null
+        || length == 0
+        || (length % 4 != 0 && !supports(NativeKernelCapability.SLEEF_ACTIVATIONS_F32)))
+      return false;
+    try {
+      int status =
+          (int)
+              swiGluHandle
+                  .segmentHandle()
+                  .invokeExact(
+                      out,
+                      out.byteSize() / Float.BYTES,
+                      outAt,
+                      gate,
+                      gate.byteSize() / Float.BYTES,
+                      gateAt,
+                      up,
+                      up.byteSize() / Float.BYTES,
+                      upAt,
+                      length);
+      if (status == STATUS_INVALID_SHAPE) return false;
+      if (status != STATUS_OK)
+        throw new IllegalStateException("native SwiGLU failed: " + statusName(status));
+      return true;
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Throwable failure) {
+      throw bridgeFailure("SwiGLU", failure);
+    }
+  }
+
+  synchronized boolean trySigmoidAndScaledSoftplus(
+      float[] sigmoid,
+      int sigmoidAt,
+      float[] softplus,
+      int softplusAt,
+      float[] bias,
+      int biasAt,
+      float[] scale,
+      int scaleAt,
+      float[] out,
+      int outAt,
+      int length) {
+    if (closed) throw new IllegalStateException("native kernel library is closed");
+    Objects.checkFromIndexSize(sigmoidAt, length, sigmoid.length);
+    Objects.checkFromIndexSize(softplusAt, length, softplus.length);
+    Objects.checkFromIndexSize(biasAt, length, bias.length);
+    Objects.checkFromIndexSize(scaleAt, length, scale.length);
+    Objects.checkFromIndexSize(outAt, length, out.length);
+    if (sigmoidSoftplusHandle == null || length == 0) return false;
+    try {
+      int status =
+          (int)
+              sigmoidSoftplusHandle
+                  .handle()
+                  .invokeExact(
+                      sigmoid,
+                      (long) sigmoid.length,
+                      sigmoidAt,
+                      softplus,
+                      (long) softplus.length,
+                      softplusAt,
+                      bias,
+                      (long) bias.length,
+                      biasAt,
+                      scale,
+                      (long) scale.length,
+                      scaleAt,
+                      out,
+                      (long) out.length,
+                      outAt,
+                      length);
+      if (status == STATUS_INVALID_SHAPE) return false;
+      if (status != STATUS_OK)
+        throw new IllegalStateException("native sigmoid/softplus failed: " + statusName(status));
+      return true;
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Throwable failure) {
+      throw bridgeFailure("sigmoid/softplus", failure);
+    }
+  }
+
+  synchronized boolean trySigmoidAndScaledSoftplus(
+      MemorySegment sigmoid,
+      int sigmoidAt,
+      MemorySegment softplus,
+      int softplusAt,
+      MemorySegment bias,
+      int biasAt,
+      MemorySegment scale,
+      int scaleAt,
+      MemorySegment out,
+      int outAt,
+      int length) {
+    if (closed) throw new IllegalStateException("native kernel library is closed");
+    Objects.checkFromIndexSize(sigmoidAt, length, (sigmoid.byteSize() / Float.BYTES));
+    Objects.checkFromIndexSize(softplusAt, length, (softplus.byteSize() / Float.BYTES));
+    Objects.checkFromIndexSize(biasAt, length, (bias.byteSize() / Float.BYTES));
+    Objects.checkFromIndexSize(scaleAt, length, (scale.byteSize() / Float.BYTES));
+    Objects.checkFromIndexSize(outAt, length, (out.byteSize() / Float.BYTES));
+    if (sigmoidSoftplusHandle == null || length == 0) return false;
+    try {
+      int status =
+          (int)
+              sigmoidSoftplusHandle
+                  .segmentHandle()
+                  .invokeExact(
+                      sigmoid,
+                      (sigmoid.byteSize() / Float.BYTES),
+                      sigmoidAt,
+                      softplus,
+                      (softplus.byteSize() / Float.BYTES),
+                      softplusAt,
+                      bias,
+                      (bias.byteSize() / Float.BYTES),
+                      biasAt,
+                      scale,
+                      (scale.byteSize() / Float.BYTES),
+                      scaleAt,
+                      out,
+                      (out.byteSize() / Float.BYTES),
+                      outAt,
+                      length);
+      if (status == STATUS_INVALID_SHAPE) return false;
+      if (status != STATUS_OK)
+        throw new IllegalStateException("native sigmoid/softplus failed: " + statusName(status));
+      return true;
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Throwable failure) {
+      throw bridgeFailure("sigmoid/softplus", failure);
+    }
+  }
+
+  synchronized boolean tryCausalDepthwiseConv1dSilu(
+      float[] values,
+      int valuesAt,
+      float[] history,
+      int historyAt,
+      float[] weights,
+      int weightsAt,
+      int channels,
+      int kernel,
+      boolean fused) {
+    if (closed) throw new IllegalStateException("native kernel library is closed");
+    if (kernel < 2) throw new IllegalArgumentException("convolution kernel must be at least two");
+    Objects.checkFromIndexSize(valuesAt, channels, values.length);
+    Objects.checkFromIndexSize(historyAt, Math.multiplyExact(channels, kernel - 1), history.length);
+    Objects.checkFromIndexSize(weightsAt, Math.multiplyExact(channels, kernel), weights.length);
+    if (convolutionSiluHandle == null || channels == 0) return false;
+    try {
+      int status =
+          (int)
+              convolutionSiluHandle
+                  .handle()
+                  .invokeExact(
+                      values,
+                      (long) values.length,
+                      valuesAt,
+                      history,
+                      (long) history.length,
+                      historyAt,
+                      weights,
+                      (long) weights.length,
+                      weightsAt,
+                      channels,
+                      kernel,
+                      fused ? 1 : 0);
+      if (status == STATUS_INVALID_SHAPE) return false;
+      if (status != STATUS_OK)
+        throw new IllegalStateException("native convolution/SiLU failed: " + statusName(status));
+      return true;
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Throwable failure) {
+      throw bridgeFailure("convolution/SiLU", failure);
+    }
+  }
+
+  synchronized boolean tryCausalDepthwiseConv1dSilu(
+      MemorySegment values,
+      int valuesAt,
+      MemorySegment history,
+      int historyAt,
+      MemorySegment weights,
+      int weightsAt,
+      int channels,
+      int kernel,
+      boolean fused) {
+    if (closed) throw new IllegalStateException("native kernel library is closed");
+    if (kernel < 2) throw new IllegalArgumentException("convolution kernel must be at least two");
+    Objects.checkFromIndexSize(valuesAt, channels, (values.byteSize() / Float.BYTES));
+    Objects.checkFromIndexSize(
+        historyAt, Math.multiplyExact(channels, kernel - 1), (history.byteSize() / Float.BYTES));
+    Objects.checkFromIndexSize(
+        weightsAt, Math.multiplyExact(channels, kernel), (weights.byteSize() / Float.BYTES));
+    if (convolutionSiluHandle == null || channels == 0) return false;
+    try {
+      int status =
+          (int)
+              convolutionSiluHandle
+                  .segmentHandle()
+                  .invokeExact(
+                      values,
+                      (values.byteSize() / Float.BYTES),
+                      valuesAt,
+                      history,
+                      (history.byteSize() / Float.BYTES),
+                      historyAt,
+                      weights,
+                      (weights.byteSize() / Float.BYTES),
+                      weightsAt,
+                      channels,
+                      kernel,
+                      fused ? 1 : 0);
+      if (status == STATUS_INVALID_SHAPE) return false;
+      if (status != STATUS_OK)
+        throw new IllegalStateException("native convolution/SiLU failed: " + statusName(status));
+      return true;
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Throwable failure) {
+      throw bridgeFailure("convolution/SiLU", failure);
+    }
   }
 
   /** Applies the Qwen 3.5 float32 Gated DeltaNet recurrence in caller-owned arrays. */
@@ -454,27 +891,29 @@ public final class NativeKernelLibrary implements AutoCloseable {
     try {
       int status =
           (int)
-              gatedDeltaNetHandle.invokeExact(
-                  context,
-                  query,
-                  (long) query.length,
-                  key,
-                  (long) key.length,
-                  value,
-                  (long) value.length,
-                  logDecay,
-                  (long) logDecay.length,
-                  beta,
-                  (long) beta.length,
-                  state,
-                  (long) state.length,
-                  output,
-                  (long) output.length,
-                  tokenCount,
-                  keyHeadCount,
-                  valueHeadCount,
-                  keyDimension,
-                  valueDimension);
+              gatedDeltaNetHandle
+                  .handle()
+                  .invokeExact(
+                      context,
+                      query,
+                      (long) query.length,
+                      key,
+                      (long) key.length,
+                      value,
+                      (long) value.length,
+                      logDecay,
+                      (long) logDecay.length,
+                      beta,
+                      (long) beta.length,
+                      state,
+                      (long) state.length,
+                      output,
+                      (long) output.length,
+                      tokenCount,
+                      keyHeadCount,
+                      valueHeadCount,
+                      keyDimension,
+                      valueDimension);
       if (status != STATUS_OK) {
         throw new IllegalStateException(
             "native Gated DeltaNet kernel failed: " + statusName(status));
@@ -594,23 +1033,25 @@ public final class NativeKernelLibrary implements AutoCloseable {
     try {
       int status =
           (int)
-              groupedGatedDeltaNetHandle.invokeExact(
-                  context,
-                  MemorySegment.ofArray(query),
-                  MemorySegment.ofArray(key),
-                  MemorySegment.ofArray(value),
-                  MemorySegment.ofArray(logDecay),
-                  MemorySegment.ofArray(beta),
-                  MemorySegment.ofArray(state),
-                  (long) state.length,
-                  MemorySegment.ofArray(output),
-                  slots,
-                  rowCount,
-                  stateSlotCount,
-                  keyHeadCount,
-                  valueHeadCount,
-                  keyDimension,
-                  valueDimension);
+              groupedGatedDeltaNetHandle
+                  .handle()
+                  .invokeExact(
+                      context,
+                      MemorySegment.ofArray(query),
+                      MemorySegment.ofArray(key),
+                      MemorySegment.ofArray(value),
+                      MemorySegment.ofArray(logDecay),
+                      MemorySegment.ofArray(beta),
+                      MemorySegment.ofArray(state),
+                      (long) state.length,
+                      MemorySegment.ofArray(output),
+                      slots,
+                      rowCount,
+                      stateSlotCount,
+                      keyHeadCount,
+                      valueHeadCount,
+                      keyDimension,
+                      valueDimension);
       if (status != STATUS_OK) {
         throw new IllegalStateException(
             "native grouped Gated DeltaNet kernel failed: " + statusName(status));
@@ -1231,14 +1672,62 @@ public final class NativeKernelLibrary implements AutoCloseable {
     return LINKER.downcallHandle(symbol, descriptor);
   }
 
-  private static MethodHandle downcallCritical(
-      SymbolLookup lookup, String symbolName, FunctionDescriptor descriptor) {
+  private static DeferredCriticalCall deferredCritical(
+      SymbolLookup lookup,
+      String symbolName,
+      FunctionDescriptor descriptor,
+      int... arrayPositions) {
+    // Resolve every advertised entry while opening the library, so malformed binaries still fail
+    // immediately. Link only operations the loaded model uses; first use owns that setup cost.
     MemorySegment symbol =
         lookup
             .find(symbolName)
             .orElseThrow(
                 () -> new IllegalArgumentException("missing native kernel symbol: " + symbolName));
-    return LINKER.downcallHandle(symbol, descriptor, Linker.Option.critical(true));
+    return new DeferredCriticalCall(symbol, descriptor, arrayPositions);
+  }
+
+  private static final class DeferredCriticalCall {
+    private final MemorySegment symbol;
+    private final FunctionDescriptor descriptor;
+    private final int[] arrayPositions;
+    private volatile MethodHandle linked;
+    private volatile MethodHandle rawLinked;
+
+    private DeferredCriticalCall(
+        MemorySegment symbol, FunctionDescriptor descriptor, int[] arrayPositions) {
+      this.symbol = symbol;
+      this.descriptor = descriptor;
+      this.arrayPositions = arrayPositions;
+    }
+
+    private MethodHandle segmentHandle() {
+      MethodHandle result = rawLinked;
+      if (result == null) {
+        synchronized (this) {
+          result = rawLinked;
+          if (result == null) {
+            result = LINKER.downcallHandle(symbol, descriptor, Linker.Option.critical(true));
+            rawLinked = result;
+          }
+        }
+      }
+      return result;
+    }
+
+    private MethodHandle handle() {
+      MethodHandle result = linked;
+      if (result == null) {
+        synchronized (this) {
+          result = linked;
+          if (result == null) {
+            result = withFloatArrays(segmentHandle(), arrayPositions);
+            linked = result;
+          }
+        }
+      }
+      return result;
+    }
   }
 
   private static void requirePositive(int value, String name) {
@@ -1364,37 +1853,39 @@ public final class NativeKernelLibrary implements AutoCloseable {
     try {
       int status =
           (int)
-              groupedAttentionHandle.invokeExact(
-                  context,
-                  MemorySegment.ofArray(query),
-                  (long) queryOffset,
-                  (long) query.length,
-                  MemorySegment.ofArray(keysA),
-                  (long) keysAOffset,
-                  (long) keysA.length,
-                  MemorySegment.ofArray(valuesA),
-                  (long) valuesAOffset,
-                  (long) valuesA.length,
-                  positionsA,
-                  MemorySegment.ofArray(safeKeysB),
-                  (long) keysBOffset,
-                  (long) safeKeysB.length,
-                  MemorySegment.ofArray(safeValuesB),
-                  (long) valuesBOffset,
-                  (long) safeValuesB.length,
-                  positionsB,
-                  MemorySegment.ofArray(output),
-                  (long) outputOffset,
-                  (long) output.length,
-                  MemorySegment.ofArray(scores),
-                  (long) scores.length,
-                  keyDim,
-                  valueDim,
-                  keyLength,
-                  valueLength,
-                  numHeads,
-                  numKvHeads,
-                  scale);
+              groupedAttentionHandle
+                  .handle()
+                  .invokeExact(
+                      context,
+                      MemorySegment.ofArray(query),
+                      (long) queryOffset,
+                      (long) query.length,
+                      MemorySegment.ofArray(keysA),
+                      (long) keysAOffset,
+                      (long) keysA.length,
+                      MemorySegment.ofArray(valuesA),
+                      (long) valuesAOffset,
+                      (long) valuesA.length,
+                      positionsA,
+                      MemorySegment.ofArray(safeKeysB),
+                      (long) keysBOffset,
+                      (long) safeKeysB.length,
+                      MemorySegment.ofArray(safeValuesB),
+                      (long) valuesBOffset,
+                      (long) safeValuesB.length,
+                      positionsB,
+                      MemorySegment.ofArray(output),
+                      (long) outputOffset,
+                      (long) output.length,
+                      MemorySegment.ofArray(scores),
+                      (long) scores.length,
+                      keyDim,
+                      valueDim,
+                      keyLength,
+                      valueLength,
+                      numHeads,
+                      numKvHeads,
+                      scale);
       if (status != 0) {
         throw new IllegalStateException("native grouped attention failed: " + statusName(status));
       }
