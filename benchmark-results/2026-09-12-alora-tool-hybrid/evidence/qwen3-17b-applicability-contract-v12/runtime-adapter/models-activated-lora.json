@@ -1,0 +1,101 @@
+{
+  "adapter": {
+    "alpha": 64,
+    "file": "adapter_model.safetensors",
+    "rank": 32,
+    "sha256": "f1a4a1bc15e3942ed5a3fbe2c4750f39a8b24804e20566242ec740c5ce851c21",
+    "targetModules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ]
+  },
+  "base": {
+    "artifactSha256": "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
+    "model": "Qwen/Qwen3-1.7B",
+    "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e"
+  },
+  "invocation": {
+    "tokens": [
+      151644,
+      77091,
+      198
+    ]
+  },
+  "kind": "activated-lora-tool-specialist",
+  "schemaVersion": 4,
+  "tokenizer": {
+    "files": [
+      {
+        "name": "added_tokens.json",
+        "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+      },
+      {
+        "name": "chat_template.jinja",
+        "sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+      },
+      {
+        "name": "merges.txt",
+        "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+      },
+      {
+        "name": "tokenizer.json",
+        "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "sha256": "443bfa629eb16387a12edbf92a76f6a6f10b2af3b53d87ba1550adfcf45f7fa0"
+      },
+      {
+        "name": "vocab.json",
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      }
+    ]
+  },
+  "training": {
+    "formatter": "train_alora.py",
+    "formatterSha256": "bcf5942e8689aa92c02998ce858b56580c728c1fce7e23451578b5c75e05ad8c",
+    "preparedManifestSha256": "c7da1f5f826bb1c6f10047e09ff1e7a69e3346dad2336400e5a277ef937090b9",
+    "preparedSchemaVersion": 2,
+    "sources": [
+      {
+        "dataset": "edbuildingstuff/bfcl-ft-data",
+        "datasetRevision": "a7ceb3b1e1605f609fda6f2befec704f575290de",
+        "role": "tool-calls",
+        "sourceFile": "train.javajs.messages.jsonl",
+        "sourceSha256": "915679b445c64676d7212e8953a0c3379c1024235e3c8168d1af2d2ef2ae7973"
+      },
+      {
+        "dataset": "MadeAgents/xlam-irrelevance-7.5k",
+        "datasetRevision": "34323bf09efc7e4a394998a0fa91ff997617c369",
+        "role": "no-call",
+        "sourceFile": "xlam-7.5k-irrelevancek.json",
+        "sourceSha256": "2e6f3d0adbd40248a592ea001e3f3a4f1624a5d50f434fa1e7d019e93e922327"
+      }
+    ],
+    "trainSelection": {
+      "multipleCall": 5149,
+      "noCall": 2263,
+      "skippedOverMaxLength": 173,
+      "sourceLinesSha256": "279bfb58780d89f96e65de0dd0d0c1988a18106104078d84c9afba0971f6d18a",
+      "usable": 11827
+    },
+    "trainSha256": "3fe555c1e4a68b65b6715341cd1d1cbf9995e549cbdb267f15896b0a9b7edf77",
+    "validationSelection": {
+      "multipleCall": 396,
+      "noCall": 188,
+      "skippedOverMaxLength": 21,
+      "sourceLinesSha256": "1c1c1fa35b750e342f33a1420c36cf8fb793184bdf80c132b68fd4e66f0a96e2",
+      "usable": 979
+    },
+    "validationSha256": "f12c4c34c875d929b252d075749468f2c53d919744eca711e907927d9ecd83ca"
+  }
+}

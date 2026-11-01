@@ -1,0 +1,79 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/root/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+> Task :models-api:compileJava UP-TO-DATE
+> Task :backend-java:compileJava UP-TO-DATE
+> Task :backend-java:processResources NO-SOURCE
+> Task :backend-java:classes UP-TO-DATE
+> Task :backend-java:jar UP-TO-DATE
+> Task :models-api:processResources NO-SOURCE
+> Task :models-api:classes UP-TO-DATE
+> Task :models-api:jar UP-TO-DATE
+> Task :models-runtime:compileJava UP-TO-DATE
+> Task :models-router:compileJava UP-TO-DATE
+> Task :models-bench:compileJava UP-TO-DATE
+> Task :models-bench:processResources UP-TO-DATE
+> Task :models-bench:classes UP-TO-DATE
+> Task :models-router:processResources UP-TO-DATE
+> Task :models-router:classes UP-TO-DATE
+> Task :models-router:jar UP-TO-DATE
+> Task :models-runtime:processResources NO-SOURCE
+> Task :models-runtime:classes UP-TO-DATE
+> Task :models-runtime:jar UP-TO-DATE
+
+> Task :models-bench:run
+WARNING: Using incubator modules: jdk.incubator.vector
+Sep 14, 2026 6:36:08 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Sep 14, 2026 6:36:08 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+loaded qwen3_8b_q4_k_m in 366.7 ms
+home                     prompt=370 tools=[set_lights, set_thermostat, lock_door]
+home                     PASS 107420 ms selection=true schema=true arguments=4/4
+robot                    prompt=349 tools=[move, rotate, gripper]
+robot                    PASS  96093 ms selection=true schema=true arguments=5/5
+device                   prompt=300 tools=[open_website, set_theme, speak]
+device                   FAIL  81144 ms selection=true schema=true arguments=2/3
+gallery                  prompt=309 tools=[create_album, move_photos, delete_photos]
+gallery                  PASS  79733 ms selection=true schema=true arguments=3/3
+email                    prompt=207 tools=[send_email]
+email                    FAIL  63617 ms selection=true schema=true arguments=1/2
+currency                 prompt=213 tools=[convert_currency]
+currency                 PASS  49296 ms selection=true schema=true arguments=3/3
+document                 prompt=351 tools=[record_booking]
+document                 FAIL 124050 ms selection=true schema=true arguments=2/4
+sentiment                prompt=196 tools=[classify_sentiment]
+sentiment                PASS  40307 ms selection=true schema=true arguments=1/1
+crowded                  prompt=813 tools=[set_lights, set_thermostat, lock_door, play_music, set_timer, send_message, create_note, start_vacuum, water_plants, open_blinds, preheat_oven, charge_car]
+crowded                  PASS 197953 ms selection=true schema=true arguments=2/2
+repeat                   prompt=174 tools=[add_to_list]
+repeat                   PASS  46571 ms selection=true schema=true arguments=4/4
+array                    prompt=171 tools=[add_items]
+array                    PASS  36749 ms selection=true schema=true arguments=1/1
+flight                   prompt=222 tools=[search_flights]
+flight                   PASS  59539 ms selection=true schema=true arguments=4/4
+refuse                   prompt=339 tools=[move, rotate, gripper]
+refuse                   PASS  94815 ms selection=true schema=true arguments=0/0
+spring-weather-zipcode   prompt=179 tools=[get-weather-for-zipcode]
+spring-weather-zipcode   PASS  36657 ms selection=true schema=true arguments=1/1
+tool-result-follow-up    PASS  27860 ms conversational=true grounded=true repeated-call=false
+FAIL selection=1.000 schema=1.000 arguments=0.892 refusal=1.000 follow-up=true report=/opt/models/benchmark-results/2026-09-14-qwen3-8b-qualification/qwen3-8b-full.json
+
+> Task :models-bench:run FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':models-bench:run'.
+> Process 'command '/opt/jdk/bin/java'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 19m 8s
+12 actionable tasks: 1 executed, 11 up-to-date
