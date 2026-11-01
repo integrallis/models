@@ -1,0 +1,80 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/Users/briansam-bodden/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :spotlessInternalRegisterDependencies
+> Task :backend-java:spotlessJava
+> Task :backend-java:spotlessJavaApply
+> Task :backend-java:spotlessApply
+> Task :models-api:compileJava
+> Task :backend-java:compileJava
+> Task :writeReleaseDependencyManifest
+> Task :backend-java:processResources
+> Task :backend-java:classes
+> Task :backend-java:jar
+> Task :models-runtime:compileJava
+> Task :backend-java:compileTestJava
+> Task :backend-java:processTestResources
+> Task :backend-java:testClasses
+> Task :models-api:processResources
+> Task :models-api:classes
+> Task :models-api:jar
+> Task :models-runtime:processResources
+> Task :models-runtime:classes
+> Task :models-runtime:jar
+
+> Task :backend-java:test
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: Using incubator modules: jdk.incubator.vector
+
+GgufEmbeddingBackendTest$Determinism > repeatedCallsAgreeExactly() PASSED
+
+GgufEmbeddingBackendTest$Determinism > oneTextDoesNotLeakIntoTheNext() PASSED
+
+GgufEmbeddingBackendTest$Shape > reportsTheModelEmbeddingWidth() PASSED
+
+GgufEmbeddingBackendTest$Shape > embedAllPreservesRowOrderWithinFloatTolerance() PASSED
+
+GgufEmbeddingBackendTest$Normalization > normalizationCanBeDisabled() PASSED
+
+BertConfigTest > loadsTheMiniLmGgufContract() PASSED
+
+GgufEmbeddingBackendTest$Normalization > normalizedVectorsAreUnitLength() PASSED
+
+BertConfigTest > rejectsCausalMetadataInsteadOfSilentlyChangingTheModel() PASSED
+
+BertConfigTest > rejectsAnUnknownPoolingContract() PASSED
+
+BertConfigTest > acceptsTheStandardGgufRankPoolingContract() PASSED
+
+GgufTokenizerTest > WordPieceEncoding > encodesSentencePairsWithBertBoundariesAndTokenTypes() PASSED
+
+GgufTokenizerTest > WordPieceEncoding > matchesTheBertNormalizationAndBoundaryContract() PASSED
+
+GgufEmbeddingBackendTest$Contract > embedsEmptyTextWithoutFailing() PASSED
+
+GgufEmbeddingBackendTest$Contract > returnsCallerOwnedArrays() PASSED
+
+GgufEmbeddingBackendTest$Contract > closingReleasesTheUnderlyingBackend() PASSED
+
+GgufEmbeddingBackendTest$Contract > rejectsNullInput() PASSED
+
+GgufEmbeddingBackendTest$PoolingModes > meanPoolingIsDeterministic() PASSED
+
+GgufEmbeddingBackendTest$PoolingModes > meanAndLastTokenDisagreeOnMultiTokenInput() PASSED
+
+BertClassificationHeadTest > loadsTheEarlierCorrectedClassifierNames(Path) PASSED
+
+BertClassificationHeadTest > loadsTheStandardGgufClassifierNames(Path) PASSED
+
+BertQ51ProjectionTest > injectedExactProjectionIsExecutedAndUnsupportedShapesRetainJava(Path) PASSED
+
+TensorOpsTest > Gelu > matchesTheErfExactBertActivation() PASSED
+
+BUILD SUCCESSFUL in 6m 16s
+16 actionable tasks: 16 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.4.1/userguide/configuration_cache_enabling.html
