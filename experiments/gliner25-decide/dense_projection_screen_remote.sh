@@ -9,8 +9,8 @@ aws s3 cp "$GLINER_URI/evaluation-overlay.tar.gz" /work/evaluation-overlay.tar.g
 printf '%s  %s\n' "$GLINER_EVAL_OVERLAY_SHA" /work/evaluation-overlay.tar.gz | sha256sum -c -
 tar -xzf /work/evaluation-overlay.tar.gz -C /work/payload/experiment
 bash evaluate_finetune_remote.sh --parity-only
-# Screen correctness and speed before repeating the larger quality suites. A losing speed
-# candidate must not consume the remaining rental budget on already-known accuracy failures.
+# Screen correctness and speed within the remaining aggregate rental budget. Full task-quality
+# repeats and the public default route are required before adoption, even if this screen passes.
 /work/python/bin/python - <<'PY'
 import json,pathlib
 root=pathlib.Path('/work/out')
@@ -29,6 +29,5 @@ sha256sum /work/reranker/* > /work/out/dense-reranker-snapshot-sha256.txt
 /work/python/bin/python run_worker.py --cases performance-cases.jsonl --output /work/out/dense-performance-reference.jsonl -- /work/python/bin/python reference_worker.py --snapshot /work/variant --manifest /work/variant-manifest.json --source /work/reference --threads 8
 /work/python/bin/python run_worker.py --cases performance-cases.jsonl --output /work/out/dense-performance-models.jsonl -- java --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx8g -Dmodels.deberta.threads=8 -Djdk.virtualThreadScheduler.parallelism=8 -cp '/work/payload/classes:/work/payload/lib/*' GlinerWorker /work/variant /work/payload/rust/target/release/libjmodels_kernels.so /work/variant-manifest.json
 /work/python/bin/python compare_performance.py --cases performance-cases.jsonl --candidate /work/out/dense-performance-models.jsonl --reference /work/out/dense-performance-reference.jsonl --output /work/out/dense-performance-report.json
-# Only a passing screen justifies repeating full task quality with this runtime. Even if
-# these all pass, one performance pair is not the required final replication sequence.
-bash evaluate_finetune_remote.sh
+# This is screening evidence only. Neither full task quality on this experimental runtime
+# nor the required final performance replication sequence is claimed here.
