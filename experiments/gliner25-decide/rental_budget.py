@@ -9,8 +9,20 @@ def aggregate_limit_seconds():
     if not path.exists():
         return 7200
     record = json.loads(path.read_text())
-    limit = record['maximumAggregateRentedSeconds']
-    if type(limit) is not int or limit != record['previousAggregateLimitSeconds'] + record['additionalAllocationSeconds']:
+    return validate_limit(record)
+
+
+def validate_limit(record):
+    limit=record['previousAggregateLimitSeconds']
+    additions=[dict(previousLimitSeconds=limit,additionalAllocationSeconds=record['additionalAllocationSeconds'],
+                    newLimitSeconds=limit+record['additionalAllocationSeconds'])]+record.get('continuations',[])
+    for addition in additions:
+        extra=addition['additionalAllocationSeconds']
+        if type(extra) is not int or extra<=0 or addition['previousLimitSeconds']!=limit:
+            raise ValueError('invalid continuation budget chain')
+        limit+=extra
+        if addition['newLimitSeconds']!=limit:raise ValueError('invalid continuation increment')
+    if type(record['maximumAggregateRentedSeconds']) is not int or record['maximumAggregateRentedSeconds']!=limit:
         raise ValueError('invalid continuation budget')
     return limit
 

@@ -125,13 +125,19 @@ def main():
     print(json.dumps(dict(control=str(root/'control.json'),gpu=gpu['id'],hourlyUsd=gpu['price']['secure'],launch=args.launch)),flush=True)
     if not args.launch:return
     if datetime.now(timezone.utc)>datetime.fromisoformat(record['creationDeadline']):raise ValueError('creation deadline passed')
-    bootstrap="""import os,json,urllib.request,pathlib,hashlib,subprocess
+    bootstrap="""import os,json,urllib.request,pathlib,hashlib,subprocess,time
 p=pathlib.Path('/work');p.mkdir(exist_ok=True)
 b=urllib.request.urlopen(os.environ['GLINER_MANIFEST_URL'],timeout=60).read();(p/'manifest.json').write_bytes(b)
 m=json.loads(b);w=urllib.request.urlopen(m['workerUrl'],timeout=60).read()
 assert hashlib.sha256(w).hexdigest()==m['workerSha256']
 (p/'worker.py').write_bytes(w)
-raise SystemExit(subprocess.call(['python','-u',str(p/'worker.py'),str(p/'manifest.json')]))
+receipt=p/'worker-exit.json'
+if not receipt.exists():
+    code=subprocess.call(['python','-u',str(p/'worker.py'),str(p/'manifest.json')])
+    receipt.write_text(json.dumps(dict(exitCode=code)))
+# Keep terminal evidence stable until the external controller deletes the pod.
+# Exiting here lets the provider restart the container and overwrite status.json.
+while True: time.sleep(20)
 """
     body=dict(name=run,image='python:3.12-slim-bookworm',cloud='SECURE',disk=40,
         gpu=dict(id=args.gpu,count=1,minRamPerGpu=48,minVcpuCountPerGpu=8,minCudaVersion='12.8'),
