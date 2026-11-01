@@ -115,3 +115,19 @@ default; a bounded same-host parity/performance screen is pending. A passing scr
 need full task-quality regression and default-route validation before adoption, followed by the
 required three passing final pairs. ModelJars integration, a released-runtime repeat, native
 packaging checks across advertised platforms, and catalog publication remain outstanding.
+
+## Accuracy follow-up, not yet executed
+
+The next accuracy experiment should first test a longer training schedule, with per-cohort
+development metrics and an explicit early-stop rule. Training-only label counts also identify
+a separate class-imbalance hypothesis: 14,143 neutral examples versus 67 grief examples among
+42,936 GoEmotions training cases. `training-label-distribution.json` records the full counts
+and input digest. Compare ordinary sampling with capped rare-label oversampling as a separate
+ablation; keep all ten intent domains and BoolQ in both arms. Do not change selection thresholds
+or reduce scope to rescue a qualification result.
+
+Freeze a new untouched qualification holdout before that experiment. The 1,001 cases above have
+now been evaluated and must remain regression evidence for subsequent selection. Checkpoint
+selection must use development data only, with the original nonregression and absolute floors
+retained. This is a proposed follow-up, not a second training run or a reset of the original
+two-hour compute cap; the observed gains do not establish that either hypothesis will pass.

@@ -11,6 +11,7 @@ import tarfile
 import time
 
 import boto3
+from rental_budget import prior_rented_seconds
 
 HERE=Path(__file__).resolve().parent
 REPO=HERE.parent.parent
@@ -32,15 +33,7 @@ def main():
     if training['state']!='deleted' or training.get('workerResult',{}).get('stage')!='complete':
         raise ValueError('training must be complete, uploaded and its pod deleted')
     previous=json.loads((EVIDENCE/'deployment.json').read_text())
-    prior=2602
-    for path in EVIDENCE.glob('gliner25-training-*/control.json'):
-        record=json.loads(path.read_text())
-        if 'podId' in record and record.get('state')!='deleted':raise ValueError('unresolved training rental')
-        prior+=record.get('rentedSecondsUpperBound',0)
-    for path in EVIDENCE.glob('gliner25-eval-*/control.json'):
-        record=json.loads(path.read_text())
-        if 'instanceId' in record and record.get('state')!='terminated':raise ValueError('unresolved evaluation rental')
-        prior+=record.get('rentedSecondsUpperBound',0)
+    prior=prior_rented_seconds(EVIDENCE)
     seconds=min(2700,7200-prior-120)
     if seconds<1500:raise ValueError('insufficient remaining budget for complete CPU evaluation')
     ec2=boto3.client('ec2',region_name='us-east-1');s3=boto3.client('s3',region_name='us-east-1')

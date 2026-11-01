@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 
 import boto3
+from rental_budget import prior_rented_seconds
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
@@ -61,13 +62,8 @@ def main():
     existing=api(key,'GET','pods')['pods']
     if any(p['name'].startswith('gliner25-training-') for p in existing):
         raise ValueError('existing GLiNER training pod must be reconciled before a new rental')
-    prior_seconds=2602
-    for path in (REPO/'benchmark-results/2026-11-01-gliner25-decide').glob('gliner25-training-*/control.json'):
-        previous=json.loads(path.read_text())
-        if 'podId' in previous and previous.get('state')!='deleted':
-            raise ValueError('previous training rental needs cleanup/accounting')
-        prior_seconds += previous.get('rentedSecondsUpperBound',0)
-    rental_seconds=min(2100,7200-prior_seconds)
+    prior_seconds=prior_rented_seconds(REPO/'benchmark-results/2026-11-01-gliner25-decide')
+    rental_seconds=min(2100,7200-prior_seconds-120)
     if rental_seconds<1800:raise ValueError('insufficient aggregate budget for another training attempt')
     policy=json.loads((HERE/'finetune-policy.json').read_text())
     splits=json.loads((HERE/'finetune-splits.json').read_text())
