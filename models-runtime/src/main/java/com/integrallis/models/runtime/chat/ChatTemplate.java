@@ -43,6 +43,8 @@ public enum ChatTemplate {
   MOBILE_MOE("mobilemoe", ToolSyntax.NONE),
   GPT_OSS("gpt-oss", ToolSyntax.HARMONY),
   FLINT("flint", ToolSyntax.FLINT),
+  LFM3("lfm3", ToolSyntax.LFM3),
+  LFM3_NO_THINK("lfm3-no-think", ToolSyntax.LFM3),
   NEEDLE2("needle2", ToolSyntax.NEEDLE2),
   HAMMER("hammer", ToolSyntax.HAMMER),
   GEMMA("gemma", ToolSyntax.NONE),
@@ -169,6 +171,8 @@ public enum ChatTemplate {
               SMOLLM3_NO_THINK,
               NEEDLE2,
               HAMMER,
+              LFM3,
+              LFM3_NO_THINK,
               MINICPM5_NO_THINK ->
               "<|im_end|>";
           case ZEPHYR, H2O, H2O_DIRECT -> "</s>";
@@ -254,6 +258,7 @@ public enum ChatTemplate {
       case MOBILE_MOE -> renderMobileMoe(conversation);
       case GPT_OSS -> renderGptOss(conversation, List.of());
       case FLINT -> FlintToolProtocol.render(conversation, List.of());
+      case LFM3, LFM3_NO_THINK -> Lfm3ToolProtocol.render(conversation, List.of(), this == LFM3);
       case NEEDLE2 -> renderNeedle2(conversation, List.of());
       case HAMMER -> renderHammer(conversation, List.of());
       case GEMMA -> renderGemma(conversation);
@@ -307,6 +312,7 @@ public enum ChatTemplate {
       case LLAMA3 -> renderLlama3WithTools(conversation, declared);
       case GPT_OSS -> renderGptOss(conversation, declared);
       case FLINT -> FlintToolProtocol.render(conversation, declared);
+      case LFM3, LFM3_NO_THINK -> Lfm3ToolProtocol.render(conversation, declared, this == LFM3);
       case NEEDLE2 -> renderNeedle2(conversation, declared);
       case HAMMER -> renderHammer(conversation, declared);
       case MINICPM5_NO_THINK -> renderMiniCpm5WithTools(conversation, declared);

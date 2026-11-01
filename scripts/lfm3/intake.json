@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "status": "implementation-in-progress; not qualified",
+  "model": "LiquidAI/LFM3-1.7B",
+  "modelRevision": "ac2586a34f1a1c03329dbdcdefabd8b6478ddaa7",
+  "ggufRevision": "bad5729bba61d076fff20d2548e62526665af215",
+  "referenceRuntime": {
+    "repository": "https://github.com/ggml-org/llama.cpp",
+    "tag": "v0.8.0",
+    "commit": "8642541b255bfb5dc39cd351a178be09013a55d6"
+  },
+  "artifacts": [
+    {
+      "file": "LFM3-1.7B-BF16.gguf",
+      "sizeBytes": 3466626336,
+      "sha256": "39158a79f56edb85e0c4252ce6447b8d7883ef82ffedd02f0cda7c84da5e9f68"
+    },
+    {
+      "file": "LFM3-1.7B-F16.gguf",
+      "sizeBytes": 3466626336,
+      "sha256": "b7ab8b69a85e4dfbf62cdfd0e02d7d051ed09f2c5b84c701771dddb073b85970"
+    },
+    {
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "sizeBytes": 1099627808,
+      "sha256": "3793e1e6e2266919d6e015287221b41100175a98eddaba92e111aed3b05c93c4"
+    },
+    {
+      "file": "LFM3-1.7B-Q5_K_M.gguf",
+      "sizeBytes": 1258663200,
+      "sha256": "41e51fb0be5f472d323055f2734d986d5a2429570973508fa6322f3f07f6d7f3"
+    },
+    {
+      "file": "LFM3-1.7B-Q6_K.gguf",
+      "sizeBytes": 1427638304,
+      "sha256": "54e1bd947c77167823d45bf495f1c3e2d226ca7fb242f83cfa141ee3a6ab55c6"
+    },
+    {
+      "file": "LFM3-1.7B-Q8_0.gguf",
+      "sizeBytes": 1846238496,
+      "sha256": "8f6b24182258205e9e01e21f1f24a1f208c1e8115578825d202ce39976af20b6"
+    },
+    {
+      "file": "LFM3-1.7B-QAD-Q4_0.gguf",
+      "sizeBytes": 1049615680,
+      "sha256": "43a7d09a0e9cba91b63eb7052488b9564569bddfd65754d2e426465e572a7452"
+    }
+  ],
+  "referenceFiles": [
+    {
+      "file": "config.json",
+      "sha256": "8c6ae8b8f6d88c87cfb98cf4b5e34e943d0ee07e24215c4121b3159a46e1399d"
+    },
+    {
+      "file": "modeling_lfm3.py",
+      "sha256": "e8cd5254ea99ce6bd731b57b10908c2e8b5010ce8315341f895a38484885eeab"
+    },
+    {
+      "file": "chat_template.jinja",
+      "sha256": "f45005c50cd2a97329722bf3a2dee9f16c04cdf825a589b280fb7e99e6827818"
+    },
+    {
+      "file": "tokenizer_config.json",
+      "sha256": "bf028f813efc6137bc07ed045cafe71820df9a5e26a38e39954706ed1e30a457"
+    },
+    {
+      "file": "LICENSE",
+      "sha256": "4d28ca14dedc0b3d0fcc2b3339f0e79931faa33874f3d24f522183a8fc70068c"
+    }
+  ],
+  "gates": [
+    "numerical-parity",
+    "session-and-cache-correctness",
+    "chat-and-tool-protocol",
+    "performance",
+    "rag-qualification",
+    "tool-qualification",
+    "released-runtime-verification",
+    "catalog-publication"
+  ]
+}

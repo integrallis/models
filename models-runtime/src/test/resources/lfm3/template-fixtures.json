@@ -1,0 +1,157 @@
+{
+  "modelRevision": "ac2586a34f1a1c03329dbdcdefabd8b6478ddaa7",
+  "templateSha256": "f45005c50cd2a97329722bf3a2dee9f16c04cdf825a589b280fb7e99e6827818",
+  "cases": [
+    {
+      "id": "chat",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello"
+        }
+      ],
+      "tools": [],
+      "thinking": true,
+      "expected": "<|startoftext|><|im_start|>user\nHello<|im_end|>\n<|im_start|>assistant\n<think>"
+    },
+    {
+      "id": "direct",
+      "messages": [
+        {
+          "role": "system",
+          "content": "Be concise."
+        },
+        {
+          "role": "user",
+          "content": "Hello"
+        }
+      ],
+      "tools": [],
+      "thinking": false,
+      "expected": "<|startoftext|><|im_start|>system\nBe concise.<|im_end|>\n<|im_start|>user\nHello<|im_end|>\n<|im_start|>assistant\n<think></think>"
+    },
+    {
+      "id": "tools",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Echo MiXeD: 007! 🌧️"
+        }
+      ],
+      "tools": [
+        {
+          "name": "echo",
+          "description": "Return exact text.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "thinking": false,
+      "expected": "<|startoftext|><|im_start|>system\n<tools>\n{\"name\": \"echo\", \"description\": \"Return exact text.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"text\": {\"type\": \"string\"}, \"count\": {\"type\": \"integer\"}}, \"required\": [\"text\"], \"additionalProperties\": false}}\n</tools><|im_end|>\n<|im_start|>user\nEcho MiXeD: 007! 🌧️<|im_end|>\n<|im_start|>assistant\n<think></think>"
+    },
+    {
+      "id": "tool-roundtrip",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Echo MiXeD: 007! 🌧️"
+        },
+        {
+          "role": "assistant",
+          "content": "<think>Use echo.</think>",
+          "tool_calls": [
+            {
+              "function": {
+                "name": "echo",
+                "arguments": {
+                  "text": " MiXeD: 007! 🌧️ ",
+                  "count": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": " MiXeD: 007! 🌧️ "
+        }
+      ],
+      "tools": [
+        {
+          "name": "echo",
+          "description": "Return exact text.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ],
+      "thinking": true,
+      "expected": "<|startoftext|><|im_start|>system\n<tools>\n{\"name\": \"echo\", \"description\": \"Return exact text.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"text\": {\"type\": \"string\"}, \"count\": {\"type\": \"integer\"}}, \"required\": [\"text\"], \"additionalProperties\": false}}\n</tools><|im_end|>\n<|im_start|>user\nEcho MiXeD: 007! 🌧️<|im_end|>\n<|im_start|>assistant\n<think>Use echo.</think><tool_call>\n<function=echo>\n<parameter=text>\n MiXeD: 007! 🌧️ \n</parameter>\n<parameter=count>\n2\n</parameter>\n</function>\n</tool_call><|im_end|>\n<|im_start|>tool\n<tool_response>\n MiXeD: 007! 🌧️ \n</tool_response><|im_end|>\n<|im_start|>assistant\n<think>"
+    },
+    {
+      "id": "old-thought",
+      "messages": [
+        {
+          "role": "user",
+          "content": "One"
+        },
+        {
+          "role": "assistant",
+          "content": "<think>old thought</think> First answer "
+        },
+        {
+          "role": "user",
+          "content": "Two"
+        }
+      ],
+      "tools": [],
+      "thinking": true,
+      "expected": "<|startoftext|><|im_start|>user\nOne<|im_end|>\n<|im_start|>assistant\n<think></think>First answer<|im_end|>\n<|im_start|>user\nTwo<|im_end|>\n<|im_start|>assistant\n<think>"
+    },
+    {
+      "id": "assistant-history",
+      "messages": [
+        {
+          "role": "user",
+          "content": "One"
+        },
+        {
+          "role": "assistant",
+          "content": "First answer"
+        },
+        {
+          "role": "user",
+          "content": "Two"
+        }
+      ],
+      "tools": [],
+      "thinking": false,
+      "expected": "<|startoftext|><|im_start|>user\nOne<|im_end|>\n<|im_start|>assistant\n<think></think>First answer<|im_end|>\n<|im_start|>user\nTwo<|im_end|>\n<|im_start|>assistant\n<think></think>"
+    }
+  ]
+}

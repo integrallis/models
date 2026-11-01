@@ -21,6 +21,12 @@ import java.util.Locale;
 
 /** Exact artifacts admitted to the small-model tool-calling qualification round. */
 enum ToolCallingCandidate {
+  LFM3_17B(
+      "lfm3-1.7b",
+      "liquidai_lfm3_1_7b_gguf_q4_k_m",
+      "LiquidAI LFM3 1.7B GGUF Q4_K_M",
+      "3793e1e6e2266919d6e015287221b41100175a98eddaba92e111aed3b05c93c4",
+      ChatTemplate.LFM3_NO_THINK),
   FLINT_40B_A2_5B(
       "flint-40b-a2.5b",
       "ggml_org_flint_gguf_q4_k_m",

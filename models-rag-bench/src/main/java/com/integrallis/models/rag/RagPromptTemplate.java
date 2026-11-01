@@ -26,6 +26,8 @@ import java.util.Locale;
 public enum RagPromptTemplate {
   RAW("raw"),
   FLINT("flint"),
+  LFM3("lfm3"),
+  LFM3_NO_THINK("lfm3-no-think"),
   CHATML("chatml"),
   CHATML_DIRECT("chatml-direct"),
   CHATML_ANSWER("chatml-answer"),
@@ -66,6 +68,8 @@ public enum RagPromptTemplate {
     ModelPrompt.Builder result = ModelPrompt.builder();
     return switch (this) {
       case RAW -> result.text(prompt).build();
+      case LFM3 -> ChatTemplate.LFM3.render(List.of(ChatMessage.user(prompt)));
+      case LFM3_NO_THINK -> ChatTemplate.LFM3_NO_THINK.render(List.of(ChatMessage.user(prompt)));
       case FLINT -> ChatTemplate.FLINT.render(List.of(ChatMessage.user(prompt)));
       case CHATML ->
           result
@@ -178,6 +182,12 @@ public enum RagPromptTemplate {
   public ModelPrompt applyPrompt(String systemPrompt, String userPrompt) {
     ModelPrompt.Builder result = ModelPrompt.builder();
     return switch (this) {
+      case LFM3 ->
+          ChatTemplate.LFM3.render(
+              List.of(ChatMessage.system(systemPrompt), ChatMessage.user(userPrompt)));
+      case LFM3_NO_THINK ->
+          ChatTemplate.LFM3_NO_THINK.render(
+              List.of(ChatMessage.system(systemPrompt), ChatMessage.user(userPrompt)));
       case FLINT ->
           ChatTemplate.FLINT.render(
               List.of(ChatMessage.system(systemPrompt), ChatMessage.user(userPrompt)));

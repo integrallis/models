@@ -244,6 +244,20 @@ public record ToolSyntax(
           "<tool_response>",
           "</tool_response>");
 
+  /** LFM3's function/parameter tags; tool results retain their own role. */
+  public static final ToolSyntax LFM3 =
+      new ToolSyntax(
+          Mode.TAG_WITH_TAGGED,
+          "<tool_call>",
+          "</tool_call>",
+          "function",
+          "parameter",
+          false,
+          true,
+          ResultStyle.TOOL_ROLE,
+          "<tool_response>",
+          "</tool_response>");
+
   public ToolSyntax {
     Objects.requireNonNull(mode, "mode");
     Objects.requireNonNull(resultStyle, "resultStyle");
@@ -302,6 +316,6 @@ public record ToolSyntax(
 
   /** Whether calls can be recovered when the request's declared JSON Schemas are available. */
   public boolean parsableWithSchemas() {
-    return parsable() || this.equals(MINICPM5) || this.equals(FLINT);
+    return parsable() || this.equals(MINICPM5) || this.equals(FLINT) || this.equals(LFM3);
   }
 }

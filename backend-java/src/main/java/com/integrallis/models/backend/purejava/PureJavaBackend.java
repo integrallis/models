@@ -62,6 +62,8 @@ import com.integrallis.models.backend.purejava.internal.ModelMemoryArena;
 import com.integrallis.models.backend.purejava.lfm2.Lfm2Config;
 import com.integrallis.models.backend.purejava.lfm2.Lfm2ForwardPass;
 import com.integrallis.models.backend.purejava.lfm2.Lfm2SequenceEncoder;
+import com.integrallis.models.backend.purejava.lfm3.Lfm3Config;
+import com.integrallis.models.backend.purejava.lfm3.Lfm3ForwardPass;
 import com.integrallis.models.backend.purejava.llama.DenseProjectionHead;
 import com.integrallis.models.backend.purejava.llama.EncoderForwardPass;
 import com.integrallis.models.backend.purejava.llama.LlamaConfig;
@@ -516,6 +518,8 @@ public final class PureJavaBackend
         } else if ("gemma3n".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded = loadGemma3n(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
+        } else if ("lfm3".equals(modelFamily)) {
+          loaded = loadLfm3(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
         } else if ("lfm2".equals(modelFamily)) {
           requireLlamaAdapterModel(activatedAdapterDirectory, modelFamily);
           loaded = loadLfm2(modelPath, file, runtime, planConfiguration, batchedMatrixKernel);
@@ -1069,6 +1073,39 @@ public final class PureJavaBackend
             config.numHeads(),
             config.kvHeads().get(0));
     return new LoadedDecoder(decoder, metadata, contextCapacity, executionPlan);
+  }
+
+  private static LoadedDecoder loadLfm3(
+      Path modelPath,
+      GgufFile file,
+      RuntimeFingerprint runtime,
+      PureJavaPlanConfiguration planConfiguration,
+      GgufBatchedMatrixKernel kernel) {
+    Lfm3Config config = Lfm3Config.fromMetadata(file.metadata());
+    int first = 0;
+    while (!config.usesAttention(first)) first++;
+    int keyDim = config.keyDim(first);
+    PureJavaExecutionPlan plan =
+        ExecutionPlanner.plan(
+            runtime,
+            ModelTopology.mappedArchitecture(
+                "lfm3", config.queryDim(), keyDim, keyDim, config.numLayers()),
+            planConfiguration,
+            kernel);
+    int context = runtimeContextLength(config.contextLength(), planConfiguration);
+    PureJavaDecoder decoder =
+        new Lfm3DecoderAdapter(Lfm3ForwardPass.fromGgufFile(file, config, context, kernel));
+    ModelMetadata metadata =
+        new ModelMetadata(
+            "lfm3",
+            modelName(modelPath, file),
+            config.contextLength(),
+            config.vocabSize(),
+            config.embeddingDim(),
+            config.numLayers(),
+            config.numHeads(),
+            config.numKvHeads(first));
+    return new LoadedDecoder(decoder, metadata, context, plan);
   }
 
   private static LoadedDecoder loadLfm2(
