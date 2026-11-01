@@ -63,8 +63,11 @@ Four voices, in the config's order: `af_heart` (0), `bf_isabella` (1), `am_puck`
 ## Arms
 
 **Comparator (the publisher's runtime):** the `paradee` package at `aae3cc46`, onnxruntime
-1.31.1, misaki 0.9.4 with the eSpeak fallback, exactly as `paradee/tts.py` wires them; pinned in
-`comparator/uv.lock`. Sentence split, phonemization, pad tokens, truncation and `voice` index are
+1.23.2, misaki 0.9.4 with the eSpeak fallback, exactly as `paradee/tts.py` wires them; pinned in
+`comparator/uv.lock`. onnxruntime is 1.23.2 rather than the current 1.31.1 because the dev box is
+an Intel Mac and 1.23.2 is the newest release that ships a wheel for it; the publisher's package
+requires only `>=1.17` and pins nothing itself. The judge runs on torch 2.2.2 for the same reason.
+Both deviations are stated here before any arm has run. Sentence split, phonemization, pad tokens, truncation and `voice` index are
 the package's own code, called through its own methods, never re-implemented here.
 
 **Candidate (ours):** `models-backend-onnx` executing the same int8 graph, `models-audio`'s
