@@ -27,8 +27,8 @@ import java.util.Objects;
  * transcription that silently stopped early otherwise reads as a short utterance rather than as a
  * truncated one. {@link #truncated()} says which it was.
  */
-public record Transcript(String text, List<Segment> segments, Duration audioDuration,
-    boolean truncated) {
+public record Transcript(
+    String text, List<Segment> segments, Duration audioDuration, boolean truncated) {
 
   /** A timed span of recognised text. */
   public record Segment(String text, Duration start, Duration end) {
@@ -40,7 +40,8 @@ public record Transcript(String text, List<Segment> segments, Duration audioDura
         throw new IllegalArgumentException("segment bounds must not be negative");
       }
       if (end.compareTo(start) < 0) {
-        throw new IllegalArgumentException("segment end precedes its start: " + start + " > " + end);
+        throw new IllegalArgumentException(
+            "segment end precedes its start: " + start + " > " + end);
       }
     }
   }

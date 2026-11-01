@@ -22,10 +22,10 @@ import java.util.Optional;
  * Per-request transcription settings.
  *
  * <p>Deliberately small. The TDT and CTC decoders a {@code parakeet}-class model carries are driven
- * by metadata the artifact publishes — {@code decoding.max_symbols}, {@code blank_id}, the mel front
- * end's window and hop — not by caller preference, so exposing those here would invite a caller to
- * contradict the file. What a caller legitimately chooses is the language hint, whether to ask for
- * the CTC head where a model ships one, and a cap on how long a transcript may run.
+ * by metadata the artifact publishes — {@code decoding.max_symbols}, {@code blank_id}, the mel
+ * front end's window and hop — not by caller preference, so exposing those here would invite a
+ * caller to contradict the file. What a caller legitimately chooses is the language hint, whether
+ * to ask for the CTC head where a model ships one, and a cap on how long a transcript may run.
  */
 public final class TranscriptionOptions {
 
@@ -42,10 +42,11 @@ public final class TranscriptionOptions {
   /**
    * Which decoder head to read.
    *
-   * <p>A hybrid artifact may carry more than one. {@code parakeet-tdt_ctc-110m} ships a
-   * {@code ctc_decoder} tensor root and {@code parakeet-tdt-0.6b-v3} does not, although both declare
-   * {@code arch = hybrid_tdt_ctc} — so the declared architecture does not say which heads exist, and
-   * {@link #MODEL_DEFAULT} lets the loader answer from the tensor set rather than from the string.
+   * <p>A hybrid artifact may carry more than one. {@code parakeet-tdt_ctc-110m} ships a {@code
+   * ctc_decoder} tensor root and {@code parakeet-tdt-0.6b-v3} does not, although both declare
+   * {@code arch = hybrid_tdt_ctc} — so the declared architecture does not say which heads exist,
+   * and {@link #MODEL_DEFAULT} lets the loader answer from the tensor set rather than from the
+   * string.
    */
   public enum Head {
     /** Whatever the artifact's tensor set provides, preferring the transducer when both exist. */

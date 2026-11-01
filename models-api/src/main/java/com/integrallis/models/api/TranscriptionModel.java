@@ -23,10 +23,10 @@ import java.util.Objects;
  * <p>Mirrors {@link TextToSpeechModel} in shape on purpose — identity, diagnostics, one blocking
  * operation, one streaming default, {@code close} — because that interface is already served by a
  * shipped model and adapters know it. A transcription model is not a decoder: a {@code parakeet}
- * artifact carries <b>zero</b> {@code blk.*} tensors and its roots are
- * {@code preprocessor/encoder/decoder/joint}, so none of {@code DecoderArchitecture},
- * {@code LlamaConfig} or the execution planner applies to it. That is why this is a separate
- * contract rather than a capability on an existing one.
+ * artifact carries <b>zero</b> {@code blk.*} tensors and its roots are {@code
+ * preprocessor/encoder/decoder/joint}, so none of {@code DecoderArchitecture}, {@code LlamaConfig}
+ * or the execution planner applies to it. That is why this is a separate contract rather than a
+ * capability on an existing one.
  *
  * <p>Takes {@link PcmAudio} rather than a file path or an encoded buffer. Decoding containers and
  * resampling belong to a caller or a codec component, not to a model: a model that accepted MP3
@@ -44,10 +44,10 @@ public interface TranscriptionModel extends AutoCloseable {
   /**
    * The sample rate this model requires, in hertz.
    *
-   * <p>Exposed rather than assumed. {@code parakeet} declares
-   * {@code preprocessor.sample_rate = 16000}, and feeding 44.1 kHz audio to a 16 kHz mel front end
-   * produces a transcript that is wrong in a way no exception reports — so a caller can resample
-   * before calling, and an adapter can refuse mismatched audio instead of transcribing noise.
+   * <p>Exposed rather than assumed. {@code parakeet} declares {@code preprocessor.sample_rate =
+   * 16000}, and feeding 44.1 kHz audio to a 16 kHz mel front end produces a transcript that is
+   * wrong in a way no exception reports — so a caller can resample before calling, and an adapter
+   * can refuse mismatched audio instead of transcribing noise.
    */
   int requiredSampleRate();
 

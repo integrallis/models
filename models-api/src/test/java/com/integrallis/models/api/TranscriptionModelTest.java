@@ -28,8 +28,7 @@ import org.junit.jupiter.api.Test;
 @Tag("unit")
 class TranscriptionModelTest {
 
-  private static final PcmAudio ONE_SECOND =
-      new PcmAudio(16_000, 1, new float[16_000]);
+  private static final PcmAudio ONE_SECOND = new PcmAudio(16_000, 1, new float[16_000]);
 
   private static TranscriptionModel model(Transcript result, RuntimeException failure) {
     return new TranscriptionModel() {
