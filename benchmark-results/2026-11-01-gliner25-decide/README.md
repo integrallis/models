@@ -1,5 +1,10 @@
 # GLiNER2.5-Decide CPU qualification experiment
 
+**The supplied model's VPS performance benchmark completed:** 429 requests in each runtime,
+all 13 shapes, zero inference errors. [Absolute timings, throughput, load and memory](BASE-PERFORMANCE.md)
+are reproduced from the raw logs. The Models runtime misses the speed thresholds; that is not a
+failure to collect measurements. The later native projection screen is separately marked incomplete.
+
 Status: **FAILED_ABSOLUTE_QUALITY** for both the pinned base and fine-tuned checkpoint.
 No catalog admission. The base performance pair and the isolated native projection screen fail.
 
@@ -60,7 +65,7 @@ Only the 32-token/eight-label bucket passes both performance thresholds. The 32-
 bucket reaches 0.778x reference throughput, below 0.80x. At 128–512 tokens, throughput is
 0.313–0.365x and p95 latency is 2.717–3.532x the reference. At 512 tokens, median Models latency
 is approximately 4.03 seconds versus 1.34 seconds for the publisher. This is one screening pair,
-not a final replication sequence. `performance-1-report.json` retains every bucket and both
+not a final replication sequence. `results-restart-1/performance-1-report.json` retains every bucket and both
 arms' latency, throughput and peak RSS. The shared encoder currently projects each input row
 separately; batched dense matrix kernels are the next performance experiment, not a measured fix.
 

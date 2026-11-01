@@ -3,6 +3,12 @@
 Started 2026-11-01 from Models main `5d4de4262045afe825f295e022c9a64ce1e1e6e7`.
 Candidate: `fastino_gliner2_5_decide_f32`. Nothing here grants catalog admission.
 
+The supplied checkpoint has a **complete same-host CPU performance benchmark**: 429 requests
+per runtime, all 13 shapes, zero errors. See [absolute performance measurements](../../benchmark-results/2026-11-01-gliner25-decide/BASE-PERFORMANCE.md).
+`report_base_performance.py` reproduces the report and distinguishes measurement completion from
+the Models runtime's failed speed thresholds. The later native optimization screen is incomplete
+and recorded separately.
+
 `policy.json` registers the comparator, quality/parity gates, final replication rule and
 aggregate two-hour rented-compute cap before model runs. Ollama is not a comparator for this
 schema classifier: the user explicitly authorized a dedicated publisher-runtime harness.
@@ -70,8 +76,10 @@ Publisher source: https://github.com/fastino-ai/GLiNER2/tree/ca4f68235b50fe4c3ec
 
 The base checkpoint failed the frozen JevBench yes/no and GoEmotions floors in both runtimes.
 The user authorized fine-tuning for qualification **and general usage**. The resulting candidate
-has a separate identity, `modeljars-gliner25-decide-general-v1`; no trained artifact or improved
-accuracy is claimed yet. Its scope remains English schema classification, not generative chat.
+has a separate identity, `modeljars-gliner25-decide-general-v1`. Training and the full accuracy
+evaluation have completed, with gains on the fresh holdout but remaining GoEmotions failures;
+see the [measured results](../../benchmark-results/2026-11-01-gliner25-decide/README.md).
+Its scope remains English schema classification, not generative chat.
 
 `finetune-policy.json` freezes the training recipe and evaluation requirements before training.
 The dataset mix covers all ten CLINC intent domains, all 28 GoEmotions labels, and BoolQ
