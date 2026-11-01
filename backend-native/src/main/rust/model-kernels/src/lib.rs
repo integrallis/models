@@ -96,6 +96,12 @@ const CAPABILITY_MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 31;
 /// `format.selected_kernel()` per matrix, which for TQ1_0 is the AVX2 ternary dot. So the grouped
 /// path has always handled TQ1_0; only the caller's per-type grouped check lacked a bit to read.
 const CAPABILITY_TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL: u64 = 1 << 32;
+/// Q5_0 matrices inside an INDEPENDENT batched dispatch, each against its own activation.
+///
+/// Distinct from the retired grouped Q5_0 bit: grouping shares one quantized activation and that
+/// measured slower, which is why it went. An independent dispatch quantizes per matrix, so the
+/// measurement that retired the grouped path says nothing about this one.
+const CAPABILITY_Q5_0_INDEPENDENT_BATCHED_MATMUL: u64 = 1 << 33;
 const CAPABILITY_Q5_K_F32_BATCHED_MATMUL: u64 = 1 << 10;
 const CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 11;
 const CAPABILITY_Q5_0_F32_BATCHED_MATMUL: u64 = 1 << 12;
@@ -1565,6 +1571,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_MIXED_K_F32_GROUPED_BATCHED_MATMUL
         | CAPABILITY_MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL
         | CAPABILITY_TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL
+        | CAPABILITY_Q5_0_INDEPENDENT_BATCHED_MATMUL
         | CAPABILITY_Q5_K_F32_BATCHED_MATMUL
         | CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL
         | CAPABILITY_Q5_0_F32_BATCHED_MATMUL
@@ -2736,9 +2743,14 @@ fn quantized_f32_independent_batched_matmul(
     if formats
         .iter()
         .any(|format| format.activation_format() != activation_format)
-        || formats.iter().any(|format| {
-            matches!(format, WeightFormat::Q5_0) || cols % format.block_elements() != 0
-        })
+        // Q5_0 is refused by the GROUPED entry point because grouping shares one quantized
+        // activation and that sharing measured slower for Q5_0. This path gives every matrix its
+        // own activation, so the sharing argument does not apply here, and
+        // compute_batched_row_range already carries the Q5/Q5Avx2/Q5Neon arms. Refusing it here
+        // was a copy of the grouped guard, not a decision about this path.
+        || formats
+            .iter()
+            .any(|format| cols % format.block_elements() != 0)
     {
         return STATUS_INVALID_SHAPE;
     }
@@ -6984,6 +6996,7 @@ mod tests {
                 | CAPABILITY_MIXED_K_F32_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL
+                | CAPABILITY_Q5_0_INDEPENDENT_BATCHED_MATMUL
                 | CAPABILITY_Q5_K_F32_BATCHED_MATMUL
                 | CAPABILITY_Q5_K_F32_GROUPED_BATCHED_MATMUL
                 | CAPABILITY_Q5_0_F32_BATCHED_MATMUL

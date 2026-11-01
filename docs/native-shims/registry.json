@@ -32,7 +32,8 @@
     "TQ1_0_Q8_K_BATCHED_MATMUL": 536870912,
     "Q4_K_ORDERED_REDUCTION": 1073741824,
     "MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL": 2147483648,
-    "TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL": 4294967296
+    "TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL": 4294967296,
+    "Q5_0_INDEPENDENT_BATCHED_MATMUL": 8589934592
   },
   "exports": {
     "cpu": [
@@ -124,7 +125,8 @@
       "status": "UNPROVEN",
       "summary": "Active single Q5_0 projections remain. Dormant grouped dispatch and capability are retired after measured whole-model regression and divergent isolated-group continuations; bit 13 is reserved.",
       "capabilities": [
-        "Q5_0_F32_BATCHED_MATMUL"
+        "Q5_0_F32_BATCHED_MATMUL",
+        "Q5_0_INDEPENDENT_BATCHED_MATMUL"
       ],
       "exports": {
         "cpu": [

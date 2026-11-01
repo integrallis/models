@@ -39,6 +39,14 @@ public enum NativeKernelCapability {
   MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL(1L << 31),
   /** TQ1_0 rows inside a grouped dispatch, sharing the group's Q8_K activation quantization. */
   TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL(1L << 32),
+  /**
+   * Q5_0 matrices inside an independent batched dispatch, each against its own activation.
+   *
+   * <p>Not a revival of the retired grouped Q5_0 bit. Grouping shares one quantized activation and
+   * that sharing measured slower for Q5_0, which is why the grouped capability was removed. An
+   * independent dispatch quantizes per matrix, so that measurement does not speak to this path.
+   */
+  Q5_0_INDEPENDENT_BATCHED_MATMUL(1L << 33),
   Q5_K_F32_BATCHED_MATMUL(1L << 10),
   Q5_K_F32_GROUPED_BATCHED_MATMUL(1L << 11),
   Q5_0_F32_BATCHED_MATMUL(1L << 12),

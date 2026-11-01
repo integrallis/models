@@ -683,6 +683,39 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     return true;
   }
 
+  /**
+   * Per-matrix support for an independent dispatch, which is NOT the same set as grouped.
+   *
+   * <p>An independent dispatch gives every matrix its own activation. Q5_0's exclusion from
+   * grouping is about sharing one quantized activation -- measured slower, which is why the grouped
+   * Q5_0 capability was retired -- and that says nothing about this path. The native side carries
+   * the Q5/Q5Avx2/Q5Neon row arms either way.
+   *
+   * <p>This matters to a real file: {@code Mellum2-12B-A2.5B-Thinking-Q4_K_M} stores its expert
+   * down projections as Q8_0 in 14 of its 28 blocks and Q5_0 in the other 14, read from the
+   * artifact's tensor table rather than assumed. The Q5_0 half fell back to one dispatch per expert
+   * -- 8 calls a layer, 112 a token -- while the Q8_0 half took a single dispatch.
+   */
+  private boolean supportsIndependent(GgufTensorType type) {
+    if (type == GgufTensorType.Q5_0) {
+      return library.supports(NativeKernelCapability.Q5_0_INDEPENDENT_BATCHED_MATMUL)
+          && library.supports(NativeKernelCapability.Q5_0_F32_BATCHED_MATMUL);
+    }
+    return supportsGrouped(type);
+  }
+
+  /** {@link #groupable} widened for the independent path, where Q5_0 has nothing to share. */
+  private boolean independentlyGroupable(GgufTensorType type) {
+    return type == GgufTensorType.Q5_0
+        ? library.supports(NativeKernelCapability.Q5_0_INDEPENDENT_BATCHED_MATMUL)
+        : groupable(type);
+  }
+
+  /** Identical types always match; otherwise the activation families must agree. */
+  private boolean compatibleIndependent(GgufTensorType firstType, GgufTensorType secondType) {
+    return firstType == secondType || compatibleGroup(firstType, secondType);
+  }
+
   @Override
   public synchronized void multiplyGrouped(
       float[][] outputs,
@@ -737,9 +770,9 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     GgufTensorType firstType = types[0];
     for (int index = 0; index < matrixCount; index++) {
       if (rows[index] < 1
-          || !supportsGrouped(types[index])
-          || !groupable(types[index])
-          || !compatibleGroup(firstType, types[index])) {
+          || !supportsIndependent(types[index])
+          || !independentlyGroupable(types[index])
+          || !compatibleIndependent(firstType, types[index])) {
         return false;
       }
     }
@@ -780,9 +813,9 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     GgufTensorType firstType = types[0];
     for (int index = 0; index < matrixCount; index++) {
       if (rows[index] < 1
-          || !supportsGrouped(types[index])
-          || !groupable(types[index])
-          || !compatibleGroup(firstType, types[index])) {
+          || !supportsIndependent(types[index])
+          || !independentlyGroupable(types[index])
+          || !compatibleIndependent(firstType, types[index])) {
         return false;
       }
     }
@@ -823,8 +856,14 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
             "independent projection input " + index + " is smaller than its shape");
       }
       groupedOutputElements[index] =
-          validateGroupedProjection(
-              outputs[index], weights[index], types[index], batchSizes[index], rows[index], cols);
+          validateProjectionForDispatch(
+              outputs[index],
+              weights[index],
+              types[index],
+              batchSizes[index],
+              rows[index],
+              cols,
+              true);
       totalInputElements = Math.addExact(totalInputElements, inputElements);
       totalOutputElements = Math.addExact(totalOutputElements, groupedOutputElements[index]);
     }
@@ -1117,11 +1156,35 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       int batchSize,
       int rows,
       int cols) {
+    return validateProjectionForDispatch(output, weights, type, batchSize, rows, cols, false);
+  }
+
+  /**
+   * Shape and support validation shared by the grouped and independent dispatches.
+   *
+   * <p>{@code independent} is not cosmetic: the two dispatches support different type sets. Q5_0 is
+   * admissible on the independent path, where every matrix quantizes its own activation, and
+   * refused on the grouped one, where the group shares a single activation and that sharing
+   * measured slower. Validating both against {@link #supportsGrouped} rejected a Q5_0 independent
+   * dispatch that the kernel performs correctly.
+   */
+  private int validateProjectionForDispatch(
+      float[] output,
+      MemorySegment weights,
+      GgufTensorType type,
+      int batchSize,
+      int rows,
+      int cols,
+      boolean independent) {
     Objects.requireNonNull(output, "output");
     Objects.requireNonNull(weights, "weights");
     Objects.requireNonNull(type, "type");
-    if (!supportsGrouped(type)) {
-      throw new UnsupportedOperationException("Rust grouped kernel does not support GGUF " + type);
+    if (independent ? !supportsIndependent(type) : !supportsGrouped(type)) {
+      throw new UnsupportedOperationException(
+          "Rust "
+              + (independent ? "independent" : "grouped")
+              + " kernel does not support GGUF "
+              + type);
     }
     int blockElements = blockElements(type);
     if (batchSize < 1 || rows < 1 || cols < 1 || cols % blockElements != 0) {
