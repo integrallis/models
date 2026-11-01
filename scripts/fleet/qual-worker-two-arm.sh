@@ -325,7 +325,22 @@ fi
 # Verified from the backend's own exceptions, not from the adapter class existing.
 # gpt-oss REMOVED for GGUF: type 39 (MXFP4) is not a known GgufTensorType, so the parser rejects
 # the file. gpt-oss IS supported via the HuggingFace safetensors path -- qualify it from there.
-SUPPORTED_ARCH="llama gemma gemma2 gemma4 phi3 mistral3 hunyuan-dense lfm2 qwen2 qwen3 qwen3moe granite smollm3 gemma3 gemma-embedding qwen35 qwen35moe qwen3next gemma3n deepseek2 gpt-oss mobilemoe needle2"
+# maple ADDED: DecoderArchitecture.MAPLE (llama/DecoderArchitecture.java) routes the
+# LlamaForwardPass path, and four defects in that route are now fixed across two PRs. #300 fixed
+# three: the declared sliding-window pattern was applied to no layer, swiglu_clamp_exp was
+# unimplemented, and RoPE was applied to the six global layers maple gives no positions. #321
+# fixed the fourth: TQ1_0 products used exact F32 where ggml quantizes activations to Q8_K, which
+# left the worst per-layer delta at 31.95% -- 0.00064% after it. With those and an F16 KV cache it
+# reproduces llama.cpp's hidden state bit-for-bit at one token and selects the same experts on 24
+# of 24 layers. Before #300 it loaded and answered, which is exactly why this list is keyed on a
+# verified route rather than on a decoder class existing.
+#
+# This admits maple's CANDIDATE arm. It does not mean maple can qualify: its comparator is settled
+# as NO_COMPARABLE_BASELINE in benchmark-results/2026-11-01-maple-no-authoritative-comparator,
+# because modeling_maple.py imports flash_attn at module scope and so has no CPU path, leaving no
+# same-compute-class reference. A shard that runs maple should expect a candidate arm and an
+# excluded comparator.
+SUPPORTED_ARCH="llama gemma gemma2 gemma4 phi3 mistral3 hunyuan-dense lfm2 qwen2 qwen3 qwen3moe granite smollm3 gemma3 gemma-embedding qwen35 qwen35moe qwen3next gemma3n deepseek2 gpt-oss mobilemoe needle2 maple"
 
 # Largest artifact this instance type can actually decode, in bytes. GGUF is mmap'd, so an
 # oversized model loads and then thrashes rather than failing: decode touches every weight on
