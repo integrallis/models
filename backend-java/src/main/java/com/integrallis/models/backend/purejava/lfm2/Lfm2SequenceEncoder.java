@@ -287,10 +287,12 @@ public final class Lfm2SequenceEncoder implements SequenceEncoder {
    *
    * <p>This pass had no kernel seam: projections went straight to {@code TensorOps} and the kernel
    * the caller injected was never consulted, so it ran unaccelerated while diagnostics reported one
-   * was loaded. Found by audit on 2026-11-01 after the same gap cost {@code lfm2moe} a
-   * qualification -- 8.94 tok/s against a reference's 45.33 -- where a seamed decoder on the same
-   * host reached 0.5794 of its reference. No qualified catalog entry used this pass, so no
-   * published number moved; the cost was that a future run here would read "the model is slow".
+   * was loaded. Found by audit on 2026-11-01 after the same gap cost {@code lfm2moe} 166% of its
+   * decode throughput -- 8.94 to 23.80 tok/s, our own arm before and after on one host. (The gate
+   * ratios first reported beside those figures were withdrawn: the comparator arm carried no
+   * artifact SHA-256 and the policy had excluded it. The admitted ollama comparison of 2026-11-01
+   * is decodeThroughputRatio 0.3974.) No qualified catalog entry used this pass, so no published
+   * number moved; the cost was that a future run here would read "the model is slow".
    */
   private final GgufBatchedMatrixKernel matrixKernel;
 

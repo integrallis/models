@@ -87,9 +87,11 @@ public final class Lfm2ForwardPass {
    * <p><b>This decoder had no kernel seam at all.</b> Every projection went through {@code
    * TensorOps.ggufMatmul}, and {@code PureJavaBackend.loadLfm2} never passed the kernel it had
    * already resolved -- so an lfm2 or lfm2moe model ran with no native acceleration even when the
-   * caller injected one and the diagnostics reported it. Measured 2026-11-01: lfm2moe decoded 8.94
-   * tok/s against the reference's 45.33, a {@code decodeThroughputRatio} of 0.1972 against a 0.80
-   * floor, while mellum on the Llama path -- same host, same comparator -- reached 0.5794.
+   * caller injected one and the diagnostics reported it. Measured 2026-11-01: adding the seam took
+   * lfm2moe's decode from 8.94 to 23.80 tok/s, our own arm before and after on one host under one
+   * protocol -- a paired within-arm A/B, not a gate result. Its admitted qualification, against
+   * ollama at warmups 1 and iterations 3, is {@code decodeThroughputRatio} 0.3974 against a 0.80
+   * floor, with prefill the worse half at 0.1833 (25.54 against 139.31 tok/s).
    */
   private final GgufBatchedMatrixKernel matrixKernel;
 
@@ -450,11 +452,13 @@ public final class Lfm2ForwardPass {
    * The selected experts in two native dispatches instead of {@code 3 * usedCount}.
    *
    * <p>Same change as {@code LlamaForwardPass.routeExpertsGrouped}, for this decoder. The loop in
-   * {@link #route} issues one dispatch per projection per expert — twelve at {@code
-   * expert_used_count = 4} — where ggml issues one {@code mul_mat_id}. Measured 2026-11-01:
-   * lfm2moe's qualification {@code decodeThroughputRatio} was 0.1972 against a 0.80 floor, 8.94
-   * against the reference's 45.33 tok/s, while the same fix on the Llama path moved mellum from
-   * 0.3771 to 0.5794.
+   * {@link #route} issues one dispatch per projection per expert -- twelve at {@code
+   * expert_used_count = 4} -- where ggml issues one {@code mul_mat_id}. Measured 2026-11-01: this
+   * and the missing kernel seam together took lfm2moe's decode from 8.94 to 23.80 tok/s, our own
+   * arm before and after. That paired figure is what this change is worth; the gate ratios first
+   * quoted beside it were withdrawn, because the comparator arm they divided carried no artifact
+   * SHA-256 and the policy had excluded it. The admitted ollama comparison is {@code
+   * decodeThroughputRatio} 0.3974 -- still FAILED_RELATIVE_GATE against a 0.80 floor.
    *
    * <p>The two groups are decided separately, which is not symmetry for its own sake: mellum lost
    * half its layers to a coupled check because one of its three expert families is Q5_0, the single

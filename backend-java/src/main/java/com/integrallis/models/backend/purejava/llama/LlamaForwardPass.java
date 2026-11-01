@@ -2427,13 +2427,19 @@ public final class LlamaForwardPass {
    *
    * <p><b>Why this exists.</b> The per-expert loop below calls {@code matmulDispatch} once per
    * projection per expert — twenty-four batch-1 dispatches per routed layer per token at {@code
-   * expert_used_count = 8} — where ggml issues one {@code mul_mat_id} over the selected rows.
-   * Measured on 2026-10-31, every mixture-of-experts decoder on this path failed the qualification
-   * relative gate on that: maple {@code decodeThroughputRatio} 0.2085, mellum 0.3771, lfm2moe
-   * 0.1410, against a 0.80 floor, while the catalog's 80 qualified entries contained exactly one
-   * MoE model and it has its own decoder. The expert projections were reaching the kernel — all
-   * four quantisations report eligible at batch 1 for these shapes — so the cost was dispatch
-   * count, not a silent fallback.
+   * expert_used_count = 8} — where ggml issues one {@code mul_mat_id} over the selected rows. The
+   * catalog's 80 qualified entries contain exactly one MoE model and it has its own decoder. The
+   * expert projections were reaching the kernel — all four quantisations report eligible at batch 1
+   * for these shapes — so the cost was dispatch count, not a silent fallback.
+   *
+   * <p><b>What is measured.</b> The ratios first quoted here (maple 0.2085, mellum 0.3771, lfm2moe
+   * 0.1410) were withdrawn: they were computed by hand from two reports whose comparator arm
+   * carried no artifact SHA-256, which the policy excludes, so no gate had admitted any of them.
+   * The one admitted comparison, lfm2moe against ollama on 2026-11-01 at warmups 1 and iterations
+   * 3, is {@code decodeThroughputRatio} 0.3974 and {@code endToEndLatencyRatio} 2.8670 --
+   * FAILED_RELATIVE_GATE, with its contribution gate passing at 0.4444 and 1.0000. Prefill is the
+   * worse half at 0.1833, and this grouping does not address prefill: it batches the experts
+   * selected for one token, while prefill walks tokens one at a time.
    *
    * <p><b>Why this shape.</b> {@code flint} already does exactly this and is qualified ({@code
    * FlintForwardPass:425-470}): the gate and up projections share one input, so they go through

@@ -496,10 +496,13 @@ public final class Gemma3nForwardPass {
    * <p>This decoder had no kernel seam: every projection went to {@code TensorOps.ggufMatmul} and
    * the kernel the caller injected was never consulted, so the model ran unaccelerated while
    * diagnostics reported a kernel was loaded. Found by audit on 2026-11-01 after the same gap cost
-   * {@code lfm2moe} a qualification -- 8.94 tok/s against a reference's 45.33, a {@code
-   * decodeThroughputRatio} of 0.1972, where a seamed decoder on the same host reached 0.5794. No
-   * qualified catalog entry used this decoder, so no published number moved; the cost was that a
-   * future two-arm run here would have read "the model is slow".
+   * {@code lfm2moe} 166% of its decode throughput -- 8.94 to 23.80 tok/s, our own arm before and
+   * after, one host and one protocol. (The gate ratios first reported beside those figures were
+   * withdrawn: the comparator arm carried no artifact SHA-256, so the policy had excluded it and
+   * returned NO_COMPARABLE_BASELINE. The admitted comparison, measured 2026-11-01 against ollama at
+   * warmups 1 and iterations 3, is decodeThroughputRatio 0.3974.) No qualified catalog entry used
+   * this decoder, so no published number moved; the cost was that a future two-arm run here would
+   * have read "the model is slow".
    */
   private final GgufBatchedMatrixKernel matrixKernel;
 
