@@ -376,7 +376,8 @@ public record LlamaConfig(
   public boolean usesNeoxRope() {
     // EXHAUSTIVE on purpose, with no default. A boolean chain silently answers NORM for an
     // architecture nobody listed, and NORM-for-NEOX rotates the right angles onto the wrong element
-    // pairs: output is exact at position 0, where there is no rotation, and degrades towards garbage
+    // pairs: output is exact at position 0, where there is no rotation, and degrades towards
+    // garbage
     // as positions grow, without failing one shape assertion.
     //
     // MEASURED 2026-10-31. MELLUM was registered in DecoderArchitecture and left out of the chain

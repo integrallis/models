@@ -245,6 +245,18 @@ public final class LlamaForwardPass {
   private final float[] moeActivated;
   private final FloatArrayView moeActivatedView;
   private final float[] moeExpertOut;
+
+  // Grouped expert dispatch scratch. Null on a dense model and when the kernel cannot group, which
+  // is what routeExpertsGrouped checks before using any of it.
+  private final float[][] moeGroupedGateUpOutputs;
+  private final MemorySegment[] moeGroupedGateUpWeights;
+  private final GgufTensorType[] moeGroupedGateUpTypes;
+  private final int[] moeGroupedGateUpRows;
+  private final float[][] moeGroupedActivations;
+  private final float[][] moeGroupedDownOutputs;
+  private final MemorySegment[] moeGroupedDownWeights;
+  private final GgufTensorType[] moeGroupedDownTypes;
+  private final int[] moeGroupedDownRows;
   private final int[] moeSelected;
   private final float[] moeRoutingWeights;
   private final float[] logits;
@@ -528,6 +540,31 @@ public final class LlamaForwardPass {
     this.moeActivated = new float[expertHiddenDim];
     this.moeActivatedView = prepareActivationArray(moeActivated);
     this.moeExpertOut = new float[config.usesMixtureOfExperts() ? dim : 0];
+    // One buffer per selected expert, allocated once rather than per token: a routed layer runs
+    // this every token of every layer, so an allocation here is an allocation in the hot path.
+    if (config.usesMixtureOfExperts()) {
+      int used = config.numExpertsUsed();
+      int hidden = config.expertHiddenDim();
+      this.moeGroupedGateUpOutputs = new float[2 * used][hidden];
+      this.moeGroupedGateUpWeights = new MemorySegment[2 * used];
+      this.moeGroupedGateUpTypes = new GgufTensorType[2 * used];
+      this.moeGroupedGateUpRows = new int[2 * used];
+      this.moeGroupedActivations = new float[used][hidden];
+      this.moeGroupedDownOutputs = new float[used][dim];
+      this.moeGroupedDownWeights = new MemorySegment[used];
+      this.moeGroupedDownTypes = new GgufTensorType[used];
+      this.moeGroupedDownRows = new int[used];
+    } else {
+      this.moeGroupedGateUpOutputs = null;
+      this.moeGroupedGateUpWeights = null;
+      this.moeGroupedGateUpTypes = null;
+      this.moeGroupedGateUpRows = null;
+      this.moeGroupedActivations = null;
+      this.moeGroupedDownOutputs = null;
+      this.moeGroupedDownWeights = null;
+      this.moeGroupedDownTypes = null;
+      this.moeGroupedDownRows = null;
+    }
     this.moeSelected = new int[config.numExpertsUsed()];
     this.moeRoutingWeights = new float[config.numExpertsUsed()];
     this.logits = new float[vocabSize];
@@ -2342,39 +2379,136 @@ public final class LlamaForwardPass {
     selectExperts(moeRouterLogits, config.numExperts(), used, moeSelected, moeRoutingWeights);
 
     java.util.Arrays.fill(destination, destinationOffset, destinationOffset + dim, 0.0f);
+    if (routeExpertsGrouped(destination, destinationOffset, moe, layer, dim, hidden, used)) {
+      return;
+    }
     for (int slot = 0; slot < used; slot++) {
       int expert = moeSelected[slot];
       float weight = moeRoutingWeights[slot];
       matmulDispatch(moeGate, moeInput, moe.gate()[expert], moe.gateType(), hidden, dim);
       matmulDispatch(moeUp, moeInput, moe.up()[expert], moe.upType(), hidden, dim);
-      // The same activation policy as the dense path, so a routed model honours usesGeluFfn and the
-      // Granite sigmoid rather than hardcoding SwiGLU here.
-      // swiglu_clamp_exp applies to the EXPERT FFN only -- the reference keeps a separate
-      // swiglu_clamp_shexp for shared experts -- so the clamp is applied here and not in the dense
-      // path. Above the reference's 1e-6 epsilon it takes the scalar clamped route, because the
-      // vectorized SwiGLU kernels do not clamp and silently returning their unclamped result is
-      // the failure this fixes.
-      float clampLimit = config.swigluClampExp(layer);
-      if (clampLimit > 1.0e-6f) {
-        TensorOps.swiGluClamped(moeActivated, 0, moeGate, 0, moeUp, 0, hidden, clampLimit);
-      } else {
-        activateFfn(
-            moeActivated,
-            0,
-            moeGate,
-            0,
-            moeUp,
-            0,
-            hidden,
-            moeActivatedView,
-            moeGateView,
-            moeUpView);
-      }
+      activateExpert(moeActivated, moeGate, moeUp, hidden, layer);
       matmulDispatch(moeExpertOut, moeActivated, moe.down()[expert], moe.downType(), dim, hidden);
       for (int index = 0; index < dim; index++) {
         destination[destinationOffset + index] += weight * moeExpertOut[index];
       }
     }
+  }
+
+  /**
+   * The expert feed-forward activation, shared by the grouped and per-expert routes.
+   *
+   * <p>The same activation policy as the dense path, so a routed model honours {@code usesGeluFfn}
+   * and the Granite sigmoid rather than hardcoding SwiGLU. {@code swiglu_clamp_exp} applies to the
+   * EXPERT feed-forward only -- the reference keeps a separate {@code swiglu_clamp_shexp} for
+   * shared experts -- so the clamp is applied here and not in the dense path. Above the reference's
+   * 1e-6 epsilon it takes the scalar clamped route, because the vectorized SwiGLU kernels do not
+   * clamp and silently returning their unclamped result is the failure that fixed.
+   *
+   * <p>Shared rather than copied: two routes that activate differently would qualify a model on
+   * arithmetic the other route does not reproduce, and which route runs depends on whether a kernel
+   * happens to accept a group.
+   */
+  private void activateExpert(float[] activated, float[] gate, float[] up, int hidden, int layer) {
+    float clampLimit = config.swigluClampExp(layer);
+    if (clampLimit > 1.0e-6f) {
+      TensorOps.swiGluClamped(activated, 0, gate, 0, up, 0, hidden, clampLimit);
+      return;
+    }
+    if (activated == moeActivated && gate == moeGate && up == moeUp) {
+      activateFfn(activated, 0, gate, 0, up, 0, hidden, moeActivatedView, moeGateView, moeUpView);
+      return;
+    }
+    activateFfn(activated, 0, gate, 0, up, 0, hidden, null, null, null);
+  }
+
+  /**
+   * Runs the selected experts in two native dispatches instead of {@code 3 * used}.
+   *
+   * <p><b>Why this exists.</b> The per-expert loop below calls {@code matmulDispatch} once per
+   * projection per expert — twenty-four batch-1 dispatches per routed layer per token at {@code
+   * expert_used_count = 8} — where ggml issues one {@code mul_mat_id} over the selected rows.
+   * Measured on 2026-10-31, every mixture-of-experts decoder on this path failed the qualification
+   * relative gate on that: maple {@code decodeThroughputRatio} 0.2085, mellum 0.3771, lfm2moe
+   * 0.1410, against a 0.80 floor, while the catalog's 80 qualified entries contained exactly one
+   * MoE model and it has its own decoder. The expert projections were reaching the kernel — all
+   * four quantisations report eligible at batch 1 for these shapes — so the cost was dispatch
+   * count, not a silent fallback.
+   *
+   * <p><b>Why this shape.</b> {@code flint} already does exactly this and is qualified ({@code
+   * FlintForwardPass:425-470}): the gate and up projections share one input, so they go through
+   * {@code multiplyGrouped}; the down projections each take their own activated vector, so they go
+   * through {@code multiplyIndependent}. Copying a qualified arrangement is worth more than
+   * inventing one.
+   *
+   * <p>Returns false when the kernel declines either group, leaving the per-expert loop to run. The
+   * activation policy is the loop's, not a second copy: {@link #activateExpert} is shared, so
+   * {@code usesGeluFfn}, the Granite sigmoid and {@code swiglu_clamp_exp} behave identically either
+   * way.
+   */
+  private boolean routeExpertsGrouped(
+      float[] destination,
+      int destinationOffset,
+      LlamaWeights.MoeWeights moe,
+      int layer,
+      int dim,
+      int hidden,
+      int used) {
+    if (moeGroupedGateUpOutputs == null) {
+      return false;
+    }
+    for (int slot = 0; slot < used; slot++) {
+      int expert = moeSelected[slot];
+      moeGroupedGateUpWeights[2 * slot] = moe.gate()[expert];
+      moeGroupedGateUpWeights[2 * slot + 1] = moe.up()[expert];
+      moeGroupedGateUpTypes[2 * slot] = moe.gateType();
+      moeGroupedGateUpTypes[2 * slot + 1] = moe.upType();
+      moeGroupedGateUpRows[2 * slot] = hidden;
+      moeGroupedGateUpRows[2 * slot + 1] = hidden;
+      moeGroupedDownWeights[slot] = moe.down()[expert];
+      moeGroupedDownTypes[slot] = moe.downType();
+      moeGroupedDownRows[slot] = dim;
+    }
+    if (!batchedMatrixKernel.isGroupedEligible(
+            moeGroupedGateUpTypes, moeGroupedGateUpRows, 2 * used, 1, dim)
+        || !batchedMatrixKernel.isIndependentEligible(
+            moeGroupedDownTypes, moeGroupedDownRows, used, 1, hidden)) {
+      return false;
+    }
+    batchedMatrixKernel.multiplyGrouped(
+        moeGroupedGateUpOutputs,
+        moeGroupedGateUpWeights,
+        moeGroupedGateUpTypes,
+        moeGroupedGateUpRows,
+        2 * used,
+        moeInput,
+        1,
+        dim);
+    for (int slot = 0; slot < used; slot++) {
+      activateExpert(
+          moeGroupedActivations[slot],
+          moeGroupedGateUpOutputs[2 * slot],
+          moeGroupedGateUpOutputs[2 * slot + 1],
+          hidden,
+          layer);
+    }
+    batchedMatrixKernel.multiplyIndependent(
+        moeGroupedDownOutputs,
+        moeGroupedDownWeights,
+        moeGroupedDownTypes,
+        moeGroupedDownRows,
+        used,
+        moeGroupedActivations,
+        1,
+        hidden);
+    for (int slot = 0; slot < used; slot++) {
+      float weight = moeRoutingWeights[slot];
+      float[] contribution = moeGroupedDownOutputs[slot];
+      for (int index = 0; index < dim; index++) {
+        destination[destinationOffset + index] += weight * contribution[index];
+      }
+    }
+    return true;
   }
 
   /**

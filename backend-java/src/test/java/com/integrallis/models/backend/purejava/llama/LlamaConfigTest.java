@@ -1079,12 +1079,9 @@ class LlamaConfigTest {
       if ("granite".equals(architecture)) {
         // Granite persists four scalars the other architectures derive, and refuses to load
         // without them. They do not affect the rotary layout; they are here so the header parses.
-        entries.put(
-            architecture + ".embedding_scale", new GgufMetadataValue.Float32Value(1.0f));
-        entries.put(
-            architecture + ".residual_scale", new GgufMetadataValue.Float32Value(1.0f));
-        entries.put(
-            architecture + ".attention.scale", new GgufMetadataValue.Float32Value(1.0f));
+        entries.put(architecture + ".embedding_scale", new GgufMetadataValue.Float32Value(1.0f));
+        entries.put(architecture + ".residual_scale", new GgufMetadataValue.Float32Value(1.0f));
+        entries.put(architecture + ".attention.scale", new GgufMetadataValue.Float32Value(1.0f));
         entries.put(architecture + ".logit_scale", new GgufMetadataValue.Float32Value(1.0f));
       }
       return new GgufMetadata(entries);
