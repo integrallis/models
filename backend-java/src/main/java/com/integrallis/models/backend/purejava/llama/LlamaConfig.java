@@ -374,13 +374,26 @@ public record LlamaConfig(
    * against.
    */
   public boolean usesNeoxRope() {
-    return architecture == DecoderArchitecture.QWEN2
-        || architecture == DecoderArchitecture.QWEN3
-        || architecture == DecoderArchitecture.QWEN3MOE
-        || architecture == DecoderArchitecture.MAPLE
-        || architecture == DecoderArchitecture.PHI3
-        || architecture == DecoderArchitecture.HUNYUAN_DENSE
-        || isGemmaFamily();
+    // EXHAUSTIVE on purpose, with no default. A boolean chain silently answers NORM for an
+    // architecture nobody listed, and NORM-for-NEOX rotates the right angles onto the wrong element
+    // pairs: output is exact at position 0, where there is no rotation, and degrades towards garbage
+    // as positions grow, without failing one shape assertion.
+    //
+    // MEASURED 2026-10-31. MELLUM was registered in DecoderArchitecture and left out of the chain
+    // this replaces, even though the javadoc above already named it as NEOX in llama.cpp's table.
+    // It served NORM. Its per-layer residuals matched the oracle to 0.0005% at position 0 and
+    // diverged 3.7% at layer 0 over thirteen positions -- and in a RAG qualification it emitted 256
+    // newline tokens per case and never reached its end-of-generation token, answering 0 of 9 where
+    // llama.cpp on the identical artifact and prompt answered 7 of 9 correctly. Nothing threw.
+    //
+    // So the switch is exhaustive and adding an architecture is a compile error until its rotary
+    // layout is read from llama_model_rope_type and written down here. That is cheaper than this
+    // was to find.
+    return switch (architecture) {
+      case QWEN2, QWEN3, QWEN3MOE, MAPLE, MELLUM, PHI3, HUNYUAN_DENSE -> true;
+      case GEMMA, GEMMA2, GEMMA3, GEMMA_EMBEDDING -> true;
+      case LLAMA, GRANITE, MISTRAL3, SMOLLM3 -> false;
+    };
   }
 
   /**

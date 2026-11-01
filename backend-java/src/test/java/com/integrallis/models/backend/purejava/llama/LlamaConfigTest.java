@@ -968,4 +968,126 @@ class LlamaConfigTest {
       assertThat(config.expertHiddenDim()).isEqualTo(896);
     }
   }
+
+  /**
+   * Every architecture's rotary layout, pinned against llama.cpp's {@code llama_model_rope_type}.
+   *
+   * <p>This exists because a missing entry is silent. {@code MELLUM} was registered without one on
+   * 2026-10-31 and served NORM where the reference serves NEOX: residuals matched the oracle to
+   * 0.0005% at position 0, drifted 3.7% at layer 0 over thirteen positions, and in a RAG
+   * qualification the model emitted 256 newline tokens per case and never reached its
+   * end-of-generation token — 0 of 9 answered against llama.cpp's 7 of 9 correct on the identical
+   * artifact and prompt. No exception, no shape mismatch.
+   *
+   * <p>The table below is transcribed from {@code llama_model_rope_type} at ggml-org/llama.cpp
+   * {@code origin/master}, which agrees with the pinned {@code 3f03b1772}. {@code
+   * LlamaConfig.usesNeoxRope()} is an exhaustive switch, so a new architecture cannot reach it
+   * without a decision; this asserts the decisions are the <i>right</i> ones.
+   */
+  @Nested
+  class RotaryLayoutPerArchitecture {
+
+    @Test
+    void everyArchitectureMatchesTheReferenceRopeTypeTable() {
+      // NEOX in llama_model_rope_type.
+      for (DecoderArchitecture architecture :
+          List.of(
+              DecoderArchitecture.QWEN2,
+              DecoderArchitecture.QWEN3,
+              DecoderArchitecture.QWEN3MOE,
+              DecoderArchitecture.MAPLE,
+              DecoderArchitecture.MELLUM,
+              DecoderArchitecture.PHI3,
+              DecoderArchitecture.HUNYUAN_DENSE,
+              DecoderArchitecture.GEMMA,
+              DecoderArchitecture.GEMMA2,
+              DecoderArchitecture.GEMMA3,
+              DecoderArchitecture.GEMMA_EMBEDDING)) {
+        assertThat(neox(architecture)).describedAs("%s must be NEOX", architecture).isTrue();
+      }
+      // NORM in llama_model_rope_type.
+      for (DecoderArchitecture architecture :
+          List.of(
+              DecoderArchitecture.LLAMA,
+              DecoderArchitecture.GRANITE,
+              DecoderArchitecture.MISTRAL3,
+              DecoderArchitecture.SMOLLM3)) {
+        assertThat(neox(architecture)).describedAs("%s must be NORM", architecture).isFalse();
+      }
+    }
+
+    @Test
+    void everyRegisteredArchitectureIsCovered() {
+      // The point of the exhaustive switch: if someone adds an architecture and the switch grows a
+      // default instead of a case, this still fails rather than letting NORM be assumed.
+      for (DecoderArchitecture architecture : DecoderArchitecture.values()) {
+        assertThat(COVERED)
+            .describedAs(
+                "%s has no recorded rotary layout -- read llama_model_rope_type and add it to both"
+                    + " LlamaConfig.usesNeoxRope() and this test",
+                architecture)
+            .contains(architecture);
+      }
+    }
+
+    private static final List<DecoderArchitecture> COVERED =
+        List.of(
+            DecoderArchitecture.QWEN2,
+            DecoderArchitecture.QWEN3,
+            DecoderArchitecture.QWEN3MOE,
+            DecoderArchitecture.MAPLE,
+            DecoderArchitecture.MELLUM,
+            DecoderArchitecture.PHI3,
+            DecoderArchitecture.HUNYUAN_DENSE,
+            DecoderArchitecture.GEMMA,
+            DecoderArchitecture.GEMMA2,
+            DecoderArchitecture.GEMMA3,
+            DecoderArchitecture.GEMMA_EMBEDDING,
+            DecoderArchitecture.LLAMA,
+            DecoderArchitecture.GRANITE,
+            DecoderArchitecture.MISTRAL3,
+            DecoderArchitecture.SMOLLM3);
+
+    private boolean neox(DecoderArchitecture architecture) {
+      return LlamaConfig.fromMetadata(minimal(architecture.metadataId())).usesNeoxRope();
+    }
+
+    /**
+     * The smallest header {@link LlamaConfig} will parse, for any architecture string.
+     *
+     * <p>Rotary width is <b>four</b>, not two, deliberately: at a width of two NORM pairs (0,1) and
+     * NeoX with {@code half == 1} pairs (0, 0+1), the same two elements, so a two-wide fixture
+     * cannot tell the layouts apart and would pass whichever way the flag went.
+     */
+    private GgufMetadata minimal(String architecture) {
+      Map<String, GgufMetadataValue> entries = new LinkedHashMap<>();
+      entries.put("general.architecture", new GgufMetadataValue.StringValue(architecture));
+      entries.put(architecture + ".block_count", new GgufMetadataValue.Uint32Value(2));
+      entries.put(architecture + ".embedding_length", new GgufMetadataValue.Uint32Value(8));
+      entries.put(architecture + ".attention.head_count", new GgufMetadataValue.Uint32Value(2));
+      entries.put(architecture + ".attention.head_count_kv", new GgufMetadataValue.Uint32Value(1));
+      entries.put(architecture + ".attention.key_length", new GgufMetadataValue.Uint32Value(4));
+      entries.put(architecture + ".attention.value_length", new GgufMetadataValue.Uint32Value(4));
+      entries.put(architecture + ".rope.dimension_count", new GgufMetadataValue.Uint32Value(4));
+      entries.put(architecture + ".vocab_size", new GgufMetadataValue.Uint32Value(16));
+      entries.put(architecture + ".context_length", new GgufMetadataValue.Uint32Value(64));
+      entries.put(architecture + ".feed_forward_length", new GgufMetadataValue.Uint32Value(16));
+      entries.put(architecture + ".rope.freq_base", new GgufMetadataValue.Float32Value(10000.0f));
+      entries.put(
+          architecture + ".attention.layer_norm_rms_epsilon",
+          new GgufMetadataValue.Float32Value(1.0e-5f));
+      if ("granite".equals(architecture)) {
+        // Granite persists four scalars the other architectures derive, and refuses to load
+        // without them. They do not affect the rotary layout; they are here so the header parses.
+        entries.put(
+            architecture + ".embedding_scale", new GgufMetadataValue.Float32Value(1.0f));
+        entries.put(
+            architecture + ".residual_scale", new GgufMetadataValue.Float32Value(1.0f));
+        entries.put(
+            architecture + ".attention.scale", new GgufMetadataValue.Float32Value(1.0f));
+        entries.put(architecture + ".logit_scale", new GgufMetadataValue.Float32Value(1.0f));
+      }
+      return new GgufMetadata(entries);
+    }
+  }
 }
