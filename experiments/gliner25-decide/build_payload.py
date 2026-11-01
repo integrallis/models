@@ -19,11 +19,12 @@ def main():
     for folder in ['classes','lib','rust','experiment']:(root/folder).mkdir()
     for jar in (REPO/'build/gliner-qualification/lib').glob('*.jar'):
         shutil.copyfile(jar,root/'lib'/jar.name)
-    for module in ['backend-java','backend-native']:
-        jars=[p for p in (REPO/module/'build/libs').glob('*.jar') if not p.stem.endswith(('-sources','-javadoc'))]
-        if len(jars)!=1:raise ValueError('ambiguous built runtime jar: '+module)
+    version=next(line.split('=',1)[1].strip() for line in (REPO/'gradle.properties').read_text().splitlines() if line.startswith('version ='))
+    for module in ['models-api','backend-java','backend-native']:
+        jar=REPO/module/'build/libs'/f'{module}-{version}.jar'
+        if not jar.is_file():raise ValueError('missing built runtime jar: '+str(jar))
         for old in (root/'lib').glob(module+'-*.jar'):old.unlink()
-        shutil.copyfile(jars[0],root/'lib'/jars[0].name)
+        shutil.copyfile(jar,root/'lib'/jar.name)
     for path in HERE.iterdir():
         if path.is_file() and path.suffix in ['.json','.jsonl','.py','.java','.sh','.lock','.in']:
             shutil.copyfile(path,root/'experiment'/path.name)
