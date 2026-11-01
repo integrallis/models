@@ -22,13 +22,15 @@ BUCKET='models-qual-077051030817'
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--training-control',type=Path,required=True)
-    parser.add_argument('--dense-payload',type=Path)
-    parser.add_argument('--dense-manifest',type=Path)
+    parser.add_argument('--dense-payload','--runtime-payload',dest='dense_payload',type=Path)
+    parser.add_argument('--dense-manifest','--runtime-manifest',dest='dense_manifest',type=Path)
     parser.add_argument('--profile',action='store_true')
+    parser.add_argument('--performance',action='store_true')
+    parser.add_argument('--recipe',type=Path,default=HERE)
     args=parser.parse_args()
     if bool(args.dense_payload)!=bool(args.dense_manifest):raise ValueError('dense payload and manifest are required together')
     dense=json.loads(args.dense_manifest.read_text()) if args.dense_manifest else None
-    if args.profile and dense:raise ValueError('profile the original runtime independently')
+    if args.profile and (dense or args.performance):raise ValueError('profile the original runtime independently')
     if dense and hashlib.file_digest(args.dense_payload.open('rb'),'sha256').hexdigest()!=dense['sha256']:
         raise ValueError('dense payload identity mismatch')
     training=json.loads(args.training_control.read_text())
@@ -59,14 +61,15 @@ def main():
     with tarfile.open(overlay,'w:gz') as archive:
         for name in ['common.py','run_worker.py','reference_worker.py','compare_parity.py','assess_quality.py','assess_finetune.py',
                      'finetune-policy.json','finetune-splits.json','finetune-qualification-cases.jsonl','policy.json','quality-cases.jsonl','parity-cases.jsonl','performance-parity-cases.jsonl','performance-cases.jsonl','performance-cohort.json','compare_performance.py','evaluate_finetune_remote.sh','download_reranker_fixture.sh']:
-            archive.add(HERE/name,arcname=name)
+            source=args.recipe/name if name in ['finetune-policy.json','finetune-splits.json','finetune-qualification-cases.jsonl'] else HERE/name
+            archive.add(source,arcname=name)
     sha=hashlib.file_digest(overlay.open('rb'),'sha256').hexdigest()
     if dense:
         s3.upload_file(str(args.dense_payload),BUCKET,prefix+'/payload.tar.gz')
     else:
         s3.copy_object(Bucket=BUCKET,Key=prefix+'/payload.tar.gz',CopySource={'Bucket':BUCKET,'Key':previous['payloadUri'].split(BUCKET+'/')[1]+'/payload.tar.gz'})
     s3.upload_file(str(overlay),BUCKET,prefix+'/evaluation-overlay.tar.gz')
-    job='profile_remote.sh' if args.profile else 'dense_projection_screen_remote.sh' if dense else 'evaluate_finetune_remote.sh'
+    job='profile_remote.sh' if args.profile else 'performance_remote.sh' if args.performance else 'evaluate_finetune_remote.sh'
     s3.upload_file(str(HERE/job),BUCKET,prefix+'/jobs/evaluate.sh')
     s3.put_object(Bucket=BUCKET,Key=prefix+'/next-job.json',Body=b'{"id":"evaluate"}')
     worker=(HERE/'remote-worker.sh').read_text().replace('shutdown -h +110','shutdown -h +'+str(seconds//60))
@@ -85,7 +88,7 @@ def main():
     body['UserData']=userdata
     record=dict(experiment=run,provider='EC2',region='us-east-1',plan='m6a.4xlarge',
         sourceRevision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),
-        mode='cpu-profile' if args.profile else 'dense-projection-screen' if dense else 'fine-tune-quality',
+        mode='cpu-profile' if args.profile else 'paired-performance' if args.performance else 'fine-tune-quality',
         maximumAggregateRentedSeconds=aggregate_limit,
         measuredRuntimeSource=dense['sourceRevision'] if dense else previous['payloadManifest']['sourceRevision'],payloadSha256=env['GLINER_PAYLOAD_SHA'],overlaySha256=sha,
         trainedWeightSha256=training['workerResult']['mergedWeightSha256'],trainedSourceUri=training['resultUri'],

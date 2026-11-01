@@ -17,7 +17,7 @@ import json,os,pathlib,subprocess,sys
 sys.path.insert(0,'/work/payload/experiment')
 from common import verify_snapshot
 manifest=json.load(open('/work/variant-manifest.json'))
-assert manifest['id']=='modeljars-gliner25-decide-general-v1'
+assert manifest['id']==json.load(open('/work/payload/experiment/finetune-policy.json'))['candidate']
 for entry in manifest['files']:
     path=pathlib.Path('/work/variant')/entry['path'];path.parent.mkdir(parents=True,exist_ok=True)
     subprocess.run(['aws','s3','cp',os.environ['GLINER_TRAINED_RESULTS']+'/snapshot/'+entry['path'],str(path),'--only-show-errors'],check=True)
