@@ -52,6 +52,8 @@ def main(root):
         if arm != "candidate" or ("comparator", corpus, voice) not in first: continue
         ours = json.loads((root / path / "pass.json").read_text())["rows"]
         theirs = json.loads((root / first[("comparator", corpus, voice)] / "pass.json").read_text())["rows"]
+        if not ours or "phonemes" not in ours[0]:
+            continue  # the released-library arm records no phonemes (public API only)
         n = min(len(ours), len(theirs))
         same = [" ".join(a["phonemes"]) == " ".join(b["phonemes"]) for a, b in zip(ours, theirs)]
         chunked = sum(1 for a, b in zip(ours, theirs) if a["phonemes"] == b["phonemes"])

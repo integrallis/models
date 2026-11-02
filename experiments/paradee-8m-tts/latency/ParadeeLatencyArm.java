@@ -3,7 +3,9 @@
 //RUNTIME_OPTIONS --add-modules=jdk.incubator.vector --enable-native-access=ALL-UNNAMED
 //DEPS com.integrallis:models-audio:${models.version:0.5.11}
 
+import com.integrallis.models.api.AudioStream;
 import com.integrallis.models.api.PcmAudio;
+import com.integrallis.models.api.SpeechSynthesisOptions;
 import com.integrallis.models.api.WavEncoder;
 import com.integrallis.models.audio.ParadeeTextToSpeechModel;
 import java.nio.charset.StandardCharsets;
@@ -16,10 +18,12 @@ import java.util.Map;
 
 /**
  * The candidate arm against the RELEASED library, for the latency block and the throughput
- * ratio on a quiet machine: {@code ParadeeTextToSpeechModel.load(onnx, config)}, the route a
- * ModelJars user gets (bundled dictionaries, dictionary tier and fallback model), one untimed
- * warm-up on the first sentence, then per-sentence graph time. Writes NNN.wav, NNN.txt and
- * pass.json in the same layout as ParadeeCandidateArmIntegrationTest so derive.py reads it.
+ * ratio on a quiet machine: {@code ParadeeTextToSpeechModel.load(onnx, config)} and the public
+ * streaming {@code synthesize}, the route a ModelJars user gets (bundled dictionaries, dictionary
+ * tier and fallback model). One untimed warm-up on the first sentence, then per sentence the time
+ * to the first audio callback and the time to completion. Writes NNN.wav, NNN.txt and pass.json
+ * in the layout derive.py reads; the phonemizer time is inside the first-audio time here, as it
+ * is for a user.
  *
  * usage: jbang -Dmodels.version=0.5.11 ParadeeLatencyArm.java ONNX CONFIG CORPUS.json VOICE PASS OUT_DIR
  */
@@ -34,33 +38,32 @@ public class ParadeeLatencyArm {
     Files.createDirectories(out);
     List<String> sentences = sentences(corpusJson);
     String corpusName = field(corpusJson, "name");
-    long seed = 20261101L + pass;
+    SpeechSynthesisOptions options = SpeechSynthesisOptions.builder().voice(voice).build();
     try (ParadeeTextToSpeechModel model = ParadeeTextToSpeechModel.load(onnx, config)) {
-      for (String chunk : model.phonemeChunks(sentences.get(0), voice)) {
-        model.synthesizePhonemes(chunk, voice, 1f, seed);
-      }
+      model.synthesize(sentences.get(0), options);
       List<Map<String, Object>> rows = new ArrayList<>();
       double totalAudio = 0;
       double totalRun = 0;
       boolean allFinite = true;
       for (int i = 0; i < sentences.size(); i++) {
         String text = sentences.get(i);
-        long g2pStart = System.nanoTime();
-        List<String> chunks = model.phonemeChunks(text, voice);
-        double g2pSeconds = (System.nanoTime() - g2pStart) / 1e9;
         List<float[]> parts = new ArrayList<>();
-        double runSeconds = 0;
-        Double firstChunk = null;
-        for (String chunk : chunks) {
-          long start = System.nanoTime();
-          PcmAudio audio = model.synthesizePhonemes(chunk, voice, 1f, seed);
-          double dt = (System.nanoTime() - start) / 1e9;
-          runSeconds += dt;
-          if (firstChunk == null) {
-            firstChunk = dt;
+        long[] firstAudioNanos = {-1L};
+        long[] completeNanos = {-1L};
+        Throwable[] failure = {null};
+        long start = System.nanoTime();
+        model.synthesize(text, options, new AudioStream() {
+          @Override public void onAudio(PcmAudio audio) {
+            if (firstAudioNanos[0] < 0) firstAudioNanos[0] = System.nanoTime();
+            parts.add(audio.samples());
           }
-          parts.add(audio.samples());
-        }
+          @Override public void onComplete() { completeNanos[0] = System.nanoTime(); }
+          @Override public void onError(Throwable t) { failure[0] = t; completeNanos[0] = System.nanoTime(); }
+        });
+        if (failure[0] != null) throw new IllegalStateException("sentence " + i + " failed", failure[0]);
+        double runSeconds = (completeNanos[0] - start) / 1e9;
+        Double firstChunk = firstAudioNanos[0] < 0 ? null : (firstAudioNanos[0] - start) / 1e9;
+        double g2pSeconds = 0.0;
         int total = 0;
         for (float[] part : parts) {
           total += part.length;
@@ -85,7 +88,6 @@ public class ParadeeLatencyArm {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("index", i);
         row.put("text", text);
-        row.put("phonemes", chunks);
         row.put("audioSeconds", audioSeconds);
         row.put("runSeconds", runSeconds);
         row.put("g2pSeconds", g2pSeconds);
@@ -102,12 +104,12 @@ public class ParadeeLatencyArm {
       report.put("intraOpThreads", 1);
       report.put("interOpThreads", 1);
       report.put("model", "onnx/paradee_int8.onnx");
-      report.put("phonemeSource", "java misaki port (bundled dictionaries, CMUdict tier, fallback model)");
+      report.put("phonemeSource", "java misaki port (bundled dictionaries, CMUdict tier, fallback model); public streaming synthesize");
       report.put("voice", voice);
-      report.put("voiceIndex", model.voiceIndex(voice));
+      report.put("voiceIndex", model.config().voices().indexOf(voice));
       report.put("corpus", corpusName);
       report.put("pass", pass);
-      report.put("noiseSeed", seed);
+      report.put("noiseSeed", "model default");
       report.put("java", System.getProperty("java.version"));
       report.put("machine", System.getProperty("os.name") + " " + System.getProperty("os.version") + " " + System.getProperty("os.arch") + " " + Runtime.getRuntime().availableProcessors() + " cpus");
       report.put("sentences", rows.size());
