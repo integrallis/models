@@ -69,6 +69,7 @@ def assemble(quality_path, performance):
         'cohortCases':quality['cohortCases'],'inferenceErrors':0,'numericalParityPassed':True,
         'performance':rows,'releasedRuntimeVerified':True,'qualified':True,
         'snapshot':quality['snapshot'],'runtimeReceipt':receipts[0],
+        'performanceMeasurements':measured,
         'evidence':{'quality':{'path':str(quality_path),'sha256':sha(quality_path)},
             'performanceManifest':{'path':str(performance/'performance-run-manifest.json'),
                 'sha256':sha(performance/'performance-run-manifest.json')}},
