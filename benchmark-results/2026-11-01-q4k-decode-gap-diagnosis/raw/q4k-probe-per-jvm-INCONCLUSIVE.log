@@ -1,0 +1,11 @@
+patched for single-thread-count runs
+### one JVM per thread count -- no leftover worker pools
+threads= 2  A one-call:   14.3 GB/s   B 224-calls:   13.7 GB/s   orchestration cost:  4.4%
+threads= 4  A one-call:   28.0 GB/s   B 224-calls:   25.6 GB/s   orchestration cost:  8.5%
+threads= 8  A one-call:   31.1 GB/s   B 224-calls:   28.5 GB/s   orchestration cost:  8.2%
+threads=12  A one-call:   46.7 GB/s   B 224-calls:   39.1 GB/s   orchestration cost: 16.2%
+threads=16  A one-call:   36.5 GB/s   B 224-calls:   48.7 GB/s   orchestration cost: -33.2%
+threads= 8  A one-call:   31.2 GB/s   B 224-calls:   28.4 GB/s   orchestration cost:  8.9%
+threads=16  A one-call:   31.2 GB/s   B 224-calls:    7.7 GB/s   orchestration cost: 75.4%
+
+[exited with code 0]
