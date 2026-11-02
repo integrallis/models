@@ -52,4 +52,4 @@ for pass in 1 2 3; do for corpus in wikitext103-heldout-200 harvard-200; do for 
   jbang -Dmodels.version=$MODELS_VERSION $ROOT/latency/ParadeeLatencyArm.java $ART/onnx_paradee_int8.onnx $ART/config.json $ROOT/corpus/$corpus.json $voice $pass $out 2>&1 | grep PARADEE_ARM
 done; done; done
 log "done; pass.json files under $EV"
-cd $ROOT && tar czf /root/paradee-box-evidence.tgz --exclude='*.wav' evidence
+cd $ROOT && tar czf /root/paradee-box-evidence.tgz --exclude='*.wav' --exclude='[0-9][0-9][0-9].txt' evidence
