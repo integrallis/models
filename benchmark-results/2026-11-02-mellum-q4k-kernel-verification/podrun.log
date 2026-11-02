@@ -1,0 +1,37 @@
+######## ARM SET 1: MAIN kernel (baseline on this box) ########
+### host: 16 vCPU of 192 on host, cpu.max=max 100000
+###  AMD EPYC 9654 96-Core Processor, avx512f=192
+### host loadavg before: 42.89 47.13 52.64 39/5752 2536   [host-wide, not ours]
+### protocol: warmups=1 iterations=3 threads=16
+### ARM 1 candidate (rust-ffm) model=mellum2_12b_a2_5b_thinking_q4_k_m wl=coding tpl=chatml-no-think topk=1
+### candidate rc=0
+### ollama ready after 2s
+### ARM 2 comparator (ollama)
+### comparator rc=0
+### host loadavg after: 49.94 48.67 51.98 38/5978 3296   [host-wide, not ours]
+### verdict: FAILED_RELATIVE_GATE qualified= False
+### absoluteTier: PERFORMANCE_REDUCED
+### contribution: answerRate=0.7778 (min 0.3333)  correctRate=1.0000 (min 0.9000)
+### vs ollama: decodeRatio=0.7355 e2eRatio=0.5430 qualified=False
+
+######## ARM SET 2: FIXED kernel (Q4_K per-block unpack) ########
+### host: 16 vCPU of 192 on host, cpu.max=max 100000
+###  AMD EPYC 9654 96-Core Processor, avx512f=192
+### host loadavg before: 48.75 48.44 51.88 39/5978 3342   [host-wide, not ours]
+### protocol: warmups=1 iterations=3 threads=16
+### ARM 1 candidate (rust-ffm) model=mellum2_12b_a2_5b_thinking_q4_k_m wl=coding tpl=chatml-no-think topk=1
+### candidate rc=0
+### ollama ready after 1s
+### ARM 2 comparator (ollama)
+### comparator rc=0
+### host loadavg after: 48.72 49.11 51.42 40/6001 4223   [host-wide, not ours]
+### verdict: QUALIFIED qualified= True
+### absoluteTier: PERFORMANCE_REDUCED
+### contribution: answerRate=0.7778 (min 0.3333)  correctRate=1.0000 (min 0.9000)
+### vs ollama: decodeRatio=0.8669 e2eRatio=0.7895 qualified=True
+
+######## SUMMARY ########
+  main   candidate decode 38.10  prefill 52.55   | comparator decode 51.81   | ratio 0.7355
+  fixed  candidate decode 44.99  prefill 68.35   | comparator decode 51.89   | ratio 0.8669
+--- verdict (main) ---
+--- verdict (fixed) ---
