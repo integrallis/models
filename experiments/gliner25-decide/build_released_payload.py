@@ -68,15 +68,15 @@ def main():
     receipt = {'kind':'central-release','version':args.version,'sourceRevision':revision,
         'artifacts':records,'nativeSha256':sha(native_path),'runtimeFiles':{p.name:sha(p) for p in (root/'lib').glob('*.jar')}}
     (root/'released-runtime.json').write_text(json.dumps(receipt,indent=2)+'\n')
-    archive = root.with_suffix('.tar.gz')
+    archive = Path(str(root)+'.tar.gz')
     with tarfile.open(archive,'w:gz') as output:
         for path in sorted(root.rglob('*')):
             if path.is_file():output.add(path,arcname=str(path.relative_to(root)))
     manifest = {'sourceRevision':revision,'sha256':sha(archive),'runtimeKind':'central-release',
         'releasedVersion':args.version,'catalogQualified':False,
         'files':{str(p.relative_to(root)):sha(p) for p in root.rglob('*') if p.is_file()}}
-    root.with_suffix('.json').write_text(json.dumps(manifest,indent=2)+'\n')
-    print(json.dumps({'payload':str(archive),'manifest':str(root.with_suffix('.json'))}))
+    Path(str(root)+'.json').write_text(json.dumps(manifest,indent=2)+'\n')
+    print(json.dumps({'payload':str(archive),'manifest':str(Path(str(root)+'.json'))}))
 
 if __name__ == '__main__':
     main()
