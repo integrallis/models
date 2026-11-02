@@ -1,0 +1,36 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Nov 02, 2026 5:11:27 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256 (capped from hardware-preferred 512; raise with -Dvectors.maxBits))
+Nov 02, 2026 5:11:27 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=512 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Nov 02, 2026 5:11:27 AM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=512; FMA enabled
+iteration 1/3 case=list-copy-null-handling correct=true retrieval=1.9ms ttft=573.7ms decode=37.01 tok/s e2e=1389.8ms
+iteration 1/3 case=compute-if-absent-null correct=true retrieval=3.4ms ttft=1435.7ms decode=34.03 tok/s e2e=2587.8ms
+iteration 1/3 case=virtual-thread-executor correct=true retrieval=1.9ms ttft=1165.6ms decode=37.94 tok/s e2e=1961.0ms
+iteration 1/3 case=record-compact-validation correct=true retrieval=1.4ms ttft=1074.2ms decode=37.70 tok/s e2e=1714.4ms
+iteration 1/3 case=gradle-java-25 correct=true retrieval=1.5ms ttft=2300.4ms decode=37.96 tok/s e2e=3466.8ms
+iteration 1/3 case=http-retry-rules correct=true retrieval=1.3ms ttft=1924.9ms decode=37.74 tok/s e2e=2669.8ms
+iteration 1/3 case=migration-lock-expiry correct=true retrieval=1.2ms ttft=1428.5ms decode=38.15 tok/s e2e=2140.1ms
+iteration 1/3 case=jackson-module-and-feature correct=true retrieval=1.3ms ttft=2501.4ms decode=38.20 tok/s e2e=3551.7ms
+iteration 1/3 case=unsupported-cuda-kernel correct=true retrieval=2.5ms ttft=1440.3ms decode=32.04 tok/s e2e=1569.6ms
+iteration 2/3 case=list-copy-null-handling correct=true retrieval=1.3ms ttft=732.4ms decode=31.49 tok/s e2e=1690.1ms
+iteration 2/3 case=compute-if-absent-null correct=true retrieval=2.3ms ttft=1217.2ms decode=38.24 tok/s e2e=2241.0ms
+iteration 2/3 case=virtual-thread-executor correct=true retrieval=1.1ms ttft=1280.4ms decode=38.37 tok/s e2e=2065.0ms
+iteration 2/3 case=record-compact-validation correct=true retrieval=0.9ms ttft=3442.4ms decode=38.37 tok/s e2e=4070.4ms
+iteration 2/3 case=gradle-java-25 correct=true retrieval=3.3ms ttft=1949.9ms decode=38.04 tok/s e2e=3111.7ms
+iteration 2/3 case=http-retry-rules correct=true retrieval=1.1ms ttft=1194.6ms decode=38.13 tok/s e2e=1931.7ms
+iteration 2/3 case=migration-lock-expiry correct=true retrieval=1.0ms ttft=2261.4ms decode=38.05 tok/s e2e=2973.8ms
+iteration 2/3 case=jackson-module-and-feature correct=true retrieval=2.8ms ttft=1281.4ms decode=38.32 tok/s e2e=2329.9ms
+iteration 2/3 case=unsupported-cuda-kernel correct=true retrieval=2.6ms ttft=3594.9ms decode=31.70 tok/s e2e=3725.4ms
+iteration 3/3 case=list-copy-null-handling correct=true retrieval=1.1ms ttft=2312.4ms decode=38.10 tok/s e2e=3104.4ms
+iteration 3/3 case=compute-if-absent-null correct=true retrieval=2.2ms ttft=5067.8ms decode=38.11 tok/s e2e=6095.3ms
+iteration 3/3 case=virtual-thread-executor correct=true retrieval=1.1ms ttft=1177.5ms decode=38.15 tok/s e2e=1967.1ms
+iteration 3/3 case=record-compact-validation correct=true retrieval=2.1ms ttft=1013.7ms decode=38.43 tok/s e2e=1643.1ms
+iteration 3/3 case=gradle-java-25 correct=true retrieval=0.8ms ttft=1330.9ms decode=38.08 tok/s e2e=2490.9ms
+iteration 3/3 case=http-retry-rules correct=true retrieval=1.4ms ttft=1408.7ms decode=38.20 tok/s e2e=2144.8ms
+iteration 3/3 case=migration-lock-expiry correct=true retrieval=1.8ms ttft=1178.0ms decode=38.17 tok/s e2e=1889.1ms
+iteration 3/3 case=jackson-module-and-feature correct=true retrieval=0.9ms ttft=1278.8ms decode=38.13 tok/s e2e=2331.2ms
+iteration 3/3 case=unsupported-cuda-kernel correct=true retrieval=1.7ms ttft=1212.5ms decode=31.84 tok/s e2e=1341.9ms
+plain-java/rust-ffm/mellum2_12b_a2_5b_thinking_q4_k_m: tier=PERFORMANCE_REDUCED success=27/27 p95-retrieval=3.2ms p95-ttft=3549.2ms p50-decode=38.10 tok/s p95-e2e=3966.9ms correct=100.0% model-answered=77.8% of-those-correct=100.0% extractive-fallback=11.1% truncated=0.0%
+report: /root/out-main/candidate.json
