@@ -37,6 +37,11 @@ class CertifiedRagEvidenceTest {
   private static final Path TWO_ARM_EVIDENCE =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20260930/rag");
+  private static final Path TWO_ARM_EVIDENCE_20261102 =
+      Path.of(System.getProperty("models.repositoryRoot"))
+          .resolve("benchmark-results/certified-20261102/rag");
+  private static final Path JETBRAINS_MELLUM2_12B_A2_5B_THINKING_GGUF_Q4_K_M_EVIDENCE =
+      TWO_ARM_EVIDENCE_20261102.resolve("jetbrains-mellum2-12b-a2-5b-thinking-gguf-q4_k_m");
   private static final Path TWO_ARM_EVIDENCE_20261031 =
       Path.of(System.getProperty("models.repositoryRoot"))
           .resolve("benchmark-results/certified-20261031/rag");
@@ -4040,6 +4045,38 @@ class CertifiedRagEvidenceTest {
       assertThat(result.qualified()).as(trial).isTrue();
       assertThat(result.exclusions()).as(trial).isEmpty();
     }
+  }
+
+  @Test
+  void jetbrainsMellum212bA25bThinkingGgufQ4KMQualifiesAgainstItsSameHostOllamaComparator()
+      throws Exception {
+    RagBenchmarkReport candidate =
+        report(
+            JETBRAINS_MELLUM2_12B_A2_5B_THINKING_GGUF_Q4_K_M_EVIDENCE,
+            "jetbrains-mellum2-12b-a2-5b-thinking-gguf-q4_k_m-rust-ffm-grounded.json");
+    RagBenchmarkReport ollama =
+        report(
+            JETBRAINS_MELLUM2_12B_A2_5B_THINKING_GGUF_Q4_K_M_EVIDENCE,
+            "jetbrains-mellum2-12b-a2-5b-thinking-gguf-q4_k_m-ollama-grounded.json");
+
+    RagProductionQualification qualification =
+        RagProductionQualificationPolicy.assess(candidate, List.of(ollama));
+
+    assertThat(qualification.qualified()).isTrue();
+    assertThat(qualification.verdict()).isEqualTo(RagQualificationVerdict.QUALIFIED);
+    assertThat(qualification.qualifyingComparators()).containsExactly("ollama");
+    assertThat(qualification.exclusions()).isEmpty();
+    assertThat(qualification.modelAnswerRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_RATE);
+    assertThat(qualification.modelAnswerCorrectRate())
+        .isGreaterThanOrEqualTo(RagProductionQualificationPolicy.MINIMUM_MODEL_ANSWER_CORRECT_RATE);
+    assertThat(qualification.comparisons())
+        .singleElement()
+        .satisfies(
+            comparison -> {
+              assertThat(comparison.decodeThroughputRatio()).isBetween(0.862, 0.872);
+              assertThat(comparison.endToEndLatencyRatio()).isBetween(0.78, 0.8);
+            });
   }
 
   private RagBenchmarkReport report(Path directory, String filename) throws IOException {
