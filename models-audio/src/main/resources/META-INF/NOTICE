@@ -17,3 +17,10 @@ tables g2p-us.json and g2p-gb.json, were trained for this module on those dictio
 licensed with it under the Apache License 2.0. Recipe, held-out accuracy and agreement with the
 publisher's eSpeak fallback: experiments/paradee-8m-tts/g2p/ in the Models repository. They stand
 in for misaki's eSpeak NG fallback, which is GPL-3.0 and is not bundled.
+
+cmudict-us.json beside them is derived from CMUdict (cmusphinx/cmudict, Copyright (C) 1993-2015
+Carnegie Mellon University, BSD-2-Clause; license text: META-INF/licenses/cmudict.txt): the words
+misaki's American dictionaries lack, with CMUdict's ARPAbet converted to misaki's spelling by
+experiments/paradee-8m-tts/g2p/cmudict_to_misaki.py in the Models repository. The conversion is
+measured against misaki's own entries where both have a word; the report is beside the script.
+

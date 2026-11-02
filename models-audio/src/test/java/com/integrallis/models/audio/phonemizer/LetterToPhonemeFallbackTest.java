@@ -64,6 +64,24 @@ class LetterToPhonemeFallbackTest {
     }
   }
 
+  @Test
+  void americanDictionaryTierAnswersBeforeTheModelAndInflectsPossessivesAndPlurals()
+      throws Exception {
+    LetterToPhonemeFallback us = LetterToPhonemeFallback.bundled(false);
+    assertThat(us.dictionaryWords()).isGreaterThan(70_000);
+    // Entries of cmudict-us.json, words misaki's dictionaries lack, in misaki's spelling.
+    assertThat(us.phonemize("Alcock")).isEqualTo("əlkˈɑk");
+    assertThat(us.phonemize("rosebush")).isEqualTo("ɹˈOzbˌʊʃ");
+    assertThat(us.lookup("Hurlbut's")).isEqualTo("hˈɜɹlbəts");
+    assertThat(us.lookup("Alcocks")).isEqualTo("əlkˈɑks");
+    assertThat(us.lookup("rosebushes")).isEqualTo("ɹˈOzbˌʊʃᵻz");
+    assertThat(us.lookup("Alcocks'")).isEqualTo("əlkˈɑks");
+    assertThat(us.lookup("xenoceratops")).isNull();
+    assertThat(us.phonemize("xenoceratops")).isNotBlank();
+    // The British accent has no dictionary tier; its words all go to the model.
+    assertThat(LetterToPhonemeFallback.bundled(true).dictionaryWords()).isZero();
+  }
+
   @SuppressWarnings("unchecked")
   private static List<Map<String, Object>> sample(String accent) throws Exception {
     String path = "g2p/g2p-" + accent + "-dev-sample.json";
