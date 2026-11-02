@@ -141,6 +141,11 @@ class StructuralTest {
     assertThat(ge0.floats()).containsExactly(4, 2, 6);
 
     Tensor expanded = Structural.expand(Tensor.vector(1, 2), Tensor.vector(2, 2));
+    Tensor tiled =
+        Structural.tile(Tensor.ofLongs(new long[] {1, 2}, new long[] {1, 2}), Tensor.vector(2, 2));
+    assertThat(tiled.shape()).containsExactly(2, 4);
+    assertThat(tiled.longs()).containsExactly(1, 2, 1, 2, 1, 2, 1, 2);
+    assertThat(Structural.tile(M23, Tensor.vector(1, 1))).isSameAs(M23);
     assertThat(expanded.longs()).containsExactly(1, 2, 1, 2);
     assertThat(Structural.expand(M23, Tensor.vector(2, 3))).isSameAs(M23);
     assertThat(Structural.expand(Tensor.scalar(5f), Tensor.vector(3)).floats())

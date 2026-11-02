@@ -331,6 +331,40 @@ final class Structural {
     return out;
   }
 
+  /** ONNX {@code Tile}: the input repeated {@code repeats[d]} times along every axis {@code d}. */
+  static Tensor tile(Tensor x, Tensor repeatsTensor) {
+    long[] shape = x.shape();
+    long[] repeats = repeatsTensor.toInt64().longs();
+    if (repeats.length != shape.length) {
+      throw new IllegalArgumentException(
+          "Tile repeats has rank " + repeats.length + " for an input of rank " + shape.length);
+    }
+    long[] target = new long[shape.length];
+    boolean identity = true;
+    for (int d = 0; d < shape.length; d++) {
+      target[d] = shape[d] * repeats[d];
+      identity &= repeats[d] == 1;
+    }
+    if (identity) {
+      return x;
+    }
+    long[] inStrides = Tensor.strides(shape);
+    long[] outStrides = Tensor.strides(target);
+    Tensor out = x.emptyLike(target);
+    int count = (int) Tensor.elementCount(target);
+    for (int i = 0; i < count; i++) {
+      long rem = i;
+      long src = 0;
+      for (int d = 0; d < shape.length; d++) {
+        long idx = rem / outStrides[d];
+        rem %= outStrides[d];
+        src += (idx % shape[d]) * inStrides[d];
+      }
+      out.copyElement(x, (int) src, i);
+    }
+    return out;
+  }
+
   static Tensor constantOfShape(Tensor shapeTensor, Tensor value) {
     long[] shape = shapeTensor.toInt64().longs();
     int count = (int) Tensor.elementCount(shape);
