@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.12] - 2026-11-02
+
 - Run the ONNX executor's matrix products, sines and erf on Models-owned Rust kernels when the
   bundled native library is present: `NativeOnnxKernels` in `backend-native` implements the new
   `OnnxKernels` interface of `models-backend-onnx` with a single-threaded `matrixmultiply` sgemm
@@ -15,6 +17,9 @@ All notable changes to models are documented here.
   1.000000, worst 62.10 dB. The executor also gains faster float Clip, contiguous Less and
   bool-to-float conversion. No speed figure is claimed here; the dev machine was saturated, and
   the throughput gate is measured on a quiet dedicated box against the released library.
+
+- This focused release is based on 0.5.11, as 0.5.11 was on 0.5.10; the main-branch GGUF
+  tokenization and decoder changes remain deferred.
 
 ## [0.5.11] - 2026-11-02
 
