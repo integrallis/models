@@ -1,0 +1,63 @@
+e05d93fa1e022569eacab0f707a3e2bc9cb79992038cb809b0f7c719e324a1bc  /root/diag/decode.jfr
+=== summary ===
+
+ Version: 2.1
+ Chunks: 1
+ Start: 2026-11-02 03:13:28 (UTC)
+ Duration: 454 s
+
+ Event Type                                  Count  Size (bytes) 
+=================================================================
+ jdk.NativeMethodSample                     289013       3446318
+ jdk.ThreadPark                             175970       7004564
+ jdk.ExecutionSample                         91094       1086663
+ jdk.Checkpoint                                909        633469
+ com.integrallis.models.PerformanceCliff         1            80
+ jdk.Metadata                                    1        111106
+
+=== NativeMethodSample top frames (stack-depth 3) ===
+ 189584 com.integrallis.models.backend.nativekernel.RustGgufBatchedMatrixKernel.invokeGrouped(GgufTensorType, GgufTensorType, GgufTensorType, int, int, int, int, int)
+ 189584 com.integrallis.models.backend.nativekernel.NativeKernelLibrary.quantizedF32GroupedBatchedMatmul(String, NativeKernelCapability, MemorySegment, MemorySegment, MemorySegment, MemorySegment, int, MemorySegment, long, MemorySegment, long, int, int)
+ 189584 com.integrallis.models.backend.nativekernel.NativeKernelLibrary.invokeGrouped(String, NativeKernelCapability, MemorySegment, MemorySegment, MemorySegment, MemorySegment, int, MemorySegment, long, MemorySegment, long, int, int)
+  97834 com.integrallis.models.backend.nativekernel.RustGgufBatchedMatrixKernel.multiply(float[], float[], MemorySegment, GgufTensorType, int, int, int)
+  97834 com.integrallis.models.backend.nativekernel.NativeKernelLibrary.invokeBatched(String, int, NativeKernelCapability, MemorySegment, long, MemorySegment, long, MemorySegment, long, int, int, int)
+  86613 com.integrallis.models.backend.nativekernel.NativeKernelLibrary.q4_KF32BatchedMatmul(MemorySegment, long, MemorySegment, long, MemorySegment, long, int, int, int)
+   9646 com.integrallis.models.backend.nativekernel.NativeKernelLibrary.q5_KF32BatchedMatmul(MemorySegment, long, MemorySegment, long, MemorySegment, long, int, int, int)
+   1575 com.integrallis.models.backend.nativekernel.NativeKernelLibrary.q6_KF32BatchedMatmul(MemorySegment, long, MemorySegment, long, MemorySegment, long, int, int, int)
+   1241 sun.nio.ch.UnixFileDispatcherImpl.read0(FileDescriptor, long, int)
+   1241 sun.nio.ch.UnixFileDispatcherImpl.read(FileDescriptor, long, int)
+   1241 sun.nio.ch.IOUtil.readIntoNativeBuffer(FileDescriptor, ByteBuffer, long, boolean, boolean, int, NativeDispatcher)
+    232 sun.nio.ch.UnixFileDispatcherImpl.unmap0(long, long)
+
+=== native samples by thread ===
+ 289011 sampledThread = "main" (javaThreadId = 3)
+      1 sampledThread = "vectors-gguf-14" (javaThreadId = 68)
+      1 sampledThread = "vectors-gguf-1" (javaThreadId = 55)
+
+=== ExecutionSample top frames (stack-depth 2) ===
+  39012 com.integrallis.models.backend.purejava.ops.TensorOps.swiGlu(float[], int, float[], int, float[], int, int)
+  39012 com.integrallis.models.backend.purejava.llama.LlamaForwardPass.activateFfn(float[], int, float[], int, float[], int, int, GgufBatchedMatrixKernel$FloatArrayView, GgufBatchedMatrixKernel$FloatArrayView, GgufBatchedMatrixKernel$FloatArrayView)
+  18028 com.integrallis.vectors.core.PanamaVectorUtilSupport.matVecDotExact(float[], int, float[], int, int, int, int, float[], int)
+  17158 com.integrallis.vectors.core.VectorUtil.batchDotProductExact(float[], int, float[], int, int, int, int, float[], int)
+  15255 com.integrallis.vectors.core.PanamaVectorUtilSupport.addWeightedRowsInPlace(float[], int, float[], int, int, float[], int, int, int)
+  15162 com.integrallis.vectors.core.VectorUtil.addWeightedRowsInPlace(float[], int, float[], int, int, float[], int, int, int)
+   7267 com.integrallis.models.backend.purejava.ops.TensorOps.softmax(float[], int, int)
+   6440 com.integrallis.models.backend.purejava.llama.LlamaForwardPass.attendGroupHeadByHead(KvCache$AttentionView, KvCache, int, int, int, int, int, int, int, float, float[], int, float[], int, float[])
+   2576 com.integrallis.models.backend.purejava.llama.LlamaForwardPass.prefillBatch(int[], int, int, int, boolean, float[], int)
+   1907 com.integrallis.models.backend.purejava.llama.LlamaForwardPass.dualBatchedMatmulDispatch(float[], MemorySegment, GgufTensorType, int, float[], MemorySegment, GgufTensorType, int, float[], int, int)
+   1803 java.io.InputStream.transferTo(OutputStream)
+   1803 com.integrallis.models.rag.RagBenchmarkCli.sha256(Path)
+   1148 com.integrallis.models.backend.nativekernel.NativeKernelLibrary.invokeBatched(String, int, NativeKernelCapability, MemorySegment, long, MemorySegment, long, MemorySegment, long, int, int, int)
+   1019 java.lang.Float.isNaN(float)
+
+=== Java samples by thread ===
+  76311 sampledThread = "main" (javaThreadId = 3)
+   2640 sampledThread = "vectors-gguf-0" (javaThreadId = 54)
+   2124 sampledThread = "vectors-gguf-1" (javaThreadId = 55)
+   1813 sampledThread = "vectors-gguf-2" (javaThreadId = 56)
+
+=== ThreadPark by thread ===
+  11669 "vectors-gguf-13"
+  11661 "vectors-gguf-12"
+  11653 "vectors-gguf-10"
+  11629 "vectors-gguf-14"

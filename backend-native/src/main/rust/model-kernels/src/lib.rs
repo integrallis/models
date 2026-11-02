@@ -6088,7 +6088,22 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
         let scales = &weights[weight_offset + 4..weight_offset + 16];
         let quants = weights.as_ptr().wrapping_add(weight_offset + 16);
         let mut quantized_lanes = _mm256_setzero_si256();
-        let mut block_minimum_sum = 0_i32;
+        let (scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
+        // The mins term, vectorised: sum over groups of min[g] * (sums[2g] + sums[2g+1]).
+        // Pair sums fit i16 (16 q8 values, |v| <= 127, so |pair| <= 4064) and the products fit
+        // i32, so this is bit-identical to the scalar loop it replaces -- integer addition is
+        // associative, and no lane overflows.
+        // SAFETY: every block carries QK_K / Q8_K_SUM_BLOCK = 16 activation sums.
+        let q8sums = unsafe {
+            _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast())
+        };
+        let q8s = _mm_hadd_epi16(
+            _mm256_extracti128_si256(q8sums, 0),
+            _mm256_extracti128_si256(q8sums, 1),
+        );
+        let min_products =
+            _mm_madd_epi16(_mm256_extracti128_si256(mins_and_scales, 1), q8s);
+        let block_minimum_sum = horizontal_sum_i32_sse2(min_products);
         for pair in 0..4 {
             // SAFETY: each Q4_K block contains four complete 32-byte packed groups.
             let packed = unsafe { _mm256_loadu_si256(quants.add(pair * 32).cast()) };
@@ -6102,19 +6117,14 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
             let low_products = unsafe { unsigned_signed_products_avx2(low, low_activation) };
             // SAFETY: every activation group contains 32 signed bytes.
             let high_products = unsafe { unsigned_signed_products_avx2(high, high_activation) };
-            let low_scale = _mm256_set1_epi16(qk_scale(scales, pair * 2) as i16);
-            let high_scale = _mm256_set1_epi16(qk_scale(scales, pair * 2 + 1) as i16);
+            let low_scale = _mm256_set1_epi16(scale_values[pair * 2]);
+            let high_scale = _mm256_set1_epi16(scale_values[pair * 2 + 1]);
             quantized_lanes =
                 _mm256_add_epi32(quantized_lanes, _mm256_madd_epi16(low_products, low_scale));
             quantized_lanes = _mm256_add_epi32(
                 quantized_lanes,
                 _mm256_madd_epi16(high_products, high_scale),
             );
-        }
-        for group in 0..8 {
-            block_minimum_sum += qk_min(scales, group)
-                * (activation_sums[sum_offset + group * 2] as i32
-                    + activation_sums[sum_offset + group * 2 + 1] as i32);
         }
         if ORDERED {
             // Integer lanes may fold freely; floating-point blocks must follow Java's order.
@@ -6168,6 +6178,7 @@ unsafe fn dot_q5_k_q8_k_row_avx2(
             weights[weight_offset + 3],
         ])) * activation_scales[scale_offset];
         let scales = &weights[weight_offset + 4..weight_offset + 16];
+        let (scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
         // SAFETY: every Q5_K block contains one complete 32-byte high-bit plane.
         let high_bits =
             unsafe { _mm256_loadu_si256(weights.as_ptr().add(weight_offset + 16).cast()) };
@@ -6202,8 +6213,8 @@ unsafe fn dot_q5_k_q8_k_row_avx2(
             let high_values = unsafe { _mm256_loadu_si256(high_activation.cast()) };
             let low_pairs = _mm256_maddubs_epi16(low, low_values);
             let high_pairs = _mm256_maddubs_epi16(high, high_values);
-            let low_scale = _mm256_set1_epi16(qk_scale(scales, low_group) as i16);
-            let high_scale = _mm256_set1_epi16(qk_scale(scales, high_group) as i16);
+            let low_scale = _mm256_set1_epi16(scale_values[low_group]);
+            let high_scale = _mm256_set1_epi16(scale_values[high_group]);
             let low_scaled = _mm256_madd_epi16(low_pairs, low_scale);
             let high_scaled = _mm256_madd_epi16(high_pairs, high_scale);
             quantized_lanes =
@@ -6214,16 +6225,9 @@ unsafe fn dot_q5_k_q8_k_row_avx2(
         let activation_sum_values =
             unsafe { _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast()) };
         let paired_sums = _mm256_madd_epi16(activation_sum_values, _mm256_set1_epi16(1));
-        let minimum_values = _mm256_setr_epi32(
-            qk_min(scales, 0),
-            qk_min(scales, 1),
-            qk_min(scales, 2),
-            qk_min(scales, 3),
-            qk_min(scales, 4),
-            qk_min(scales, 5),
-            qk_min(scales, 6),
-            qk_min(scales, 7),
-        );
+        // Mins come from the same single unpack: widen lanes 8..15 to i32 in group order.
+        let minimum_values =
+            _mm256_cvtepi16_epi32(_mm256_extracti128_si256(mins_and_scales, 1));
         let minimum_sum = horizontal_sum_i32_avx2(_mm256_mullo_epi32(minimum_values, paired_sums));
         sum = d.mul_add(quantized_sum as f32, sum);
         sum = (-d_min).mul_add(minimum_sum as f32, sum);
@@ -6333,6 +6337,15 @@ unsafe fn unsigned_signed_products_avx2(unsigned: __m256i, signed: *const i8) ->
 
 #[cfg(target_arch = "x86_64")]
 #[inline]
+#[target_feature(enable = "sse2")]
+fn horizontal_sum_i32_sse2(values: __m128i) -> i32 {
+    let shuffled = _mm_add_epi32(values, _mm_shuffle_epi32(values, 0b0100_1110));
+    let folded = _mm_add_epi32(shuffled, _mm_shuffle_epi32(shuffled, 0b1011_0001));
+    _mm_cvtsi128_si32(folded)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[inline]
 #[target_feature(enable = "avx2")]
 fn horizontal_sum_i32_avx2(values: __m256i) -> i32 {
     let halves = _mm_add_epi32(
@@ -6351,6 +6364,45 @@ fn horizontal_sum_f32_avx2(values: __m256) -> f32 {
     sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
     sum = _mm_add_ss(sum, _mm_movehdup_ps(sum));
     _mm_cvtss_f32(sum)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[inline]
+#[target_feature(enable = "avx2")]
+/// Unpacks all eight six-bit scales and all eight six-bit mins of one K-quant block in a single
+/// pass, returning the scales as eight i16 lanes and `[scales | mins]` as sixteen i16 lanes.
+///
+/// The per-group extractors `qk_scale` / `qk_min` are branchy and were previously called sixteen
+/// times per 256-element block; doing the field surgery once on three u32 words is what the
+/// measurement in benchmark-results/2026-11-01-q4k-decode-gap-diagnosis is about. The bit layout
+/// and the mask constants are ggml's, from `ggml_vec_dot_q4_K_q8_K` (MIT, ggerganov/ggml).
+fn qk_unpack_scales_and_mins(scales: &[u8]) -> ([i16; 8], __m256i) {
+    const KMASK1: u32 = 0x3f3f_3f3f;
+    const KMASK2: u32 = 0x0f0f_0f0f;
+    const KMASK3: u32 = 0x0303_0303;
+    let s0 = u32::from_le_bytes([scales[0], scales[1], scales[2], scales[3]]);
+    let s1 = u32::from_le_bytes([scales[4], scales[5], scales[6], scales[7]]);
+    let s2 = u32::from_le_bytes([scales[8], scales[9], scales[10], scales[11]]);
+    let utmp0 = s0 & KMASK1;
+    let utmp1 = (s2 & KMASK2) | (((s0 >> 6) & KMASK3) << 4);
+    let utmp2 = s1 & KMASK1;
+    let utmp3 = ((s2 >> 4) & KMASK2) | (((s1 >> 6) & KMASK3) << 4);
+    // Lanes 0..7 are the scales in group order, lanes 8..15 the mins in group order.
+    let mins_and_scales = _mm256_cvtepu8_epi16(_mm_set_epi32(
+        utmp3 as i32,
+        utmp2 as i32,
+        utmp1 as i32,
+        utmp0 as i32,
+    ));
+    let mut scale_values = [0_i16; 8];
+    // SAFETY: scale_values holds eight i16 lanes, exactly the width of the low half.
+    unsafe {
+        _mm_storeu_si128(
+            scale_values.as_mut_ptr().cast(),
+            _mm256_extracti128_si256(mins_and_scales, 0),
+        )
+    };
+    (scale_values, mins_and_scales)
 }
 
 #[inline(always)]
