@@ -8,6 +8,39 @@ could be chosen after seeing numbers; the one change made after seeing data was 
 `modeljars/docs/CANDIDATE-PARADEE-8M-20261101.md`; the artifact triage is
 `modeljars/docs/model-evidence/paradee-8m/TRIAGE-v1.2.md`.
 
+## Throughput and latency on a quiet box, released 0.5.11 (2026-11-02, `evidence/box/`)
+
+Both arms on one dedicated Hetzner ccx33 (8 AMD EPYC vCPU, nothing else running), one thread each,
+three passes per cell, the candidate through the **released** `com.integrallis:models-audio:0.5.11`
+from Maven Central (`latency/ParadeeLatencyArm.java`, the public streaming route) and the
+comparator through the publisher's package on onnxruntime 1.23.2. Derived by `derive.py` into
+`evidence/box/report.json` and by `verdict.py --timing-is-gate` into `verdict-timing.json`.
+
+| corpus | voice | candidate, x real time (min of 3) | onnxruntime, x real time (max of 3) | ratio (gate 0.80) |
+| --- | --- | ---: | ---: | ---: |
+| WikiText | af_heart | 12.62 | 41.28 | 0.306 |
+| WikiText | bf_isabella | 12.37 | 41.42 | 0.299 |
+| WikiText | am_puck | 12.53 | 41.28 | 0.304 |
+| WikiText | bm_fable | 12.61 | 41.46 | 0.304 |
+| Harvard | af_heart | 12.19 | 40.50 | 0.301 |
+| Harvard | bf_isabella | 12.74 | 41.03 | 0.310 |
+| Harvard | am_puck | 12.39 | 40.88 | 0.303 |
+| Harvard | bm_fable | 13.05 | 40.99 | 0.318 |
+
+- **The protocol's throughput gate fails on the released library: 0.30 to 0.32 against 0.80.** This
+  is the result for 0.5.11 and stands as measured. The Rust kernels for the executor's matrix
+  products, sine and erf (PR #340) are the response; they are measured the same way once released.
+- **The shipped speech policy's latency block passes with wide margins** on the Harvard passes
+  (`comparator/catalog_entry.py` with this directory as the latency source, `catalog-entry.json`):
+  p95 real-time factor 0.088 against 2.0, p95 time to first audio 261 ms against 2,000 ms. The
+  earlier 3,067 ms figure was the saturated dev box.
+- onnxruntime at six threads reaches 54.9x to 71.1x on the same box.
+- Not retained: the per-pass `load.txt` files and the box's machine record. The evidence tarball
+  excluded `*.txt` to drop the per-sentence transcripts and took those with it, and the box was
+  deleted before that was noticed. The box was dedicated and idle apart from this chain; the probe
+  run on it right after the chain read a load average of 0.00. `peakRssBytes` in the entry is the
+  dev box's test JVM (4 GB heap ceiling), not a measure of the model's footprint.
+
 ## Verdict (2026-11-02, `evidence/devbox/verdict.json`, derived by `verdict.py` from `report.json`)
 
 Configuration measured: the Java executor on the int8 graph; the misaki port with, for American

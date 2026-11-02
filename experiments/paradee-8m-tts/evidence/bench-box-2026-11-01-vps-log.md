@@ -82,3 +82,32 @@ Local evidence destination:    experiments/paradee-8m-tts/g2p/out/v2/ and this l
 - 2026-11-02T04:34:01Z server `g2p-train-20261102` created: id 174090498, ccx33, fsn1, IPv4 157.90.155.75, firewall `g2p-train-ssh` id 11947902.
 - 2026-11-02T04:52:58Z venv ready (torch CPU, misaki 0.9.4 from PyPI); train_g2p.py and cmudict-us.json copied; training started (8 threads, 8 epochs, --extra cmudict-us.json).
 - 2026-11-02T05:17:14Z training finished: 8 epochs at about 133 s each on the box (dev word accuracy 61.6 % at epoch 5, 63.4 % at 6, 63.7 % at 7, batched evaluation); the box's torch build needed onnxscript for the ONNX export, so the checkpoint and logs were copied back and the export is done locally with the pinned torch 2.2.2. Server 174090498 and firewall deleted; inventory after: servers 1, firewalls 1. Billed ≈ 45 min.
+
+## Third box, 2026-11-02: throughput ratio and latency block against the released 0.5.11
+
+Both arms on a quiet dedicated box, nothing private copied: the comparator from PyPI/GitHub
+(`comparator/{comparator_arm.py,pins.py,run_comparator_passes.sh,pyproject.toml,uv.lock}`), the
+candidate through jbang against `com.integrallis:models-audio:0.5.11` on Maven Central
+(`latency/ParadeeLatencyArm.java`), the model from Hugging Face, the two corpora. Chain:
+`latency/box-chain.sh` (comparator 1 and 6 threads, then the candidate once Central serves 0.5.11).
+
+```text
+Experiment:                    throughput gate (candidate/comparator real-time multiple >= 0.80 at 1
+                               thread, min across 3 candidate passes against the comparator's best)
+                               and the shipped speech policy's latency block (p95 RTF <= 2.0, p95
+                               TTFA <= 2000 ms on Harvard) for the catalog entry.
+Provider / plan:               Hetzner Cloud, fsn1, ccx33 (8 dedicated vCPU, 32 GB), ubuntu-24.04,
+                               ssh key vectors-bench-v2, firewall TCP/22 from 68.227.243.139/32.
+Expected duration:             bootstrap 10 min, comparator 30 min, candidate 24 sequential passes
+                               about 80 min; about 2 h.
+Maximum authorized spend:      EUR 1.50 (about 5.7 h of ccx33).
+UTC deletion deadline:         2026-11-02T18:00Z (label delete-by=2026-11-02-1800Z)
+Correctness gate:              48 comparator and 24 candidate pass.json files, all finite; derive.py
+                               and verdict.py --timing-is-gate over the copied evidence.
+Secrets on the box:            none.
+Local evidence destination:    experiments/paradee-8m-tts/evidence/box/ and this log.
+```
+- 2026-11-02T14:47:12Z inventory before creation: servers 1, firewalls 1, volumes 0, floating IPs 0, snapshots 0.
+- 2026-11-02T14:47:54Z server `paradee-box-20261102` created: id 174176518, ccx33, fsn1, IPv4 138.201.184.110, firewall `paradee-box-ssh` id 11952344; the other server in the account (memory-cell-20261102-g11) belongs to another campaign and is not touched.
+- 2026-11-02T17:08:38Z chain complete (72 pass.json fetched at 15:58Z). Before deletion the idle box ran one standalone probe for models #331 (SwiGluSplitProbe.java, jbang against the published com.integrallis:vectors-core:0.1.32; nothing from the repository copied).
+- 2026-11-02T17:09:28Z server 174176518 and firewall 11952344 deleted. Inventory after: 1 server (memory-cell-20261102-g11, another campaign's), 1 firewall (its). Billed about 2 h 25 min.
