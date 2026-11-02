@@ -6,6 +6,27 @@ that none could be chosen after seeing numbers. The candidate record that decide
 `modeljars/docs/CANDIDATE-PARADEE-8M-20261101.md`; the artifact triage is
 `modeljars/docs/model-evidence/paradee-8m/TRIAGE-v1.2.md`.
 
+## State of the work (updated 2026-11-02, second candidate configuration)
+
+- **The fallback alone left the two American WikiText cells a quarter point over the floor**
+  (`af_heart` 6.06 / 6.43 / 6.06 % against 6.18 %, `am_puck` 6.32 / 6.23 % against 6.13 %),
+  while both British cells cleared theirs (`bf_isabella` 6.20 / 6.17 / 6.06 % against 6.41 %,
+  `bm_fable` 6.20 % against 6.24 % on the first judged pass). Those passes stay under
+  `evidence/devbox/candidate-fallback-v1/` for the American voices.
+- **Second configuration, American voices only: a dictionary tier in front of the model, and a
+  model retrained with it.** CMUdict (cmusphinx/cmudict, BSD-2-Clause) covers 90 of the 159
+  WikiText words misaki's dictionaries lack once possessives and plurals fall back to their base.
+  `g2p/cmudict_to_misaki.py` converts CMUdict's ARPAbet to misaki's American spelling (stress
+  before the vowel, the flap as `ɾ`, misaki's syllabic `ᵊ` and `ᵻ` endings) and keeps the 77,064
+  words misaki lacks as `cmudict-us.json`; on the 36,973 words both have, the conversion agrees
+  with misaki's gold entry exactly 60.8 % of the time with a 7.5 % phoneme error rate
+  (`g2p/out/cmudict-report.json`), which is the tier's quality, measured rather than assumed.
+  `LetterToPhonemeFallback` answers from the dictionary first (`lookup`), inflecting possessives
+  and plurals by misaki's own suffix rule, and from the model otherwise. The American model is
+  retrained (`g2p/out/v2/`) with packed sequences, eight epochs and the converted CMUdict words
+  added to its training split only, never to the held-out words. The British configuration is
+  unchanged, so the British cells' passes stand as measured.
+
 ## State of the work (updated 2026-11-02, after the first candidate WER)
 
 - **The first candidate WER on our phonemes failed the WikiText cell for the predicted reason.**
