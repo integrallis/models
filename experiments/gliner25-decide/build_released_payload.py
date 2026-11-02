@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -20,10 +21,13 @@ def sha(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', required=True)
+    parser.add_argument('--source-revision', help='exact source SHA of the publishing workflow when Central is available before its tag')
     parser.add_argument('--dependency-directory', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
-    revision = subprocess.check_output(['git','rev-parse','v'+args.version+'^{commit}'],cwd=REPO,text=True).strip()
+    if args.source_revision and not re.fullmatch(r'[0-9a-f]{40}',args.source_revision):
+        parser.error('--source-revision must be an immutable full commit SHA')
+    revision = subprocess.check_output(['git','rev-parse',(args.source_revision or 'v'+args.version)+'^{commit}'],cwd=REPO,text=True).strip()
     root = args.output
     root.mkdir(parents=True,exist_ok=False)
     for name in ['classes','lib','experiment','rust/target/release']:
