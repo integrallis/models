@@ -12,6 +12,10 @@ usage: catalog_entry.py EVIDENCE_DIR VERDICT_JSON PEAK_RSS_TXT REPORT_PATH_IN_RE
 
 LATENCY_ROOT (default EVIDENCE_DIR/devbox) is the directory whose candidate/ passes supply the
 latency block; the quiet-box passes against the released library go there.
+
+From models 0.5.12 the default route runs the executor on the bundled Rust kernels, so the entry is
+labelled rust-ffm and its oracle block comes from the seeded-parity record of that route. The
+peak-RSS file may be either "<pid> <bytes>" samples or the output of macOS `/usr/bin/time -l`.
 """
 import hashlib, json, pathlib, sys
 
@@ -27,7 +31,9 @@ def p95(values):
 def main(evidence, verdict_path, rss_path, report_path, models_version, latency_root=None):
     evidence = pathlib.Path(evidence)
     verdict = json.load(open(verdict_path))
-    parity = json.load(open(evidence / "parity" / "seeded-parity-2026-11-01.json"))
+    native = tuple(int(x) for x in models_version.split(".")) >= (0, 5, 12)
+    parity_name = "seeded-parity-rust-ffm-2026-11-02.json" if native else "seeded-parity-2026-11-01.json"
+    parity = json.load(open(evidence / "parity" / parity_name))
     cases = parity["perCase"]
     cos = min(c["pcmCosine"] for c in cases); sdr = min(c["signalToDifferenceDb"] for c in cases)
     per_corpus = {}
@@ -39,7 +45,9 @@ def main(evidence, verdict_path, rss_path, report_path, models_version, latency_
             rtf += [r["realTimeFactor"] for r in d["rows"] if r["realTimeFactor"] is not None]
             ttfa += [r["timeToFirstAudioSeconds"] * 1000.0 for r in d["rows"]]
         per_corpus[corpus] = {"passes": passes, "timedSentences": len(rtf), "p95RealTimeFactor": p95(rtf), "p95TimeToFirstAudioMillis": p95(ttfa)}
-    rss = max(int(line.split()[1]) for line in open(rss_path) if line and line.split()[0].isdigit())
+    rss_lines = [line.split() for line in open(rss_path) if line.split()]
+    time_l = [int(f[0]) for f in rss_lines if f[0].isdigit() and " ".join(f[1:]) == "maximum resident set size"]
+    rss = max(time_l) if time_l else max(int(f[1]) for f in rss_lines if f[0].isdigit() and len(f) > 1 and f[1].isdigit())
     report_bytes = pathlib.Path(verdict_path).read_bytes()
     cells = verdict["cells"]
     ours = [c.get("ourPhonemes", {}).get("intelligibility") for c in cells]
@@ -57,7 +65,7 @@ def main(evidence, verdict_path, rss_path, report_path, models_version, latency_
     entry = {
         "modelId": "sahilmahendrakar_paradee_8m_v1_2_onnx_int8",
         "model": "Paradee-8M v1.2 ONNX INT8",
-        "backend": "pure-java",
+        "backend": "rust-ffm" if native else "pure-java",
         "backendVersion": f"models-{models_version}",
         "workload": "paradee_sentence_tts_v1",
         "artifactSha256": ARTIFACT_SHA,
