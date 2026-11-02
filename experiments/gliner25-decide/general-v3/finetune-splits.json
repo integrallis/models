@@ -1,0 +1,140 @@
+{
+  "candidate": "modeljars-gliner25-decide-general-v3",
+  "selection": "deterministic hash, no inference-based selection",
+  "maximumEncodedTokens": 512,
+  "exclusions": {
+    "goemotions:previous-qualification-text": 43714,
+    "goemotions:overlength": 1,
+    "clinc-travel:previous-qualification-text": 1590,
+    "clinc-banking:previous-qualification-text": 1740,
+    "clinc-utility:previous-qualification-text": 1590,
+    "clinc-small_talk:previous-qualification-text": 1594,
+    "clinc-work:previous-qualification-text": 1590,
+    "clinc-credit_cards:previous-qualification-text": 1590,
+    "clinc-meta:previous-qualification-text": 1594,
+    "clinc-home:previous-qualification-text": 1591,
+    "clinc-auto_and_commute:previous-qualification-text": 1590,
+    "clinc-kitchen_and_dining:previous-qualification-text": 1590,
+    "boolq:previous-qualification-text": 10811,
+    "boolq:overlength": 32,
+    "boolq:split-overlap-or-duplicate": 6
+  },
+  "files": {
+    "train-cases.jsonl": {
+      "sha256": "446fda112c5136c83f6846cf8789f7522b71401426efc4136a492e893033c308",
+      "cases": 70823,
+      "cohorts": {
+        "clinc-meta": 1496,
+        "boolq": 7731,
+        "goemotions": 48103,
+        "clinc-small_talk": 1494,
+        "clinc-kitchen_and_dining": 1500,
+        "clinc-auto_and_commute": 1500,
+        "clinc-work": 1500,
+        "clinc-banking": 1500,
+        "clinc-travel": 1500,
+        "clinc-utility": 1499,
+        "clinc-credit_cards": 1500,
+        "clinc-home": 1500
+      }
+    },
+    "train.jsonl": {
+      "sha256": "dc8ff21ddecc1f3269e3ba964168f3f061d7a2080550f37b2c2a19c221be34e3",
+      "cases": 70823
+    },
+    "development-cases.jsonl": {
+      "sha256": "dffc395507dd56443fc2a3d84ef80d84cdd31582df0907b5118b5c64744e207c",
+      "cases": 990,
+      "cohorts": {
+        "goemotions": 243,
+        "clinc-banking": 45,
+        "clinc-home": 45,
+        "clinc-work": 45,
+        "clinc-travel": 45,
+        "clinc-kitchen_and_dining": 45,
+        "clinc-small_talk": 45,
+        "clinc-auto_and_commute": 45,
+        "clinc-credit_cards": 45,
+        "clinc-utility": 45,
+        "clinc-meta": 45,
+        "boolq": 297
+      }
+    },
+    "development.jsonl": {
+      "sha256": "45bd38db402620f901ab32875f69ff8bf2fd0beac0e1784c948001be1b84840b",
+      "cases": 990
+    },
+    "qualification-cases.jsonl": {
+      "sha256": "7301c0de972f62277d5abbdcb9e3c66ebe902d156d302b07a752d4fd7a2e9412",
+      "cases": 1000,
+      "cohorts": {
+        "goemotions": 254,
+        "clinc-work": 45,
+        "clinc-meta": 45,
+        "clinc-auto_and_commute": 45,
+        "clinc-small_talk": 45,
+        "clinc-home": 45,
+        "clinc-kitchen_and_dining": 45,
+        "clinc-credit_cards": 45,
+        "clinc-utility": 45,
+        "clinc-banking": 45,
+        "clinc-travel": 45,
+        "boolq": 296
+      }
+    }
+  },
+  "previousSplitsSha256": {
+    "train": "0a0c82af934e495bcb6ac2687591e70991fb116ceafee400899dff151c587af6",
+    "development": "dffc395507dd56443fc2a3d84ef80d84cdd31582df0907b5118b5c64744e207c",
+    "qualification": "27f285ded66573677b4a92f300ce0472968635db9cf201058acbe99bc6893877"
+  },
+  "trainingBalance": {
+    "method": "capped inverse-frequency repetition",
+    "target": 1000,
+    "maximumRepeats": 8,
+    "inputCases": 65656,
+    "outputCases": 70823,
+    "allInputRowsRetained": true,
+    "inputSha256": "0a0c82af934e495bcb6ac2687591e70991fb116ceafee400899dff151c587af6",
+    "repeatedEmotionCounts": {
+      "neutral": 14338,
+      "caring": 1163,
+      "sadness": 1563,
+      "surprise": 1097,
+      "admiration": 4335,
+      "approval": 3050,
+      "realization": 1168,
+      "annoyance": 2580,
+      "relief": 1001,
+      "remorse": 1031,
+      "gratitude": 2748,
+      "joy": 1539,
+      "disappointment": 1370,
+      "nervousness": 997,
+      "curiosity": 2246,
+      "love": 2096,
+      "embarrassment": 1001,
+      "optimism": 1731,
+      "disapproval": 2072,
+      "disgust": 1055,
+      "confusion": 1396,
+      "amusement": 2383,
+      "excitement": 1030,
+      "anger": 1616,
+      "pride": 800,
+      "fear": 1179,
+      "grief": 536,
+      "desire": 1007
+    },
+    "repetitions": {
+      "1": 63284,
+      "2": 1621,
+      "3": 178,
+      "4": 111,
+      "6": 82,
+      "7": 213,
+      "8": 167
+    }
+  },
+  "qualificationReuse": "Reuse the untouched general-v2 holdout. V2 stopped at development screening and never evaluated these inputs."
+}

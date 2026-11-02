@@ -1,0 +1,25 @@
+{
+  "authorization": "User instruction on 2026-11-01: proceed until it is qualified, don't waste time",
+  "previousAggregateLimitSeconds": 7200,
+  "previousRentedSecondsUpperBound": 5962,
+  "maximumAggregateRentedSeconds": 21600,
+  "additionalAllocationSeconds": 7200,
+  "purpose": "Bounded continuation: CPU profiling, measured runtime fixes and further development-selected training",
+  "rules": "Count every prior and overlapping rental; each worker has its own deletion deadline; accuracy and performance floors remain unchanged",
+  "continuations": [
+    {
+      "previousLimitSeconds": 14400,
+      "newLimitSeconds": 18000,
+      "additionalAllocationSeconds": 3600,
+      "reason": "User-authorized continued qualification: complete prepared-weight performance measurement and development-directed balanced training; v2 development scores did not clear quality floors",
+      "authorization": "User instruction on 2026-11-01: proceed until it is qualified, don't waste time"
+    },
+    {
+      "previousLimitSeconds": 18000,
+      "newLimitSeconds": 21600,
+      "additionalAllocationSeconds": 3600,
+      "reason": "Explicitly requested publisher benchmark and emotion-scoring audit: both runtimes on all 1700 public development rows and 5427 official emotion test rows",
+      "authorization": "User on 2026-11-01: Try their F1 bench to see if our Emotions bench is way off and there is a problem"
+    }
+  ]
+}
