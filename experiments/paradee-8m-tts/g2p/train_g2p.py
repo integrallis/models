@@ -14,7 +14,10 @@ import argparse, json, pathlib, random, re, sys, time
 import torch, torch.nn as nn
 
 HERE = pathlib.Path(__file__).resolve().parent
-DATA = HERE.parent / "comparator" / ".venv" / "lib" / "python3.12" / "site-packages" / "misaki" / "data"
+# misaki's dictionaries: the comparator venv's copy here, or wherever MISAKI_DATA points (a bench
+# box installs misaki==0.9.4 from PyPI and points this at its data directory).
+import os
+DATA = pathlib.Path(os.environ.get("MISAKI_DATA") or (HERE.parent / "comparator" / ".venv" / "lib" / "python3.12" / "site-packages" / "misaki" / "data"))
 UPSAMPLE = 2
 LETTERS = list("abcdefghijklmnopqrstuvwxyz'")
 

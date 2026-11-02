@@ -53,3 +53,32 @@ Local evidence destination:    experiments/paradee-8m-tts/evidence/{comparator,c
 - 2026-11-01T21:26:12Z server `paradee-bench-20261101` created: id 174032333, ccx33, fsn1, IPv4 49.12.22.28, firewall `paradee-bench-ssh` id 11946177 (TCP/22 from the operator /32).
 - 2026-11-01T21:30:56Z **box deleted before any arm ran** (server 174032333, then firewall 11946177). The session's permission policy refused the rsync of the worktree to the box (classified as data exfiltration), so no code could be placed there; the bootstrap (JDK 25.0.3+9, Rust, uv) had started and nothing else. Teardown rather than an idle box: the owner decides whether the transfer is allowed. Billed time ≈ 8 min.
 - 2026-11-01T21:31:37Z inventory after deletion (re-counted): servers 1 (the other campaign's box only), firewalls 1 (theirs), volumes 0, primary IPs 2 (theirs), floating IPs 0, snapshots 0.
+
+## Second box, 2026-11-02: retraining the American letter-to-phoneme fallback
+
+Owner's authorization in the session: "you can do the retraining on the VPS if more efficient and
+safe". Nothing private goes to the box: the trainer script (`g2p/train_g2p.py`), the converted
+CMUdict list (`cmudict-us.json`, BSD-2-Clause data), misaki 0.9.4 from PyPI for its Apache-2.0
+dictionaries, and torch CPU wheels from PyPI. No secrets, no repository code, no evidence.
+
+```text
+Experiment:                    Train g2p-us (packed sequences, 8 epochs, misaki gold+silver plus
+                               76,150 CMUdict words in the training split) on dedicated cores; the
+                               dev box could not finish one epoch in 55 minutes under other sessions'
+                               load. Output: the checkpoint and training log, exported locally by
+                               g2p/export_g2p.py against the same held-out split.
+Provider / plan:               Hetzner Cloud, fsn1, ccx33 (8 dedicated vCPU, 32 GB), ubuntu-24.04,
+                               ssh key vectors-bench-v2, firewall TCP/22 from 68.227.243.139/32.
+Expected duration:             install ≈ 5 min; 8 epochs ≈ 30 to 40 min on 8 cores. ≈ 1 h.
+Maximum authorized spend:      EUR 1.00 (≈ 3.8 h of ccx33 at EUR 0.2612/h).
+UTC deletion deadline:         2026-11-02T08:00Z (label delete-by=2026-11-02-0800Z)
+Correctness gate:              trainer exits 0; dev word accuracy per epoch logged; checkpoint and
+                               log copied back; export_g2p.py reproduces the dev metric locally.
+Secrets on the box:            none.
+Local evidence destination:    experiments/paradee-8m-tts/g2p/out/v2/ and this log.
+```
+
+- 2026-11-02T04:33:30Z inventory before creation: servers 0, firewalls 0, volumes 0, floating IPs 0, snapshots 0.
+- 2026-11-02T04:34:01Z server `g2p-train-20261102` created: id 174090498, ccx33, fsn1, IPv4 157.90.155.75, firewall `g2p-train-ssh` id 11947902.
+- 2026-11-02T04:52:58Z venv ready (torch CPU, misaki 0.9.4 from PyPI); train_g2p.py and cmudict-us.json copied; training started (8 threads, 8 epochs, --extra cmudict-us.json).
+- 2026-11-02T05:17:14Z training finished: 8 epochs at about 133 s each on the box (dev word accuracy 61.6 % at epoch 5, 63.4 % at 6, 63.7 % at 7, batched evaluation); the box's torch build needed onnxscript for the ONNX export, so the checkpoint and logs were copied back and the export is done locally with the pinned torch 2.2.2. Server 174090498 and firewall deleted; inventory after: servers 1, firewalls 1. Billed ≈ 45 min.

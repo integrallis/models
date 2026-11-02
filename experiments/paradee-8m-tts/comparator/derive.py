@@ -21,9 +21,9 @@ def main(root):
         j = json.loads((d / "judge.json").read_text()) if (d / "judge.json").exists() else None
         rtfs = [r["realTimeFactor"] for r in p["rows"] if r["realTimeFactor"] is not None]
         out["groups"].append({
-            "arm": d.parents[3].name, "corpus": p["corpus"], "voice": p["voice"], "threads": p["intraOpThreads"], "pass": p["pass"],
+            "arm": d.parents[3].name, "corpus": p["corpus"], "voice": p["voice"], "threads": p.get("intraOpThreads", 1), "pass": p.get("pass", 1),
             "realTimeMultiple": p["realTimeMultiple"], "p95RealTimeFactor": p95(rtfs), "medianRealTimeFactor": statistics.median(rtfs) if rtfs else None,
-            "p95TimeToFirstAudioMillis": (p95([r["timeToFirstAudioSeconds"] for r in p["rows"]]) or 0) * 1000.0,
+            "p95TimeToFirstAudioMillis": (p95([r.get("timeToFirstAudioSeconds", r.get("runSeconds")) for r in p["rows"] if r.get("timeToFirstAudioSeconds", r.get("runSeconds")) is not None]) or 0) * 1000.0,
             "allFinite": p["allFinite"], "sentences": p["sentences"],
             "werPublisherNormalizer": j and j["werPublisherNormalizer"], "werWhisperNormalizer": j and j["werWhisperNormalizer"],
             "judge": j and j["judge"], "judgeModelSha256": j and j["modelSha256"], "path": str(d.relative_to(root)),
