@@ -33,6 +33,9 @@ final class MToken {
   boolean prespace;
   Integer rating;
 
+  /** Set when the letter-to-phoneme fallback, not the lexicon, produced the phonemes. */
+  boolean fallback;
+
   MToken(String text, String tag, String whitespace) {
     this.text = text;
     this.tag = tag;

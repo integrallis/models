@@ -58,11 +58,39 @@ public final class MisakiEnglishPhonemizer {
 
   private final MisakiLexicon lexicon;
   private final String unk;
+  private final LetterToPhonemeFallback fallback;
 
-  /** Creates a phonemizer; {@code unk} replaces unresolved words and may be empty. */
+  /** Creates a phonemizer without a fallback; {@code unk} replaces unresolved words. */
   public MisakiEnglishPhonemizer(MisakiLexicon lexicon, String unk) {
+    this(lexicon, unk, null);
+  }
+
+  /**
+   * Creates a phonemizer whose unresolved words go to {@code fallback} (misaki's eSpeak slot);
+   * {@code unk} replaces what the fallback cannot pronounce either, and may be empty.
+   */
+  public MisakiEnglishPhonemizer(
+      MisakiLexicon lexicon, String unk, LetterToPhonemeFallback fallback) {
     this.lexicon = Objects.requireNonNull(lexicon, "lexicon");
     this.unk = Objects.requireNonNull(unk, "unk");
+    this.fallback = fallback;
+  }
+
+  /** Whether unresolved words are pronounced by a letter-to-phoneme fallback. */
+  public boolean hasFallback() {
+    return fallback != null;
+  }
+
+  private void applyFallback(MToken token) {
+    if (fallback == null || token.phonemes != null) {
+      return;
+    }
+    String ps = fallback.phonemize(token.text);
+    if (ps != null) {
+      token.phonemes = ps;
+      token.rating = LetterToPhonemeFallback.RATING;
+      token.fallback = true;
+    }
   }
 
   /** Whether this phonemizer spells British English. */
@@ -91,6 +119,7 @@ public final class MisakiEnglishPhonemizer {
           w.single.phonemes = found.phonemes();
           w.single.rating = found.rating();
         }
+        applyFallback(w.single);
         ctx = tokenContext(ctx, w.single.phonemes, w.single);
         continue;
       }
@@ -101,13 +130,13 @@ public final class MisakiEnglishPhonemizer {
     List<MToken> merged = new ArrayList<>();
     for (Word w : words) {
       if (w.single != null) {
-        if (w.single.phonemes == null && w.single.alias == null) {
+        if ((w.single.phonemes == null || w.single.fallback) && w.single.alias == null) {
           unknown.add(w.single.text);
         }
         merged.add(w.single);
       } else {
         for (MToken tk : w.group) {
-          if (tk.phonemes == null) {
+          if (tk.phonemes == null || tk.fallback) {
             unknown.add(tk.text);
           }
         }
@@ -279,6 +308,7 @@ public final class MisakiEnglishPhonemizer {
   private MisakiLexicon.Context resolveGroup(List<MToken> w, MisakiLexicon.Context ctx) {
     int left = 0;
     int right = w.size();
+    boolean shouldFallback = false;
     while (left < right) {
       boolean anyResolved = false;
       for (int k = left; k < right; k++) {
@@ -305,12 +335,30 @@ public final class MisakiEnglishPhonemizer {
       } else {
         right--;
         MToken tk = w.get(right);
-        if (tk.phonemes == null && allJunk(tk.text)) {
-          tk.phonemes = "";
-          tk.rating = 3;
+        if (tk.phonemes == null) {
+          if (allJunk(tk.text)) {
+            tk.phonemes = "";
+            tk.rating = 3;
+          } else if (fallback != null) {
+            shouldFallback = true;
+            break;
+          }
         }
         left = 0;
       }
+    }
+    if (shouldFallback) {
+      MToken whole = mergeTokens(w, null);
+      String ps = fallback.phonemize(whole.text);
+      MToken head = w.get(0);
+      head.phonemes = ps;
+      head.rating = LetterToPhonemeFallback.RATING;
+      head.fallback = ps != null;
+      for (int k = 1; k < w.size(); k++) {
+        w.get(k).phonemes = "";
+        w.get(k).rating = LetterToPhonemeFallback.RATING;
+      }
+      return tokenContext(ctx, ps, whole);
     }
     resolveTokens(w);
     return ctx;

@@ -83,6 +83,7 @@ final class Operators {
       case "GatherElements" ->
           one(Structural.gatherElements(in[0], in[1], node.intAttribute("axis", 0)));
       case "Expand" -> one(Structural.expand(in[0], in[1]));
+      case "Tile" -> one(Structural.tile(in[0], in[1]));
       case "ConstantOfShape" ->
           one(Structural.constantOfShape(in[0], node.tensorAttribute("value")));
       case "Range" -> one(Structural.range(in[0], in[1], in[2]));
