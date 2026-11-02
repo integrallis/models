@@ -1,0 +1,15 @@
+ 17:08:45 up  2:21,  1 user,  load average: 0.00, 0.00, 0.00
+WARNING: Using incubator modules: jdk.incubator.vector
+cpus 8, java 25.0.3
+Nov 02, 2026 5:08:47 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 02, 2026 5:08:47 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+size   1024  w1      0.86 us (x1.00)  w2     39.82 us (x0.02)  w4     40.71 us (x0.02)  w7     39.59 us (x0.02)  w8     41.39 us (x0.02)
+size   2048  w1      1.68 us (x1.00)  w2     28.11 us (x0.06)  w4     31.45 us (x0.05)  w7     38.08 us (x0.04)  w8     41.59 us (x0.04)
+size   4096  w1      3.28 us (x1.00)  w2     32.16 us (x0.10)  w4     39.73 us (x0.08)  w7     40.84 us (x0.08)  w8     40.60 us (x0.08)
+size   8192  w1      6.76 us (x1.00)  w2     34.59 us (x0.20)  w4     43.30 us (x0.16)  w7     55.32 us (x0.12)  w8     56.94 us (x0.12)
+size  14336  w1     11.87 us (x1.00)  w2     45.27 us (x0.26)  w4     58.96 us (x0.20)  w7     63.42 us (x0.19)  w8     63.49 us (x0.19)
+size  18944  w1     15.22 us (x1.00)  w2     49.69 us (x0.31)  w4     56.84 us (x0.27)  w7     59.70 us (x0.25)  w8     49.36 us (x0.31)
+size  32768  w1     26.33 us (x1.00)  w2     55.36 us (x0.48)  w4     69.03 us (x0.38)  w7     58.31 us (x0.45)  w8     58.84 us (x0.45)
+size  65536  w1     54.27 us (x1.00)  w2     97.27 us (x0.56)  w4     95.78 us (x0.57)  w7     96.98 us (x0.56)  w8     94.34 us (x0.58)
