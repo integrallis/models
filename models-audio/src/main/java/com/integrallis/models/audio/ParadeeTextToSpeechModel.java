@@ -23,8 +23,10 @@ import com.integrallis.models.api.TextToSpeechModel;
 import com.integrallis.models.audio.phonemizer.LetterToPhonemeFallback;
 import com.integrallis.models.audio.phonemizer.MisakiEnglishPhonemizer;
 import com.integrallis.models.audio.phonemizer.MisakiLexicon;
+import com.integrallis.models.backend.nativekernel.NativeOnnxKernels;
 import com.integrallis.models.backend.onnx.NoiseSource;
 import com.integrallis.models.backend.onnx.OnnxGraphExecutor;
+import com.integrallis.models.backend.onnx.OnnxKernels;
 import com.integrallis.models.backend.onnx.OnnxModel;
 import com.integrallis.models.backend.onnx.OnnxNode;
 import com.integrallis.models.backend.onnx.Tensor;
@@ -169,26 +171,70 @@ public final class ParadeeTextToSpeechModel implements TextToSpeechModel {
         new MisakiEnglishPhonemizer(gb, "", LetterToPhonemeFallback.bundled(true)));
   }
 
-  /** Loads the graph and config with the given phonemizers; {@code british} may be {@code null}. */
+  /**
+   * Loads the graph and config with the given phonemizers; {@code british} may be {@code null}. The
+   * executor's matrix products and sines run on the bundled Rust kernels when this platform has
+   * them, and on the pure-Java kernels otherwise; diagnostics name the route and, for the second,
+   * why.
+   */
   public static ParadeeTextToSpeechModel load(
       Path onnx, Path configJson, MisakiEnglishPhonemizer american, MisakiEnglishPhonemizer british)
       throws IOException {
+    OnnxKernels kernels = null;
+    String unavailable = null;
+    try {
+      kernels = NativeOnnxKernels.load();
+    } catch (IOException | RuntimeException | UnsatisfiedLinkError failure) {
+      unavailable = failure.getClass().getSimpleName() + ": " + failure.getMessage();
+    }
+    return load(onnx, configJson, american, british, kernels, unavailable);
+  }
+
+  /**
+   * Loads with explicit executor kernels; {@code null} runs every operator on the pure-Java
+   * kernels. Parity and ablation tests use this to name the route they measure.
+   */
+  public static ParadeeTextToSpeechModel load(
+      Path onnx,
+      Path configJson,
+      MisakiEnglishPhonemizer american,
+      MisakiEnglishPhonemizer british,
+      OnnxKernels kernels)
+      throws IOException {
+    return load(onnx, configJson, american, british, kernels, null);
+  }
+
+  private static ParadeeTextToSpeechModel load(
+      Path onnx,
+      Path configJson,
+      MisakiEnglishPhonemizer american,
+      MisakiEnglishPhonemizer british,
+      OnnxKernels kernels,
+      String nativeUnavailable)
+      throws IOException {
     Config config = Config.load(configJson);
     OnnxModel model = OnnxModel.load(onnx);
-    OnnxGraphExecutor executor = new OnnxGraphExecutor(model);
+    OnnxGraphExecutor executor = new OnnxGraphExecutor(model, NoiseSource.seeded(0), kernels);
     Map<String, Integer> operators = new TreeMap<>();
     for (OnnxNode node : model.graph().nodes()) {
       operators.merge(node.opType(), 1, Integer::sum);
     }
     Map<String, String> environment = new LinkedHashMap<>();
     environment.put("backend", "pure-java");
+    environment.put("onnx-kernels", kernels == null ? "pure-java" : kernels.name());
     environment.put("graph", String.valueOf(onnx.getFileName()));
     environment.put("onnxOpset", Long.toString(model.defaultOpset()));
     environment.put("onnxNodes", Integer.toString(model.graph().nodes().size()));
     environment.put("onnxDynamicNodes", Integer.toString(executor.dynamicNodeCount()));
     environment.put("onnxOperators", Integer.toString(operators.size()));
     environment.put("voices", String.join(",", config.voices()));
-    environment.put("phonemizer", "misaki-java fba1236, no fallback");
+    environment.put(
+        "phonemizer",
+        "misaki-java fba1236; unresolved words: "
+            + (american.hasFallback() ? "cmudict tier + letter-to-phoneme model" : "dropped"));
+    if (nativeUnavailable != null) {
+      environment.put("onnx-kernels-unavailable", nativeUnavailable);
+    }
     BackendDiagnostics diagnostics =
         new BackendDiagnostics("pure-java", "paradee-onnx-eager-v1", environment, List.of());
     Synthesizer synthesizer =

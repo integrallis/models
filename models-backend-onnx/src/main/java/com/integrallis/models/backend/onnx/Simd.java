@@ -220,6 +220,11 @@ final class Simd {
       int m,
       int k,
       int n) {
+    OnnxKernels kernels = KernelScope.current();
+    if (kernels != null && (long) m * k * n >= KernelScope.NATIVE_GEMM_MIN_MACS) {
+      kernels.gemm(a, aOff, lda, b, bOff, ldb, c, cOff, ldc, m, k, n);
+      return;
+    }
     int tile = 2 * LANES;
     int nBound = n - n % tile;
     int i = 0;

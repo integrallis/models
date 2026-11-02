@@ -46,6 +46,29 @@ import org.junit.jupiter.api.Test;
 @Tag("integration")
 class ParadeeSeededParityIntegrationTest {
 
+  /**
+   * The kernels the parity run measures: the bundled Rust kernels, the product's default route,
+   * unless MODELS_PARADEE_PARITY_KERNELS=pure-java asks for the Java kernels.
+   */
+  private static final com.integrallis.models.backend.onnx.OnnxKernels PARITY_KERNELS =
+      parityKernels();
+
+  private static com.integrallis.models.backend.onnx.OnnxKernels parityKernels() {
+    if ("pure-java".equals(System.getenv("MODELS_PARADEE_PARITY_KERNELS"))) {
+      return null;
+    }
+    String pinned = System.getProperty("models.native.kernels.library");
+    if (pinned != null) {
+      return com.integrallis.models.backend.nativekernel.NativeOnnxKernels.load(
+          java.nio.file.Path.of(pinned));
+    }
+    try {
+      return com.integrallis.models.backend.nativekernel.NativeOnnxKernels.load();
+    } catch (java.io.IOException failure) {
+      throw new IllegalStateException("bundled Rust ONNX kernels are not loadable", failure);
+    }
+  }
+
   private static final double MINIMUM_COSINE = 0.995;
   private static final double MINIMUM_SDR_DB = 20.0;
 
@@ -203,7 +226,11 @@ class ParadeeSeededParityIntegrationTest {
             noiseName = node.outputs().get(0);
           }
         }
-        return new OnnxGraphExecutorHolder(model, new OnnxGraphExecutor(model), noiseName);
+        return new OnnxGraphExecutorHolder(
+            model,
+            new OnnxGraphExecutor(
+                model, com.integrallis.models.backend.onnx.NoiseSource.seeded(0), PARITY_KERNELS),
+            noiseName);
       } catch (java.io.IOException e) {
         throw new java.io.UncheckedIOException(e);
       }

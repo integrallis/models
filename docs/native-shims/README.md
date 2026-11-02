@@ -46,4 +46,10 @@ existing Java DeBERTa tokenizer. The passing Linux parity fixtures justify conti
 they do not prove a JVM limitation, finish this shim campaign, or qualify GLiNER for the catalog.
 See `experiments/gliner25-decide/README.md` and the registered raw-evidence hashes.
 
+The ONNX executor kernels (`onnx-executor-kernels`) are inventoried as **UNPROVEN** on the same
+basis: the owner asked for a Rust shim to bring Paradee-8M toward onnxruntime's throughput, and
+seeded parity against onnxruntime on the new route (40 of 40, worst 62.10 dB) justifies shipping
+it as the default route. That record is correctness, not causality; the throughput effect and a
+Java alternative for each kernel remain to be measured before any `PROVEN_REQUIRED` claim.
+
 [ABI7 symbol retirement](abi7-symbol-retirement.md) lists removed compatibility wrappers and the retained generic entry points.

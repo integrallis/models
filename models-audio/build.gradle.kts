@@ -45,6 +45,15 @@ val sopranoNativeLibrary =
     project(":backend-native")
         .layout.buildDirectory.file("rust-target/release/$sopranoNativeLibraryName")
 
+// Integration tests that measure the product's default route need the Rust kernels; the dev build
+// does not put the bundled platform jar on this module's test classpath, so the freshly built
+// library is passed explicitly, as the Soprano tests do.
+tasks.withType<Test>().configureEach {
+    dependsOn(project(":backend-native").tasks.named("cargoBuildRelease"))
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    systemProperty("models.native.kernels.library", sopranoNativeLibrary.get().asFile.absolutePath)
+}
+
 tasks.register<Test>("sopranoIntegrationTest") {
     description = "Run end-to-end speech synthesis with the configured standalone Soprano GGUF"
     group = "verification"

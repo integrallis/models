@@ -71,6 +71,13 @@ final class Elementwise {
    * the Vector API's lane-wise sine was measured slower than the scalar call, not faster.
    */
   static Tensor sin(Tensor x) {
+    OnnxKernels kernels = KernelScope.current();
+    if (kernels != null && x.isFloat()) {
+      float[] in = x.floats();
+      float[] out = new float[in.length];
+      kernels.sin(in, out, in.length);
+      return Tensor.ofFloats(x.shape(), out);
+    }
     return unary(x, Math::sin);
   }
 
@@ -79,6 +86,13 @@ final class Elementwise {
   }
 
   static Tensor erf(Tensor x) {
+    OnnxKernels kernels = KernelScope.current();
+    if (kernels != null && x.isFloat()) {
+      float[] in = x.floats();
+      float[] out = new float[in.length];
+      kernels.erf(in, out, in.length);
+      return Tensor.ofFloats(x.shape(), out);
+    }
     return unary(x, Elementwise::erf);
   }
 
@@ -130,6 +144,16 @@ final class Elementwise {
       return x.type() == OnnxDataType.INT32
           ? Tensor.ofInts(x.shape(), out)
           : Tensor.ofLongs(x.shape(), out);
+    }
+    if (x.isFloat()) {
+      float flo = (float) lo;
+      float fhi = (float) hi;
+      float[] in = x.floats();
+      float[] out = new float[in.length];
+      for (int i = 0; i < in.length; i++) {
+        out[i] = Math.min(Math.max(in[i], flo), fhi);
+      }
+      return Tensor.ofFloats(x.shape(), out);
     }
     return unary(x, v -> Math.min(Math.max(v, lo), hi));
   }
@@ -474,8 +498,21 @@ final class Elementwise {
       int ib = ob;
       switch (op) {
         case LESS -> {
-          for (int i = 0; i < inner; i++, ia += stepA, ib += stepB) {
-            out[oi + i] = (byte) (fa[ia] < fb[ib] ? 1 : 0);
+          // The contiguous-versus-scalar and contiguous-versus-contiguous runs are the large ones
+          // (the harmonic source's threshold); unit or zero strides let C2 vectorize the loop.
+          if (stepA == 1 && stepB == 0) {
+            float bound = fb[ib];
+            for (int i = 0; i < inner; i++) {
+              out[oi + i] = (byte) (fa[ia + i] < bound ? 1 : 0);
+            }
+          } else if (stepA == 1 && stepB == 1) {
+            for (int i = 0; i < inner; i++) {
+              out[oi + i] = (byte) (fa[ia + i] < fb[ib + i] ? 1 : 0);
+            }
+          } else {
+            for (int i = 0; i < inner; i++, ia += stepA, ib += stepB) {
+              out[oi + i] = (byte) (fa[ia] < fb[ib] ? 1 : 0);
+            }
           }
         }
         case GREATER -> {
