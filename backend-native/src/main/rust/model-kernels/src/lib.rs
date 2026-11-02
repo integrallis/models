@@ -182,8 +182,12 @@ const CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL: u64 = 1 << 29;
 /// Q4_K with Java-compatible sequential floating-point block accumulation.
 const CAPABILITY_Q4_K_ORDERED_REDUCTION: u64 = 1 << 30;
 mod ptq;
+mod q4k_interleave;
+mod q4k_tile_bench;
 const Q8_0_BLOCK_BYTES: usize = 34;
 const Q4_K_BLOCK_BYTES: usize = 144;
+/// Byte offset of the packed nibbles inside a Q4_K block.
+const QUANTS_OFFSET_Q4_K: usize = 16;
 const Q5_K_BLOCK_BYTES: usize = 176;
 const Q6_K_BLOCK_BYTES: usize = 210;
 const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
@@ -283,6 +287,9 @@ enum DotKernel {
     Q4K,
     #[cfg(target_arch = "x86_64")]
     Q4KAvx2,
+    /// AVX-512 batched Q4_K. Same arithmetic as `Q4KAvx2`, two Q4_K groups per instruction.
+    #[cfg(target_arch = "x86_64")]
+    Q4KAvx512,
     #[cfg(target_arch = "x86_64")]
     Q4KOrderedAvx2,
     #[cfg(target_arch = "aarch64")]
@@ -3379,6 +3386,24 @@ unsafe fn compute_batched_row_range(
             }
         }
         #[cfg(target_arch = "x86_64")]
+        DotKernel::Q4KAvx512 => {
+            // SAFETY: selected only after runtime avx512f/avx512bw/fma/f16c detection.
+            unsafe {
+                compute_q4_k_batched_row_range_avx512(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                )
+            }
+        }
+        #[cfg(target_arch = "x86_64")]
         DotKernel::Q4KAvx2 => {
             // SAFETY: runtime dispatch selected this variant only when AVX2 and FMA are available.
             unsafe {
@@ -4176,6 +4201,146 @@ unsafe fn compute_q6_k_batched_row_range_scalar(
 }
 
 #[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx512f,avx512bw,fma,f16c")]
+/// Batched Q4_K at 512 bits: identical arithmetic to the AVX2 range, two groups per instruction.
+///
+/// `maddubs` + `madd_epi16` is already the minimum pair -- `madd_epi16` applies the group scale and
+/// reduces pairs in the same op, which is why VNNI's `vpdpbusd` cannot improve on it. Width can: one
+/// 512-bit pair covers two 32-element Q4_K groups, so the scale vector carries `scale[2k]` in its
+/// low sixteen i16 lanes and `scale[2k+1]` in the high sixteen. Measured 1.70x on the isolated tile
+/// with identical checksums (`q4k_tile_bench`).
+///
+/// The float accumulation order per block is unchanged, and the integer lanes are summed with
+/// `_mm512_reduce_add_epi32`, which is exact. Only the lane *grouping* differs from the AVX2 path.
+///
+/// # Safety
+///
+/// Every buffer must cover the advertised extent and AVX-512BW must be present.
+unsafe fn compute_q4_k_batched_row_range_avx512(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    activation_sums: &[i16],
+    output: *mut f32,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
+    if batch_size == 1 {
+        // Batch 1 has no second group to pair; use the measured row dot.
+        for row in start_row..end_row {
+            // SAFETY: AVX2/FMA/F16C are implied by the AVX-512 gate.
+            let sum = unsafe {
+                dot_q4_k_q8_k_row_avx2(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    0,
+                    row,
+                    cols,
+                )
+            };
+            // SAFETY: each worker owns this output row.
+            unsafe { output.add(row).write(sum) };
+        }
+        return;
+    }
+
+    let blocks_per_row = cols / QK_K;
+    let sums_per_batch = cols / Q8_K_SUM_BLOCK;
+    let nibble_mask = _mm512_set1_epi8(0x0f);
+    let mut sums = vec![0.0_f32; batch_size];
+    let mut minimum_sums = vec![0.0_f32; batch_size];
+    let mut decoded = [_mm512_setzero_si512(); 4];
+    let mut scale_pairs = [_mm512_setzero_si512(); 4];
+
+    for row in start_row..end_row {
+        sums.iter_mut().for_each(|v| *v = 0.0);
+        minimum_sums.iter_mut().for_each(|v| *v = 0.0);
+        for block in 0..blocks_per_row {
+            let weight_offset = (row * blocks_per_row + block) * Q4_K_BLOCK_BYTES;
+            let weight_scale = f16_to_f32_f16c(u16::from_le_bytes([
+                weights[weight_offset],
+                weights[weight_offset + 1],
+            ]));
+            let weight_min_scale = f16_to_f32_f16c(u16::from_le_bytes([
+                weights[weight_offset + 2],
+                weights[weight_offset + 3],
+            ]));
+            let scales = &weights[weight_offset + 4..weight_offset + 16];
+            let (scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
+            let quants = weights.as_ptr().wrapping_add(weight_offset + QUANTS_OFFSET_Q4_K);
+
+            // Two Q4_K groups per 512-bit step: low nibbles of 32 packed bytes give group 2k,
+            // high nibbles give group 2k+1, and the pair shares one instruction.
+            for step in 0..4 {
+                // SAFETY: each Q4_K block holds four complete 32-byte packed pairs.
+                let packed = unsafe {
+                    _mm512_castsi256_si512(_mm256_loadu_si256(quants.add(step * 32).cast()))
+                };
+                let low = _mm512_and_si512(packed, nibble_mask);
+                let high = _mm512_and_si512(_mm512_srli_epi16(packed, 4), nibble_mask);
+                // low occupies the first 256 bits, high the second
+                decoded[step] = _mm512_inserti64x4(low, _mm512_castsi512_si256(high), 1);
+                let mut lanes = [0_i16; 32];
+                for (i, slot) in lanes.iter_mut().enumerate() {
+                    slot.clone_from(&scale_values[step * 2 + usize::from(i >= 16)]);
+                }
+                // SAFETY: lanes holds thirty-two i16.
+                scale_pairs[step] = unsafe { _mm512_loadu_si512(lanes.as_ptr().cast()) };
+            }
+
+            let minimum_values =
+                _mm256_cvtepi16_epi32(_mm256_extracti128_si256(mins_and_scales, 1));
+
+            for batch in 0..batch_size {
+                let activation_offset = batch * cols + block * QK_K;
+                let sum_offset = batch * sums_per_batch + block * QK_K / Q8_K_SUM_BLOCK;
+                let mut lanes = _mm512_setzero_si512();
+                for step in 0..4 {
+                    // Group 2k sits at step*64 and group 2k+1 at step*64+32, so the pair is
+                    // contiguous and loads in one instruction. An earlier version staged them
+                    // through a buffer, which put two memcpys in the hot loop and made the 512-bit
+                    // path 12% SLOWER than AVX2 despite the tile itself being 1.70x faster.
+                    let g0 = activation_offset + step * 64;
+                    // SAFETY: the activation row holds 64 signed bytes from this offset.
+                    let acts =
+                        unsafe { _mm512_loadu_si512(quantized.as_ptr().add(g0).cast()) };
+                    let products = _mm512_maddubs_epi16(decoded[step], acts);
+                    lanes =
+                        _mm512_add_epi32(lanes, _mm512_madd_epi16(products, scale_pairs[step]));
+                }
+                let quantized_sum = _mm512_reduce_add_epi32(lanes);
+
+                // SAFETY: one Q8_K block carries sixteen i16 group sums.
+                let activation_sum_values = unsafe {
+                    _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast())
+                };
+                let paired_sums = _mm256_madd_epi16(activation_sum_values, _mm256_set1_epi16(1));
+                let block_minimum_sum =
+                    horizontal_sum_i32_avx2(_mm256_mullo_epi32(minimum_values, paired_sums));
+                let activation_scale = activation_scales[batch * blocks_per_row + block];
+                let d = weight_scale * activation_scale;
+                let d_min = weight_min_scale * activation_scale;
+                sums[batch] = d.mul_add(quantized_sum as f32, sums[batch]);
+                minimum_sums[batch] = (-d_min).mul_add(block_minimum_sum as f32, minimum_sums[batch]);
+            }
+        }
+        for batch in 0..batch_size {
+            // SAFETY: each worker owns this output element.
+            unsafe {
+                output
+                    .add(batch * rows + row)
+                    .write(sums[batch] + minimum_sums[batch]);
+            }
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
 #[allow(clippy::too_many_arguments)]
 #[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn compute_q4_k_batched_row_range_avx2(
@@ -4261,22 +4426,14 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
             for batch in 0..batch_size {
                 let activation_offset = batch * cols + block * QK_K;
                 let sum_offset = batch * sums_per_batch + block * QK_K / Q8_K_SUM_BLOCK;
-                let mut quantized_lanes = _mm256_setzero_si256();
-                for group in 0..8 {
-                    // SAFETY: every decoded group and activation group contains 32 bytes.
-                    let activation = unsafe {
-                        _mm256_loadu_si256(
-                            quantized
-                                .as_ptr()
-                                .add(activation_offset + group * 32)
-                                .cast(),
-                        )
-                    };
-                    let products = _mm256_maddubs_epi16(decoded[group], activation);
-                    let scale = _mm256_set1_epi16(group_scales[group] as i16);
-                    quantized_lanes =
-                        _mm256_add_epi32(quantized_lanes, _mm256_madd_epi16(products, scale));
-                }
+                // SAFETY: the activation row holds 256 signed bytes from this offset.
+                let quantized_lanes = unsafe {
+                    qk_batched_tile_lanes(
+                        &decoded,
+                        &group_scales,
+                        quantized.as_ptr().add(activation_offset),
+                    )
+                };
                 // Match the single-row reduction order: the minimum correction is a
                 // scalar FMA per block, added only after reducing the quantized lanes.
                 // Folding it into SIMD lanes changes rounding when prefill batch size changes.
@@ -4706,8 +4863,11 @@ fn compute_output_range(
                     )
                 }
             }
+            // The 512-bit tier only widens the BATCHED tile. Decode is batch 1, where there is no
+            // second group to pair, so it keeps the measured AVX2 row dot rather than pretending a
+            // wider instruction helps a single row.
             #[cfg(target_arch = "x86_64")]
-            DotKernel::Q4KAvx2 => {
+            DotKernel::Q4KAvx512 | DotKernel::Q4KAvx2 => {
                 // SAFETY: this variant is selected only after runtime AVX2 and FMA detection.
                 unsafe {
                     dot_q4_k_q8_k_row_avx2(
@@ -4903,6 +5063,19 @@ fn selected_q5_kernel() -> DotKernel {
 }
 
 fn selected_q4_k_kernel() -> DotKernel {
+    // Width is the one lever the op-count leaves: `maddubs` + `madd_epi16` is already two
+    // multiply-class ops per 32 elements, and `madd_epi16` both applies the group scale and reduces
+    // pairs, which is why VNNI's `vpdpbusd` cannot beat it -- it wins the dot in one op and then
+    // needs a separate multiply for the scale. At 512 bits the same two ops cover 64 elements.
+    // Measured 1.70x on the isolated tile, identical checksums.
+    #[cfg(target_arch = "x86_64")]
+    if std::arch::is_x86_feature_detected!("avx512f")
+        && std::arch::is_x86_feature_detected!("avx512bw")
+        && std::arch::is_x86_feature_detected!("fma")
+        && std::arch::is_x86_feature_detected!("f16c")
+    {
+        return DotKernel::Q4KAvx512;
+    }
     #[cfg(target_arch = "x86_64")]
     if std::arch::is_x86_feature_detected!("avx2")
         && std::arch::is_x86_feature_detected!("fma")
@@ -6119,7 +6292,8 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
         let scales = &weights[weight_offset + 4..weight_offset + 16];
         let quants = weights.as_ptr().wrapping_add(weight_offset + 16);
         let mut quantized_lanes = _mm256_setzero_si256();
-        let (scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
+        let (_scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
+        let scale_source = qk_scale_broadcast_source(mins_and_scales);
         // The mins term, vectorised: sum over groups of min[g] * (sums[2g] + sums[2g+1]).
         // Pair sums fit i16 (16 q8 values, |v| <= 127, so |pair| <= 4064) and the products fit
         // i32, so this is bit-identical to the scalar loop it replaces -- integer addition is
@@ -6148,8 +6322,8 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
             let low_products = unsafe { unsigned_signed_products_avx2(low, low_activation) };
             // SAFETY: every activation group contains 32 signed bytes.
             let high_products = unsafe { unsigned_signed_products_avx2(high, high_activation) };
-            let low_scale = _mm256_set1_epi16(scale_values[pair * 2]);
-            let high_scale = _mm256_set1_epi16(scale_values[pair * 2 + 1]);
+            let low_scale = qk_broadcast_scale(scale_source, pair * 2);
+            let high_scale = qk_broadcast_scale(scale_source, pair * 2 + 1);
             quantized_lanes =
                 _mm256_add_epi32(quantized_lanes, _mm256_madd_epi16(low_products, low_scale));
             quantized_lanes = _mm256_add_epi32(
@@ -6395,6 +6569,81 @@ fn horizontal_sum_f32_avx2(values: __m256) -> f32 {
     sum = _mm_add_ps(sum, _mm_movehl_ps(sum, sum));
     sum = _mm_add_ss(sum, _mm_movehdup_ps(sum));
     _mm_cvtss_f32(sum)
+}
+
+#[cfg(target_arch = "x86_64")]
+/// Byte selectors that broadcast one of eight i16 scales across all sixteen lanes.
+///
+/// Entry `i` repeats the pair `(2i, 2i+1)`, so `vpshufb` with it turns the packed scales into the
+/// splatted scale `madd_epi16` wants. `_mm256_shuffle_epi8` selects within each 128-bit half, which
+/// is why the caller duplicates the scales into both halves first. Layout is ggml's
+/// `get_scale_shuffle_k4` (MIT, ggerganov/ggml).
+static QK_SCALE_SHUFFLE: [u8; 256] = {
+    let mut table = [0_u8; 256];
+    let mut group = 0;
+    while group < 8 {
+        let mut lane = 0;
+        while lane < 16 {
+            table[group * 32 + lane * 2] = (group * 2) as u8;
+            table[group * 32 + lane * 2 + 1] = (group * 2 + 1) as u8;
+            lane += 1;
+        }
+        group += 1;
+    }
+    table
+};
+
+#[cfg(target_arch = "x86_64")]
+#[inline]
+#[target_feature(enable = "avx2")]
+/// Duplicates the eight packed scales into both 128-bit halves, ready for `qk_broadcast_scale`.
+fn qk_scale_broadcast_source(mins_and_scales: __m256i) -> __m256i {
+    let low = _mm256_extracti128_si256(mins_and_scales, 0);
+    _mm256_set_m128i(low, low)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[inline]
+#[target_feature(enable = "avx2")]
+/// Splats scale `group` across sixteen i16 lanes with one `vpshufb`, no general-register detour.
+fn qk_broadcast_scale(source: __m256i, group: usize) -> __m256i {
+    // SAFETY: group is below eight and the table holds eight 32-byte selectors.
+    let selector = unsafe { _mm256_loadu_si256(QK_SCALE_SHUFFLE.as_ptr().add(group * 32).cast()) };
+    _mm256_shuffle_epi8(source, selector)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[inline]
+#[target_feature(enable = "avx2")]
+/// One batched-GEMM tile: eight decoded nibble groups against one batch row's activations.
+///
+/// This is the whole of the lane-layout decision for the quantised prefill GEMM, deliberately in
+/// one place. Today the eight i32 lanes hold partial sums of a **single** output element, so the
+/// caller must reduce them horizontally once per (output row, batch row). ggml's interleaved
+/// `block_q4_Kx8` layout instead puts **eight different output rows** in those lanes, which removes
+/// the horizontal reduction entirely and lets one weight load feed eight outputs. Swapping that is
+/// a change to this function, not to its callers -- which is the point of factoring it out before
+/// attempting the swap.
+///
+/// Extracted with no arithmetic change: same order, same intrinsics, same operands.
+///
+/// # Safety
+///
+/// `activation` must address at least 256 signed bytes.
+unsafe fn qk_batched_tile_lanes(
+    decoded: &[__m256i; 8],
+    group_scales: &[i32; 8],
+    activation: *const i8,
+) -> __m256i {
+    let mut quantized_lanes = _mm256_setzero_si256();
+    for group in 0..8 {
+        // SAFETY: every decoded group and activation group contains 32 bytes.
+        let activations = unsafe { _mm256_loadu_si256(activation.add(group * 32).cast()) };
+        let products = _mm256_maddubs_epi16(decoded[group], activations);
+        let scale = _mm256_set1_epi16(group_scales[group] as i16);
+        quantized_lanes = _mm256_add_epi32(quantized_lanes, _mm256_madd_epi16(products, scale));
+    }
+    quantized_lanes
 }
 
 #[cfg(target_arch = "x86_64")]
