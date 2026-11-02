@@ -1,0 +1,18 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Nov 02, 2026 6:14:32 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256 (capped from hardware-preferred 512; raise with -Dvectors.maxBits))
+Nov 02, 2026 6:14:32 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=512 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=persistent ggufThreads=16 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+Nov 02, 2026 6:14:33 AM org.apache.lucene.internal.vectorization.PanamaVectorizationProvider <init>
+INFO: Java vector incubator API enabled; uses preferredBitSize=512; FMA enabled
+iteration 1/1 case=list-copy-null-handling correct=true retrieval=75.9ms ttft=22842.4ms decode=10.51 tok/s e2e=25810.6ms
+iteration 1/1 case=compute-if-absent-null correct=true retrieval=8.1ms ttft=9475.1ms decode=15.81 tok/s e2e=11962.4ms
+iteration 1/1 case=virtual-thread-executor correct=true retrieval=4.5ms ttft=9640.8ms decode=6.43 tok/s e2e=14314.1ms
+iteration 1/1 case=record-compact-validation correct=true retrieval=3.5ms ttft=4064.2ms decode=7.39 tok/s e2e=7321.0ms
+iteration 1/1 case=gradle-java-25 correct=true retrieval=4.4ms ttft=5484.1ms decode=15.30 tok/s e2e=8368.2ms
+iteration 1/1 case=http-retry-rules correct=true retrieval=5.8ms ttft=4771.0ms decode=15.63 tok/s e2e=6572.3ms
+iteration 1/1 case=migration-lock-expiry correct=true retrieval=3.7ms ttft=4711.7ms decode=15.62 tok/s e2e=6450.6ms
+iteration 1/1 case=jackson-module-and-feature correct=true retrieval=5.0ms ttft=4411.1ms decode=14.88 tok/s e2e=7111.5ms
+iteration 1/1 case=unsupported-cuda-kernel correct=true retrieval=3.9ms ttft=3949.3ms decode=11.49 tok/s e2e=4305.9ms
+plain-java/rust-ffm/mellum2_12b_a2_5b_thinking_q4_k_m: tier=PERFORMANCE_REDUCED success=9/9 p95-retrieval=48.8ms p95-ttft=17561.8ms p50-decode=14.88 tok/s p95-e2e=21212.0ms correct=100.0% model-answered=77.8% of-those-correct=100.0% extractive-fallback=11.1% truncated=0.0%
+report: /root/smoke/default-correctness/models-rust-ffm.json
