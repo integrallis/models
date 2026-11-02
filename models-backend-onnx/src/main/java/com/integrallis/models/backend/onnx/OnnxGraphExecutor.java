@@ -38,6 +38,7 @@ public final class OnnxGraphExecutor {
   private final Map<String, Tensor> constants;
   private final List<OnnxNode> dynamicNodes;
   private final NoiseSource noise;
+  private final OnnxKernels kernels;
 
   /** Prepares {@code model} with a fixed-seed noise source. */
   public OnnxGraphExecutor(OnnxModel model) {
@@ -46,18 +47,42 @@ public final class OnnxGraphExecutor {
 
   /** Prepares {@code model}; {@code noise} answers every {@code RandomNormalLike} draw. */
   public OnnxGraphExecutor(OnnxModel model, NoiseSource noise) {
+    this(model, noise, null);
+  }
+
+  /**
+   * Prepares {@code model} with accelerated {@code kernels} for its matrix products and sines;
+   * {@code null} keeps every operator on the pure-Java kernels.
+   */
+  public OnnxGraphExecutor(OnnxModel model, NoiseSource noise, OnnxKernels kernels) {
     this.model = Objects.requireNonNull(model, "model");
     this.noise = Objects.requireNonNull(noise, "noise");
+    this.kernels = kernels;
     this.constants = new HashMap<>(model.graph().initializers());
     this.dynamicNodes = new ArrayList<>();
-    for (OnnxNode node : model.graph().nodes()) {
-      if (isFoldable(node)) {
-        Tensor[] outputs = Operators.apply(node, resolve(node, constants), noise);
-        store(node, outputs, constants);
-      } else {
-        dynamicNodes.add(node);
-      }
-    }
+    inScope(
+        () -> {
+          for (OnnxNode node : model.graph().nodes()) {
+            if (isFoldable(node)) {
+              Tensor[] outputs = Operators.apply(node, resolve(node, constants), noise);
+              store(node, outputs, constants);
+            } else {
+              dynamicNodes.add(node);
+            }
+          }
+          return null;
+        });
+  }
+
+  /** The accelerated kernels this executor routes to, or {@code null} for pure Java. */
+  public OnnxKernels kernels() {
+    return kernels;
+  }
+
+  private <T> T inScope(java.util.function.Supplier<T> body) {
+    return kernels == null
+        ? body.get()
+        : ScopedValue.where(KernelScope.CURRENT, kernels).call(body::get);
   }
 
   /** The decoded model this executor runs. */
@@ -101,6 +126,14 @@ public final class OnnxGraphExecutor {
       BiConsumer<String, Tensor> observer,
       NoiseSource noiseSource) {
     Objects.requireNonNull(noiseSource, "noiseSource");
+    return inScope(() -> runInScope(feeds, requested, observer, noiseSource));
+  }
+
+  private Map<String, Tensor> runInScope(
+      Map<String, Tensor> feeds,
+      Collection<String> requested,
+      BiConsumer<String, Tensor> observer,
+      NoiseSource noiseSource) {
     for (OnnxValueInfo input : model.graph().feedInputs()) {
       if (!feeds.containsKey(input.name())) {
         throw new IllegalArgumentException("graph input '" + input.name() + "' was not fed");

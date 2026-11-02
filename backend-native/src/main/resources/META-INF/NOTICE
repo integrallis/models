@@ -23,3 +23,14 @@ and its pinned Rust dependencies, including the Oniguruma regular-expression eng
 Repository: https://github.com/huggingface/tokenizers
 Dependency license and copyright texts: META-INF/licenses/rust-dependencies.txt
 The full dependency versions and registry checksums are pinned in model-kernels/Cargo.lock.
+
+ONNX executor kernels (onnx_kernels.rs)
+The single-precision sine uses the argument-reduction constants and kernel polynomial
+coefficients of FreeBSD msun / fdlibm (k_sin.c, k_cos.c, e_rem_pio2.c):
+  Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+  Developed at SunPro, a Sun Microsystems, Inc. business.
+  Permission to use, copy, modify, and distribute this software is freely granted, provided that
+  this notice is preserved.
+The erf calls the libm crate 0.2.16 (MIT; a port of musl, whose erf is FreeBSD's s_erf.c under
+the same Sun notice). The matrix product is matrixmultiply 0.3.11 (MIT OR Apache-2.0).
+

@@ -274,9 +274,14 @@ public final class Tensor {
       for (int i = 0; i < values.length; i++) {
         values[i] = (float) longs[i];
       }
-    } else {
+    } else if (type == OnnxDataType.UINT8) {
       for (int i = 0; i < values.length; i++) {
-        values[i] = floatAt(i);
+        values[i] = bytes[i] & 0xFF;
+      }
+    } else {
+      // BOOL and INT8 are stored as signed bytes; BOOL holds only 0 and 1.
+      for (int i = 0; i < values.length; i++) {
+        values[i] = bytes[i];
       }
     }
     return new Tensor(OnnxDataType.FLOAT, shape, values, null, null, null);

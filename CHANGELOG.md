@@ -4,6 +4,18 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+- Run the ONNX executor's matrix products, sines and erf on Models-owned Rust kernels when the
+  bundled native library is present: `NativeOnnxKernels` in `backend-native` implements the new
+  `OnnxKernels` interface of `models-backend-onnx` with a single-threaded `matrixmultiply` sgemm
+  (every MatMul and Gemm, the im2col form of every Conv, the wide ConvTranspose path), an AVX2/FMA
+  sine evaluated in double precision with exact range reduction, and an erf from `libm`.
+  `ParadeeTextToSpeechModel.load` uses them by default and reports the route as `onnx-kernels` in
+  its diagnostics, falling back to the pure-Java kernels (and saying why) where the platform has
+  no library. Seeded parity against onnxruntime holds on the new route: 40 of 40 cases, cosine
+  1.000000, worst 62.10 dB. The executor also gains faster float Clip, contiguous Less and
+  bool-to-float conversion. No speed figure is claimed here; the dev machine was saturated, and
+  the throughput gate is measured on a quiet dedicated box against the released library.
+
 ## [0.5.11] - 2026-11-02
 
 - Execute ONNX graphs in process, in pure Java, with no ONNX Runtime: `models-backend-onnx` gains a

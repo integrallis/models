@@ -1,5 +1,6 @@
 mod deberta_kernels;
 mod hf_tokenizer;
+mod onnx_kernels;
 mod q51_reuse;
 #[cfg(target_arch = "x86_64")]
 mod q8f32_reuse;
@@ -6125,15 +6126,12 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
         // i32, so this is bit-identical to the scalar loop it replaces -- integer addition is
         // associative, and no lane overflows.
         // SAFETY: every block carries QK_K / Q8_K_SUM_BLOCK = 16 activation sums.
-        let q8sums = unsafe {
-            _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast())
-        };
+        let q8sums = unsafe { _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast()) };
         let q8s = _mm_hadd_epi16(
             _mm256_extracti128_si256(q8sums, 0),
             _mm256_extracti128_si256(q8sums, 1),
         );
-        let min_products =
-            _mm_madd_epi16(_mm256_extracti128_si256(mins_and_scales, 1), q8s);
+        let min_products = _mm_madd_epi16(_mm256_extracti128_si256(mins_and_scales, 1), q8s);
         let block_minimum_sum = horizontal_sum_i32_sse2(min_products);
         for pair in 0..4 {
             // SAFETY: each Q4_K block contains four complete 32-byte packed groups.
@@ -6257,8 +6255,7 @@ unsafe fn dot_q5_k_q8_k_row_avx2(
             unsafe { _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast()) };
         let paired_sums = _mm256_madd_epi16(activation_sum_values, _mm256_set1_epi16(1));
         // Mins come from the same single unpack: widen lanes 8..15 to i32 in group order.
-        let minimum_values =
-            _mm256_cvtepi16_epi32(_mm256_extracti128_si256(mins_and_scales, 1));
+        let minimum_values = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(mins_and_scales, 1));
         let minimum_sum = horizontal_sum_i32_avx2(_mm256_mullo_epi32(minimum_values, paired_sums));
         sum = d.mul_add(quantized_sum as f32, sum);
         sum = (-d_min).mul_add(minimum_sum as f32, sum);
