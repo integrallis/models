@@ -1,0 +1,12 @@
+ggml/CMakeLists.txt:152:option(GGML_CPU_REPACK       "ggml: use runtime weight conversion of Q4_0 to Q4_X_X" ON)
+ggml/src/ggml-cpu/CMakeLists.txt:626:    if (GGML_CPU_REPACK)
+=== ARM B: repack OFF ===
+| llama 7B Q4_K - Small          |   3.86 GiB |     7.25 B | CPU        |      16 |           tg128 |         20.16 ± 2.89 |
+
+build: 785322d (1)
+=== ARM A re-confirm: repack ON ===
+| llama 7B Q4_K - Small          |   3.86 GiB |     7.25 B | CPU        |      16 |           tg128 |         19.75 ± 1.25 |
+
+build: 785322d (1)
+
+[exited with code 0]

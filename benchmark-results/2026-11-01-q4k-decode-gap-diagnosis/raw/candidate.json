@@ -1,0 +1,2346 @@
+{
+  "schemaVersion" : 5,
+  "generatedAt" : "2026-11-02T03:20:57.603555460Z",
+  "framework" : "plain-java",
+  "backend" : "rust-ffm",
+  "backendVersion" : "diag@local",
+  "modelId" : "mathstral-diag",
+  "model" : "/root/mathstral/mathstral-7B-v0.1-Q4_K_S.gguf",
+  "artifactSha256" : "8f32f4bbb08aceb4128de915aeccc0dccfb978d57f236b35a23544496b51871f",
+  "artifactSizeBytes" : 4144746304,
+  "settings" : {
+    "corpusSha256" : "4b27eba8f166c84ef19c53de825445a6d0097f9bd8efa20b2d7013f34621f83c",
+    "workload" : "general",
+    "caseIds" : [ "auto-glass-deadline", "travel-limit", "telemedicine-benefit", "claim-payment-times", "chargeback-evidence", "break-glass", "idempotency", "priority-one", "unsupported-lunar-vehicle" ],
+    "promptTemplate" : "zephyr",
+    "retrievalTopK" : 3,
+    "maxOutputTokens" : 256,
+    "warmups" : 1,
+    "iterations" : 3,
+    "contextLength" : 2048,
+    "threads" : 16,
+    "groundingPolicy" : "bounded-context-injection-screened-citation-safe-statement-grounding-v24",
+    "minimumRetrievalScore" : 2.0,
+    "generationControls" : {
+      "topP" : "1.0",
+      "promptCache" : "longest-common-prefix",
+      "seed" : "42",
+      "topK" : "1",
+      "repetitionPenalty" : "1.0",
+      "temperature" : "0.0"
+    }
+  },
+  "environment" : {
+    "hostname" : "cd93c2c0a417",
+    "osName" : "Linux",
+    "osVersion" : "6.8.0-138-generic",
+    "architecture" : "amd64",
+    "cpuModel" : "AMD EPYC 7702P 64-Core Processor",
+    "availableProcessors" : 16,
+    "totalMemoryBytes" : 32000000000,
+    "maxHeapBytes" : 8002732032,
+    "javaVersion" : "25.0.5",
+    "javaVendor" : "Eclipse Adoptium",
+    "vmName" : "OpenJDK 64-Bit Server VM"
+  },
+  "backendDiagnostics" : {
+    "backend" : "rust-ffm",
+    "planVersion" : "rust-ffm-v14",
+    "environment" : {
+      "native-quantized-decode" : "true",
+      "preferred-vector-bits" : "256",
+      "kernel-runtime" : "rust-ffm",
+      "fast-scalar-fma" : "true",
+      "vector-api" : "true",
+      "performance-cliffs" : "fused-grouped-attention-disabled",
+      "java-executor-poll-millis" : "0",
+      "projection-layers" : "32",
+      "tokenizer.pre.implemented" : "true",
+      "transformer-runtime" : "java",
+      "native-kernel-threads" : "16",
+      "native-gated-delta-net" : "true",
+      "q4-short-pairwise-supported" : "true",
+      "end-of-generation-token-ids" : "2",
+      "processors" : "16",
+      "sve" : "false",
+      "java-feature" : "25",
+      "native-q5-0-grouped" : "false",
+      "gguf-chunks-per-thread" : "2",
+      "compiler" : "hotspot-c2",
+      "native-grouped-attention" : "true",
+      "vm-vendor" : "Eclipse Adoptium",
+      "os" : "Linux",
+      "cpu-model" : "AMD EPYC 7702P 64-Core Processor",
+      "ptq-activation-contract" : "q8_0-f16-scales-nearest-even",
+      "kernel-implementation" : "rust-ffm-quantized-v14",
+      "native-kernel-decode-threads" : "16",
+      "model-architecture" : "llama",
+      "end-of-generation.2" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+      "fast-vector-fma" : "true",
+      "vm-version" : "25.0.5+8-LTS",
+      "architecture" : "amd64",
+      "tokenizer.pre" : "default",
+      "performance-cliff.fused-grouped-attention-disabled" : "architecture=llama, group-size=4",
+      "native-kernel-abi" : "7",
+      "q4-unsigned-pairwise-supported" : "true",
+      "gguf-executor" : "persistent",
+      "java-version" : "25.0.5",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "gguf-parallel" : "true",
+      "gguf-threads" : "16",
+      "native-kernel-poll-millis" : "5",
+      "active-vector-bits" : "256",
+      "end-of-generation.chat-template" : "absent"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "gate-up" : "grouped",
+        "qkv" : "grouped",
+        "implementation" : "rust-ffm-quantized-v14"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no Q4_K/Q4_K/Q6_K projection group",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true",
+        "java-feature" : "25",
+        "active-vector-bits" : "256",
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "32"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded projection topology has no Q6_K consumer",
+      "settings" : {
+        "requested-kernel" : "one-query-block",
+        "kernel" : "one-query-block",
+        "architecture" : "amd64",
+        "batch-size" : "32",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "ENABLED",
+      "reason" : "the validated final FFN runs only for requested prompt output rows",
+      "settings" : {
+        "output-rows" : "requested",
+        "formats" : "Q4_K,Q4_K,Q4_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "ENABLED",
+      "reason" : "unused final-layer prompt rows compute only the persistent K/V state",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q4_K,Q4_K",
+        "unused-rows" : "kv-only"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "architecture-default" : "false",
+        "cache-passes-per-group" : "group-size"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "parallel" : "true",
+        "stages" : "2",
+        "executor" : "persistent",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "parallel" : "true",
+        "stages" : "7",
+        "executor" : "persistent",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "prefill-batch-size" : "32",
+        "layout" : "block-major-bytes"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "requested-kernel" : "scattered",
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "16",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "storage" : "memory-segment",
+        "artifact-format" : "gguf"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "threads" : "16",
+        "chunks-per-thread" : "2",
+        "executor" : "persistent"
+      }
+    }, {
+      "id" : "sliding-window-attention",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no sliding window, so every layer attends to the full context",
+      "settings" : {
+        "declared-window" : "0",
+        "local-layers" : "0/32",
+        "pattern-source" : "none"
+      }
+    }, {
+      "id" : "expert-swiglu-clamp",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no expert SwiGLU clamp",
+      "settings" : {
+        "clamped-layers" : "0/32"
+      }
+    }, {
+      "id" : "rust-ptq1-0-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible PTQ1_0 projections use Q8_0 activations with the Java fallback's pinned FMA order",
+      "settings" : {
+        "transformer" : "java",
+        "activation" : "Q8_0",
+        "weight" : "PTQ1_0"
+      }
+    }, {
+      "id" : "rust-q4-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q5-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_0 batched projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q8-0-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q8_0 batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q4-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q4_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q5-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q5_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q6-k-batched-matmul",
+      "status" : "ENABLED",
+      "reason" : "eligible Q6_K batched and grouped projections execute in the Models Rust kernel",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-mixed-k-grouped-matmul",
+      "status" : "ENABLED",
+      "reason" : "mixed Q4_K, Q5_K, and Q6_K projections share one Q8_K activation quantization",
+      "settings" : {
+        "transformer" : "java",
+        "boundary" : "panama-ffm",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "sequential recurrent heads share the projection worker pool; dimensions up to 256",
+      "settings" : {
+        "state" : "caller-owned-java-array",
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-grouped-gated-delta-net",
+      "status" : "ENABLED",
+      "reason" : "independent recurrent state slots share one native worker dispatch",
+      "settings" : {
+        "state" : "branch-major-caller-owned-java-array",
+        "boundary" : "panama-ffm-critical",
+        "abi" : "7"
+      }
+    }, {
+      "id" : "rust-q5-0-grouped-matmul",
+      "status" : "DISABLED",
+      "reason" : "Q5_0 grouped projections use Java; the unqualified native grouped capability was removed after supported-host whole-model comparisons",
+      "settings" : {
+        "evidence" : "benchmark-results/2026-10-12-q5-production/"
+      }
+    }, {
+      "id" : "rust-quantized-decode",
+      "status" : "ENABLED",
+      "reason" : "eligible single-token projections execute in the Models Rust kernel; the per-type decisions above report hardware and operation eligibility, with Java handling the remaining projections",
+      "settings" : {
+        "transformer" : "java"
+      }
+    } ]
+  },
+  "hostedApiPricing" : null,
+  "summary" : {
+    "totalAttempts" : 27,
+    "successfulAttempts" : 27,
+    "loadMillis" : 408.55584,
+    "retrievalMillis" : {
+      "p50" : 1.703918,
+      "p95" : 3.9752768999999994
+    },
+    "frameworkOverheadMillis" : {
+      "p50" : 2.850983999998789,
+      "p95" : 3.951000199999362
+    },
+    "ttftMillis" : {
+      "p50" : 8403.265922,
+      "p95" : 9179.2095197
+    },
+    "tpotMillis" : {
+      "p50" : 111.45676968181819,
+      "p95" : 130.2575693918919
+    },
+    "endToEndMillis" : {
+      "p50" : 11608.585976,
+      "p95" : 14085.7317443
+    },
+    "p50PrefillTokensPerSecond" : 22.787276098952148,
+    "p50DecodeTokensPerSecond" : 8.972088486457622,
+    "peakRssBytes" : 4622295040,
+    "totalCpuMillis" : 4669520.0,
+    "totalInputTokens" : 8655,
+    "totalCacheReadInputTokens" : 3540,
+    "totalCacheWriteInputTokens" : 5115,
+    "totalOutputTokens" : 888,
+    "totalEstimatedApiCostUsd" : null,
+    "projectedApiCostPer1kRequestsUsd" : null,
+    "retrievalRecall" : 1.0,
+    "meanReciprocalRank" : 1.0,
+    "factCoverage" : 1.0,
+    "citationRecall" : 1.0,
+    "citationPrecision" : 0.75,
+    "abstentionAccuracy" : 1.0,
+    "correctAnswerRate" : 0.6666666666666666,
+    "rawCorrectAnswerRate" : 0.4444444444444444,
+    "modelAnswerRate" : 0.5555555555555556,
+    "modelAnswerCorrectRate" : 1.0,
+    "extractiveFallbackRate" : 0.3333333333333333,
+    "truncatedAnswerRate" : 0.0
+  },
+  "performanceTier" : "FAILED_QUALITY",
+  "runs" : [ {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 2.3780782,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 1.7731061,
+      "rank" : 3
+    } ],
+    "promptSha256" : "2e2b57ca359612ad3560520c787ddc45a8c1c5ac6121d15809d253a8c6842fcf",
+    "retrievalMillis" : 4.599654,
+    "frameworkOverheadMillis" : 2.77371999999923,
+    "endToEndMillis" : 10314.810204,
+    "generation" : {
+      "text" : "You have to report an auto glass claim through the Aurora portal within 30 calendar days. The deductible for windshield repair is 75 dollars. [claims-auto-glass]",
+      "inputTokens" : 326,
+      "cacheReadInputTokens" : 182,
+      "cacheWriteInputTokens" : 144,
+      "outputTokens" : 36,
+      "ttftMillis" : 6399.583964,
+      "totalMillis" : 10307.43683,
+      "prefillTokensPerSecond" : 22.505941811280362,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4612001792,
+      "cpuMillis" : 151630.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nYou have to report an auto glass claim through the Aurora portal within 30 calendar days. The deductible for windshield repair is 75 dollars.",
+      "text" : "You have to report an auto glass claim through the Aurora portal within 30 calendar days. The deductible for windshield repair is 75 dollars. [claims-auto-glass]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 1.1442027,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "records-retention",
+        "title" : "Records retention",
+        "text" : "Closed claim records are retained for 7 years after closure. Customer support chat transcripts are retained for 18 months after the conversation date."
+      },
+      "score" : 1.1224718,
+      "rank" : 3
+    } ],
+    "promptSha256" : "0eee4ee631c2909e9420f83d8b90be24022eb9ccc273b0d76d719c1777e6d7a0",
+    "retrievalMillis" : 1.98827,
+    "frameworkOverheadMillis" : 2.8437489999996615,
+    "endToEndMillis" : 12940.26262,
+    "generation" : {
+      "text" : "The form used for trip interruption claims is T-19 and the reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "inputTokens" : 319,
+      "cacheReadInputTokens" : 127,
+      "cacheWriteInputTokens" : 192,
+      "outputTokens" : 35,
+      "ttftMillis" : 8905.844674,
+      "totalMillis" : 12935.430601,
+      "prefillTokensPerSecond" : 21.56189061001455,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4612362240,
+      "cpuMillis" : 181280.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nThe form used for trip interruption claims is T-19 and the reimbursement limit is 3,500 dollars per covered traveler.",
+      "text" : "The form used for trip interruption claims is T-19 and the reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "claims-flood",
+        "title" : "Residential flood coverage",
+        "text" : "New residential flood coverage starts after a 14 calendar day waiting period. The waiting period is waived only when coverage is required at a mortgage closing."
+      },
+      "score" : 0.7369458,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 0.70935,
+      "rank" : 3
+    } ],
+    "promptSha256" : "dac23b001965ed04c85d284039874e556a79033c8014bb264c428d1a6b39bc0e",
+    "retrievalMillis" : 2.527108,
+    "frameworkOverheadMillis" : 3.996886999999333,
+    "endToEndMillis" : 11779.605829,
+    "generation" : {
+      "text" : "Behavioral health telemedicine does not require a referral and the copay is $15 per visit. [health-telemedicine]",
+      "inputTokens" : 312,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 188,
+      "outputTokens" : 33,
+      "ttftMillis" : 8252.104279,
+      "totalMillis" : 11773.081834,
+      "prefillTokensPerSecond" : 22.787276098952148,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4612435968,
+      "cpuMillis" : 170600.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nBehavioral health telemedicine does not require a referral and the copay is $15 per visit. [health-telemedicine]",
+      "text" : "Behavioral health telemedicine does not require a referral and the copay is $15 per visit. [health-telemedicine]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 1.35617,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 1.0560995,
+      "rank" : 3
+    } ],
+    "promptSha256" : "bb0b45e3977c23942da3a08835d8022d62624c243218bbf28cfd07374bb133be",
+    "retrievalMillis" : 1.549288,
+    "frameworkOverheadMillis" : 2.7764330000009068,
+    "endToEndMillis" : 13333.049128,
+    "generation" : {
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine] Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "inputTokens" : 322,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 198,
+      "outputTokens" : 26,
+      "ttftMillis" : 9119.206437,
+      "totalMillis" : 13328.723407,
+      "prefillTokensPerSecond" : 21.715412588399584,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4612702208,
+      "cpuMillis" : 188350.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nApproved domestic ACH claims settle within 2 business days, while international claim wires settle within 5 business days.",
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine] Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 0.3333333333333333,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 0.8032608,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 0.70935,
+      "rank" : 3
+    } ],
+    "promptSha256" : "78443cafdea55674ac9619ccb477011d15bd0bbaf50bd06af594f320c2ad856a",
+    "retrievalMillis" : 1.634838,
+    "frameworkOverheadMillis" : 2.7095190000000002,
+    "endToEndMillis" : 11306.309978,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine] The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "inputTokens" : 310,
+      "cacheReadInputTokens" : 127,
+      "cacheWriteInputTokens" : 183,
+      "outputTokens" : 38,
+      "ttftMillis" : 7278.121566,
+      "totalMillis" : 11301.965621,
+      "prefillTokensPerSecond" : 25.148379755635432,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4612730880,
+      "cpuMillis" : 171510.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nMerchants must submit chargeback evidence within 7 calendar days of notification. The evidence should be uploaded as a PDF under 10 MB in the Disputes console.",
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine] The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 0.3333333333333333,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2820494,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 0.8032608,
+      "rank" : 3
+    } ],
+    "promptSha256" : "f74e5065500c76c183b1a59482db3a34542f2c3f6757455e3d629b2b497c4dbd",
+    "retrievalMillis" : 2.158028,
+    "frameworkOverheadMillis" : 2.90961199999947,
+    "endToEndMillis" : 11462.928661,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers. [security-access]",
+      "inputTokens" : 322,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 198,
+      "outputTokens" : 27,
+      "ttftMillis" : 8577.202633,
+      "totalMillis" : 11457.861021,
+      "prefillTokensPerSecond" : 23.087884020261846,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4612784128,
+      "cpuMillis" : 165930.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nThe production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers.",
+      "text" : "The production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers. [security-access]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.5346991,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "health-pharmacy",
+        "title" : "Specialty pharmacy delivery",
+        "text" : "Cold-chain specialty medicines ship only on Tuesday and Thursday. A missed delivery must be rescheduled by calling the specialty pharmacy before 4 PM local time."
+      },
+      "score" : 1.2226715,
+      "rank" : 3
+    } ],
+    "promptSha256" : "96603c5e95f3b7fd823459da89a6440d0d6c72c1ed03e43d5c4519cbf6ffbe04",
+    "retrievalMillis" : 1.734795,
+    "frameworkOverheadMillis" : 3.1878339999984746,
+    "endToEndMillis" : 14099.08037,
+    "generation" : {
+      "text" : "The Idempotency-Key header makes Claims API creates idempotent and a key can be replayed for a 24 hour replay window. [api-idempotency]",
+      "inputTokens" : 338,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 214,
+      "outputTokens" : 45,
+      "ttftMillis" : 9190.059875,
+      "totalMillis" : 14094.157741,
+      "prefillTokensPerSecond" : 23.29030499693533,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4615262208,
+      "cpuMillis" : 208070.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nThe Idempotency-Key header makes Claims API creates idempotent and a key can be replayed for a 24 hour replay window. [api-idempotency]",
+      "text" : "The Idempotency-Key header makes Claims API creates idempotent and a key can be replayed for a 24 hour replay window. [api-idempotency]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 1.6032012,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 0.9742979,
+      "rank" : 3
+    } ],
+    "promptSha256" : "f877f86699e22f1d83391a8a782bdff5762c32ccf279845a7d263210260fb3bb",
+    "retrievalMillis" : 2.976519,
+    "frameworkOverheadMillis" : 3.2962459999998828,
+    "endToEndMillis" : 13487.24019,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation] The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "inputTokens" : 312,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 188,
+      "outputTokens" : 48,
+      "ttftMillis" : 8398.53413,
+      "totalMillis" : 13480.967425,
+      "prefillTokensPerSecond" : 22.387823873068523,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4617146368,
+      "cpuMillis" : 196060.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nA priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, it is escalated through NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation] The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 0.3333333333333333,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 0.37895566,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "claims-flood",
+        "title" : "Residential flood coverage",
+        "text" : "New residential flood coverage starts after a 14 calendar day waiting period. The waiting period is waived only when coverage is required at a mortgage closing."
+      },
+      "score" : 0.34094197,
+      "rank" : 3
+    } ],
+    "promptSha256" : "c292e0233b94b87cb8b64db2819436739193b61654da2f2fbec7d042cdecdf56",
+    "retrievalMillis" : 1.835003,
+    "frameworkOverheadMillis" : 2.850983999998789,
+    "endToEndMillis" : 9716.585625,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 324,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 200,
+      "outputTokens" : 8,
+      "ttftMillis" : 8840.981461,
+      "totalMillis" : 9711.899638,
+      "prefillTokensPerSecond" : 22.625117398948465,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4617187328,
+      "cpuMillis" : 136060.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nINSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 2.3780782,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 1.7731061,
+      "rank" : 3
+    } ],
+    "promptSha256" : "2e2b57ca359612ad3560520c787ddc45a8c1c5ac6121d15809d253a8c6842fcf",
+    "retrievalMillis" : 3.597239,
+    "frameworkOverheadMillis" : 2.584845999999743,
+    "endToEndMillis" : 10389.942407,
+    "generation" : {
+      "text" : "You have to report an auto glass claim through the Aurora portal within 30 calendar days. The deductible for windshield repair is 75 dollars. [claims-auto-glass]",
+      "inputTokens" : 326,
+      "cacheReadInputTokens" : 182,
+      "cacheWriteInputTokens" : 144,
+      "outputTokens" : 36,
+      "ttftMillis" : 6529.560426,
+      "totalMillis" : 10383.760322,
+      "prefillTokensPerSecond" : 22.057229992531887,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4617228288,
+      "cpuMillis" : 151150.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nYou have to report an auto glass claim through the Aurora portal within 30 calendar days. The deductible for windshield repair is 75 dollars.",
+      "text" : "You have to report an auto glass claim through the Aurora portal within 30 calendar days. The deductible for windshield repair is 75 dollars. [claims-auto-glass]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 1.1442027,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "records-retention",
+        "title" : "Records retention",
+        "text" : "Closed claim records are retained for 7 years after closure. Customer support chat transcripts are retained for 18 months after the conversation date."
+      },
+      "score" : 1.1224718,
+      "rank" : 3
+    } ],
+    "promptSha256" : "0eee4ee631c2909e9420f83d8b90be24022eb9ccc273b0d76d719c1777e6d7a0",
+    "retrievalMillis" : 2.092225,
+    "frameworkOverheadMillis" : 3.8439309999994293,
+    "endToEndMillis" : 11745.264756,
+    "generation" : {
+      "text" : "The form used for trip interruption claims is T-19 and the reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "inputTokens" : 319,
+      "cacheReadInputTokens" : 127,
+      "cacheWriteInputTokens" : 192,
+      "outputTokens" : 35,
+      "ttftMillis" : 8030.367978,
+      "totalMillis" : 11739.3286,
+      "prefillTokensPerSecond" : 23.913475491766107,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4617326592,
+      "cpuMillis" : 172760.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nThe form used for trip interruption claims is T-19 and the reimbursement limit is 3,500 dollars per covered traveler.",
+      "text" : "The form used for trip interruption claims is T-19 and the reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "claims-flood",
+        "title" : "Residential flood coverage",
+        "text" : "New residential flood coverage starts after a 14 calendar day waiting period. The waiting period is waived only when coverage is required at a mortgage closing."
+      },
+      "score" : 0.7369458,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 0.70935,
+      "rank" : 3
+    } ],
+    "promptSha256" : "dac23b001965ed04c85d284039874e556a79033c8014bb264c428d1a6b39bc0e",
+    "retrievalMillis" : 1.521045,
+    "frameworkOverheadMillis" : 2.270367000000988,
+    "endToEndMillis" : 11596.435244,
+    "generation" : {
+      "text" : "Behavioral health telemedicine does not require a referral and the copay is $15 per visit. [health-telemedicine]",
+      "inputTokens" : 312,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 188,
+      "outputTokens" : 33,
+      "ttftMillis" : 8089.394933,
+      "totalMillis" : 11592.643832,
+      "prefillTokensPerSecond" : 23.242910067154114,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4617400320,
+      "cpuMillis" : 168380.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nBehavioral health telemedicine does not require a referral and the copay is $15 per visit. [health-telemedicine]",
+      "text" : "Behavioral health telemedicine does not require a referral and the copay is $15 per visit. [health-telemedicine]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 1.35617,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 1.0560995,
+      "rank" : 3
+    } ],
+    "promptSha256" : "bb0b45e3977c23942da3a08835d8022d62624c243218bbf28cfd07374bb133be",
+    "retrievalMillis" : 1.509383,
+    "frameworkOverheadMillis" : 2.37909099999888,
+    "endToEndMillis" : 11608.585976,
+    "generation" : {
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine] Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "inputTokens" : 322,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 198,
+      "outputTokens" : 26,
+      "ttftMillis" : 8745.892516,
+      "totalMillis" : 11604.697502,
+      "prefillTokensPerSecond" : 22.641880589921822,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4617412608,
+      "cpuMillis" : 167330.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nApproved domestic ACH claims settle within 2 business days, while international claim wires settle within 5 business days.",
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine] Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 0.3333333333333333,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 0.8032608,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 0.70935,
+      "rank" : 3
+    } ],
+    "promptSha256" : "78443cafdea55674ac9619ccb477011d15bd0bbaf50bd06af594f320c2ad856a",
+    "retrievalMillis" : 1.249387,
+    "frameworkOverheadMillis" : 2.660707999999431,
+    "endToEndMillis" : 13186.034353,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine] The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "inputTokens" : 310,
+      "cacheReadInputTokens" : 127,
+      "cacheWriteInputTokens" : 183,
+      "outputTokens" : 38,
+      "ttftMillis" : 8304.414787,
+      "totalMillis" : 13182.124258,
+      "prefillTokensPerSecond" : 22.039999252658554,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4617445376,
+      "cpuMillis" : 189540.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nMerchants must submit chargeback evidence within 7 calendar days of notification. The evidence should be uploaded as a PDF under 10 MB in the Disputes console.",
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine] The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 0.3333333333333333,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2820494,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 0.8032608,
+      "rank" : 3
+    } ],
+    "promptSha256" : "f74e5065500c76c183b1a59482db3a34542f2c3f6757455e3d629b2b497c4dbd",
+    "retrievalMillis" : 1.691965,
+    "frameworkOverheadMillis" : 2.9434369999999035,
+    "endToEndMillis" : 11561.423047,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers. [security-access]",
+      "inputTokens" : 322,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 198,
+      "outputTokens" : 27,
+      "ttftMillis" : 8647.211369,
+      "totalMillis" : 11556.787645,
+      "prefillTokensPerSecond" : 22.900436687201204,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4617547776,
+      "cpuMillis" : 169130.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nThe production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers.",
+      "text" : "The production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers. [security-access]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.5346991,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "health-pharmacy",
+        "title" : "Specialty pharmacy delivery",
+        "text" : "Cold-chain specialty medicines ship only on Tuesday and Thursday. A missed delivery must be rescheduled by calling the specialty pharmacy before 4 PM local time."
+      },
+      "score" : 1.2226715,
+      "rank" : 3
+    } ],
+    "promptSha256" : "96603c5e95f3b7fd823459da89a6440d0d6c72c1ed03e43d5c4519cbf6ffbe04",
+    "retrievalMillis" : 1.644676,
+    "frameworkOverheadMillis" : 2.8683469999996305,
+    "endToEndMillis" : 14422.0495,
+    "generation" : {
+      "text" : "The Idempotency-Key header makes Claims API creates idempotent and a key can be replayed for a 24 hour replay window. [api-idempotency]",
+      "inputTokens" : 338,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 214,
+      "outputTokens" : 45,
+      "ttftMillis" : 9498.060653,
+      "totalMillis" : 14417.536477,
+      "prefillTokensPerSecond" : 22.534370503330862,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4617580544,
+      "cpuMillis" : 209340.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nThe Idempotency-Key header makes Claims API creates idempotent and a key can be replayed for a 24 hour replay window. [api-idempotency]",
+      "text" : "The Idempotency-Key header makes Claims API creates idempotent and a key can be replayed for a 24 hour replay window. [api-idempotency]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 1.6032012,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 0.9742979,
+      "rank" : 3
+    } ],
+    "promptSha256" : "f877f86699e22f1d83391a8a782bdff5762c32ccf279845a7d263210260fb3bb",
+    "retrievalMillis" : 1.199514,
+    "frameworkOverheadMillis" : 3.1856189999998605,
+    "endToEndMillis" : 12926.074858,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation] The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "inputTokens" : 312,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 188,
+      "outputTokens" : 48,
+      "ttftMillis" : 7777.993924,
+      "totalMillis" : 12921.689725,
+      "prefillTokensPerSecond" : 24.17369216384632,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4617760768,
+      "cpuMillis" : 193410.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nA priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, it is escalated through NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation] The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 0.3333333333333333,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 0.37895566,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "claims-flood",
+        "title" : "Residential flood coverage",
+        "text" : "New residential flood coverage starts after a 14 calendar day waiting period. The waiting period is waived only when coverage is required at a mortgage closing."
+      },
+      "score" : 0.34094197,
+      "rank" : 3
+    } ],
+    "promptSha256" : "c292e0233b94b87cb8b64db2819436739193b61654da2f2fbec7d042cdecdf56",
+    "retrievalMillis" : 1.820285,
+    "frameworkOverheadMillis" : 3.5231819999989966,
+    "endToEndMillis" : 9853.351979,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 324,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 200,
+      "outputTokens" : 8,
+      "ttftMillis" : 8961.888326,
+      "totalMillis" : 9848.008512,
+      "prefillTokensPerSecond" : 22.322155142630592,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4620685312,
+      "cpuMillis" : 138220.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nINSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "auto-glass-deadline",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 4.441602,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 2.3780782,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 1.7731061,
+      "rank" : 3
+    } ],
+    "promptSha256" : "2e2b57ca359612ad3560520c787ddc45a8c1c5ac6121d15809d253a8c6842fcf",
+    "retrievalMillis" : 3.620974,
+    "frameworkOverheadMillis" : 2.593230999998923,
+    "endToEndMillis" : 10424.185096,
+    "generation" : {
+      "text" : "You have to report an auto glass claim through the Aurora portal within 30 calendar days. The deductible for windshield repair is 75 dollars. [claims-auto-glass]",
+      "inputTokens" : 326,
+      "cacheReadInputTokens" : 182,
+      "cacheWriteInputTokens" : 144,
+      "outputTokens" : 36,
+      "ttftMillis" : 6602.650659,
+      "totalMillis" : 10417.970891,
+      "prefillTokensPerSecond" : 21.8131844903257,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4621869056,
+      "cpuMillis" : 151510.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nYou have to report an auto glass claim through the Aurora portal within 30 calendar days. The deductible for windshield repair is 75 dollars.",
+      "text" : "You have to report an auto glass claim through the Aurora portal within 30 calendar days. The deductible for windshield repair is 75 dollars. [claims-auto-glass]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "travel-limit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 6.236858,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 1.1442027,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "records-retention",
+        "title" : "Records retention",
+        "text" : "Closed claim records are retained for 7 years after closure. Customer support chat transcripts are retained for 18 months after the conversation date."
+      },
+      "score" : 1.1224718,
+      "rank" : 3
+    } ],
+    "promptSha256" : "0eee4ee631c2909e9420f83d8b90be24022eb9ccc273b0d76d719c1777e6d7a0",
+    "retrievalMillis" : 4.127121,
+    "frameworkOverheadMillis" : 2.9121680000007473,
+    "endToEndMillis" : 12154.222016,
+    "generation" : {
+      "text" : "The form used for trip interruption claims is T-19 and the reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "inputTokens" : 319,
+      "cacheReadInputTokens" : 127,
+      "cacheWriteInputTokens" : 192,
+      "outputTokens" : 35,
+      "ttftMillis" : 8403.265922,
+      "totalMillis" : 12147.182727,
+      "prefillTokensPerSecond" : 22.851745726396306,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4621897728,
+      "cpuMillis" : 175280.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nThe form used for trip interruption claims is T-19 and the reimbursement limit is 3,500 dollars per covered traveler.",
+      "text" : "The form used for trip interruption claims is T-19 and the reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "telemedicine-benefit",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 7.0056014,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "claims-flood",
+        "title" : "Residential flood coverage",
+        "text" : "New residential flood coverage starts after a 14 calendar day waiting period. The waiting period is waived only when coverage is required at a mortgage closing."
+      },
+      "score" : 0.7369458,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 0.70935,
+      "rank" : 3
+    } ],
+    "promptSha256" : "dac23b001965ed04c85d284039874e556a79033c8014bb264c428d1a6b39bc0e",
+    "retrievalMillis" : 1.87612,
+    "frameworkOverheadMillis" : 2.880868999998711,
+    "endToEndMillis" : 11224.551038,
+    "generation" : {
+      "text" : "Behavioral health telemedicine does not require a referral and the copay is $15 per visit. [health-telemedicine]",
+      "inputTokens" : 312,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 188,
+      "outputTokens" : 33,
+      "ttftMillis" : 7557.773379,
+      "totalMillis" : 11219.794049,
+      "prefillTokensPerSecond" : 24.878589377323312,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4621914112,
+      "cpuMillis" : 168270.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nBehavioral health telemedicine does not require a referral and the copay is $15 per visit. [health-telemedicine]",
+      "text" : "Behavioral health telemedicine does not require a referral and the copay is $15 per visit. [health-telemedicine]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "claim-payment-times",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-settlement",
+        "title" : "Approved claim settlement",
+        "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee."
+      },
+      "score" : 8.441141,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 1.35617,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "claims-travel",
+        "title" : "Travel interruption claims",
+        "text" : "Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler."
+      },
+      "score" : 1.0560995,
+      "rank" : 3
+    } ],
+    "promptSha256" : "bb0b45e3977c23942da3a08835d8022d62624c243218bbf28cfd07374bb133be",
+    "retrievalMillis" : 1.589313,
+    "frameworkOverheadMillis" : 2.706233999999313,
+    "endToEndMillis" : 11944.879092,
+    "generation" : {
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine] Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "inputTokens" : 322,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 198,
+      "outputTokens" : 26,
+      "ttftMillis" : 9153.892024,
+      "totalMillis" : 11940.583545,
+      "prefillTokensPerSecond" : 21.63317787743729,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4622020608,
+      "cpuMillis" : 167870.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nApproved domestic ACH claims settle within 2 business days, while international claim wires settle within 5 business days.",
+      "text" : "Approved domestic claims paid by ACH settle within 2 business days. International claim wires settle within 5 business days and may incur an intermediary bank fee. [payments-settlement] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine] Trip interruption claims use form T-19 and supporting receipts must arrive within 45 calendar days. The reimbursement limit is 3,500 dollars per covered traveler. [claims-travel]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 0.3333333333333333,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "chargeback-evidence",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "payments-chargeback",
+        "title" : "Merchant chargeback evidence",
+        "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console."
+      },
+      "score" : 4.23141,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 0.8032608,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 0.70935,
+      "rank" : 3
+    } ],
+    "promptSha256" : "78443cafdea55674ac9619ccb477011d15bd0bbaf50bd06af594f320c2ad856a",
+    "retrievalMillis" : 1.703918,
+    "frameworkOverheadMillis" : 6.848431000000346,
+    "endToEndMillis" : 11530.32415,
+    "generation" : {
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine] The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "inputTokens" : 310,
+      "cacheReadInputTokens" : 127,
+      "cacheWriteInputTokens" : 183,
+      "outputTokens" : 38,
+      "ttftMillis" : 7467.362415,
+      "totalMillis" : 11521.771801,
+      "prefillTokensPerSecond" : 24.51130712678706,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4622180352,
+      "cpuMillis" : 173540.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nMerchants must submit chargeback evidence within 7 calendar days of notification. The evidence should be uploaded as a PDF under 10 MB in the Disputes console.",
+      "text" : "Merchants must submit chargeback evidence within 7 calendar days of notification. Evidence is uploaded as a PDF under 10 MB in the Disputes console. [payments-chargeback] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine] The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 0.3333333333333333,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "break-glass",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 6.6676993,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2820494,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 0.8032608,
+      "rank" : 3
+    } ],
+    "promptSha256" : "f74e5065500c76c183b1a59482db3a34542f2c3f6757455e3d629b2b497c4dbd",
+    "retrievalMillis" : 1.14376,
+    "frameworkOverheadMillis" : 2.4057509999984177,
+    "endToEndMillis" : 11335.682756,
+    "generation" : {
+      "text" : "The production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers. [security-access]",
+      "inputTokens" : 322,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 198,
+      "outputTokens" : 27,
+      "ttftMillis" : 8464.29468,
+      "totalMillis" : 11332.133245,
+      "prefillTokensPerSecond" : 23.394845497487623,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4622196736,
+      "cpuMillis" : 165950.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nThe production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers.",
+      "text" : "The production break-glass procedure is code-named Cobalt-17 and requires approval from two on-call managers. [security-access]",
+      "decision" : "MODEL_ANSWER_WITH_DERIVED_CITATIONS"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 0.0,
+      "citationPrecision" : 0.0,
+      "abstained" : false,
+      "correct" : false
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "idempotency",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 4.5037484,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.5346991,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "health-pharmacy",
+        "title" : "Specialty pharmacy delivery",
+        "text" : "Cold-chain specialty medicines ship only on Tuesday and Thursday. A missed delivery must be rescheduled by calling the specialty pharmacy before 4 PM local time."
+      },
+      "score" : 1.2226715,
+      "rank" : 3
+    } ],
+    "promptSha256" : "96603c5e95f3b7fd823459da89a6440d0d6c72c1ed03e43d5c4519cbf6ffbe04",
+    "retrievalMillis" : 1.335449,
+    "frameworkOverheadMillis" : 2.9120070000008127,
+    "endToEndMillis" : 14054.584951,
+    "generation" : {
+      "text" : "The Idempotency-Key header makes Claims API creates idempotent and a key can be replayed for a 24 hour replay window. [api-idempotency]",
+      "inputTokens" : 338,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 214,
+      "outputTokens" : 45,
+      "ttftMillis" : 9088.575244,
+      "totalMillis" : 14050.337495,
+      "prefillTokensPerSecond" : 23.54990614885899,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4622237696,
+      "cpuMillis" : 207940.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nThe Idempotency-Key header makes Claims API creates idempotent and a key can be replayed for a 24 hour replay window. [api-idempotency]",
+      "text" : "The Idempotency-Key header makes Claims API creates idempotent and a key can be replayed for a 24 hour replay window. [api-idempotency]",
+      "decision" : "MODEL_ANSWER"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "priority-one",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "support-escalation",
+        "title" : "Priority one support",
+        "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander."
+      },
+      "score" : 6.5011287,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "security-access",
+        "title" : "Production emergency access",
+        "text" : "The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes."
+      },
+      "score" : 1.6032012,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "health-telemedicine",
+        "title" : "Behavioral health telemedicine",
+        "text" : "In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited."
+      },
+      "score" : 0.9742979,
+      "rank" : 3
+    } ],
+    "promptSha256" : "f877f86699e22f1d83391a8a782bdff5762c32ccf279845a7d263210260fb3bb",
+    "retrievalMillis" : 0.959415,
+    "frameworkOverheadMillis" : 2.2801650000001246,
+    "endToEndMillis" : 13062.239265,
+    "generation" : {
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation] The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "inputTokens" : 312,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 188,
+      "outputTokens" : 48,
+      "ttftMillis" : 7909.947124,
+      "totalMillis" : 13058.999685,
+      "prefillTokensPerSecond" : 23.770634263127416,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4622254080,
+      "cpuMillis" : 194170.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nA priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, it is escalated through NORTHSTAR-P1 pages the incident commander. [support-escalation]",
+      "text" : "A priority one incident must be acknowledged within 15 minutes. If unresolved after 30 minutes, route NORTHSTAR-P1 pages the incident commander. [support-escalation] The production break-glass procedure is code-named Cobalt-17. It requires approval from two on-call managers and the resulting credentials expire after 60 minutes. [security-access] In-network behavioral health telemedicine visits do not require a referral. The member copay is 15 dollars per visit and the annual visit count is unlimited. [health-telemedicine]",
+      "decision" : "EXTRACTIVE_FALLBACK"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : false,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 0.3333333333333333,
+      "abstained" : false,
+      "correct" : false
+    }
+  }, {
+    "framework" : "plain-java",
+    "backend" : "rust-ffm",
+    "model" : "mathstral-7B-v0.1",
+    "caseId" : "unsupported-lunar-vehicle",
+    "retrieved" : [ {
+      "document" : {
+        "id" : "claims-auto-glass",
+        "title" : "Auto glass claims",
+        "text" : "Northstar Mutual auto glass claims must be reported through the Aurora portal within 30 calendar days. Windshield repair has a 75 dollar deductible. A police report is not required."
+      },
+      "score" : 1.2609214,
+      "rank" : 1
+    }, {
+      "document" : {
+        "id" : "api-idempotency",
+        "title" : "Claims API idempotency",
+        "text" : "Claims API clients send the Idempotency-Key header on create requests. Keys remain valid for a 24 hour replay window. Reusing a key with a different payload returns HTTP 409."
+      },
+      "score" : 0.37895566,
+      "rank" : 2
+    }, {
+      "document" : {
+        "id" : "claims-flood",
+        "title" : "Residential flood coverage",
+        "text" : "New residential flood coverage starts after a 14 calendar day waiting period. The waiting period is waived only when coverage is required at a mortgage closing."
+      },
+      "score" : 0.34094197,
+      "rank" : 3
+    } ],
+    "promptSha256" : "c292e0233b94b87cb8b64db2819436739193b61654da2f2fbec7d042cdecdf56",
+    "retrievalMillis" : 1.006733,
+    "frameworkOverheadMillis" : 2.569376999999804,
+    "endToEndMillis" : 9834.670099,
+    "generation" : {
+      "text" : "INSUFFICIENT_CONTEXT",
+      "inputTokens" : 324,
+      "cacheReadInputTokens" : 124,
+      "cacheWriteInputTokens" : 200,
+      "outputTokens" : 8,
+      "ttftMillis" : 8979.481849,
+      "totalMillis" : 9831.093989,
+      "prefillTokensPerSecond" : 22.275729933844463,
+      "loadMillis" : 408.55584,
+      "peakRssBytes" : 4622295040,
+      "cpuMillis" : 136240.0,
+      "estimatedApiCostUsd" : null
+    },
+    "grounding" : {
+      "rawText" : "\nINSUFFICIENT_CONTEXT",
+      "text" : "INSUFFICIENT_CONTEXT",
+      "decision" : "RETRIEVAL_ABSTENTION"
+    },
+    "rawEvaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    },
+    "evaluation" : {
+      "retrievalRecall" : 1.0,
+      "reciprocalRank" : 1.0,
+      "factCoverage" : 1.0,
+      "citationRecall" : 1.0,
+      "citationPrecision" : 1.0,
+      "abstained" : true,
+      "correct" : true
+    }
+  } ],
+  "failures" : [ ]
+}

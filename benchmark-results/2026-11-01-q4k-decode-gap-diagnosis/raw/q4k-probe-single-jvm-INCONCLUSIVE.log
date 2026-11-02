@@ -1,0 +1,11 @@
+### Q4_K kernel throughput probe: 2 GiB streamed, 1 call vs 224 calls, 16 threads
+weights=2.00 GiB rows=932067 cols=4096
+impl=rust-ffm-quantized-v14 supportsQ4_K=true eligible(batch=1)=true
+threads= 2  A one-call:   14.1 GB/s   B 224-calls:   13.8 GB/s   orchestration cost:  2.3%
+threads= 4  A one-call:   28.3 GB/s   B 224-calls:   25.8 GB/s   orchestration cost:  8.9%
+threads= 8  A one-call:   55.2 GB/s   B 224-calls:   46.6 GB/s   orchestration cost: 15.6%
+threads=12  A one-call:   46.6 GB/s   B 224-calls:   39.5 GB/s   orchestration cost: 15.1%
+threads=16  A one-call:   40.2 GB/s   B 224-calls:    3.2 GB/s   orchestration cost: 92.0%
+checksum=1711.0519
+
+[exited with code 0]
