@@ -61,3 +61,23 @@ associative, and no lane overflows (pair sums of 16 q8 values are at most 4064, 
 ## Reproduce
 
     KERNELS=<path>/model-kernels/target/release ./build-and-run.sh
+
+
+## Re-measured against CURRENT main after rebasing -- these supersede the numbers above
+
+The figures above were taken against a base that was **124 commits behind `origin/main`**, on a host
+that was 11-15 GB into swap. After rebasing onto `33700300` (both commits applied with no
+conflicts, 48 crate tests passing) the same harness, same box, now unloaded, gives:
+
+| type | main | fixed | gain | ours/ggml |
+|---|---:|---:|---:|---|
+| **Q4_K** | 5.64 GB/s | **9.49 GB/s** | **1.68x** | 0.536 -> **0.905** |
+| Q5_K | 8.17 GB/s | 8.45 GB/s | **1.03x -- null** | 0.822 -> 0.854 |
+
+**Take 1.68x as the Q4_K figure, and treat Q5_K as a null**: main had already improved the Q5_K row
+dot independently, so there is little left for this change to take there.
+
+Note ggml itself measured **10.5 GB/s** here against **4.15 GB/s** in the earlier session on the
+same machine -- a 2.5x swing from machine load alone. That is the whole reason ggml runs in-process
+as the control and why only `ours/ggml` is comparable across sessions: 0.455 -> 0.991 earlier,
+0.536 -> 0.905 now, the same finding at different absolute scales.

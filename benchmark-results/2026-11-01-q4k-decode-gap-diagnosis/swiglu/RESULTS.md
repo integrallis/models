@@ -85,3 +85,39 @@ including Qwen used the scalar path. It was built for Qwen and never extended.
     java --add-modules jdk.incubator.vector -cp <dist>/lib/'*':. SwiGluProbe
     # serial vs parallel, with an output digest; vary the threshold
     java -Dmodels.purejava.swiGluParallelThreshold=<n> ... SwiGluParallelProbe
+
+
+## This does NOT help mellum, and the finding was not first made here
+
+Two corrections, both found after rebasing onto current `origin/main`:
+
+**1. Another session reached the SwiGLU gate first and already measured it.**
+`benchmark-results/2026-11-01-mellum-final-qualification` and
+`.../2026-11-01-mellum-shim-optimisation` (both 2026-11-01) identify the same
+`usesVectorizedSwiGlu()` whitelist, admit `MELLUM` to it -- the admission is on main now -- and
+measure the result: **+76% prefill and nothing on decode.**
+
+**2. The parallel split cannot engage for mellum at all.** mellum is MoE with
+`expert_feed_forward_length` **896**, routing 8 of 64 experts across 28 blocks. Each SwiGLU call is
+therefore 896 elements, **below the 1024 threshold** set here, so `swiGluWorkers` returns 1 and the
+serial loop runs. The measured 1.86x applies to dense models with a wide FFN -- mathstral-7B's
+14336 -- and not to this MoE target.
+
+Their explanation of why the vectorised route bought nothing on mellum's decode is the structural
+one and it generalises: at batch 1 the activation is a small share of a memory-bound token, while in
+a batch-32 prefill it is a serial scalar loop across the whole batch. So on **decode**, SwiGLU is
+worth attacking only where the FFN is wide; on **prefill** it matters much more broadly.
+
+The authoritative mellum ladder from that work, EPYC 7713 (no AVX-512), workload `coding`, template
+`chatml-no-think`:
+
+| stage | decode | decodeRatio |
+|---|---:|---:|
+| baseline | 21.70 | 0.6396 |
+| + vectorised swiGLU | 21.08 | 0.5352 |
+| + Q5_0 independent dispatch | **23.87** | **0.6422** |
+
+Decode is the only failing gate; contribution (0.7778 / 1.0000) and end-to-end (0.9654) pass.
+That record also warns that ollama's own decode on that box spanned 33.93 / 39.42 / 37.17 tok/s
+(about +/-8%), so a single ratio carries the comparator's spread and the within-arm decode numbers
+are the reliable signal.
