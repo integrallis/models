@@ -62,6 +62,13 @@ final class Convolution {
     // A wide kernel at a large stride (the head's STFT: 600 taps every 150 samples) is a dot
     // product of each frame with each filter; a narrow kernel at stride 1 is a sum of shifted,
     // scaled copies of the input. Both reduce to contiguous SIMD loops.
+    // With accelerated kernels bound, every convolution is an im2col copy and one matrix product.
+    if (KernelScope.current() != null && (long) cPerGroup * k * outLength <= 8_000_000L) {
+      im2colConv(
+          xs, ws, bias, out, n, c, length, m, cPerGroup, k, g, padBegin, outLength, stride,
+          dilation);
+      return Tensor.ofFloats(new long[] {n, m, outLength}, out);
+    }
     boolean frameDot = dilation == 1 && stride >= 8 && k >= 32;
     if (frameDot) {
       frameDotConv(
@@ -69,7 +76,7 @@ final class Convolution {
       return Tensor.ofFloats(new long[] {n, m, outLength}, out);
     }
     if (stride == 1 && dilation == 1 && (long) cPerGroup * k * outLength <= 8_000_000L) {
-      im2colConv(xs, ws, bias, out, n, c, length, m, cPerGroup, k, g, padBegin, outLength);
+      im2colConv(xs, ws, bias, out, n, c, length, m, cPerGroup, k, g, padBegin, outLength, 1, 1);
       return Tensor.ofFloats(new long[] {n, m, outLength}, out);
     }
     float[] row = new float[outLength];
@@ -323,7 +330,9 @@ final class Convolution {
       int k,
       int g,
       int padBegin,
-      int outLength) {
+      int outLength,
+      int stride,
+      int dilation) {
     int mPerGroup = m / g;
     int rows = cPerGroup * k;
     float[] columns = new float[rows * outLength];
@@ -334,12 +343,21 @@ final class Convolution {
           int xBase = (batch * c + channel) * length;
           for (int tap = 0; tap < k; tap++) {
             int row = (ic * k + tap) * outLength;
-            int offset = tap - padBegin;
-            int tStart = Math.max(0, -offset);
-            int tEnd = Math.min(outLength, length - offset);
+            int offset = tap * dilation - padBegin;
             java.util.Arrays.fill(columns, row, row + outLength, 0f);
-            if (tEnd > tStart) {
-              System.arraycopy(xs, xBase + tStart + offset, columns, row + tStart, tEnd - tStart);
+            if (stride == 1) {
+              int tStart = Math.max(0, -offset);
+              int tEnd = Math.min(outLength, length - offset);
+              if (tEnd > tStart) {
+                System.arraycopy(xs, xBase + tStart + offset, columns, row + tStart, tEnd - tStart);
+              }
+            } else {
+              for (int t = 0; t < outLength; t++) {
+                int src = t * stride + offset;
+                if (src >= 0 && src < length) {
+                  columns[row + t] = xs[xBase + src];
+                }
+              }
             }
           }
         }

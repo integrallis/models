@@ -17,6 +17,7 @@ val nativeAbi = 7
 dependencies {
     api(project(":models-api"))
     implementation(project(":backend-java"))
+    api(project(":models-backend-onnx"))
     implementation("com.integrallis:vectors-core:${providers.gradleProperty("vectorsVersion").get()}")
     testImplementation(project(":models-runtime"))
 }
