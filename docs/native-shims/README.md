@@ -1,7 +1,7 @@
 # Native shim evidence
 
 `registry.json` inventories every CPU capability bit and exported CPU/CUDA function, links the
-Java dispatch sites, and records the evidence status of each operation. All eighteen current
+Java dispatch sites, and records the evidence status of each operation. All current
 operation groups are **unproven**. Historical speedups and repaired correctness defects
 are not certificates that a JVM limitation requires Rust.
 
@@ -38,5 +38,12 @@ unrelated article edits do not. Supporting workers inherit justification from th
 operations they serve and need no invented, independent JVM limitation.
 
 The BF16 and SwiGLU candidate entries remain UNPROVEN. Their [inventory](bf16-swiglu-candidate-inventory.md) separates measured compiler/allocation mechanisms, completed artifact-specific functional and Bonsai quality campaigns, and component screens from unresolved causal/resource and final-composition gates. Raw rejected experiments remain outside project repositories.
+
+The GLiNER Hugging Face tokenizer adapter is explicitly inventoried as **UNPROVEN**, including
+its four independent ABI exports and remaining platform checks. The user authorized Rust shims
+for model adaptation, and the pinned tokenizer has different normalization semantics from the
+existing Java DeBERTa tokenizer. The passing Linux parity fixtures justify continuing integration;
+they do not prove a JVM limitation, finish this shim campaign, or qualify GLiNER for the catalog.
+See `experiments/gliner25-decide/README.md` and the registered raw-evidence hashes.
 
 [ABI7 symbol retirement](abi7-symbol-retirement.md) lists removed compatibility wrappers and the retained generic entry points.

@@ -1,0 +1,51 @@
+{
+  "policy": "schema-classification-upstream-v2",
+  "status": "user-approved-after-upstream-audit",
+  "authorization": "Approve upstream fidelity plus performance and disclosed accuracy",
+  "supersedesForOriginalModel": "schema-classification-v1 absolute quality admission gates; historical verdicts and fine-tune targets are preserved",
+  "checkpointRevision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+  "checkpointSha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+  "referenceCommit": "ca4f68235b50fe4c3ecf3876851d748fe4b15c6c",
+  "tokenizersVersion": "0.22.2",
+  "maxEncodedTokens": 512,
+  "computeClass": "cpu",
+  "threadsPerArm": 8,
+  "parity": {
+    "atol": 0.0001,
+    "rtol": 0.0001,
+    "exactTokenIds": true,
+    "exactSelectedLabels": true
+  },
+  "quality": {
+    "maxOracleQualityLoss": 0.005,
+    "maximumInferenceErrors": 0,
+    "cohortCases": {
+      "publisher.singleHead": 2900,
+      "publisher.jointHead": 1700,
+      "goemotions.fullTest": 5427
+    },
+    "dataMeaning": "1700 publisher public development documents evaluated jointly and head-by-head; 5427 official GoEmotions test documents; 10027 evaluation requests are not 10027 independent documents",
+    "requiredDisclosures": [
+      "per-domain single-head exact match",
+      "per-domain joint-head exact match",
+      "per-domain all-heads-correct document exact match",
+      "full GoEmotions micro-F1 and macro-F1",
+      "same-weight publisher scores and losses for every metric"
+    ],
+    "confidenceClaim": "none; scores are not calibrated"
+  },
+  "performance": {
+    "minPairedReplications": 3,
+    "minTimedSamplesPerBucket": 30,
+    "minThroughputRatio": 0.8,
+    "maxP95LatencyRatio": 1.5,
+    "acceptance": "every final pair and advertised bucket must pass",
+    "warmups": 3
+  },
+  "release": {
+    "releasedRuntimeVerified": true,
+    "exactSnapshotFilesRequired": true
+  },
+  "provenance": "User explicitly approved upstream fidelity plus unchanged performance and disclosed accuracy after the original model failed local absolute emotion targets in both runtimes. This is a transparent policy revision, not a claim that old targets passed.",
+  "approvalDate": "2026-11-01"
+}

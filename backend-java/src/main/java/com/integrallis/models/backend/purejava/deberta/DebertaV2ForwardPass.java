@@ -18,6 +18,8 @@ package com.integrallis.models.backend.purejava.deberta;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -36,6 +38,9 @@ final class DebertaV2ForwardPass {
   private final float[] tokenEmbedding;
   private final float[] pooled;
   private final Worker[] workers;
+  private final DebertaV2Kernels projection;
+  private final Map<DebertaV2Weights.Matrix, DebertaV2Kernels.Projection> preparedMatrices =
+      new IdentityHashMap<>();
 
   private float[] hidden = new float[0];
   private float[] queries = new float[0];
@@ -47,8 +52,16 @@ final class DebertaV2ForwardPass {
   private float[] feedForward = new float[0];
   private float[] feedForwardProjected = new float[0];
   private int capacity;
+  private int[] relativeIndices = new int[0];
+  private int relativeIndexLength;
 
   DebertaV2ForwardPass(DebertaV2Config config, DebertaV2Weights weights) {
+    this(config, weights, null);
+  }
+
+  DebertaV2ForwardPass(
+      DebertaV2Config config, DebertaV2Weights weights, DebertaV2Kernels projection) {
+    this.projection = projection;
     this.config = Objects.requireNonNull(config, "config");
     this.weights = Objects.requireNonNull(weights, "weights");
     this.tokenEmbedding = new float[config.hiddenSize()];
@@ -56,6 +69,23 @@ final class DebertaV2ForwardPass {
     this.workers = new Worker[resolveParallelism()];
     for (int worker = 0; worker < workers.length; worker++) {
       workers[worker] = new Worker(new float[config.maxPositions()]);
+    }
+    if (projection != null) {
+      for (int index = 0; index < config.numLayers(); index++) {
+        var layer = weights.layer(index);
+        for (var matrix :
+            new DebertaV2Weights.Matrix[] {
+              layer.query(),
+              layer.key(),
+              layer.value(),
+              layer.attentionOutput(),
+              layer.feedForwardUp(),
+              layer.feedForwardDown()
+            }) {
+          preparedMatrices.computeIfAbsent(
+              matrix, value -> projection.prepare(value.values(), value.rows(), value.columns()));
+        }
+      }
     }
     this.relativeProjections = prepareRelativeProjections();
   }
@@ -71,6 +101,26 @@ final class DebertaV2ForwardPass {
     addBias(pooled, 1, pooled.length, weights.poolerBias());
     TensorOps.geluErf(pooled, 0, pooled, 0, pooled.length);
     return VectorUtil.dotProduct(pooled, weights.classifierWeight()) + weights.classifierBias()[0];
+  }
+
+  synchronized float[][] encode(int[] tokens, int[] positions) {
+    Objects.requireNonNull(tokens, "tokens");
+    Objects.requireNonNull(positions, "positions");
+    if (tokens.length == 0 || tokens.length > config.maxPositions()) {
+      throw new IllegalArgumentException("token count outside encoder context: " + tokens.length);
+    }
+    for (int position : positions) {
+      if (position < 0 || position >= tokens.length) {
+        throw new IllegalArgumentException("marker position outside input: " + position);
+      }
+    }
+    execute(tokens);
+    float[][] result = new float[positions.length][config.hiddenSize()];
+    for (int row = 0; row < positions.length; row++) {
+      System.arraycopy(
+          hidden, positions[row] * config.hiddenSize(), result[row], 0, config.hiddenSize());
+    }
+    return result;
   }
 
   static int relativeBucket(int relativePosition, int bucketSize, int maxPosition) {
@@ -96,6 +146,23 @@ final class DebertaV2ForwardPass {
     int sequenceLength = tokens.length;
     int dim = config.hiddenSize();
     ensureCapacity(sequenceLength);
+    if (relativeIndexLength != sequenceLength) {
+      relativeIndices = new int[Math.multiplyExact(sequenceLength, sequenceLength)];
+      int[] byDistance = new int[2 * sequenceLength - 1];
+      for (int distance = 1 - sequenceLength; distance < sequenceLength; distance++) {
+        int bucket =
+            relativeBucket(distance, config.positionBuckets(), config.maxRelativePositions());
+        byDistance[distance + sequenceLength - 1] =
+            Math.max(
+                0, Math.min(config.positionBuckets() * 2 - 1, bucket + config.positionBuckets()));
+      }
+      for (int q = 0; q < sequenceLength; q++) {
+        for (int k = 0; k < sequenceLength; k++) {
+          relativeIndices[q * sequenceLength + k] = byDistance[q - k + sequenceLength - 1];
+        }
+      }
+      relativeIndexLength = sequenceLength;
+    }
     for (int position = 0; position < sequenceLength; position++) {
       weights.wordEmbedding(tokens[position], tokenEmbedding);
       TensorOps.layerNorm(
@@ -139,7 +206,12 @@ final class DebertaV2ForwardPass {
 
     project(feedForward, normalized, sequenceLength, layer.feedForwardUp());
     addBias(feedForward, sequenceLength, config.intermediateSize(), layer.feedForwardUpBias());
-    TensorOps.geluErf(feedForward, 0, feedForward, 0, sequenceLength * config.intermediateSize());
+    forEachRow(
+        sequenceLength,
+        (row, worker) -> {
+          int offset = row * config.intermediateSize();
+          TensorOps.geluErf(feedForward, offset, feedForward, offset, config.intermediateSize());
+        });
     project(feedForwardProjected, feedForward, sequenceLength, layer.feedForwardDown());
     addBias(feedForwardProjected, sequenceLength, dim, layer.feedForwardDownBias());
     for (int index = 0; index < elements; index++) {
@@ -155,8 +227,22 @@ final class DebertaV2ForwardPass {
 
   private void attend(int sequenceLength, RelativeProjections relative) {
     int dim = config.hiddenSize();
+    if (projection != null) {
+      projection.attend(
+          attention,
+          queries,
+          keys,
+          values,
+          relative.queries(),
+          relative.keys(),
+          relativeIndices,
+          sequenceLength,
+          dim,
+          config.numHeads(),
+          config.positionBuckets() * 2);
+      return;
+    }
     int headSize = config.headSize();
-    int span = config.positionBuckets();
     float scale = (float) Math.sqrt(headSize * 3.0);
     Arrays.fill(attention, 0, sequenceLength * dim, 0.0f);
     forEachRow(
@@ -177,12 +263,8 @@ final class DebertaV2ForwardPass {
                 scores,
                 0);
             for (int keyPosition = 0; keyPosition < sequenceLength; keyPosition++) {
-              int bucket =
-                  relativeBucket(
-                      queryPosition - keyPosition,
-                      config.positionBuckets(),
-                      config.maxRelativePositions());
-              int relativeOffset = (Math.max(0, Math.min(span * 2 - 1, bucket + span))) * dim;
+              int relativeOffset =
+                  relativeIndices[queryPosition * sequenceLength + keyPosition] * dim;
               float contentToPosition =
                   VectorUtil.dotProduct(
                       queries,
@@ -256,6 +338,10 @@ final class DebertaV2ForwardPass {
   }
 
   private void project(float[] output, float[] input, int rows, DebertaV2Weights.Matrix matrix) {
+    if (projection != null) {
+      preparedMatrices.get(matrix).project(output, input, rows);
+      return;
+    }
     forEachRow(
         rows,
         (row, worker) ->

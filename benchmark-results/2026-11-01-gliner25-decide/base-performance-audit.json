@@ -1,0 +1,52 @@
+{
+  "checkpoint": "fastino_gliner2_5_decide_f32",
+  "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+  "measuredRuntimeSource": "6add46ee740f8acd80295741fc8e22bae34f845f",
+  "benchmarkCompleted": true,
+  "performanceGatePassed": false,
+  "catalogQualified": false,
+  "reportReproducedExactly": true,
+  "pairedRuns": 1,
+  "buckets": 13,
+  "requestsPerRuntime": 429,
+  "observations": {
+    "models": {
+      "requests": 429,
+      "errors": 0,
+      "loadMs": 22910.317858,
+      "peakRssGiB": 5.456279754638672
+    },
+    "reference": {
+      "requests": 429,
+      "errors": 0,
+      "loadMs": 4643.2131119998985,
+      "peakRssGiB": 4.0438690185546875
+    }
+  },
+  "failedGateBuckets": [
+    "tokens32-labels2-tasks1",
+    "tokens128-labels2-tasks1",
+    "tokens128-labels8-tasks1",
+    "tokens128-labels32-tasks1",
+    "tokens256-labels2-tasks1",
+    "tokens256-labels8-tasks1",
+    "tokens256-labels32-tasks1",
+    "tokens512-labels2-tasks1",
+    "tokens512-labels8-tasks1",
+    "tokens512-labels32-tasks1",
+    "tokens128-labels8-tasks2",
+    "tokens512-labels8-tasks2"
+  ],
+  "sources": {
+    "experiments/gliner25-decide/performance-cases.jsonl": "24944973c5db9276bbbb641aa469d5ec8e62a7f7afedb71796540020a719b6f5",
+    "experiments/gliner25-decide/performance-cohort.json": "f4602a842b0c6bfec6fa7587c1b114047a7f05e66adfbf4558e790fa75546980",
+    "benchmark-results/2026-11-01-gliner25-decide/results-restart-1/performance-1-models.jsonl": "e30f46f9d5d3572e12f22f583bd2141acc2c770634df13c578bd569692c39e18",
+    "benchmark-results/2026-11-01-gliner25-decide/results-restart-1/performance-1-reference.jsonl": "16cfe667a8e4e3295c2956cd7217defc7993a39674b642684003c442ed24893e",
+    "benchmark-results/2026-11-01-gliner25-decide/results-restart-1/performance-1-report.json": "84fe27c3f28344b794c34526a3dd9e4b13a558e1fbba13dcc4171c927f2a2e7f",
+    "benchmark-results/2026-11-01-gliner25-decide/results-restart-1/lscpu.txt": "d16cc8016a23245a2d6254192e59525a07c03e504a92fa6bef1ce43600e0b573",
+    "benchmark-results/2026-11-01-gliner25-decide/results-restart-1/memory.txt": "e5862b6038a0ba363ad7b920dbe967a45ab70fdea6a7a2a201a00056257cb8c1",
+    "benchmark-results/2026-11-01-gliner25-decide/deployment.json": "24c6d7d9c0d1c99a97419667e181ea57bb149945e5609ea024998fcc24a9d3b7",
+    "experiments/gliner25-decide/report_base_performance.py": "f5669f42c6863cfe3882129ecb3e4f2f696cbf80facd272a982adef1706d74d0"
+  },
+  "note": "Audit of existing remote measurements; no new inference run. Load is one worker-reported observation, not controlled cold-start latency."
+}

@@ -1,0 +1,91 @@
+{
+  "candidate": "modeljars-gliner25-decide-general-v2",
+  "selection": "deterministic hash, no inference-based selection",
+  "maximumEncodedTokens": 512,
+  "exclusions": {
+    "goemotions:previous-qualification-text": 43714,
+    "goemotions:overlength": 1,
+    "clinc-travel:previous-qualification-text": 1590,
+    "clinc-banking:previous-qualification-text": 1740,
+    "clinc-utility:previous-qualification-text": 1590,
+    "clinc-small_talk:previous-qualification-text": 1594,
+    "clinc-work:previous-qualification-text": 1590,
+    "clinc-credit_cards:previous-qualification-text": 1590,
+    "clinc-meta:previous-qualification-text": 1594,
+    "clinc-home:previous-qualification-text": 1591,
+    "clinc-auto_and_commute:previous-qualification-text": 1590,
+    "clinc-kitchen_and_dining:previous-qualification-text": 1590,
+    "boolq:previous-qualification-text": 10811,
+    "boolq:overlength": 32,
+    "boolq:split-overlap-or-duplicate": 6
+  },
+  "files": {
+    "train-cases.jsonl": {
+      "sha256": "0a0c82af934e495bcb6ac2687591e70991fb116ceafee400899dff151c587af6",
+      "cases": 65656,
+      "cohorts": {
+        "boolq": 7731,
+        "clinc-auto_and_commute": 1500,
+        "clinc-travel": 1500,
+        "clinc-meta": 1496,
+        "clinc-utility": 1499,
+        "clinc-home": 1500,
+        "clinc-banking": 1500,
+        "clinc-small_talk": 1494,
+        "goemotions": 42936,
+        "clinc-kitchen_and_dining": 1500,
+        "clinc-work": 1500,
+        "clinc-credit_cards": 1500
+      }
+    },
+    "train.jsonl": {
+      "sha256": "1d63a2e3ed4dc417f349b3eceff87c4e930193819289738923656936a91e23f2",
+      "cases": 65656
+    },
+    "development-cases.jsonl": {
+      "sha256": "dffc395507dd56443fc2a3d84ef80d84cdd31582df0907b5118b5c64744e207c",
+      "cases": 990,
+      "cohorts": {
+        "goemotions": 243,
+        "clinc-banking": 45,
+        "clinc-home": 45,
+        "clinc-work": 45,
+        "clinc-travel": 45,
+        "clinc-kitchen_and_dining": 45,
+        "clinc-small_talk": 45,
+        "clinc-auto_and_commute": 45,
+        "clinc-credit_cards": 45,
+        "clinc-utility": 45,
+        "clinc-meta": 45,
+        "boolq": 297
+      }
+    },
+    "development.jsonl": {
+      "sha256": "45bd38db402620f901ab32875f69ff8bf2fd0beac0e1784c948001be1b84840b",
+      "cases": 990
+    },
+    "qualification-cases.jsonl": {
+      "sha256": "7301c0de972f62277d5abbdcb9e3c66ebe902d156d302b07a752d4fd7a2e9412",
+      "cases": 1000,
+      "cohorts": {
+        "goemotions": 254,
+        "clinc-work": 45,
+        "clinc-meta": 45,
+        "clinc-auto_and_commute": 45,
+        "clinc-small_talk": 45,
+        "clinc-home": 45,
+        "clinc-kitchen_and_dining": 45,
+        "clinc-credit_cards": 45,
+        "clinc-utility": 45,
+        "clinc-banking": 45,
+        "clinc-travel": 45,
+        "boolq": 296
+      }
+    }
+  },
+  "previousSplitsSha256": {
+    "train": "0a0c82af934e495bcb6ac2687591e70991fb116ceafee400899dff151c587af6",
+    "development": "dffc395507dd56443fc2a3d84ef80d84cdd31582df0907b5118b5c64744e207c",
+    "qualification": "27f285ded66573677b4a92f300ce0472968635db9cf201058acbe99bc6893877"
+  }
+}

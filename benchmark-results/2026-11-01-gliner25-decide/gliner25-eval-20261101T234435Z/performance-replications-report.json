@@ -1,0 +1,1754 @@
+{
+  "stage": "performance-replications",
+  "pairs": 3,
+  "passed": true,
+  "replicationGatePassed": true,
+  "identity": {
+    "models.snapshot": {
+      "id": "fastino_gliner2_5_decide_f32",
+      "sourceUri": "https://huggingface.co/fastino/GLiNER2.5-Decide",
+      "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+      "files": [
+        {
+          "path": "config.json",
+          "role": "configuration",
+          "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+          "sizeBytes": 1612
+        },
+        {
+          "path": "encoder_config/config.json",
+          "role": "configuration",
+          "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+          "sizeBytes": 920
+        },
+        {
+          "path": "model.safetensors",
+          "role": "classification-model",
+          "sha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+          "sizeBytes": 1945828140
+        },
+        {
+          "path": "special_tokens_map.json",
+          "role": "tokenizer",
+          "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+          "sizeBytes": 2414
+        },
+        {
+          "path": "tokenizer.json",
+          "role": "tokenizer",
+          "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+          "sizeBytes": 8333952
+        },
+        {
+          "path": "tokenizer_config.json",
+          "role": "tokenizer",
+          "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+          "sizeBytes": 3356
+        }
+      ]
+    },
+    "models.backend": "rust-ffm-gliner",
+    "models.threads": 8,
+    "models.dtype": [
+      "float32"
+    ],
+    "models.nativeSha256": "5434800398f15a0537c95bdd2936e152c66a5577a5f1b53ec55591fe12405a2f",
+    "models.javaVersion": "25.0.3",
+    "models.sourceRevision": null,
+    "models.torchVersion": null,
+    "models.attentionBackend": null,
+    "reference.snapshot": {
+      "id": "fastino_gliner2_5_decide_f32",
+      "sourceUri": "https://huggingface.co/fastino/GLiNER2.5-Decide",
+      "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+      "files": [
+        {
+          "path": "config.json",
+          "role": "configuration",
+          "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+          "sizeBytes": 1612
+        },
+        {
+          "path": "encoder_config/config.json",
+          "role": "configuration",
+          "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+          "sizeBytes": 920
+        },
+        {
+          "path": "model.safetensors",
+          "role": "classification-model",
+          "sha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+          "sizeBytes": 1945828140
+        },
+        {
+          "path": "special_tokens_map.json",
+          "role": "tokenizer",
+          "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+          "sizeBytes": 2414
+        },
+        {
+          "path": "tokenizer.json",
+          "role": "tokenizer",
+          "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+          "sizeBytes": 8333952
+        },
+        {
+          "path": "tokenizer_config.json",
+          "role": "tokenizer",
+          "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+          "sizeBytes": 3356
+        }
+      ]
+    },
+    "reference.backend": "publisher-gliner2",
+    "reference.threads": 8,
+    "reference.dtype": [
+      "torch.float32"
+    ],
+    "reference.nativeSha256": null,
+    "reference.javaVersion": null,
+    "reference.sourceRevision": "ca4f68235b50fe4c3ecf3876851d748fe4b15c6c",
+    "reference.torchVersion": null,
+    "reference.attentionBackend": null
+  },
+  "buckets": {
+    "tokens32-labels2-tasks1": {
+      "throughputRatio": {
+        "values": [
+          1.4153154331212383,
+          1.41007656722466,
+          1.3321125185217628
+        ],
+        "minimum": 1.3321125185217628,
+        "maximum": 1.4153154331212383,
+        "mean": 1.3858348396225537,
+        "sampleStandardDeviation": 0.046598575807774906
+      },
+      "p95LatencyRatio": {
+        "values": [
+          0.7545069259616917,
+          0.7484134194647903,
+          0.7432710486454903
+        ],
+        "minimum": 0.7432710486454903,
+        "maximum": 0.7545069259616917,
+        "mean": 0.7487304646906574,
+        "sampleStandardDeviation": 0.005624644257427828
+      }
+    },
+    "tokens32-labels8-tasks1": {
+      "throughputRatio": {
+        "values": [
+          1.448308039815785,
+          1.4489924179806508,
+          1.4135671035075386
+        ],
+        "minimum": 1.4135671035075386,
+        "maximum": 1.4489924179806508,
+        "mean": 1.4369558537679914,
+        "sampleStandardDeviation": 0.02025814212674779
+      },
+      "p95LatencyRatio": {
+        "values": [
+          0.6946643083538523,
+          0.7354868352423432,
+          0.7610756221407231
+        ],
+        "minimum": 0.6946643083538523,
+        "maximum": 0.7610756221407231,
+        "mean": 0.7304089219123062,
+        "sampleStandardDeviation": 0.03349559004652821
+      }
+    },
+    "tokens128-labels2-tasks1": {
+      "throughputRatio": {
+        "values": [
+          0.9639694463107581,
+          0.9740558949058978,
+          0.995115143816147
+        ],
+        "minimum": 0.9639694463107581,
+        "maximum": 0.995115143816147,
+        "mean": 0.9777134950109343,
+        "sampleStandardDeviation": 0.01589173203809354
+      },
+      "p95LatencyRatio": {
+        "values": [
+          1.0533254069418783,
+          0.9989928978053451,
+          0.9945386469367311
+        ],
+        "minimum": 0.9945386469367311,
+        "maximum": 1.0533254069418783,
+        "mean": 1.0156189838946514,
+        "sampleStandardDeviation": 0.03273057961543705
+      }
+    },
+    "tokens128-labels8-tasks1": {
+      "throughputRatio": {
+        "values": [
+          0.9997100897503912,
+          0.965209665027167,
+          1.0130509178681852
+        ],
+        "minimum": 0.965209665027167,
+        "maximum": 1.0130509178681852,
+        "mean": 0.9926568908819144,
+        "sampleStandardDeviation": 0.0246881971609567
+      },
+      "p95LatencyRatio": {
+        "values": [
+          0.9862850955223835,
+          1.0580707922798949,
+          1.1904454289848447
+        ],
+        "minimum": 0.9862850955223835,
+        "maximum": 1.1904454289848447,
+        "mean": 1.0782671055957076,
+        "sampleStandardDeviation": 0.10356774953400648
+      }
+    },
+    "tokens128-labels32-tasks1": {
+      "throughputRatio": {
+        "values": [
+          0.934030891665899,
+          0.9122071157502134,
+          1.03480960592434
+        ],
+        "minimum": 0.9122071157502134,
+        "maximum": 1.03480960592434,
+        "mean": 0.9603492044468175,
+        "sampleStandardDeviation": 0.06540132139299547
+      },
+      "p95LatencyRatio": {
+        "values": [
+          1.2787210747230489,
+          1.3268465001202723,
+          0.937155044944738
+        ],
+        "minimum": 0.937155044944738,
+        "maximum": 1.3268465001202723,
+        "mean": 1.1809075399293532,
+        "sampleStandardDeviation": 0.21246287499427874
+      }
+    },
+    "tokens256-labels2-tasks1": {
+      "throughputRatio": {
+        "values": [
+          0.9721034286989003,
+          0.9359557947082536,
+          0.9712133396021612
+        ],
+        "minimum": 0.9359557947082536,
+        "maximum": 0.9721034286989003,
+        "mean": 0.9597575210031051,
+        "sampleStandardDeviation": 0.020617703451434623
+      },
+      "p95LatencyRatio": {
+        "values": [
+          0.9791662352692221,
+          0.9402863051623892,
+          1.0796462780705036
+        ],
+        "minimum": 0.9402863051623892,
+        "maximum": 1.0796462780705036,
+        "mean": 0.9996996061673716,
+        "sampleStandardDeviation": 0.07191324636371471
+      }
+    },
+    "tokens256-labels8-tasks1": {
+      "throughputRatio": {
+        "values": [
+          0.9410376863664722,
+          0.9180261538644628,
+          0.9893173100398676
+        ],
+        "minimum": 0.9180261538644628,
+        "maximum": 0.9893173100398676,
+        "mean": 0.9494603834236008,
+        "sampleStandardDeviation": 0.03638424942875157
+      },
+      "p95LatencyRatio": {
+        "values": [
+          1.207136425100679,
+          1.1438811362151091,
+          0.9791551255909523
+        ],
+        "minimum": 0.9791551255909523,
+        "maximum": 1.207136425100679,
+        "mean": 1.1100575623022468,
+        "sampleStandardDeviation": 0.11769406886379229
+      }
+    },
+    "tokens256-labels32-tasks1": {
+      "throughputRatio": {
+        "values": [
+          1.002625925662254,
+          0.9899983850348915,
+          0.9738846229454913
+        ],
+        "minimum": 0.9738846229454913,
+        "maximum": 1.002625925662254,
+        "mean": 0.9888363112142122,
+        "sampleStandardDeviation": 0.014405847150989763
+      },
+      "p95LatencyRatio": {
+        "values": [
+          0.9608202455653861,
+          1.0316709735708478,
+          1.1163844046972644
+        ],
+        "minimum": 0.9608202455653861,
+        "maximum": 1.1163844046972644,
+        "mean": 1.036291874611166,
+        "sampleStandardDeviation": 0.07788495648339541
+      }
+    },
+    "tokens512-labels2-tasks1": {
+      "throughputRatio": {
+        "values": [
+          1.3411087133780435,
+          1.25749225823437,
+          1.2741370051578118
+        ],
+        "minimum": 1.25749225823437,
+        "maximum": 1.3411087133780435,
+        "mean": 1.2909126589234083,
+        "sampleStandardDeviation": 0.04426053334683027
+      },
+      "p95LatencyRatio": {
+        "values": [
+          0.7532727640962736,
+          0.8250724136403959,
+          0.7626899387416641
+        ],
+        "minimum": 0.7532727640962736,
+        "maximum": 0.8250724136403959,
+        "mean": 0.7803450388261112,
+        "sampleStandardDeviation": 0.039020178599137326
+      }
+    },
+    "tokens512-labels8-tasks1": {
+      "throughputRatio": {
+        "values": [
+          1.2939623798171154,
+          1.2491907592801983,
+          1.298458135451616
+        ],
+        "minimum": 1.2491907592801983,
+        "maximum": 1.298458135451616,
+        "mean": 1.28053709151631,
+        "sampleStandardDeviation": 0.027239628543241984
+      },
+      "p95LatencyRatio": {
+        "values": [
+          0.7456700012706583,
+          0.8163946462158298,
+          0.7648841195826891
+        ],
+        "minimum": 0.7456700012706583,
+        "maximum": 0.8163946462158298,
+        "mean": 0.775649589023059,
+        "sampleStandardDeviation": 0.03657068976460245
+      }
+    },
+    "tokens512-labels32-tasks1": {
+      "throughputRatio": {
+        "values": [
+          1.2594811213149162,
+          1.2335887921994306,
+          1.349842554358674
+        ],
+        "minimum": 1.2335887921994306,
+        "maximum": 1.349842554358674,
+        "mean": 1.2809708226243404,
+        "sampleStandardDeviation": 0.06103351334161162
+      },
+      "p95LatencyRatio": {
+        "values": [
+          0.7756220455864583,
+          0.7731355806086371,
+          0.7228571929106588
+        ],
+        "minimum": 0.7228571929106588,
+        "maximum": 0.7756220455864583,
+        "mean": 0.757204939701918,
+        "sampleStandardDeviation": 0.029771990347452926
+      }
+    },
+    "tokens128-labels8-tasks2": {
+      "throughputRatio": {
+        "values": [
+          0.946782562965082,
+          1.0035433232404662,
+          0.9851675818808053
+        ],
+        "minimum": 0.946782562965082,
+        "maximum": 1.0035433232404662,
+        "mean": 0.9784978226954512,
+        "sampleStandardDeviation": 0.028962220951661687
+      },
+      "p95LatencyRatio": {
+        "values": [
+          1.0916465380671563,
+          0.968617451127209,
+          1.2600070897091402
+        ],
+        "minimum": 0.968617451127209,
+        "maximum": 1.2600070897091402,
+        "mean": 1.1067570263011686,
+        "sampleStandardDeviation": 0.1462813231729526
+      }
+    },
+    "tokens512-labels8-tasks2": {
+      "throughputRatio": {
+        "values": [
+          1.3068823165341048,
+          1.2438237895613833,
+          1.2964302761820699
+        ],
+        "minimum": 1.2438237895613833,
+        "maximum": 1.3068823165341048,
+        "mean": 1.2823787940925193,
+        "sampleStandardDeviation": 0.0337961176420766
+      },
+      "p95LatencyRatio": {
+        "values": [
+          0.7817749080962153,
+          0.8856874410837433,
+          0.7476276708116799
+        ],
+        "minimum": 0.7476276708116799,
+        "maximum": 0.8856874410837433,
+        "mean": 0.8050300066638795,
+        "sampleStandardDeviation": 0.07190775166098272
+      }
+    }
+  },
+  "pairResults": [
+    {
+      "policy": "schema-classification-v1",
+      "stage": "performance-pair",
+      "passed": true,
+      "candidateRuntime": {
+        "javaVersion": "25.0.3",
+        "type": "ready",
+        "device": [
+          "cpu"
+        ],
+        "backend": "rust-ffm-gliner",
+        "dtype": [
+          "float32"
+        ],
+        "snapshot": {
+          "id": "fastino_gliner2_5_decide_f32",
+          "sourceUri": "https://huggingface.co/fastino/GLiNER2.5-Decide",
+          "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+          "files": [
+            {
+              "path": "config.json",
+              "role": "configuration",
+              "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+              "sizeBytes": 1612
+            },
+            {
+              "path": "encoder_config/config.json",
+              "role": "configuration",
+              "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+              "sizeBytes": 920
+            },
+            {
+              "path": "model.safetensors",
+              "role": "classification-model",
+              "sha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+              "sizeBytes": 1945828140
+            },
+            {
+              "path": "special_tokens_map.json",
+              "role": "tokenizer",
+              "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+              "sizeBytes": 2414
+            },
+            {
+              "path": "tokenizer.json",
+              "role": "tokenizer",
+              "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+              "sizeBytes": 8333952
+            },
+            {
+              "path": "tokenizer_config.json",
+              "role": "tokenizer",
+              "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+              "sizeBytes": 3356
+            }
+          ]
+        },
+        "loadMs": 2143.590851,
+        "threads": 8,
+        "nativeSha256": "5434800398f15a0537c95bdd2936e152c66a5577a5f1b53ec55591fe12405a2f",
+        "driverHostname": "ip-172-31-13-205",
+        "driverCpuAffinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "referenceRuntime": {
+        "type": "ready",
+        "backend": "publisher-gliner2",
+        "snapshot": {
+          "id": "fastino_gliner2_5_decide_f32",
+          "sourceUri": "https://huggingface.co/fastino/GLiNER2.5-Decide",
+          "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+          "files": [
+            {
+              "path": "config.json",
+              "role": "configuration",
+              "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+              "sizeBytes": 1612
+            },
+            {
+              "path": "encoder_config/config.json",
+              "role": "configuration",
+              "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+              "sizeBytes": 920
+            },
+            {
+              "path": "model.safetensors",
+              "role": "classification-model",
+              "sha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+              "sizeBytes": 1945828140
+            },
+            {
+              "path": "special_tokens_map.json",
+              "role": "tokenizer",
+              "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+              "sizeBytes": 2414
+            },
+            {
+              "path": "tokenizer.json",
+              "role": "tokenizer",
+              "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+              "sizeBytes": 8333952
+            },
+            {
+              "path": "tokenizer_config.json",
+              "role": "tokenizer",
+              "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+              "sizeBytes": 3356
+            }
+          ]
+        },
+        "sourceRevision": "ca4f68235b50fe4c3ecf3876851d748fe4b15c6c",
+        "device": [
+          "cpu"
+        ],
+        "dtype": [
+          "torch.float32"
+        ],
+        "threads": 8,
+        "versions": {
+          "torch": "2.9.1+cpu",
+          "transformers": "4.57.6",
+          "tokenizers": "0.22.2",
+          "safetensors": "0.7.0"
+        },
+        "hostname": "ip-172-31-13-205",
+        "loadMs": 4663.618178999996,
+        "api": "extract",
+        "driverHostname": "ip-172-31-13-205",
+        "driverCpuAffinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "buckets": {
+        "tokens32-labels2-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 135.02326899998707,
+            "p95Ms": 145.77528400002393,
+            "requestsPerSecond": 7.551164147295615,
+            "meanInferenceMs": 131.3976029,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 186.7183349999948,
+            "p95Ms": 193.20602499999495,
+            "requestsPerSecond": 5.335322409819839,
+            "meanInferenceMs": 187.12651276666557,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 1.4153154331212383,
+          "p95LatencyRatio": 0.7545069259616917,
+          "passed": true
+        },
+        "tokens32-labels8-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 136.25655549992644,
+            "p95Ms": 142.9440339999246,
+            "requestsPerSecond": 7.56679163085258,
+            "meanInferenceMs": 131.08376546666668,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 188.64383250000571,
+            "p95Ms": 205.77425999999832,
+            "requestsPerSecond": 5.22457337999382,
+            "meanInferenceMs": 191.08524856666142,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 1.448308039815785,
+          "p95LatencyRatio": 0.6946643083538523,
+          "passed": true
+        },
+        "tokens128-labels2-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 305.1504455000327,
+            "p95Ms": 336.705514000073,
+            "requestsPerSecond": 3.2498176915374835,
+            "meanInferenceMs": 306.81727060000003,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 293.1239714999947,
+            "p95Ms": 319.6595390000425,
+            "requestsPerSecond": 3.3712870298690243,
+            "meanInferenceMs": 296.23995763334204,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 0.9639694463107581,
+          "p95LatencyRatio": 1.0533254069418783,
+          "passed": true
+        },
+        "tokens128-labels8-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 292.75355200002195,
+            "p95Ms": 305.3064440000526,
+            "requestsPerSecond": 3.400400937579643,
+            "meanInferenceMs": 293.2210762,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 292.164785500006,
+            "p95Ms": 309.55191900000045,
+            "requestsPerSecond": 3.401387034543844,
+            "meanInferenceMs": 293.32464223333164,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 0.9997100897503912,
+          "p95LatencyRatio": 0.9862850955223835,
+          "passed": true
+        },
+        "tokens128-labels32-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 294.85916550004276,
+            "p95Ms": 379.2786320000232,
+            "requestsPerSecond": 3.263090773096744,
+            "meanInferenceMs": 305.5856507666667,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 284.7751120000055,
+            "p95Ms": 296.60778999999593,
+            "requestsPerSecond": 3.493557656617577,
+            "meanInferenceMs": 285.71628716666356,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 0.934030891665899,
+          "p95LatencyRatio": 1.2787210747230489,
+          "passed": true
+        },
+        "tokens256-labels2-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 534.850997000035,
+            "p95Ms": 555.2386909999996,
+            "requestsPerSecond": 1.857100270216724,
+            "meanInferenceMs": 537.7576364333333,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 519.7360819999801,
+            "p95Ms": 567.0525300000122,
+            "requestsPerSecond": 1.9103937044048251,
+            "meanInferenceMs": 523.1286191666603,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 0.9721034286989003,
+          "p95LatencyRatio": 0.9791662352692221,
+          "passed": true
+        },
+        "tokens256-labels8-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 538.1606999999917,
+            "p95Ms": 649.1037149999102,
+            "requestsPerSecond": 1.8081545038534006,
+            "meanInferenceMs": 552.3133447333333,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 522.9071765000128,
+            "p95Ms": 537.7219189999778,
+            "requestsPerSecond": 1.9214474936014874,
+            "meanInferenceMs": 520.1031717333345,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 0.9410376863664722,
+          "p95LatencyRatio": 1.207136425100679,
+          "passed": true
+        },
+        "tokens256-labels32-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 514.065462499957,
+            "p95Ms": 547.5796719999835,
+            "requestsPerSecond": 1.9159344487774115,
+            "meanInferenceMs": 521.1116788,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 527.0574600000089,
+            "p95Ms": 569.9085489999902,
+            "requestsPerSecond": 1.9109165240385135,
+            "meanInferenceMs": 522.9431433333389,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 1.002625925662254,
+          "p95LatencyRatio": 0.9608202455653861,
+          "passed": true
+        },
+        "tokens512-labels2-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 1042.598274999989,
+            "p95Ms": 1117.1328770000173,
+            "requestsPerSecond": 0.9516893973405116,
+            "meanInferenceMs": 1050.0788394333333,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 1405.0869635000254,
+            "p95Ms": 1483.0389869999863,
+            "requestsPerSecond": 0.709628822665207,
+            "meanInferenceMs": 1408.8221635333298,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 1.3411087133780435,
+          "p95LatencyRatio": 0.7532727640962736,
+          "passed": true
+        },
+        "tokens512-labels8-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 1107.9200760000276,
+            "p95Ms": 1152.805126999965,
+            "requestsPerSecond": 0.8955964986164785,
+            "meanInferenceMs": 1115.8780558666667,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 1437.42973800002,
+            "p95Ms": 1545.9990679999578,
+            "requestsPerSecond": 0.6921348816517057,
+            "meanInferenceMs": 1444.4345562333353,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 1.2939623798171154,
+          "p95LatencyRatio": 0.7456700012706583,
+          "passed": true
+        },
+        "tokens512-labels32-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 1114.2649975000154,
+            "p95Ms": 1166.21038400001,
+            "requestsPerSecond": 0.8867449529369412,
+            "meanInferenceMs": 1126.8896201,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 1410.4607904999966,
+            "p95Ms": 1503.5807589999877,
+            "requestsPerSecond": 0.7040557718016185,
+            "meanInferenceMs": 1419.9429910999982,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 1.2594811213149162,
+          "p95LatencyRatio": 0.7756220455864583,
+          "passed": true
+        },
+        "tokens128-labels8-tasks2": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 290.70017349999944,
+            "p95Ms": 337.06593199997315,
+            "requestsPerSecond": 3.3456118291144263,
+            "meanInferenceMs": 298.2360510666667,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 278.4738784999945,
+            "p95Ms": 308.7683790000142,
+            "requestsPerSecond": 3.533664391364393,
+            "meanInferenceMs": 282.64442793333916,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 0.946782562965082,
+          "p95LatencyRatio": 1.0916465380671563,
+          "passed": true
+        },
+        "tokens512-labels8-tasks2": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 1061.5307169999824,
+            "p95Ms": 1198.2005029999527,
+            "requestsPerSecond": 0.9154072004380439,
+            "meanInferenceMs": 1091.6981711333333,
+            "peakRssKiB": 4932160
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 1410.3628830000048,
+            "p95Ms": 1532.6668720000498,
+            "requestsPerSecond": 0.7004511338601123,
+            "meanInferenceMs": 1427.2646199333299,
+            "peakRssKiB": 4240448
+          },
+          "throughputRatio": 1.3068823165341048,
+          "p95LatencyRatio": 0.7817749080962153,
+          "passed": true
+        }
+      },
+      "failures": [],
+      "catalogQualified": false
+    },
+    {
+      "policy": "schema-classification-v1",
+      "stage": "performance-pair",
+      "passed": true,
+      "candidateRuntime": {
+        "loadMs": 2218.141176,
+        "snapshot": {
+          "id": "fastino_gliner2_5_decide_f32",
+          "sourceUri": "https://huggingface.co/fastino/GLiNER2.5-Decide",
+          "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+          "files": [
+            {
+              "path": "config.json",
+              "role": "configuration",
+              "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+              "sizeBytes": 1612
+            },
+            {
+              "path": "encoder_config/config.json",
+              "role": "configuration",
+              "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+              "sizeBytes": 920
+            },
+            {
+              "path": "model.safetensors",
+              "role": "classification-model",
+              "sha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+              "sizeBytes": 1945828140
+            },
+            {
+              "path": "special_tokens_map.json",
+              "role": "tokenizer",
+              "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+              "sizeBytes": 2414
+            },
+            {
+              "path": "tokenizer.json",
+              "role": "tokenizer",
+              "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+              "sizeBytes": 8333952
+            },
+            {
+              "path": "tokenizer_config.json",
+              "role": "tokenizer",
+              "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+              "sizeBytes": 3356
+            }
+          ]
+        },
+        "dtype": [
+          "float32"
+        ],
+        "backend": "rust-ffm-gliner",
+        "device": [
+          "cpu"
+        ],
+        "type": "ready",
+        "javaVersion": "25.0.3",
+        "nativeSha256": "5434800398f15a0537c95bdd2936e152c66a5577a5f1b53ec55591fe12405a2f",
+        "threads": 8,
+        "driverHostname": "ip-172-31-13-205",
+        "driverCpuAffinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "referenceRuntime": {
+        "type": "ready",
+        "backend": "publisher-gliner2",
+        "snapshot": {
+          "id": "fastino_gliner2_5_decide_f32",
+          "sourceUri": "https://huggingface.co/fastino/GLiNER2.5-Decide",
+          "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+          "files": [
+            {
+              "path": "config.json",
+              "role": "configuration",
+              "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+              "sizeBytes": 1612
+            },
+            {
+              "path": "encoder_config/config.json",
+              "role": "configuration",
+              "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+              "sizeBytes": 920
+            },
+            {
+              "path": "model.safetensors",
+              "role": "classification-model",
+              "sha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+              "sizeBytes": 1945828140
+            },
+            {
+              "path": "special_tokens_map.json",
+              "role": "tokenizer",
+              "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+              "sizeBytes": 2414
+            },
+            {
+              "path": "tokenizer.json",
+              "role": "tokenizer",
+              "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+              "sizeBytes": 8333952
+            },
+            {
+              "path": "tokenizer_config.json",
+              "role": "tokenizer",
+              "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+              "sizeBytes": 3356
+            }
+          ]
+        },
+        "sourceRevision": "ca4f68235b50fe4c3ecf3876851d748fe4b15c6c",
+        "device": [
+          "cpu"
+        ],
+        "dtype": [
+          "torch.float32"
+        ],
+        "threads": 8,
+        "versions": {
+          "torch": "2.9.1+cpu",
+          "transformers": "4.57.6",
+          "tokenizers": "0.22.2",
+          "safetensors": "0.7.0"
+        },
+        "hostname": "ip-172-31-13-205",
+        "loadMs": 4648.32229700005,
+        "api": "extract",
+        "driverHostname": "ip-172-31-13-205",
+        "driverCpuAffinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "buckets": {
+        "tokens32-labels2-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 137.9278715000396,
+            "p95Ms": 148.0909499999825,
+            "requestsPerSecond": 7.53387482695392,
+            "meanInferenceMs": 131.68455716666668,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 186.19614850001653,
+            "p95Ms": 197.87318900011996,
+            "requestsPerSecond": 5.342883501554982,
+            "meanInferenceMs": 186.87413453336225,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 1.41007656722466,
+          "p95LatencyRatio": 0.7484134194647903,
+          "passed": true
+        },
+        "tokens32-labels8-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 129.5210020000468,
+            "p95Ms": 151.73230799996418,
+            "requestsPerSecond": 7.591157630723463,
+            "meanInferenceMs": 130.60058153333333,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 188.60530349991222,
+            "p95Ms": 206.30186800008232,
+            "requestsPerSecond": 5.238921568204391,
+            "meanInferenceMs": 190.57272646668176,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 1.4489924179806508,
+          "p95LatencyRatio": 0.7354868352423432,
+          "passed": true
+        },
+        "tokens128-labels2-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 292.2886695000102,
+            "p95Ms": 304.6311649999325,
+            "requestsPerSecond": 3.3991097454663493,
+            "meanInferenceMs": 293.33929966666665,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 280.75703799993335,
+            "p95Ms": 304.9382689998765,
+            "requestsPerSecond": 3.4896454743952168,
+            "meanInferenceMs": 286.2764359000039,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 0.9740558949058978,
+          "p95LatencyRatio": 0.9989928978053451,
+          "passed": true
+        },
+        "tokens128-labels8-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 292.0781775000023,
+            "p95Ms": 308.80592799996975,
+            "requestsPerSecond": 3.388634037316021,
+            "meanInferenceMs": 294.2102314,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 285.4231164999419,
+            "p95Ms": 291.8575300000157,
+            "requestsPerSecond": 3.510775078304509,
+            "meanInferenceMs": 284.52147306665364,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 0.965209665027167,
+          "p95LatencyRatio": 1.0580707922798949,
+          "passed": true
+        },
+        "tokens128-labels32-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 294.880524000007,
+            "p95Ms": 381.24871200000143,
+            "requestsPerSecond": 3.262799805308754,
+            "meanInferenceMs": 305.6049543,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 279.0885150000122,
+            "p95Ms": 287.3344519998682,
+            "requestsPerSecond": 3.57681906770194,
+            "meanInferenceMs": 279.237695633348,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 0.9122071157502134,
+          "p95LatencyRatio": 1.3268465001202723,
+          "passed": true
+        },
+        "tokens256-labels2-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 532.5719299999605,
+            "p95Ms": 545.1114190000226,
+            "requestsPerSecond": 1.8690066718415324,
+            "meanInferenceMs": 534.3126015333333,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 501.5232040000228,
+            "p95Ms": 579.7291909998421,
+            "requestsPerSecond": 1.9968963090015588,
+            "meanInferenceMs": 500.4396177666422,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 0.9359557947082536,
+          "p95LatencyRatio": 0.9402863051623892,
+          "passed": true
+        },
+        "tokens256-labels8-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 535.9740625000313,
+            "p95Ms": 614.1842140000335,
+            "requestsPerSecond": 1.830680819994591,
+            "meanInferenceMs": 545.4993609333334,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 505.8086189999358,
+            "p95Ms": 536.9301010000527,
+            "requestsPerSecond": 1.994148872870644,
+            "meanInferenceMs": 501.1513805333455,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 0.9180261538644628,
+          "p95LatencyRatio": 1.1438811362151091,
+          "passed": true
+        },
+        "tokens256-labels32-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 511.21110399998315,
+            "p95Ms": 586.0430570000972,
+            "requestsPerSecond": 1.916615452023903,
+            "meanInferenceMs": 520.9018330333333,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 518.4094385000435,
+            "p95Ms": 568.0522879999899,
+            "requestsPerSecond": 1.9359783621832412,
+            "meanInferenceMs": 516.174112966678,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 0.9899983850348915,
+          "p95LatencyRatio": 1.0316709735708478,
+          "passed": true
+        },
+        "tokens512-labels2-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 1121.228513999995,
+            "p95Ms": 1258.66781000002,
+            "requestsPerSecond": 0.8809021496151597,
+            "meanInferenceMs": 1134.5050564333333,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 1412.7848450000329,
+            "p95Ms": 1525.5240500000582,
+            "requestsPerSecond": 0.7005229207947761,
+            "meanInferenceMs": 1427.138157400024,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 1.25749225823437,
+          "p95LatencyRatio": 0.8250724136403959,
+          "passed": true
+        },
+        "tokens512-labels8-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 1115.4570755000464,
+            "p95Ms": 1230.5903399999352,
+            "requestsPerSecond": 0.885416930892905,
+            "meanInferenceMs": 1128.6815746333334,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 1403.3652924999842,
+            "p95Ms": 1507.3473910001667,
+            "requestsPerSecond": 0.708792411659445,
+            "meanInferenceMs": 1410.475342133365,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 1.2491907592801983,
+          "p95LatencyRatio": 0.8163946462158298,
+          "passed": true
+        },
+        "tokens512-labels32-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 1132.8386824999939,
+            "p95Ms": 1172.1805700000232,
+            "requestsPerSecond": 0.8738526437781919,
+            "meanInferenceMs": 1143.5051102666666,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 1391.6649329999018,
+            "p95Ms": 1516.1384360001193,
+            "requestsPerSecond": 0.7083824442180233,
+            "meanInferenceMs": 1411.2713669333289,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 1.2335887921994306,
+          "p95LatencyRatio": 0.7731355806086371,
+          "passed": true
+        },
+        "tokens128-labels8-tasks2": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 285.6305715000076,
+            "p95Ms": 306.88759300005586,
+            "requestsPerSecond": 3.465976621807141,
+            "meanInferenceMs": 287.8073177,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 285.4365399998642,
+            "p95Ms": 316.830543000151,
+            "requestsPerSecond": 3.4537389084662697,
+            "meanInferenceMs": 289.19985773328943,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 1.0035433232404662,
+          "p95LatencyRatio": 0.968617451127209,
+          "passed": true
+        },
+        "tokens512-labels8-tasks2": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 1123.3268419999831,
+            "p95Ms": 1337.6626080000733,
+            "requestsPerSecond": 0.878212821012415,
+            "meanInferenceMs": 1138.0255024,
+            "peakRssKiB": 4932356
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 1400.6099764999362,
+            "p95Ms": 1510.310010000012,
+            "requestsPerSecond": 0.7060588713471256,
+            "meanInferenceMs": 1415.936366233306,
+            "peakRssKiB": 4240112
+          },
+          "throughputRatio": 1.2438237895613833,
+          "p95LatencyRatio": 0.8856874410837433,
+          "passed": true
+        }
+      },
+      "failures": [],
+      "catalogQualified": false
+    },
+    {
+      "policy": "schema-classification-v1",
+      "stage": "performance-pair",
+      "passed": true,
+      "candidateRuntime": {
+        "javaVersion": "25.0.3",
+        "nativeSha256": "5434800398f15a0537c95bdd2936e152c66a5577a5f1b53ec55591fe12405a2f",
+        "threads": 8,
+        "loadMs": 2256.478217,
+        "snapshot": {
+          "id": "fastino_gliner2_5_decide_f32",
+          "sourceUri": "https://huggingface.co/fastino/GLiNER2.5-Decide",
+          "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+          "files": [
+            {
+              "path": "config.json",
+              "role": "configuration",
+              "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+              "sizeBytes": 1612
+            },
+            {
+              "path": "encoder_config/config.json",
+              "role": "configuration",
+              "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+              "sizeBytes": 920
+            },
+            {
+              "path": "model.safetensors",
+              "role": "classification-model",
+              "sha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+              "sizeBytes": 1945828140
+            },
+            {
+              "path": "special_tokens_map.json",
+              "role": "tokenizer",
+              "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+              "sizeBytes": 2414
+            },
+            {
+              "path": "tokenizer.json",
+              "role": "tokenizer",
+              "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+              "sizeBytes": 8333952
+            },
+            {
+              "path": "tokenizer_config.json",
+              "role": "tokenizer",
+              "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+              "sizeBytes": 3356
+            }
+          ]
+        },
+        "dtype": [
+          "float32"
+        ],
+        "backend": "rust-ffm-gliner",
+        "device": [
+          "cpu"
+        ],
+        "type": "ready",
+        "driverHostname": "ip-172-31-13-205",
+        "driverCpuAffinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "referenceRuntime": {
+        "type": "ready",
+        "backend": "publisher-gliner2",
+        "snapshot": {
+          "id": "fastino_gliner2_5_decide_f32",
+          "sourceUri": "https://huggingface.co/fastino/GLiNER2.5-Decide",
+          "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+          "files": [
+            {
+              "path": "config.json",
+              "role": "configuration",
+              "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+              "sizeBytes": 1612
+            },
+            {
+              "path": "encoder_config/config.json",
+              "role": "configuration",
+              "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+              "sizeBytes": 920
+            },
+            {
+              "path": "model.safetensors",
+              "role": "classification-model",
+              "sha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+              "sizeBytes": 1945828140
+            },
+            {
+              "path": "special_tokens_map.json",
+              "role": "tokenizer",
+              "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+              "sizeBytes": 2414
+            },
+            {
+              "path": "tokenizer.json",
+              "role": "tokenizer",
+              "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+              "sizeBytes": 8333952
+            },
+            {
+              "path": "tokenizer_config.json",
+              "role": "tokenizer",
+              "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+              "sizeBytes": 3356
+            }
+          ]
+        },
+        "sourceRevision": "ca4f68235b50fe4c3ecf3876851d748fe4b15c6c",
+        "device": [
+          "cpu"
+        ],
+        "dtype": [
+          "torch.float32"
+        ],
+        "threads": 8,
+        "versions": {
+          "torch": "2.9.1+cpu",
+          "transformers": "4.57.6",
+          "tokenizers": "0.22.2",
+          "safetensors": "0.7.0"
+        },
+        "hostname": "ip-172-31-13-205",
+        "loadMs": 4655.537208999931,
+        "api": "extract",
+        "driverHostname": "ip-172-31-13-205",
+        "driverCpuAffinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "buckets": {
+        "tokens32-labels2-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 147.64173849994222,
+            "p95Ms": 153.93435299984048,
+            "requestsPerSecond": 6.973772886851342,
+            "meanInferenceMs": 142.2944714,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 187.88220950000323,
+            "p95Ms": 207.10392699993463,
+            "requestsPerSecond": 5.235123001914355,
+            "meanInferenceMs": 190.71360683333296,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 1.3321125185217628,
+          "p95LatencyRatio": 0.7432710486454903,
+          "passed": true
+        },
+        "tokens32-labels8-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 130.28528049994748,
+            "p95Ms": 149.88437599981808,
+            "requestsPerSecond": 7.7086729618871415,
+            "meanInferenceMs": 128.6536258,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 181.56739400001243,
+            "p95Ms": 196.9375599999239,
+            "requestsPerSecond": 5.453347734790456,
+            "meanInferenceMs": 183.073817699983,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 1.4135671035075386,
+          "p95LatencyRatio": 0.7610756221407231,
+          "passed": true
+        },
+        "tokens128-labels2-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 288.2410864998519,
+            "p95Ms": 310.7017590000396,
+            "requestsPerSecond": 3.4430951918706785,
+            "meanInferenceMs": 289.6007087,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 284.37486000007084,
+            "p95Ms": 312.40792900007364,
+            "requestsPerSecond": 3.4599967785303942,
+            "meanInferenceMs": 288.7292799666587,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 0.995115143816147,
+          "p95LatencyRatio": 0.9945386469367311,
+          "passed": true
+        },
+        "tokens128-labels8-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 277.42010400004347,
+            "p95Ms": 374.82765599997947,
+            "requestsPerSecond": 3.448887327988593,
+            "meanInferenceMs": 289.08270596666665,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 290.6939685000225,
+            "p95Ms": 314.8633670000436,
+            "requestsPerSecond": 3.404456051672371,
+            "meanInferenceMs": 293.41583480001344,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 1.0130509178681852,
+          "p95LatencyRatio": 1.1904454289848447,
+          "passed": true
+        },
+        "tokens128-labels32-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 279.8944200000051,
+            "p95Ms": 291.9859430000997,
+            "requestsPerSecond": 3.545568196097018,
+            "meanInferenceMs": 281.1581295666667,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 289.4362199999705,
+            "p95Ms": 311.5663140001743,
+            "requestsPerSecond": 3.426300041861278,
+            "meanInferenceMs": 291.5201503000238,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 1.03480960592434,
+          "p95LatencyRatio": 0.937155044944738,
+          "passed": true
+        },
+        "tokens256-labels2-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 515.1852479998524,
+            "p95Ms": 587.9666869998346,
+            "requestsPerSecond": 1.8972236758084693,
+            "meanInferenceMs": 526.3341121333333,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 521.7329455001618,
+            "p95Ms": 544.5919640001193,
+            "requestsPerSecond": 1.953457184376844,
+            "meanInferenceMs": 511.58719683334465,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 0.9712133396021612,
+          "p95LatencyRatio": 1.0796462780705036,
+          "passed": true
+        },
+        "tokens256-labels8-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 534.1432149999719,
+            "p95Ms": 557.070565999993,
+            "requestsPerSecond": 1.8850458780358024,
+            "meanInferenceMs": 529.7386346,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 524.1787520000116,
+            "p95Ms": 568.9298369998141,
+            "requestsPerSecond": 1.9054006827797632,
+            "meanInferenceMs": 524.485010233343,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 0.9893173100398676,
+          "p95LatencyRatio": 0.9791551255909523,
+          "passed": true
+        },
+        "tokens256-labels32-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 525.1123069999721,
+            "p95Ms": 605.997263999825,
+            "requestsPerSecond": 1.8548571647084182,
+            "meanInferenceMs": 538.2903466333333,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 528.4156850000272,
+            "p95Ms": 542.821326999956,
+            "requestsPerSecond": 1.9045964183092305,
+            "meanInferenceMs": 524.6747952000305,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 0.9738846229454913,
+          "p95LatencyRatio": 1.1163844046972644,
+          "passed": true
+        },
+        "tokens512-labels2-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 1113.1841390000545,
+            "p95Ms": 1157.3356409999178,
+            "requestsPerSecond": 0.8893601552222815,
+            "meanInferenceMs": 1123.7442396666665,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 1425.607834500056,
+            "p95Ms": 1517.439240000158,
+            "requestsPerSecond": 0.6980098306713314,
+            "meanInferenceMs": 1432.2769828999906,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 1.2741370051578118,
+          "p95LatencyRatio": 0.7626899387416641,
+          "passed": true
+        },
+        "tokens512-labels8-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 1104.8381555000333,
+            "p95Ms": 1160.4127860000517,
+            "requestsPerSecond": 0.8957578088809539,
+            "meanInferenceMs": 1115.6719769666668,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 1447.0886739999287,
+            "p95Ms": 1517.1092670000235,
+            "requestsPerSecond": 0.6898626797616396,
+            "meanInferenceMs": 1449.1907237666585,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 1.298458135451616,
+          "p95LatencyRatio": 0.7648841195826891,
+          "passed": true
+        },
+        "tokens512-labels32-tasks1": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 1063.172172999998,
+            "p95Ms": 1138.8287620000028,
+            "requestsPerSecond": 0.9273881943921869,
+            "meanInferenceMs": 1077.4911944,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 1442.6315844999635,
+            "p95Ms": 1575.4547000001367,
+            "requestsPerSecond": 0.6870343444112265,
+            "meanInferenceMs": 1455.1391404333572,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 1.349842554358674,
+          "p95LatencyRatio": 0.7228571929106588,
+          "passed": true
+        },
+        "tokens128-labels8-tasks2": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 287.9551779999474,
+            "p95Ms": 387.76392599993414,
+            "requestsPerSecond": 3.378085968137468,
+            "meanInferenceMs": 295.32337456666664,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 289.4869589999871,
+            "p95Ms": 307.74741600021116,
+            "requestsPerSecond": 3.4289455218251184,
+            "meanInferenceMs": 291.2507401333566,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 0.9851675818808053,
+          "p95LatencyRatio": 1.2600070897091402,
+          "passed": true
+        },
+        "tokens512-labels8-tasks2": {
+          "candidate": {
+            "samples": 30,
+            "p50Ms": 1119.1874924999183,
+            "p95Ms": 1164.971056000013,
+            "requestsPerSecond": 0.8845866406665706,
+            "meanInferenceMs": 1129.7938299,
+            "peakRssKiB": 4930492
+          },
+          "reference": {
+            "samples": 30,
+            "p50Ms": 1460.4774685000166,
+            "p95Ms": 1558.2235669999136,
+            "requestsPerSecond": 0.6823248862033979,
+            "meanInferenceMs": 1465.1893667999957,
+            "peakRssKiB": 4240308
+          },
+          "throughputRatio": 1.2964302761820699,
+          "p95LatencyRatio": 0.7476276708116799,
+          "passed": true
+        }
+      },
+      "failures": [],
+      "catalogQualified": false
+    }
+  ],
+  "catalogQualified": false
+}

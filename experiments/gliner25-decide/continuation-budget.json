@@ -1,0 +1,33 @@
+{
+  "authorization": "User instruction on 2026-11-01: proceed until it is qualified, don't waste time",
+  "previousAggregateLimitSeconds": 7200,
+  "previousRentedSecondsUpperBound": 5962,
+  "maximumAggregateRentedSeconds": 28800,
+  "additionalAllocationSeconds": 7200,
+  "purpose": "Bounded continuation: CPU profiling, measured runtime fixes and further development-selected training",
+  "rules": "Count every prior and overlapping rental; each worker has a deletion deadline. Original-model admission follows user-approved upstream-v2 fidelity and disclosure; historical verdicts remain; performance gates are unchanged.",
+  "continuations": [
+    {
+      "previousLimitSeconds": 14400,
+      "newLimitSeconds": 18000,
+      "additionalAllocationSeconds": 3600,
+      "reason": "User-authorized continued qualification: complete prepared-weight performance measurement and development-directed balanced training; v2 development scores did not clear quality floors",
+      "authorization": "User instruction on 2026-11-01: proceed until it is qualified, don't waste time"
+    },
+    {
+      "previousLimitSeconds": 18000,
+      "newLimitSeconds": 21600,
+      "additionalAllocationSeconds": 3600,
+      "reason": "Explicitly requested publisher benchmark and emotion-scoring audit: both runtimes on all 1700 public development rows and 5427 official emotion test rows",
+      "authorization": "User on 2026-11-01: Try their F1 bench to see if our Emotions bench is way off and there is a problem"
+    },
+    {
+      "previousLimitSeconds": 21600,
+      "newLimitSeconds": 28800,
+      "additionalAllocationSeconds": 7200,
+      "reason": "Bounded released-artifact completion: three full same-host performance pairs plus a separate complete publisher and GoEmotions accuracy repeat. Reserve both rentals; accuracy uses a larger dedicated CPU host to finish sooner.",
+      "authorization": "User requested completion ASAP and explicitly approved upstream fidelity plus performance and disclosed accuracy on 2026-11-01",
+      "maximumAdditionalSpendUsd": 4.0
+    }
+  ]
+}

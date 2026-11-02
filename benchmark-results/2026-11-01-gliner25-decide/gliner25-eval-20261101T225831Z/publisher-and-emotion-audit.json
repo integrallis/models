@@ -1,0 +1,2755 @@
+{
+  "stage": "publisher-public-data-and-full-emotion-audit",
+  "catalogQualified": false,
+  "publisherSplit": "public development, not the private benchmark test",
+  "performanceClaim": "none; accuracy workers run concurrently on the same host",
+  "publisher": {
+    "reference": {
+      "runtime": {
+        "type": "ready",
+        "backend": "publisher-gliner2",
+        "snapshot": {
+          "id": "fastino_gliner2_5_decide_f32",
+          "sourceUri": "https://huggingface.co/fastino/GLiNER2.5-Decide",
+          "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+          "files": [
+            {
+              "path": "config.json",
+              "role": "configuration",
+              "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+              "sizeBytes": 1612
+            },
+            {
+              "path": "encoder_config/config.json",
+              "role": "configuration",
+              "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+              "sizeBytes": 920
+            },
+            {
+              "path": "model.safetensors",
+              "role": "classification-model",
+              "sha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+              "sizeBytes": 1945828140
+            },
+            {
+              "path": "special_tokens_map.json",
+              "role": "tokenizer",
+              "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+              "sizeBytes": 2414
+            },
+            {
+              "path": "tokenizer.json",
+              "role": "tokenizer",
+              "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+              "sizeBytes": 8333952
+            },
+            {
+              "path": "tokenizer_config.json",
+              "role": "tokenizer",
+              "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+              "sizeBytes": 3356
+            }
+          ]
+        },
+        "sourceRevision": "ca4f68235b50fe4c3ecf3876851d748fe4b15c6c",
+        "device": [
+          "cpu"
+        ],
+        "dtype": [
+          "torch.float32"
+        ],
+        "threads": 8,
+        "versions": {
+          "torch": "2.9.1+cpu",
+          "transformers": "4.57.6",
+          "tokenizers": "0.22.2",
+          "safetensors": "0.7.0"
+        },
+        "hostname": "ip-172-31-5-124",
+        "loadMs": 4932.593349000001,
+        "api": "classify-text",
+        "driverHostname": "ip-172-31-5-124",
+        "driverCpuAffinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "domains": {
+        "agent_handoff": {
+          "cases": 100,
+          "correctRows": 76,
+          "heads": 100,
+          "correctHeads": 76,
+          "errors": 0,
+          "documentExactMatch": 0.76,
+          "headExactMatch": 0.76,
+          "microF1": 0.76,
+          "macroF1": 0.7362637362637363,
+          "perTaskLabelCounts": {
+            "should_handoff::yes": {
+              "tp": 53,
+              "fp": 23,
+              "fn": 1
+            },
+            "should_handoff::no": {
+              "tp": 23,
+              "fp": 1,
+              "fn": 23
+            }
+          }
+        },
+        "banking_intent": {
+          "cases": 100,
+          "correctRows": 64,
+          "heads": 100,
+          "correctHeads": 64,
+          "errors": 0,
+          "documentExactMatch": 0.64,
+          "headExactMatch": 0.64,
+          "microF1": 0.64,
+          "macroF1": 0.629353938545115,
+          "perTaskLabelCounts": {
+            "intent::mortgage": {
+              "tp": 9,
+              "fp": 6,
+              "fn": 0
+            },
+            "intent::statement": {
+              "tp": 5,
+              "fp": 0,
+              "fn": 4
+            },
+            "intent::fraud_alert": {
+              "tp": 3,
+              "fp": 1,
+              "fn": 3
+            },
+            "intent::transfer": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 3
+            },
+            "intent::loan_payment": {
+              "tp": 4,
+              "fp": 6,
+              "fn": 1
+            },
+            "intent::close_account": {
+              "tp": 5,
+              "fp": 1,
+              "fn": 0
+            },
+            "intent::other": {
+              "tp": 3,
+              "fp": 6,
+              "fn": 6
+            },
+            "intent::card_lost": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 2
+            },
+            "intent::balance": {
+              "tp": 3,
+              "fp": 1,
+              "fn": 1
+            },
+            "intent::dispute_charge": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::new_account": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::wire": {
+              "tp": 0,
+              "fp": 4,
+              "fn": 5
+            },
+            "intent::branch_appointment": {
+              "tp": 6,
+              "fp": 5,
+              "fn": 0
+            },
+            "intent::limit_increase": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 2
+            },
+            "intent::fee_refund": {
+              "tp": 9,
+              "fp": 0,
+              "fn": 4
+            },
+            "intent::direct_deposit": {
+              "tp": 3,
+              "fp": 6,
+              "fn": 3
+            }
+          }
+        },
+        "benefits_request": {
+          "cases": 200,
+          "correctRows": 150,
+          "heads": 200,
+          "correctHeads": 150,
+          "errors": 0,
+          "documentExactMatch": 0.75,
+          "headExactMatch": 0.75,
+          "microF1": 0.75,
+          "macroF1": 0.8032299499192493,
+          "perTaskLabelCounts": {
+            "program::housing_aid": {
+              "tp": 11,
+              "fp": 0,
+              "fn": 2
+            },
+            "program::tax_credit": {
+              "tp": 11,
+              "fp": 3,
+              "fn": 0
+            },
+            "program::pension": {
+              "tp": 14,
+              "fp": 0,
+              "fn": 1
+            },
+            "program::disability": {
+              "tp": 8,
+              "fp": 0,
+              "fn": 1
+            },
+            "program::unemployment": {
+              "tp": 13,
+              "fp": 8,
+              "fn": 0
+            },
+            "program::other": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 8
+            },
+            "program::food_assistance": {
+              "tp": 13,
+              "fp": 0,
+              "fn": 2
+            },
+            "program::health_coverage": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 0
+            },
+            "program::childcare": {
+              "tp": 10,
+              "fp": 3,
+              "fn": 0
+            },
+            "asking_status::yes": {
+              "tp": 44,
+              "fp": 26,
+              "fn": 10
+            },
+            "asking_status::no": {
+              "tp": 20,
+              "fp": 10,
+              "fn": 26
+            }
+          }
+        },
+        "clinic_request": {
+          "cases": 200,
+          "correctRows": 129,
+          "heads": 200,
+          "correctHeads": 129,
+          "errors": 0,
+          "documentExactMatch": 0.645,
+          "headExactMatch": 0.645,
+          "microF1": 0.645,
+          "macroF1": 0.575259445576783,
+          "perTaskLabelCounts": {
+            "request::appointment": {
+              "tp": 5,
+              "fp": 12,
+              "fn": 0
+            },
+            "request::referral": {
+              "tp": 9,
+              "fp": 7,
+              "fn": 3
+            },
+            "request::provider_message": {
+              "tp": 7,
+              "fp": 1,
+              "fn": 6
+            },
+            "request::billing": {
+              "tp": 6,
+              "fp": 2,
+              "fn": 2
+            },
+            "request::insurance": {
+              "tp": 4,
+              "fp": 3,
+              "fn": 3
+            },
+            "request::other": {
+              "tp": 0,
+              "fp": 5,
+              "fn": 6
+            },
+            "request::records": {
+              "tp": 5,
+              "fp": 3,
+              "fn": 5
+            },
+            "request::refill": {
+              "tp": 5,
+              "fp": 1,
+              "fn": 1
+            },
+            "request::symptom_question": {
+              "tp": 3,
+              "fp": 4,
+              "fn": 9
+            },
+            "request::lab_results": {
+              "tp": 7,
+              "fp": 4,
+              "fn": 2
+            },
+            "request::cancel_visit": {
+              "tp": 6,
+              "fp": 1,
+              "fn": 6
+            },
+            "urgent::yes": {
+              "tp": 18,
+              "fp": 2,
+              "fn": 26
+            },
+            "urgent::no": {
+              "tp": 54,
+              "fp": 26,
+              "fn": 2
+            }
+          }
+        },
+        "document_type": {
+          "cases": 100,
+          "correctRows": 79,
+          "heads": 100,
+          "correctHeads": 79,
+          "errors": 0,
+          "documentExactMatch": 0.79,
+          "headExactMatch": 0.79,
+          "microF1": 0.79,
+          "macroF1": 0.7582917354976179,
+          "perTaskLabelCounts": {
+            "doc_type::bank_statement": {
+              "tp": 12,
+              "fp": 1,
+              "fn": 3
+            },
+            "doc_type::research_abstract": {
+              "tp": 4,
+              "fp": 2,
+              "fn": 5
+            },
+            "doc_type::lease": {
+              "tp": 8,
+              "fp": 0,
+              "fn": 1
+            },
+            "doc_type::clinical_note": {
+              "tp": 6,
+              "fp": 2,
+              "fn": 4
+            },
+            "doc_type::recipe": {
+              "tp": 6,
+              "fp": 1,
+              "fn": 0
+            },
+            "doc_type::sports_recap": {
+              "tp": 6,
+              "fp": 3,
+              "fn": 2
+            },
+            "doc_type::syllabus": {
+              "tp": 5,
+              "fp": 5,
+              "fn": 0
+            },
+            "doc_type::resume": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 1
+            },
+            "doc_type::receipt": {
+              "tp": 14,
+              "fp": 0,
+              "fn": 2
+            },
+            "doc_type::news_article": {
+              "tp": 1,
+              "fp": 3,
+              "fn": 3
+            },
+            "doc_type::invoice": {
+              "tp": 7,
+              "fp": 1,
+              "fn": 0
+            },
+            "doc_type::contract": {
+              "tp": 6,
+              "fp": 3,
+              "fn": 0
+            }
+          }
+        },
+        "email_triage": {
+          "cases": 400,
+          "correctRows": 237,
+          "heads": 400,
+          "correctHeads": 237,
+          "errors": 0,
+          "documentExactMatch": 0.5925,
+          "headExactMatch": 0.5925,
+          "microF1": 0.5925,
+          "macroF1": 0.5290075857855623,
+          "perTaskLabelCounts": {
+            "category::newsletter": {
+              "tp": 7,
+              "fp": 2,
+              "fn": 9
+            },
+            "category::calendar": {
+              "tp": 13,
+              "fp": 15,
+              "fn": 5
+            },
+            "category::billing": {
+              "tp": 9,
+              "fp": 3,
+              "fn": 2
+            },
+            "category::sales": {
+              "tp": 2,
+              "fp": 4,
+              "fn": 8
+            },
+            "category::recruiting": {
+              "tp": 6,
+              "fp": 8,
+              "fn": 2
+            },
+            "category::legal": {
+              "tp": 10,
+              "fp": 4,
+              "fn": 8
+            },
+            "category::security": {
+              "tp": 5,
+              "fp": 8,
+              "fn": 7
+            },
+            "category::support": {
+              "tp": 0,
+              "fp": 4,
+              "fn": 7
+            },
+            "action::reply": {
+              "tp": 18,
+              "fp": 21,
+              "fn": 7
+            },
+            "action::escalate": {
+              "tp": 7,
+              "fp": 1,
+              "fn": 21
+            },
+            "action::fyi": {
+              "tp": 16,
+              "fp": 20,
+              "fn": 14
+            },
+            "action::approve": {
+              "tp": 14,
+              "fp": 3,
+              "fn": 3
+            },
+            "needs_reply::yes": {
+              "tp": 45,
+              "fp": 23,
+              "fn": 8
+            },
+            "needs_reply::no": {
+              "tp": 24,
+              "fp": 8,
+              "fn": 23
+            },
+            "is_phishing::yes": {
+              "tp": 14,
+              "fp": 6,
+              "fn": 33
+            },
+            "is_phishing::no": {
+              "tp": 47,
+              "fp": 33,
+              "fn": 6
+            }
+          }
+        },
+        "news_topic": {
+          "cases": 100,
+          "correctRows": 69,
+          "heads": 100,
+          "correctHeads": 69,
+          "errors": 0,
+          "documentExactMatch": 0.69,
+          "headExactMatch": 0.69,
+          "microF1": 0.69,
+          "macroF1": 0.6900194326395699,
+          "perTaskLabelCounts": {
+            "topic::sports": {
+              "tp": 6,
+              "fp": 0,
+              "fn": 2
+            },
+            "topic::technology": {
+              "tp": 8,
+              "fp": 3,
+              "fn": 2
+            },
+            "topic::health": {
+              "tp": 10,
+              "fp": 4,
+              "fn": 0
+            },
+            "topic::politics": {
+              "tp": 2,
+              "fp": 3,
+              "fn": 12
+            },
+            "topic::science": {
+              "tp": 7,
+              "fp": 7,
+              "fn": 3
+            },
+            "topic::entertainment": {
+              "tp": 8,
+              "fp": 1,
+              "fn": 2
+            },
+            "topic::world": {
+              "tp": 5,
+              "fp": 4,
+              "fn": 4
+            },
+            "topic::culture": {
+              "tp": 7,
+              "fp": 2,
+              "fn": 3
+            },
+            "topic::weather": {
+              "tp": 7,
+              "fp": 3,
+              "fn": 2
+            },
+            "topic::business": {
+              "tp": 9,
+              "fp": 4,
+              "fn": 1
+            }
+          }
+        },
+        "paper_field": {
+          "cases": 100,
+          "correctRows": 47,
+          "heads": 100,
+          "correctHeads": 47,
+          "errors": 0,
+          "documentExactMatch": 0.47,
+          "headExactMatch": 0.47,
+          "microF1": 0.47,
+          "macroF1": 0.4650205058099795,
+          "perTaskLabelCounts": {
+            "field::medicine": {
+              "tp": 8,
+              "fp": 15,
+              "fn": 2
+            },
+            "field::earth_science": {
+              "tp": 3,
+              "fp": 7,
+              "fn": 8
+            },
+            "field::engineering": {
+              "tp": 3,
+              "fp": 9,
+              "fn": 4
+            },
+            "field::economics": {
+              "tp": 6,
+              "fp": 4,
+              "fn": 2
+            },
+            "field::mathematics": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 3
+            },
+            "field::other": {
+              "tp": 0,
+              "fp": 0,
+              "fn": 12
+            },
+            "field::physics": {
+              "tp": 5,
+              "fp": 1,
+              "fn": 11
+            },
+            "field::chemistry": {
+              "tp": 6,
+              "fp": 4,
+              "fn": 0
+            },
+            "field::computer_science": {
+              "tp": 5,
+              "fp": 2,
+              "fn": 10
+            },
+            "field::biology": {
+              "tp": 8,
+              "fp": 11,
+              "fn": 1
+            }
+          }
+        },
+        "product_feedback": {
+          "cases": 200,
+          "correctRows": 104,
+          "heads": 200,
+          "correctHeads": 104,
+          "errors": 0,
+          "documentExactMatch": 0.52,
+          "headExactMatch": 0.52,
+          "microF1": 0.5892857142857143,
+          "macroF1": 0.5980466628944291,
+          "perTaskLabelCounts": {
+            "feedback_type::praise": {
+              "tp": 16,
+              "fp": 5,
+              "fn": 5
+            },
+            "feedback_type::feature_request": {
+              "tp": 14,
+              "fp": 3,
+              "fn": 12
+            },
+            "feedback_type::bug": {
+              "tp": 26,
+              "fp": 17,
+              "fn": 6
+            },
+            "feedback_type::how_to": {
+              "tp": 18,
+              "fp": 1,
+              "fn": 3
+            },
+            "product_area::billing": {
+              "tp": 7,
+              "fp": 0,
+              "fn": 34
+            },
+            "product_area::mobile": {
+              "tp": 11,
+              "fp": 3,
+              "fn": 18
+            },
+            "product_area::admin": {
+              "tp": 11,
+              "fp": 2,
+              "fn": 8
+            },
+            "product_area::checkout": {
+              "tp": 19,
+              "fp": 6,
+              "fn": 34
+            },
+            "product_area::search": {
+              "tp": 6,
+              "fp": 0,
+              "fn": 7
+            },
+            "product_area::notifications": {
+              "tp": 18,
+              "fp": 2,
+              "fn": 10
+            },
+            "product_area::shipping": {
+              "tp": 5,
+              "fp": 0,
+              "fn": 34
+            },
+            "product_area::integrations": {
+              "tp": 14,
+              "fp": 2,
+              "fn": 18
+            }
+          }
+        },
+        "restaurant_review": {
+          "cases": 200,
+          "correctRows": 107,
+          "heads": 200,
+          "correctHeads": 107,
+          "errors": 0,
+          "documentExactMatch": 0.535,
+          "headExactMatch": 0.535,
+          "microF1": 0.8229056203605515,
+          "macroF1": 0.8106880605914859,
+          "perTaskLabelCounts": {
+            "sentiment::negative": {
+              "tp": 34,
+              "fp": 8,
+              "fn": 1
+            },
+            "sentiment::neutral": {
+              "tp": 20,
+              "fp": 0,
+              "fn": 16
+            },
+            "sentiment::positive": {
+              "tp": 28,
+              "fp": 10,
+              "fn": 1
+            },
+            "aspects::service": {
+              "tp": 68,
+              "fp": 12,
+              "fn": 9
+            },
+            "aspects::cleanliness": {
+              "tp": 39,
+              "fp": 3,
+              "fn": 16
+            },
+            "aspects::price": {
+              "tp": 39,
+              "fp": 1,
+              "fn": 14
+            },
+            "aspects::food": {
+              "tp": 84,
+              "fp": 10,
+              "fn": 5
+            },
+            "aspects::wait": {
+              "tp": 40,
+              "fp": 1,
+              "fn": 37
+            },
+            "aspects::ambiance": {
+              "tp": 36,
+              "fp": 7,
+              "fn": 16
+            }
+          }
+        },
+        "review_sentiment": {
+          "cases": 100,
+          "correctRows": 84,
+          "heads": 100,
+          "correctHeads": 84,
+          "errors": 0,
+          "documentExactMatch": 0.84,
+          "headExactMatch": 0.84,
+          "microF1": 0.84,
+          "macroF1": 0.8386999677500269,
+          "perTaskLabelCounts": {
+            "sentiment::negative": {
+              "tp": 36,
+              "fp": 14,
+              "fn": 0
+            },
+            "sentiment::neutral": {
+              "tp": 21,
+              "fp": 1,
+              "fn": 12
+            },
+            "sentiment::positive": {
+              "tp": 27,
+              "fp": 1,
+              "fn": 4
+            }
+          }
+        },
+        "screen_tags": {
+          "cases": 200,
+          "correctRows": 97,
+          "heads": 200,
+          "correctHeads": 97,
+          "errors": 0,
+          "documentExactMatch": 0.485,
+          "headExactMatch": 0.485,
+          "microF1": 0.6741996233521658,
+          "macroF1": 0.6462390690082745,
+          "perTaskLabelCounts": {
+            "genres::comedy": {
+              "tp": 32,
+              "fp": 2,
+              "fn": 3
+            },
+            "genres::documentary": {
+              "tp": 14,
+              "fp": 1,
+              "fn": 8
+            },
+            "genres::kids": {
+              "tp": 3,
+              "fp": 5,
+              "fn": 5
+            },
+            "genres::action": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 10
+            },
+            "genres::sci_fi": {
+              "tp": 13,
+              "fp": 8,
+              "fn": 9
+            },
+            "genres::drama": {
+              "tp": 13,
+              "fp": 0,
+              "fn": 75
+            },
+            "genres::horror": {
+              "tp": 7,
+              "fp": 2,
+              "fn": 4
+            },
+            "genres::romance": {
+              "tp": 10,
+              "fp": 4,
+              "fn": 3
+            },
+            "format::film": {
+              "tp": 36,
+              "fp": 11,
+              "fn": 6
+            },
+            "format::series": {
+              "tp": 47,
+              "fp": 6,
+              "fn": 11
+            }
+          }
+        },
+        "sports_recap": {
+          "cases": 300,
+          "correctRows": 227,
+          "heads": 300,
+          "correctHeads": 227,
+          "errors": 0,
+          "documentExactMatch": 0.7566666666666667,
+          "headExactMatch": 0.7566666666666667,
+          "microF1": 0.7566666666666667,
+          "macroF1": 0.7313669157725365,
+          "perTaskLabelCounts": {
+            "sport::basketball": {
+              "tp": 10,
+              "fp": 2,
+              "fn": 0
+            },
+            "sport::soccer": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 13
+            },
+            "sport::motorsport": {
+              "tp": 8,
+              "fp": 2,
+              "fn": 3
+            },
+            "sport::football": {
+              "tp": 11,
+              "fp": 17,
+              "fn": 2
+            },
+            "sport::other": {
+              "tp": 1,
+              "fp": 1,
+              "fn": 10
+            },
+            "sport::baseball": {
+              "tp": 11,
+              "fp": 0,
+              "fn": 0
+            },
+            "sport::tennis": {
+              "tp": 11,
+              "fp": 4,
+              "fn": 1
+            },
+            "sport::cricket": {
+              "tp": 15,
+              "fp": 4,
+              "fn": 1
+            },
+            "result::upcoming": {
+              "tp": 20,
+              "fp": 2,
+              "fn": 4
+            },
+            "result::loss": {
+              "tp": 20,
+              "fp": 1,
+              "fn": 3
+            },
+            "result::draw": {
+              "tp": 28,
+              "fp": 2,
+              "fn": 3
+            },
+            "result::win": {
+              "tp": 20,
+              "fp": 7,
+              "fn": 2
+            },
+            "upset::yes": {
+              "tp": 31,
+              "fp": 15,
+              "fn": 16
+            },
+            "upset::no": {
+              "tp": 38,
+              "fp": 16,
+              "fn": 15
+            }
+          }
+        },
+        "support_intent": {
+          "cases": 100,
+          "correctRows": 76,
+          "heads": 100,
+          "correctHeads": 76,
+          "errors": 0,
+          "documentExactMatch": 0.76,
+          "headExactMatch": 0.76,
+          "microF1": 0.76,
+          "macroF1": 0.7057210646496361,
+          "perTaskLabelCounts": {
+            "intent::close_account": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::downgrade_plan": {
+              "tp": 4,
+              "fp": 2,
+              "fn": 0
+            },
+            "intent::product_question": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::partner_inquiry": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 3
+            },
+            "intent::promo_code": {
+              "tp": 0,
+              "fp": 0,
+              "fn": 2
+            },
+            "intent::order_status": {
+              "tp": 2,
+              "fp": 3,
+              "fn": 1
+            },
+            "intent::shipping_delay": {
+              "tp": 0,
+              "fp": 1,
+              "fn": 1
+            },
+            "intent::cancel_subscription": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::update_payment": {
+              "tp": 3,
+              "fp": 1,
+              "fn": 0
+            },
+            "intent::upgrade_plan": {
+              "tp": 1,
+              "fp": 4,
+              "fn": 0
+            },
+            "intent::change_address": {
+              "tp": 5,
+              "fp": 2,
+              "fn": 0
+            },
+            "intent::damaged_item": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::invoice_copy": {
+              "tp": 9,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::appointment": {
+              "tp": 7,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::refund_request": {
+              "tp": 4,
+              "fp": 5,
+              "fn": 0
+            },
+            "intent::password_reset": {
+              "tp": 5,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::speak_to_human": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 4
+            },
+            "intent::outage": {
+              "tp": 1,
+              "fp": 1,
+              "fn": 0
+            },
+            "intent::missing_item": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::complaint": {
+              "tp": 3,
+              "fp": 2,
+              "fn": 1
+            },
+            "intent::other": {
+              "tp": 2,
+              "fp": 1,
+              "fn": 1
+            },
+            "intent::tax_document": {
+              "tp": 5,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::data_export": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::feature_request": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 4
+            },
+            "intent::change_order": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::pricing_question": {
+              "tp": 3,
+              "fp": 1,
+              "fn": 1
+            },
+            "intent::bug_report": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::login_problem": {
+              "tp": 2,
+              "fp": 1,
+              "fn": 1
+            }
+          }
+        },
+        "support_topic": {
+          "cases": 100,
+          "correctRows": 44,
+          "heads": 100,
+          "correctHeads": 44,
+          "errors": 0,
+          "documentExactMatch": 0.44,
+          "headExactMatch": 0.44,
+          "microF1": 0.44,
+          "macroF1": 0.4262700061613105,
+          "perTaskLabelCounts": {
+            "topic::onboarding": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 5
+            },
+            "topic::pricing": {
+              "tp": 5,
+              "fp": 4,
+              "fn": 1
+            },
+            "topic::account_access": {
+              "tp": 4,
+              "fp": 3,
+              "fn": 7
+            },
+            "topic::returns": {
+              "tp": 7,
+              "fp": 14,
+              "fn": 0
+            },
+            "topic::billing": {
+              "tp": 4,
+              "fp": 7,
+              "fn": 6
+            },
+            "topic::other": {
+              "tp": 0,
+              "fp": 1,
+              "fn": 9
+            },
+            "topic::compliance": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 5
+            },
+            "topic::technical_outage": {
+              "tp": 3,
+              "fp": 2,
+              "fn": 8
+            },
+            "topic::security": {
+              "tp": 4,
+              "fp": 9,
+              "fn": 3
+            },
+            "topic::data_privacy": {
+              "tp": 3,
+              "fp": 6,
+              "fn": 4
+            },
+            "topic::shipping": {
+              "tp": 3,
+              "fp": 2,
+              "fn": 5
+            },
+            "topic::integrations": {
+              "tp": 6,
+              "fp": 8,
+              "fn": 3
+            }
+          }
+        },
+        "ticket_route": {
+          "cases": 300,
+          "correctRows": 145,
+          "heads": 300,
+          "correctHeads": 145,
+          "errors": 0,
+          "documentExactMatch": 0.48333333333333334,
+          "headExactMatch": 0.48333333333333334,
+          "microF1": 0.48333333333333334,
+          "macroF1": 0.4857709559590093,
+          "perTaskLabelCounts": {
+            "queue::onboarding": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 1
+            },
+            "queue::product_feedback": {
+              "tp": 0,
+              "fp": 1,
+              "fn": 3
+            },
+            "queue::fraud_review": {
+              "tp": 1,
+              "fp": 3,
+              "fn": 8
+            },
+            "queue::identity": {
+              "tp": 6,
+              "fp": 0,
+              "fn": 1
+            },
+            "queue::payments": {
+              "tp": 4,
+              "fp": 5,
+              "fn": 2
+            },
+            "queue::mobile_app": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 1
+            },
+            "queue::partnerships": {
+              "tp": 4,
+              "fp": 1,
+              "fn": 4
+            },
+            "queue::returns": {
+              "tp": 2,
+              "fp": 4,
+              "fn": 2
+            },
+            "queue::general": {
+              "tp": 0,
+              "fp": 1,
+              "fn": 7
+            },
+            "queue::compliance": {
+              "tp": 9,
+              "fp": 0,
+              "fn": 2
+            },
+            "queue::refunds": {
+              "tp": 6,
+              "fp": 5,
+              "fn": 0
+            },
+            "queue::billing_disputes": {
+              "tp": 3,
+              "fp": 7,
+              "fn": 2
+            },
+            "queue::outages": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 6
+            },
+            "queue::api": {
+              "tp": 5,
+              "fp": 8,
+              "fn": 1
+            },
+            "queue::account_closure": {
+              "tp": 7,
+              "fp": 2,
+              "fn": 1
+            },
+            "queue::shipping": {
+              "tp": 2,
+              "fp": 5,
+              "fn": 1
+            },
+            "urgency::normal": {
+              "tp": 11,
+              "fp": 25,
+              "fn": 16
+            },
+            "urgency::critical": {
+              "tp": 10,
+              "fp": 13,
+              "fn": 16
+            },
+            "urgency::low": {
+              "tp": 2,
+              "fp": 2,
+              "fn": 23
+            },
+            "urgency::high": {
+              "tp": 11,
+              "fp": 26,
+              "fn": 11
+            },
+            "contains_pii::yes": {
+              "tp": 7,
+              "fp": 2,
+              "fn": 45
+            },
+            "contains_pii::no": {
+              "tp": 46,
+              "fp": 45,
+              "fn": 2
+            }
+          }
+        },
+        "travel_request": {
+          "cases": 100,
+          "correctRows": 63,
+          "heads": 100,
+          "correctHeads": 63,
+          "errors": 0,
+          "documentExactMatch": 0.63,
+          "headExactMatch": 0.63,
+          "microF1": 0.63,
+          "macroF1": 0.6099191634920188,
+          "perTaskLabelCounts": {
+            "intent::baggage": {
+              "tp": 12,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::seat": {
+              "tp": 8,
+              "fp": 3,
+              "fn": 0
+            },
+            "intent::visa_docs": {
+              "tp": 4,
+              "fp": 2,
+              "fn": 4
+            },
+            "intent::disruption": {
+              "tp": 3,
+              "fp": 2,
+              "fn": 4
+            },
+            "intent::other": {
+              "tp": 1,
+              "fp": 4,
+              "fn": 11
+            },
+            "intent::loyalty": {
+              "tp": 8,
+              "fp": 8,
+              "fn": 1
+            },
+            "intent::hotel": {
+              "tp": 9,
+              "fp": 11,
+              "fn": 2
+            },
+            "intent::car": {
+              "tp": 4,
+              "fp": 7,
+              "fn": 0
+            },
+            "intent::refund": {
+              "tp": 6,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::new_booking": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 4
+            },
+            "intent::cancel_trip": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::change_flight": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 8
+            }
+          }
+        }
+      },
+      "cases": 2900,
+      "errors": 0,
+      "meanDomainDocumentExactMatch": 0.6345588235294117,
+      "meanDomainHeadExactMatch": 0.6345588235294117
+    },
+    "models": {
+      "runtime": {
+        "dtype": [
+          "float32"
+        ],
+        "backend": "rust-ffm-gliner",
+        "device": [
+          "cpu"
+        ],
+        "type": "ready",
+        "javaVersion": "25.0.3",
+        "nativeSha256": "5434800398f15a0537c95bdd2936e152c66a5577a5f1b53ec55591fe12405a2f",
+        "threads": 8,
+        "loadMs": 2098.679462,
+        "snapshot": {
+          "id": "fastino_gliner2_5_decide_f32",
+          "sourceUri": "https://huggingface.co/fastino/GLiNER2.5-Decide",
+          "revision": "9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90",
+          "files": [
+            {
+              "path": "config.json",
+              "role": "configuration",
+              "sha256": "501c6579278518e72dbba5a1f248b421dd5bfb13600db45d86c94c224368670b",
+              "sizeBytes": 1612
+            },
+            {
+              "path": "encoder_config/config.json",
+              "role": "configuration",
+              "sha256": "bd32f1484ba5a199f7a63df44df3814b839fffcf6e64478323c4689868ef6015",
+              "sizeBytes": 920
+            },
+            {
+              "path": "model.safetensors",
+              "role": "classification-model",
+              "sha256": "40a5a23ff860dc3dff426cecd1048cacdd29c648c96db209dad818e9686dc997",
+              "sizeBytes": 1945828140
+            },
+            {
+              "path": "special_tokens_map.json",
+              "role": "tokenizer",
+              "sha256": "84ea70143f533d7e99b393d87f20010887a9ac2cba955828ef313886e4e83f4f",
+              "sizeBytes": 2414
+            },
+            {
+              "path": "tokenizer.json",
+              "role": "tokenizer",
+              "sha256": "3ad87d9ffe669147063e70850927dd2da90249e2acc5c8527f1eb65df467bcc8",
+              "sizeBytes": 8333952
+            },
+            {
+              "path": "tokenizer_config.json",
+              "role": "tokenizer",
+              "sha256": "323199a4e946039410899f3779f2aa3eaef1500213c512727ad0f623d4f21309",
+              "sizeBytes": 3356
+            }
+          ]
+        },
+        "driverHostname": "ip-172-31-5-124",
+        "driverCpuAffinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      "domains": {
+        "agent_handoff": {
+          "cases": 100,
+          "correctRows": 76,
+          "heads": 100,
+          "correctHeads": 76,
+          "errors": 0,
+          "documentExactMatch": 0.76,
+          "headExactMatch": 0.76,
+          "microF1": 0.76,
+          "macroF1": 0.7362637362637363,
+          "perTaskLabelCounts": {
+            "should_handoff::yes": {
+              "tp": 53,
+              "fp": 23,
+              "fn": 1
+            },
+            "should_handoff::no": {
+              "tp": 23,
+              "fp": 1,
+              "fn": 23
+            }
+          }
+        },
+        "banking_intent": {
+          "cases": 100,
+          "correctRows": 64,
+          "heads": 100,
+          "correctHeads": 64,
+          "errors": 0,
+          "documentExactMatch": 0.64,
+          "headExactMatch": 0.64,
+          "microF1": 0.64,
+          "macroF1": 0.629353938545115,
+          "perTaskLabelCounts": {
+            "intent::mortgage": {
+              "tp": 9,
+              "fp": 6,
+              "fn": 0
+            },
+            "intent::statement": {
+              "tp": 5,
+              "fp": 0,
+              "fn": 4
+            },
+            "intent::fraud_alert": {
+              "tp": 3,
+              "fp": 1,
+              "fn": 3
+            },
+            "intent::transfer": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 3
+            },
+            "intent::loan_payment": {
+              "tp": 4,
+              "fp": 6,
+              "fn": 1
+            },
+            "intent::close_account": {
+              "tp": 5,
+              "fp": 1,
+              "fn": 0
+            },
+            "intent::other": {
+              "tp": 3,
+              "fp": 6,
+              "fn": 6
+            },
+            "intent::card_lost": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 2
+            },
+            "intent::balance": {
+              "tp": 3,
+              "fp": 1,
+              "fn": 1
+            },
+            "intent::dispute_charge": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::new_account": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::wire": {
+              "tp": 0,
+              "fp": 4,
+              "fn": 5
+            },
+            "intent::branch_appointment": {
+              "tp": 6,
+              "fp": 5,
+              "fn": 0
+            },
+            "intent::limit_increase": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 2
+            },
+            "intent::fee_refund": {
+              "tp": 9,
+              "fp": 0,
+              "fn": 4
+            },
+            "intent::direct_deposit": {
+              "tp": 3,
+              "fp": 6,
+              "fn": 3
+            }
+          }
+        },
+        "benefits_request": {
+          "cases": 200,
+          "correctRows": 150,
+          "heads": 200,
+          "correctHeads": 150,
+          "errors": 0,
+          "documentExactMatch": 0.75,
+          "headExactMatch": 0.75,
+          "microF1": 0.75,
+          "macroF1": 0.8032299499192493,
+          "perTaskLabelCounts": {
+            "program::housing_aid": {
+              "tp": 11,
+              "fp": 0,
+              "fn": 2
+            },
+            "program::tax_credit": {
+              "tp": 11,
+              "fp": 3,
+              "fn": 0
+            },
+            "program::pension": {
+              "tp": 14,
+              "fp": 0,
+              "fn": 1
+            },
+            "program::disability": {
+              "tp": 8,
+              "fp": 0,
+              "fn": 1
+            },
+            "program::unemployment": {
+              "tp": 13,
+              "fp": 8,
+              "fn": 0
+            },
+            "program::other": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 8
+            },
+            "program::food_assistance": {
+              "tp": 13,
+              "fp": 0,
+              "fn": 2
+            },
+            "program::health_coverage": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 0
+            },
+            "program::childcare": {
+              "tp": 10,
+              "fp": 3,
+              "fn": 0
+            },
+            "asking_status::yes": {
+              "tp": 44,
+              "fp": 26,
+              "fn": 10
+            },
+            "asking_status::no": {
+              "tp": 20,
+              "fp": 10,
+              "fn": 26
+            }
+          }
+        },
+        "clinic_request": {
+          "cases": 200,
+          "correctRows": 129,
+          "heads": 200,
+          "correctHeads": 129,
+          "errors": 0,
+          "documentExactMatch": 0.645,
+          "headExactMatch": 0.645,
+          "microF1": 0.645,
+          "macroF1": 0.575259445576783,
+          "perTaskLabelCounts": {
+            "request::appointment": {
+              "tp": 5,
+              "fp": 12,
+              "fn": 0
+            },
+            "request::referral": {
+              "tp": 9,
+              "fp": 7,
+              "fn": 3
+            },
+            "request::provider_message": {
+              "tp": 7,
+              "fp": 1,
+              "fn": 6
+            },
+            "request::billing": {
+              "tp": 6,
+              "fp": 2,
+              "fn": 2
+            },
+            "request::insurance": {
+              "tp": 4,
+              "fp": 3,
+              "fn": 3
+            },
+            "request::other": {
+              "tp": 0,
+              "fp": 5,
+              "fn": 6
+            },
+            "request::records": {
+              "tp": 5,
+              "fp": 3,
+              "fn": 5
+            },
+            "request::refill": {
+              "tp": 5,
+              "fp": 1,
+              "fn": 1
+            },
+            "request::symptom_question": {
+              "tp": 3,
+              "fp": 4,
+              "fn": 9
+            },
+            "request::lab_results": {
+              "tp": 7,
+              "fp": 4,
+              "fn": 2
+            },
+            "request::cancel_visit": {
+              "tp": 6,
+              "fp": 1,
+              "fn": 6
+            },
+            "urgent::yes": {
+              "tp": 18,
+              "fp": 2,
+              "fn": 26
+            },
+            "urgent::no": {
+              "tp": 54,
+              "fp": 26,
+              "fn": 2
+            }
+          }
+        },
+        "document_type": {
+          "cases": 100,
+          "correctRows": 79,
+          "heads": 100,
+          "correctHeads": 79,
+          "errors": 0,
+          "documentExactMatch": 0.79,
+          "headExactMatch": 0.79,
+          "microF1": 0.79,
+          "macroF1": 0.7582917354976179,
+          "perTaskLabelCounts": {
+            "doc_type::bank_statement": {
+              "tp": 12,
+              "fp": 1,
+              "fn": 3
+            },
+            "doc_type::research_abstract": {
+              "tp": 4,
+              "fp": 2,
+              "fn": 5
+            },
+            "doc_type::lease": {
+              "tp": 8,
+              "fp": 0,
+              "fn": 1
+            },
+            "doc_type::clinical_note": {
+              "tp": 6,
+              "fp": 2,
+              "fn": 4
+            },
+            "doc_type::recipe": {
+              "tp": 6,
+              "fp": 1,
+              "fn": 0
+            },
+            "doc_type::sports_recap": {
+              "tp": 6,
+              "fp": 3,
+              "fn": 2
+            },
+            "doc_type::syllabus": {
+              "tp": 5,
+              "fp": 5,
+              "fn": 0
+            },
+            "doc_type::resume": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 1
+            },
+            "doc_type::receipt": {
+              "tp": 14,
+              "fp": 0,
+              "fn": 2
+            },
+            "doc_type::news_article": {
+              "tp": 1,
+              "fp": 3,
+              "fn": 3
+            },
+            "doc_type::invoice": {
+              "tp": 7,
+              "fp": 1,
+              "fn": 0
+            },
+            "doc_type::contract": {
+              "tp": 6,
+              "fp": 3,
+              "fn": 0
+            }
+          }
+        },
+        "email_triage": {
+          "cases": 400,
+          "correctRows": 237,
+          "heads": 400,
+          "correctHeads": 237,
+          "errors": 0,
+          "documentExactMatch": 0.5925,
+          "headExactMatch": 0.5925,
+          "microF1": 0.5925,
+          "macroF1": 0.5290075857855623,
+          "perTaskLabelCounts": {
+            "category::newsletter": {
+              "tp": 7,
+              "fp": 2,
+              "fn": 9
+            },
+            "category::calendar": {
+              "tp": 13,
+              "fp": 15,
+              "fn": 5
+            },
+            "category::billing": {
+              "tp": 9,
+              "fp": 3,
+              "fn": 2
+            },
+            "category::sales": {
+              "tp": 2,
+              "fp": 4,
+              "fn": 8
+            },
+            "category::recruiting": {
+              "tp": 6,
+              "fp": 8,
+              "fn": 2
+            },
+            "category::legal": {
+              "tp": 10,
+              "fp": 4,
+              "fn": 8
+            },
+            "category::security": {
+              "tp": 5,
+              "fp": 8,
+              "fn": 7
+            },
+            "category::support": {
+              "tp": 0,
+              "fp": 4,
+              "fn": 7
+            },
+            "action::reply": {
+              "tp": 18,
+              "fp": 21,
+              "fn": 7
+            },
+            "action::escalate": {
+              "tp": 7,
+              "fp": 1,
+              "fn": 21
+            },
+            "action::fyi": {
+              "tp": 16,
+              "fp": 20,
+              "fn": 14
+            },
+            "action::approve": {
+              "tp": 14,
+              "fp": 3,
+              "fn": 3
+            },
+            "needs_reply::yes": {
+              "tp": 45,
+              "fp": 23,
+              "fn": 8
+            },
+            "needs_reply::no": {
+              "tp": 24,
+              "fp": 8,
+              "fn": 23
+            },
+            "is_phishing::yes": {
+              "tp": 14,
+              "fp": 6,
+              "fn": 33
+            },
+            "is_phishing::no": {
+              "tp": 47,
+              "fp": 33,
+              "fn": 6
+            }
+          }
+        },
+        "news_topic": {
+          "cases": 100,
+          "correctRows": 69,
+          "heads": 100,
+          "correctHeads": 69,
+          "errors": 0,
+          "documentExactMatch": 0.69,
+          "headExactMatch": 0.69,
+          "microF1": 0.69,
+          "macroF1": 0.6900194326395699,
+          "perTaskLabelCounts": {
+            "topic::sports": {
+              "tp": 6,
+              "fp": 0,
+              "fn": 2
+            },
+            "topic::technology": {
+              "tp": 8,
+              "fp": 3,
+              "fn": 2
+            },
+            "topic::health": {
+              "tp": 10,
+              "fp": 4,
+              "fn": 0
+            },
+            "topic::politics": {
+              "tp": 2,
+              "fp": 3,
+              "fn": 12
+            },
+            "topic::science": {
+              "tp": 7,
+              "fp": 7,
+              "fn": 3
+            },
+            "topic::entertainment": {
+              "tp": 8,
+              "fp": 1,
+              "fn": 2
+            },
+            "topic::world": {
+              "tp": 5,
+              "fp": 4,
+              "fn": 4
+            },
+            "topic::culture": {
+              "tp": 7,
+              "fp": 2,
+              "fn": 3
+            },
+            "topic::weather": {
+              "tp": 7,
+              "fp": 3,
+              "fn": 2
+            },
+            "topic::business": {
+              "tp": 9,
+              "fp": 4,
+              "fn": 1
+            }
+          }
+        },
+        "paper_field": {
+          "cases": 100,
+          "correctRows": 47,
+          "heads": 100,
+          "correctHeads": 47,
+          "errors": 0,
+          "documentExactMatch": 0.47,
+          "headExactMatch": 0.47,
+          "microF1": 0.47,
+          "macroF1": 0.4650205058099795,
+          "perTaskLabelCounts": {
+            "field::medicine": {
+              "tp": 8,
+              "fp": 15,
+              "fn": 2
+            },
+            "field::earth_science": {
+              "tp": 3,
+              "fp": 7,
+              "fn": 8
+            },
+            "field::engineering": {
+              "tp": 3,
+              "fp": 9,
+              "fn": 4
+            },
+            "field::economics": {
+              "tp": 6,
+              "fp": 4,
+              "fn": 2
+            },
+            "field::mathematics": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 3
+            },
+            "field::other": {
+              "tp": 0,
+              "fp": 0,
+              "fn": 12
+            },
+            "field::physics": {
+              "tp": 5,
+              "fp": 1,
+              "fn": 11
+            },
+            "field::chemistry": {
+              "tp": 6,
+              "fp": 4,
+              "fn": 0
+            },
+            "field::computer_science": {
+              "tp": 5,
+              "fp": 2,
+              "fn": 10
+            },
+            "field::biology": {
+              "tp": 8,
+              "fp": 11,
+              "fn": 1
+            }
+          }
+        },
+        "product_feedback": {
+          "cases": 200,
+          "correctRows": 104,
+          "heads": 200,
+          "correctHeads": 104,
+          "errors": 0,
+          "documentExactMatch": 0.52,
+          "headExactMatch": 0.52,
+          "microF1": 0.5892857142857143,
+          "macroF1": 0.5980466628944291,
+          "perTaskLabelCounts": {
+            "feedback_type::praise": {
+              "tp": 16,
+              "fp": 5,
+              "fn": 5
+            },
+            "feedback_type::feature_request": {
+              "tp": 14,
+              "fp": 3,
+              "fn": 12
+            },
+            "feedback_type::bug": {
+              "tp": 26,
+              "fp": 17,
+              "fn": 6
+            },
+            "feedback_type::how_to": {
+              "tp": 18,
+              "fp": 1,
+              "fn": 3
+            },
+            "product_area::billing": {
+              "tp": 7,
+              "fp": 0,
+              "fn": 34
+            },
+            "product_area::mobile": {
+              "tp": 11,
+              "fp": 3,
+              "fn": 18
+            },
+            "product_area::admin": {
+              "tp": 11,
+              "fp": 2,
+              "fn": 8
+            },
+            "product_area::checkout": {
+              "tp": 19,
+              "fp": 6,
+              "fn": 34
+            },
+            "product_area::search": {
+              "tp": 6,
+              "fp": 0,
+              "fn": 7
+            },
+            "product_area::notifications": {
+              "tp": 18,
+              "fp": 2,
+              "fn": 10
+            },
+            "product_area::shipping": {
+              "tp": 5,
+              "fp": 0,
+              "fn": 34
+            },
+            "product_area::integrations": {
+              "tp": 14,
+              "fp": 2,
+              "fn": 18
+            }
+          }
+        },
+        "restaurant_review": {
+          "cases": 200,
+          "correctRows": 107,
+          "heads": 200,
+          "correctHeads": 107,
+          "errors": 0,
+          "documentExactMatch": 0.535,
+          "headExactMatch": 0.535,
+          "microF1": 0.8229056203605515,
+          "macroF1": 0.8106880605914859,
+          "perTaskLabelCounts": {
+            "sentiment::negative": {
+              "tp": 34,
+              "fp": 8,
+              "fn": 1
+            },
+            "sentiment::neutral": {
+              "tp": 20,
+              "fp": 0,
+              "fn": 16
+            },
+            "sentiment::positive": {
+              "tp": 28,
+              "fp": 10,
+              "fn": 1
+            },
+            "aspects::service": {
+              "tp": 68,
+              "fp": 12,
+              "fn": 9
+            },
+            "aspects::cleanliness": {
+              "tp": 39,
+              "fp": 3,
+              "fn": 16
+            },
+            "aspects::price": {
+              "tp": 39,
+              "fp": 1,
+              "fn": 14
+            },
+            "aspects::food": {
+              "tp": 84,
+              "fp": 10,
+              "fn": 5
+            },
+            "aspects::wait": {
+              "tp": 40,
+              "fp": 1,
+              "fn": 37
+            },
+            "aspects::ambiance": {
+              "tp": 36,
+              "fp": 7,
+              "fn": 16
+            }
+          }
+        },
+        "review_sentiment": {
+          "cases": 100,
+          "correctRows": 84,
+          "heads": 100,
+          "correctHeads": 84,
+          "errors": 0,
+          "documentExactMatch": 0.84,
+          "headExactMatch": 0.84,
+          "microF1": 0.84,
+          "macroF1": 0.8386999677500269,
+          "perTaskLabelCounts": {
+            "sentiment::negative": {
+              "tp": 36,
+              "fp": 14,
+              "fn": 0
+            },
+            "sentiment::neutral": {
+              "tp": 21,
+              "fp": 1,
+              "fn": 12
+            },
+            "sentiment::positive": {
+              "tp": 27,
+              "fp": 1,
+              "fn": 4
+            }
+          }
+        },
+        "screen_tags": {
+          "cases": 200,
+          "correctRows": 97,
+          "heads": 200,
+          "correctHeads": 97,
+          "errors": 0,
+          "documentExactMatch": 0.485,
+          "headExactMatch": 0.485,
+          "microF1": 0.6741996233521658,
+          "macroF1": 0.6462390690082745,
+          "perTaskLabelCounts": {
+            "genres::comedy": {
+              "tp": 32,
+              "fp": 2,
+              "fn": 3
+            },
+            "genres::documentary": {
+              "tp": 14,
+              "fp": 1,
+              "fn": 8
+            },
+            "genres::kids": {
+              "tp": 3,
+              "fp": 5,
+              "fn": 5
+            },
+            "genres::action": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 10
+            },
+            "genres::sci_fi": {
+              "tp": 13,
+              "fp": 8,
+              "fn": 9
+            },
+            "genres::drama": {
+              "tp": 13,
+              "fp": 0,
+              "fn": 75
+            },
+            "genres::horror": {
+              "tp": 7,
+              "fp": 2,
+              "fn": 4
+            },
+            "genres::romance": {
+              "tp": 10,
+              "fp": 4,
+              "fn": 3
+            },
+            "format::film": {
+              "tp": 36,
+              "fp": 11,
+              "fn": 6
+            },
+            "format::series": {
+              "tp": 47,
+              "fp": 6,
+              "fn": 11
+            }
+          }
+        },
+        "sports_recap": {
+          "cases": 300,
+          "correctRows": 227,
+          "heads": 300,
+          "correctHeads": 227,
+          "errors": 0,
+          "documentExactMatch": 0.7566666666666667,
+          "headExactMatch": 0.7566666666666667,
+          "microF1": 0.7566666666666667,
+          "macroF1": 0.7313669157725365,
+          "perTaskLabelCounts": {
+            "sport::basketball": {
+              "tp": 10,
+              "fp": 2,
+              "fn": 0
+            },
+            "sport::soccer": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 13
+            },
+            "sport::motorsport": {
+              "tp": 8,
+              "fp": 2,
+              "fn": 3
+            },
+            "sport::football": {
+              "tp": 11,
+              "fp": 17,
+              "fn": 2
+            },
+            "sport::other": {
+              "tp": 1,
+              "fp": 1,
+              "fn": 10
+            },
+            "sport::baseball": {
+              "tp": 11,
+              "fp": 0,
+              "fn": 0
+            },
+            "sport::tennis": {
+              "tp": 11,
+              "fp": 4,
+              "fn": 1
+            },
+            "sport::cricket": {
+              "tp": 15,
+              "fp": 4,
+              "fn": 1
+            },
+            "result::upcoming": {
+              "tp": 20,
+              "fp": 2,
+              "fn": 4
+            },
+            "result::loss": {
+              "tp": 20,
+              "fp": 1,
+              "fn": 3
+            },
+            "result::draw": {
+              "tp": 28,
+              "fp": 2,
+              "fn": 3
+            },
+            "result::win": {
+              "tp": 20,
+              "fp": 7,
+              "fn": 2
+            },
+            "upset::yes": {
+              "tp": 31,
+              "fp": 15,
+              "fn": 16
+            },
+            "upset::no": {
+              "tp": 38,
+              "fp": 16,
+              "fn": 15
+            }
+          }
+        },
+        "support_intent": {
+          "cases": 100,
+          "correctRows": 76,
+          "heads": 100,
+          "correctHeads": 76,
+          "errors": 0,
+          "documentExactMatch": 0.76,
+          "headExactMatch": 0.76,
+          "microF1": 0.76,
+          "macroF1": 0.7057210646496361,
+          "perTaskLabelCounts": {
+            "intent::close_account": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::downgrade_plan": {
+              "tp": 4,
+              "fp": 2,
+              "fn": 0
+            },
+            "intent::product_question": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::partner_inquiry": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 3
+            },
+            "intent::promo_code": {
+              "tp": 0,
+              "fp": 0,
+              "fn": 2
+            },
+            "intent::order_status": {
+              "tp": 2,
+              "fp": 3,
+              "fn": 1
+            },
+            "intent::shipping_delay": {
+              "tp": 0,
+              "fp": 1,
+              "fn": 1
+            },
+            "intent::cancel_subscription": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::update_payment": {
+              "tp": 3,
+              "fp": 1,
+              "fn": 0
+            },
+            "intent::upgrade_plan": {
+              "tp": 1,
+              "fp": 4,
+              "fn": 0
+            },
+            "intent::change_address": {
+              "tp": 5,
+              "fp": 2,
+              "fn": 0
+            },
+            "intent::damaged_item": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::invoice_copy": {
+              "tp": 9,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::appointment": {
+              "tp": 7,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::refund_request": {
+              "tp": 4,
+              "fp": 5,
+              "fn": 0
+            },
+            "intent::password_reset": {
+              "tp": 5,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::speak_to_human": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 4
+            },
+            "intent::outage": {
+              "tp": 1,
+              "fp": 1,
+              "fn": 0
+            },
+            "intent::missing_item": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::complaint": {
+              "tp": 3,
+              "fp": 2,
+              "fn": 1
+            },
+            "intent::other": {
+              "tp": 2,
+              "fp": 1,
+              "fn": 1
+            },
+            "intent::tax_document": {
+              "tp": 5,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::data_export": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 0
+            },
+            "intent::feature_request": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 4
+            },
+            "intent::change_order": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::pricing_question": {
+              "tp": 3,
+              "fp": 1,
+              "fn": 1
+            },
+            "intent::bug_report": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::login_problem": {
+              "tp": 2,
+              "fp": 1,
+              "fn": 1
+            }
+          }
+        },
+        "support_topic": {
+          "cases": 100,
+          "correctRows": 44,
+          "heads": 100,
+          "correctHeads": 44,
+          "errors": 0,
+          "documentExactMatch": 0.44,
+          "headExactMatch": 0.44,
+          "microF1": 0.44,
+          "macroF1": 0.4262700061613105,
+          "perTaskLabelCounts": {
+            "topic::onboarding": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 5
+            },
+            "topic::pricing": {
+              "tp": 5,
+              "fp": 4,
+              "fn": 1
+            },
+            "topic::account_access": {
+              "tp": 4,
+              "fp": 3,
+              "fn": 7
+            },
+            "topic::returns": {
+              "tp": 7,
+              "fp": 14,
+              "fn": 0
+            },
+            "topic::billing": {
+              "tp": 4,
+              "fp": 7,
+              "fn": 6
+            },
+            "topic::other": {
+              "tp": 0,
+              "fp": 1,
+              "fn": 9
+            },
+            "topic::compliance": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 5
+            },
+            "topic::technical_outage": {
+              "tp": 3,
+              "fp": 2,
+              "fn": 8
+            },
+            "topic::security": {
+              "tp": 4,
+              "fp": 9,
+              "fn": 3
+            },
+            "topic::data_privacy": {
+              "tp": 3,
+              "fp": 6,
+              "fn": 4
+            },
+            "topic::shipping": {
+              "tp": 3,
+              "fp": 2,
+              "fn": 5
+            },
+            "topic::integrations": {
+              "tp": 6,
+              "fp": 8,
+              "fn": 3
+            }
+          }
+        },
+        "ticket_route": {
+          "cases": 300,
+          "correctRows": 145,
+          "heads": 300,
+          "correctHeads": 145,
+          "errors": 0,
+          "documentExactMatch": 0.48333333333333334,
+          "headExactMatch": 0.48333333333333334,
+          "microF1": 0.48333333333333334,
+          "macroF1": 0.4857709559590093,
+          "perTaskLabelCounts": {
+            "queue::onboarding": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 1
+            },
+            "queue::product_feedback": {
+              "tp": 0,
+              "fp": 1,
+              "fn": 3
+            },
+            "queue::fraud_review": {
+              "tp": 1,
+              "fp": 3,
+              "fn": 8
+            },
+            "queue::identity": {
+              "tp": 6,
+              "fp": 0,
+              "fn": 1
+            },
+            "queue::payments": {
+              "tp": 4,
+              "fp": 5,
+              "fn": 2
+            },
+            "queue::mobile_app": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 1
+            },
+            "queue::partnerships": {
+              "tp": 4,
+              "fp": 1,
+              "fn": 4
+            },
+            "queue::returns": {
+              "tp": 2,
+              "fp": 4,
+              "fn": 2
+            },
+            "queue::general": {
+              "tp": 0,
+              "fp": 1,
+              "fn": 7
+            },
+            "queue::compliance": {
+              "tp": 9,
+              "fp": 0,
+              "fn": 2
+            },
+            "queue::refunds": {
+              "tp": 6,
+              "fp": 5,
+              "fn": 0
+            },
+            "queue::billing_disputes": {
+              "tp": 3,
+              "fp": 7,
+              "fn": 2
+            },
+            "queue::outages": {
+              "tp": 2,
+              "fp": 0,
+              "fn": 6
+            },
+            "queue::api": {
+              "tp": 5,
+              "fp": 8,
+              "fn": 1
+            },
+            "queue::account_closure": {
+              "tp": 7,
+              "fp": 2,
+              "fn": 1
+            },
+            "queue::shipping": {
+              "tp": 2,
+              "fp": 5,
+              "fn": 1
+            },
+            "urgency::normal": {
+              "tp": 11,
+              "fp": 25,
+              "fn": 16
+            },
+            "urgency::critical": {
+              "tp": 10,
+              "fp": 13,
+              "fn": 16
+            },
+            "urgency::low": {
+              "tp": 2,
+              "fp": 2,
+              "fn": 23
+            },
+            "urgency::high": {
+              "tp": 11,
+              "fp": 26,
+              "fn": 11
+            },
+            "contains_pii::yes": {
+              "tp": 7,
+              "fp": 2,
+              "fn": 45
+            },
+            "contains_pii::no": {
+              "tp": 46,
+              "fp": 45,
+              "fn": 2
+            }
+          }
+        },
+        "travel_request": {
+          "cases": 100,
+          "correctRows": 63,
+          "heads": 100,
+          "correctHeads": 63,
+          "errors": 0,
+          "documentExactMatch": 0.63,
+          "headExactMatch": 0.63,
+          "microF1": 0.63,
+          "macroF1": 0.6099191634920188,
+          "perTaskLabelCounts": {
+            "intent::baggage": {
+              "tp": 12,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::seat": {
+              "tp": 8,
+              "fp": 3,
+              "fn": 0
+            },
+            "intent::visa_docs": {
+              "tp": 4,
+              "fp": 2,
+              "fn": 4
+            },
+            "intent::disruption": {
+              "tp": 3,
+              "fp": 2,
+              "fn": 4
+            },
+            "intent::other": {
+              "tp": 1,
+              "fp": 4,
+              "fn": 11
+            },
+            "intent::loyalty": {
+              "tp": 8,
+              "fp": 8,
+              "fn": 1
+            },
+            "intent::hotel": {
+              "tp": 9,
+              "fp": 11,
+              "fn": 2
+            },
+            "intent::car": {
+              "tp": 4,
+              "fp": 7,
+              "fn": 0
+            },
+            "intent::refund": {
+              "tp": 6,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::new_booking": {
+              "tp": 1,
+              "fp": 0,
+              "fn": 4
+            },
+            "intent::cancel_trip": {
+              "tp": 4,
+              "fp": 0,
+              "fn": 1
+            },
+            "intent::change_flight": {
+              "tp": 3,
+              "fp": 0,
+              "fn": 8
+            }
+          }
+        }
+      },
+      "cases": 2900,
+      "errors": 0,
+      "meanDomainDocumentExactMatch": 0.6345588235294117,
+      "meanDomainHeadExactMatch": 0.6345588235294117
+    },
+    "disagreements": []
+  },
+  "goemotions": {},
+  "rawSha256": {
+    "variant-parity-reference.jsonl": "cc54e8d7b02588256a64448f1e894542d6b39de5bbc1328ccd8bd7c35516b1b9",
+    "variant-parity-models.jsonl": "15ea35ab4a46a32c1ae083f51709ba24b1019dd88b9672e5f7dcde8ccc9ef3d4",
+    "variant-shape-models.jsonl": "4cc385b37bfceb590540c81c6864f3ede6e1547d9d0d3af5917ec735f7316b13",
+    "publisher-models.jsonl": "deb53202606177b353ba849d8530f4bca2995f4d80d47d87195c15b8b97ff27d",
+    "publisher-reference.jsonl": "877bfa0fbc63e9d16055f06996e4ebb4cd454671a5a879127f39f16119fcb516",
+    "variant-shape-reference.jsonl": "4d11b2ce0010468ba2a9624e9e7d971eeecd18ccf8ddd1ecc6ef5101e5b59512"
+  }
+}

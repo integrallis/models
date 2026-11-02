@@ -1,0 +1,44 @@
+{
+  "campaign": "gliner25-20261101T183027Z",
+  "payloadUri": "s3://models-qual-077051030817/payload/gliner25-20261101T183027Z",
+  "resultUri": "s3://models-qual-077051030817/results/gliner25-20261101T183027Z",
+  "launchedAt": "2026-11-01T18:30:27.997113+00:00",
+  "deletionDeadline": "2026-11-01T20:30:27.997113+00:00",
+  "maxAggregateRentedSeconds": 7200,
+  "payloadSha256": "4cfd5473460952efc730506123dc6fecfbb707da277ea94c6edacbf701fb617c",
+  "payloadManifest": {
+    "sourceRevision": "6add46ee740f8acd80295741fc8e22bae34f845f",
+    "sha256": "4cfd5473460952efc730506123dc6fecfbb707da277ea94c6edacbf701fb617c",
+    "files": {
+      "models-api-0.5.9.jar": "4b66849f9346bec0f025a5312f04ae32222af88bacef94fe88f632ca8dd3b04f",
+      "jackson-databind-2.22.3.jar": "556db5439e206114346043f68d200497dc96a0bca62a360a81784092ebd0e0a9",
+      "vectors-core-0.1.32.jar": "a035235f056fbf81720b185925db4a63958a167999d066445371e64fc7b12e2b",
+      "slf4j-api-2.0.20.jar": "7e1446499b359675d8aabe6af2de86b85e72ae8a2a932c0b40d0e5ba57097439",
+      "jackson-annotations-2.22.jar": "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0",
+      "jackson-core-2.22.3.jar": "8a501126a385b25841915d839508f8a66e2a0dbc8a6709d055ef3b3e852b094c",
+      "backend-java-0.5.9.jar": "d5ff549bbf902d8c177e76cd3b9dd01519d97d7c606add5953cf80f2d6444d1d",
+      "backend-native-0.5.9.jar": "5b0eced659c22b49bdcea2593b63ab5c79ddbac813832571920ca63001f75c11"
+    }
+  },
+  "instances": [
+    "i-05bb179fd699f506b",
+    "i-0eafa8b24d5b35b23"
+  ],
+  "restart": {
+    "at": "2026-11-01T18:34:34.648050+00:00",
+    "reason": "worker IAM lacks ListBucket; replace s3 sync with cp --recursive",
+    "resultUri": "s3://models-qual-077051030817/results/gliner25-20261101T183027Z/restart-1",
+    "shutdownMinutes": 100
+  },
+  "cleanup": {
+    "verifiedAt": "2026-11-01T19:10:38Z",
+    "instanceStates": {
+      "i-05bb179fd699f506b": "terminated",
+      "i-0eafa8b24d5b35b23": "terminated"
+    },
+    "volumesCreatedDuringLaunchWindowRemaining": [],
+    "rentedSecondsUpperBound": 2602,
+    "remainingAggregateRentedSecondsLowerBound": 4598,
+    "method": "Conservative launch-to-observed-terminated intervals: first worker through 18:37:54Z, replacement through 19:10:38Z. Overlap counts twice."
+  }
+}

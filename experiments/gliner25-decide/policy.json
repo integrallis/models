@@ -1,0 +1,36 @@
+{
+  "policy": "schema-classification-v1",
+  "status": "registered-before-runs",
+  "comparator": "publisher-gliner2-cpu",
+  "referenceCommit": "ca4f68235b50fe4c3ecf3876851d748fe4b15c6c",
+  "tokenizersVersion": "0.22.2",
+  "computeClass": "cpu",
+  "maxAggregateRentedSeconds": 7200,
+  "maxEncodedTokens": 512,
+  "parity": {
+    "atol": 0.0001,
+    "rtol": 0.0001,
+    "exactTokenIds": true,
+    "exactSelectedLabels": true
+  },
+  "quality": {
+    "jevbenchAccuracy": 0.7,
+    "jevbenchChoiceAccuracy": 0.6,
+    "jevbenchNoulAccuracy": 0.7,
+    "singleLabelMacroF1": 0.7,
+    "multiLabelMicroF1": 0.7,
+    "multiLabelMacroF1": 0.6,
+    "maxOracleQualityLoss": 0.005,
+    "maxSingleLabelECE": 0.1,
+    "confidenceClaim": "none until separately qualified"
+  },
+  "performance": {
+    "minPairedReplications": 3,
+    "minTimedSamplesPerBucket": 30,
+    "minThroughputRatio": 0.8,
+    "maxP95LatencyRatio": 1.5,
+    "acceptance": "every final pair and advertised bucket must pass",
+    "warmups": 3
+  },
+  "provenance": "New modality policy choices adopted from the GLiNER plan; not inferred confidence intervals or retroactive changes to existing qualifications."
+}

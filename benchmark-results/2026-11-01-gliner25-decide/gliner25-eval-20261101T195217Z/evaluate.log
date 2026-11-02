@@ -1,0 +1,31 @@
+/work/evaluation-overlay.tar.gz: OK
+{
+  "policy": "schema-classification-v1",
+  "stage": "implementation-parity",
+  "passed": true,
+  "maxAbsoluteLogitError": 8.583496093450549e-06,
+  "cases": 9,
+  "failures": [],
+  "catalogQualified": false
+}
+{
+  "policy": "schema-classification-v1",
+  "stage": "implementation-parity",
+  "passed": true,
+  "maxAbsoluteLogitError": 1.9198425292188404e-05,
+  "cases": 13,
+  "failures": [],
+  "catalogQualified": false
+}
+{
+  "policy": "gliner-general-v1",
+  "stage": "fine-tuned-quality",
+  "passed": false,
+  "failures": [
+    "original-suite: goemotions.microF1: 0.519393 < 0.7",
+    "original-suite: goemotions.macroF1: 0.477815 < 0.6",
+    "goemotions.microF1: 0.496732 < 0.7",
+    "goemotions.macroF1: 0.470916 < 0.6"
+  ],
+  "catalogQualified": false
+}
