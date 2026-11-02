@@ -36,8 +36,10 @@ All notable changes to models are documented here.
   letter-to-phoneme models (`g2p-us.onnx`, `g2p-gb.onnx`, about 2 MB together) trained on
   misaki 0.9.4's own dictionaries with a CTC objective and run by `models-backend-onnx`, so the
   Paradee phonemizer no longer drops out-of-vocabulary words where the publisher's pipeline would
-  hand them to eSpeak NG (GPL, not bundled). `LetterToPhonemeFallback` is the API; the
-  phonemizer still reports the words it had to guess. The tagger now reads complementizer `that`
+  hand them to eSpeak NG (GPL, not bundled). For American English a dictionary tier answers first:
+  the 77,064 CMUdict words misaki's dictionaries lack (`cmudict-us.json`, BSD-2-Clause, converted
+  to misaki's spelling), with possessives and plurals inflected by misaki's suffix rule.
+  `LetterToPhonemeFallback` is the API; the phonemizer still reports the words it had to guess. The tagger now reads complementizer `that`
   as misaki's tagger does and treats all-caps words in mixed-case text as proper nouns.
 - This focused release is based on 0.5.10, as 0.5.10 was on 0.5.9: the GGUF tokenization and
   decoder changes of the main-branch campaign are deferred until their qualification records
