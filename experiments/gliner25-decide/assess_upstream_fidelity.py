@@ -10,13 +10,13 @@ def sha(path):
     with path.open('rb') as source:
         return hashlib.file_digest(source, 'sha256').hexdigest()
 
-def assess(joint, single):
+def assess(joint, single, single_stem="publisher"):
     policy = json.loads((HERE/'catalog-policy-v2.json').read_text())
     snapshot = json.loads((HERE/'snapshot.json').read_text())
     qualities = {'models': {}, 'reference': {}}
     evidence = {}
     disagreements = {}
-    for cohort, folder, stem, count in [('publisher.singleHead', single, 'publisher', 2900),
+    for cohort, folder, stem, count in [('publisher.singleHead', single, single_stem, 2900),
             ('publisher.jointHead', joint, 'publisher', 1700), ('goemotions.fullTest', joint, 'go-full', 5427)]:
         predictions = {}
         for arm in qualities:
@@ -45,7 +45,7 @@ def assess(joint, single):
                 for metric in ['microF1', 'macroF1']:
                     quality['goemotions.'+metric] = score[metric]
             else:
-                mode = 'singleHead' if folder == single else 'jointHead'
+                mode = 'singleHead' if cohort == 'publisher.singleHead' else 'jointHead'
                 quality[f'publisher.{mode}.meanDomainExactMatch'] = score['meanDomainHeadExactMatch']
                 for domain, result in score['domains'].items():
                     quality[f'publisher.{mode}.{domain}.exactMatch'] = result['headExactMatch']
@@ -84,7 +84,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     for name in ['joint', 'single', 'output']:
         parser.add_argument('--'+name, type=Path, required=True)
+    parser.add_argument("--single-prefix", choices=["publisher", "publisher-single"], default="publisher")
     args = parser.parse_args()
-    result = assess(args.joint, args.single)
+    result = assess(args.joint, args.single, args.single_prefix)
     args.output.write_text(json.dumps(result, indent=2, allow_nan=False)+'\n')
     print(json.dumps({k: result[k] for k in ['fidelityPassed', 'maximumOracleQualityLoss', 'labelDisagreements']}))
