@@ -6,6 +6,41 @@ that none could be chosen after seeing numbers. The candidate record that decide
 `modeljars/docs/CANDIDATE-PARADEE-8M-20261101.md`; the artifact triage is
 `modeljars/docs/model-evidence/paradee-8m/TRIAGE-v1.2.md`.
 
+## State of the work (updated 2026-11-02, after the first candidate WER)
+
+- **The first candidate WER on our phonemes failed the WikiText cell for the predicted reason.**
+  `af_heart`, pass 1: 7.56 % against a floor of 6.18 % (comparator 5.68 %). On the publisher's
+  phonemes the same pass scored 5.60 %, so the executor is not the cause; the 4.1 % of WikiText
+  words the lexicon path drops are. Harvard `af_heart` passed at 4.09 % (floor 4.59 %), Harvard
+  `bf_isabella` at 3.32 % (floor 3.88 %). Those passes are kept under
+  `evidence/devbox/candidate-no-fallback/` as the record of the configuration without a fallback.
+- **The fix is the fallback the port did not have.** The publisher's pipeline hands unresolved words
+  to eSpeak NG (GPL-3.0, not bundlable). `models-audio` now bundles two small letter-to-phoneme
+  models of our own, `g2p-us.onnx` and `g2p-gb.onnx`, trained by `g2p/train_g2p.py` on misaki
+  0.9.4's gold and silver dictionaries (Apache-2.0; DEFAULT pronunciations; 174,945 US and 188,542
+  GB words of letters and apostrophes, 2 % held out): a character embedding, each letter repeated
+  three times, a two-layer bidirectional LSTM, a linear layer over the 46 (45) phoneme symbols and
+  the CTC blank. CTC means the exported graph has no decoder loop: `LetterToPhonemeFallback` runs
+  it once per word on `models-backend-onnx` and collapses the argmax path. It sits exactly in
+  misaki's fallback slot (single words and whole unresolved groups), the words it guessed are still
+  reported, and nothing else in the phonemizer changed. Three numbers describe it and all three
+  are derived by script. Held-out dictionary words, one word per run as deployed
+  (`g2p/out/g2p-*.json`, 2 epochs, 16 minutes each on the loaded dev box): **US 46.0 % exact,
+  10.9 % phoneme error rate; GB 50.2 %, 10.5 %** (the same checkpoints score 55.4 % and 61.4 % in
+  padded batches, which is how they were trained; the gap is the backward LSTM direction seeing
+  padding, a known weakness of this quick recipe, fixable with packed sequences and more epochs).
+  Agreement with misaki's eSpeak fallback on the corpora's own 160 (US) and 159 (GB) unresolved
+  words, almost all proper nouns (`g2p/out/espeak-agreement.json`): **24.4 % / 27.0 % identical
+  strings, 25.4 % / 26.0 % phoneme error rate against eSpeak's spelling**, where eSpeak is itself a
+  rule-based guess for such words. The Java executor reproduces the exporting PyTorch model on 200
+  held-out words per accent within two near-tie flips (`LetterToPhonemeFallbackTest`), which needed
+  one more operator, `Tile`, in `models-backend-onnx`. The out-of-vocabulary rate is unchanged by
+  construction (4.13 % / 4.11 % on WikiText, 0.06 % on Harvard); those words are now pronounced
+  rather than dropped, and still listed. **The candidate passes on our phonemes are rerun
+  in full with the fallback; the comparator and publisher-phoneme passes stand.** The judge, the
+  corpora and the floors are unchanged; this is a change to the candidate, made after one failing
+  pass and recorded as such.
+
 ## State of the work (updated 2026-11-01, evening)
 
 - **Kernels on the Vector API** landed after the parity closure; parity was not re-run after the
@@ -42,10 +77,10 @@ that none could be chosen after seeing numbers. The candidate record that decide
   Hetzner box was provisioned for both arms and torn down eight minutes later because the session
   was not permitted to copy the worktree to it (`evidence/bench-box-2026-11-01-vps-log.md`). So:
   the **intelligibility gate**, which does not depend on load, is measured here under
-  `evidence/devbox/` by `comparator/run_devbox_arms.sh`, interleaving each comparator pass with the
-  candidate pass that follows it and writing the load averages before every pass (`load.txt`); the
-  **throughput gate** is not measured by those passes and stays open until both arms run on a
-  quiet machine. The per-pass real-time multiples under `evidence/devbox/` are reported with their
+  `evidence/devbox/` by `comparator/run_comparator_passes.sh` and `comparator/run_candidate_passes.sh`
+  running side by side (the first passes came from the interleaved `run_devbox_arms.sh`), each
+  writing the load averages before every pass (`load.txt`); the **throughput gate** is not measured
+  by those passes and stays open until both arms run on a quiet machine. The per-pass real-time multiples under `evidence/devbox/` are reported with their
   load values and are not the gate number.
 - First passes present (`evidence/devbox/*/wikitext103-heldout-200/af_heart/t1/pass1/pass.json`):
   comparator 1,362.8 s of audio at 8.74x realtime (load 14–21), candidate on our phonemes 1,284.8 s
@@ -55,7 +90,19 @@ that none could be chosen after seeing numbers. The candidate record that decide
   its `pass.json`; the pass is complete and the runners are now sequenced.
 - Judge: running over completed passes as they appear (`comparator/run_judge_loop.sh`); the
   Soprano judge-sanity pass (`SopranoJudgeSanityIntegrationTest`, the shipped Q8_0 artifact,
-  `evidence/judge-sanity-soprano/`) is scored by the same loop.
+  `evidence/judge-sanity-soprano/`) is scored by the same loop. **A second round-trip judge
+  landed on `main` the same evening** (PR #328,
+  `benchmark-results/2026-11-01-tts-roundtrip-judge-validation/`): faster-whisper's CTranslate2
+  `base` at int8 with beam 5, `whisper-normalizer`'s English normalizer, a 63-tap sinc resampler,
+  ten sentences through the released `ModelJars.openSpeech` route, corpus WER 0.0526. The two
+  do not compete: that one validated that a round-trip pipeline works at all; this protocol pins
+  **the publisher's own judge** (`openai-whisper` 20250625 `base`, `fp16=False`, greedy,
+  `torchaudio` resampling, the regex normalizer of `onnx_eval.py`) because its purpose is to
+  re-derive the card's figure, and the comparator's first pass did (5.68 % against the card's
+  5.8 %). Whisper's `EnglishTextNormalizer` WER is reported beside every number for comparison
+  with #328's convention. The first comparator result also answers #328's open question about
+  judge throughput: the publisher's protocol costs about ten minutes per 200 sentences on this
+  loaded machine.
 
 ## State of the work (updated 2026-11-01, end of the first session)
 

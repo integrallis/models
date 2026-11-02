@@ -11,3 +11,9 @@ Files under META-INF/models/misaki/en/, byte-identical to the misaki 0.9.4 wheel
 
 The dictionaries are data; the grapheme-to-phoneme code that reads them is a Java port written for
 this module (com.integrallis.models.audio.phonemizer). misaki's eSpeak NG fallback is not bundled.
+
+Letter-to-phoneme fallback models beside them, g2p-us.onnx and g2p-gb.onnx with their symbol
+tables g2p-us.json and g2p-gb.json, were trained for this module on those dictionaries and are
+licensed with it under the Apache License 2.0. Recipe, held-out accuracy and agreement with the
+publisher's eSpeak fallback: experiments/paradee-8m-tts/g2p/ in the Models repository. They stand
+in for misaki's eSpeak NG fallback, which is GPL-3.0 and is not bundled.

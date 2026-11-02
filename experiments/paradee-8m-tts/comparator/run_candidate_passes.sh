@@ -31,10 +31,16 @@ candidate(){ # corpus voice pass arm [phonemesFrom]
       ${from:+MODELS_PARADEE_PHONEMES_FROM=$from} \
       ./gradlew :models-audio:integrationTest --tests '*ParadeeCandidateArmIntegrationTest' --rerun --console=plain -q ) > "$out/gradle.log" 2>&1
   local rc=$?
-  cp "$ROOT"/models-audio/build/test-results/integrationTest/TEST-*ParadeeCandidateArm*.xml "$out/junit.xml" 2>/dev/null || true
+  # Several runners share Gradle's test-results directory, so the XML there may belong to another
+  # pass; keep it only when it names this corpus, voice and pass.
+  xml=$(ls "$ROOT"/models-audio/build/test-results/integrationTest/TEST-*ParadeeCandidateArm*.xml 2>/dev/null | head -1)
+  if [ -n "$xml" ] && grep -q "PARADEE_ARM $corpus $voice pass$pass:" "$xml"; then cp "$xml" "$out/junit.xml"; fi
   if [ ! -f "$out/pass.json" ]; then log "FAILED $arm $corpus $voice pass$pass (rc=$rc, see $out/gradle.log)"; return 1; fi
   [ $rc -eq 0 ] || log "note: gradle rc=$rc after pass.json was written (see $out/gradle.log)"
-  grep -o 'PARADEE_ARM [a-z0-9-]* [a-z_]* pass[0-9]*: [^<]*realtime' "$out/junit.xml" 2>/dev/null | tail -1
+  .venv/bin/python - "$out/pass.json" <<'PY'
+import json, sys; d = json.load(open(sys.argv[1]))
+print(f"PARADEE_ARM {d['corpus']} {d['voice']} pass{d['pass']}: {d['totalAudioSeconds']:.1f}s audio in {d['totalRunSeconds']:.2f}s -> {d['realTimeMultiple']:.2f}x realtime ({d['phonemeSource'][:16]})")
+PY
   return 0
 }
 

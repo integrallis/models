@@ -20,6 +20,7 @@ import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.PcmAudio;
 import com.integrallis.models.api.SpeechSynthesisOptions;
 import com.integrallis.models.api.TextToSpeechModel;
+import com.integrallis.models.audio.phonemizer.LetterToPhonemeFallback;
 import com.integrallis.models.audio.phonemizer.MisakiEnglishPhonemizer;
 import com.integrallis.models.audio.phonemizer.MisakiLexicon;
 import com.integrallis.models.backend.onnx.NoiseSource;
@@ -139,8 +140,10 @@ public final class ParadeeTextToSpeechModel implements TextToSpeechModel {
     return load(
         onnx,
         configJson,
-        new MisakiEnglishPhonemizer(MisakiLexicon.bundled(false), ""),
-        new MisakiEnglishPhonemizer(MisakiLexicon.bundled(true), ""));
+        new MisakiEnglishPhonemizer(
+            MisakiLexicon.bundled(false), "", LetterToPhonemeFallback.bundled(false)),
+        new MisakiEnglishPhonemizer(
+            MisakiLexicon.bundled(true), "", LetterToPhonemeFallback.bundled(true)));
   }
 
   /**
@@ -160,7 +163,10 @@ public final class ParadeeTextToSpeechModel implements TextToSpeechModel {
             lexiconDirectory.resolve("gb_silver.json"),
             true);
     return load(
-        onnx, configJson, new MisakiEnglishPhonemizer(us, ""), new MisakiEnglishPhonemizer(gb, ""));
+        onnx,
+        configJson,
+        new MisakiEnglishPhonemizer(us, "", LetterToPhonemeFallback.bundled(false)),
+        new MisakiEnglishPhonemizer(gb, "", LetterToPhonemeFallback.bundled(true)));
   }
 
   /** Loads the graph and config with the given phonemizers; {@code british} may be {@code null}. */
