@@ -2017,11 +2017,87 @@ public final class TensorOps {
       float[] up,
       int upOffset,
       int size) {
-    for (int i = 0; i < size; i++) {
+    int workers = swiGluWorkers(size);
+    if (workers < 2) {
+      swiGluRange(out, outOffset, gate, gateOffset, up, upOffset, 0, size);
+      return;
+    }
+    // SwiGLU is elementwise with no reduction, so splitting the range changes nothing about the
+    // arithmetic of any lane: this is bit-identical to the serial loop by construction, not by
+    // measurement. That matters here because the two prior attempts to speed this up both changed
+    // the per-element arithmetic and were rejected (audit-artifacts/swiglu-table-exp at 2.07-2.68x
+    // SLOWER, audit-artifacts/swiglu-native-fdlibm at 4.44-4.55x worse warm latency on x86).
+    // Parallelism is the one lever neither of them touched.
+    int chunk = (size + workers - 1) / workers;
+    List<Future<?>> pending = new ArrayList<>(workers - 1);
+    SWIGLU_IN_PARALLEL_REGION.set(Boolean.TRUE);
+    try {
+      for (int worker = 1; worker < workers; worker++) {
+        int from = worker * chunk;
+        if (from >= size) {
+          break;
+        }
+        int to = Math.min(size, from + chunk);
+        pending.add(
+            PackedProjectionThreads.EXECUTOR.submit(
+                () -> swiGluRange(out, outOffset, gate, gateOffset, up, upOffset, from, to)));
+      }
+      // The caller takes the first chunk rather than waiting on the pool for all of it.
+      swiGluRange(out, outOffset, gate, gateOffset, up, upOffset, 0, Math.min(size, chunk));
+      for (Future<?> task : pending) {
+        try {
+          task.get();
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new IllegalStateException("interrupted while computing SwiGLU", interrupted);
+        } catch (ExecutionException failure) {
+          Throwable cause = failure.getCause();
+          if (cause instanceof RuntimeException runtime) {
+            throw runtime;
+          }
+          if (cause instanceof Error error) {
+            throw error;
+          }
+          throw new IllegalStateException("SwiGLU worker failed", cause);
+        }
+      }
+    } finally {
+      SWIGLU_IN_PARALLEL_REGION.remove();
+    }
+  }
+
+  private static void swiGluRange(
+      float[] out,
+      int outOffset,
+      float[] gate,
+      int gateOffset,
+      float[] up,
+      int upOffset,
+      int from,
+      int to) {
+    for (int i = from; i < to; i++) {
       float x = gate[gateOffset + i];
       float silu = x / (1.0f + (float) Math.exp(-x));
       out[outOffset + i] = silu * up[upOffset + i];
     }
+  }
+
+  /** Set while a thread is inside a parallel SwiGLU region, so chunks never fan out again. */
+  private static final ThreadLocal<Boolean> SWIGLU_IN_PARALLEL_REGION = new ThreadLocal<>();
+
+  /**
+   * Minimum elements before fanning SwiGLU out. Below this the pool round-trip costs more than the
+   * scalar loop it replaces; {@code models.purejava.swiGluParallelThreshold} overrides it so the
+   * crossover stays configurable in data rather than needing a rebuild to re-measure.
+   */
+  private static final int SWIGLU_PARALLEL_THRESHOLD =
+      Integer.getInteger("models.purejava.swiGluParallelThreshold", 1024);
+
+  private static int swiGluWorkers(int size) {
+    if (size < SWIGLU_PARALLEL_THRESHOLD || Boolean.TRUE.equals(SWIGLU_IN_PARALLEL_REGION.get())) {
+      return 1;
+    }
+    return Math.max(1, Math.min(PackedProjectionThreads.COUNT, size / SWIGLU_PARALLEL_THRESHOLD));
   }
 
   /** GELU-gated activation using llama.cpp's tanh approximation. */
