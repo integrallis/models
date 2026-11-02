@@ -1,10 +1,58 @@
 # Qualifying Paradee-8M v1.2: protocol, frozen before data
 
-**Status 2026-11-01, evening: protocol frozen; the WER passes of both arms are running; no verdict
-exists.** Every threshold and every corpus was fixed in this file before the first synthesis so
-that none could be chosen after seeing numbers. The candidate record that decided to run this is
+**Verdict 2026-11-02: the intelligibility gate passes in all eight cells, on our own phonemizer,
+three passes each; the throughput gate is not measured (shared machine); seeded parity closed.**
+Every threshold and every corpus was fixed in this file before the first synthesis so that none
+could be chosen after seeing numbers; the one change made after seeing data was to the candidate
+(the out-of-vocabulary fallback and its dictionary tier, both recorded below), never to a floor. The candidate record that decided to run this is
 `modeljars/docs/CANDIDATE-PARADEE-8M-20261101.md`; the artifact triage is
 `modeljars/docs/model-evidence/paradee-8m/TRIAGE-v1.2.md`.
+
+## Verdict (2026-11-02, `evidence/devbox/verdict.json`, derived by `verdict.py` from `report.json`)
+
+Configuration measured: the Java executor on the int8 graph; the misaki port with, for American
+voices, the CMUdict tier in front of the first (two-epoch) fallback model, and for British voices
+the first fallback model alone. Every number below is the Whisper-base round-trip WER under the
+publisher's normalizer over 200 sentences; the floor is the comparator's worst of three passes plus
+0.5 points; the candidate column is the range of its three passes and the gate reads the worst.
+
+| corpus | voice | comparator, 3 passes | floor | candidate, our phonemes, 3 passes | margin (pt) | gate | candidate, publisher's phonemes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| harvard-200 | af_heart | 3.83 to 4.09 % | 4.59 % | 4.09 to 4.15 % | +0.44 | **PASS** | 3.96 to 4.02 %, PASS |
+| harvard-200 | am_puck | 5.94 to 6.51 % | 7.01 % | 6.32 to 6.70 % | +0.31 | **PASS** | not run |
+| harvard-200 | bf_isabella | 3.19 to 3.38 % | 3.88 % | 3.26 to 3.38 % | +0.50 | **PASS** | not run |
+| harvard-200 | bm_fable | 3.90 to 4.02 % | 4.52 % | 3.90 to 4.09 % | +0.44 | **PASS** | not run |
+| wikitext103-heldout-200 | af_heart | 5.51 to 5.68 % | 6.18 % | 5.83 to 5.91 % | +0.27 | **PASS** | 5.34 to 5.60 %, PASS |
+| wikitext103-heldout-200 | am_puck | 5.37 to 5.63 % | 6.13 % | 5.86 to 6.12 % | +0.01 | **PASS** | not run |
+| wikitext103-heldout-200 | bf_isabella | 5.77 to 5.91 % | 6.41 % | 6.06 to 6.20 % | +0.21 | **PASS** | not run |
+| wikitext103-heldout-200 | bm_fable | 5.60 to 5.74 % | 6.24 % | 6.09 to 6.20 % | +0.04 | **PASS** | not run |
+
+- **Kill criteria:** none triggered (comparator spreads 0.14 to 0.57 points against the 1.0-point
+  line; the anchor cell reproduces the card: comparator `af_heart` 5.51 to 5.68 % against 5.8 %).
+- **Margins are thin on two cells**, `am_puck` and `bm_fable` on WikiText (0.01 and 0.04 points,
+  one and two words of 3,463), and are reported as such; the rule is the rule that was frozen.
+- **Phonemes identical to misaki's** (first pass of each cell): WikiText af_heart 61.5 %; am_puck 61.5 %; bf_isabella 60.0 %; bm_fable 60.0 %; Harvard af_heart 96.5 %; am_puck 96.5 %; bf_isabella 97.0 %; bm_fable 97.0 %.
+- **Judge sanity:** the shipped Soprano Q8_0 model scores 5.75 % on the same 200 Harvard
+  sentences through the same judge (`evidence/judge-sanity-soprano/`).
+- **Throughput gate: not measured.** Every pass ran on the shared dev box under other sessions'
+  build load (load averages 12 to 450 on 12 logical CPUs, recorded per pass); the real-time
+  multiples in `report.json` are what that machine did, not the comparison the protocol asked
+  for. The shipped speech policy's latency block, derived from the twelve Harvard candidate passes
+  by `comparator/catalog_entry.py` (`evidence/devbox/catalog-entry.json`): p95 real-time factor
+  1.11 (limit 2.0) and **p95 time-to-first-audio 3,067 ms against the policy's 2,000 ms limit**, so
+  the entry as derived here is `qualified: false` for that reason alone. The number is the loaded
+  machine's: the same sentences had a p95 of 1,237 to 1,730 ms in the earlier, lighter-load
+  passes. The latency block and the throughput ratio are to be measured once more on a quiet
+  dedicated box against the **released** 0.5.11 library (public artifacts only reach the box), and
+  the entry flips on that measurement, not on this one.
+- **The retrained American model** (`g2p/out/v2/`: packed sequences, 8 epochs on a dedicated
+  box, CMUdict words in the training split) reaches **64.0 % exact / 6.7 % phoneme error rate** on
+  the held-out words one word at a time, against 46.0 % / 10.9 % for the model in the measured
+  configuration. It is **not** what ships from this evidence, because swapping it would make the
+  shipped configuration one the passes did not measure; it is the next release's candidate, to be
+  measured by the same 24 passes.
+- Passes that led here are kept as their own arms: `candidate-no-fallback` (first configuration)
+  and `candidate-fallback-v1` (American voices, fallback without the dictionary tier).
 
 ## State of the work (updated 2026-11-02, second candidate configuration)
 
@@ -25,7 +73,14 @@ that none could be chosen after seeing numbers. The candidate record that decide
   and plurals by misaki's own suffix rule, and from the model otherwise. The American model is
   retrained (`g2p/out/v2/`) with packed sequences, eight epochs and the converted CMUdict words
   added to its training split only, never to the held-out words. The British configuration is
-  unchanged, so the British cells' passes stand as measured.
+  unchanged, so the British cells' passes stand as measured. Agreement with misaki's eSpeak
+  fallback on the 160 unresolved American WikiText words, with the tier in front of the first
+  model (`g2p/out/espeak-agreement-with-dictionary.json`): **36.9 % identical, 22.6 % phoneme
+  error rate**, from 24.4 % and 25.4 % with the model alone; the 91 words the dictionary answers
+  come out at 49.5 % identical and 16.7 % error, the 69 the model still guesses at 20.3 % and
+  28.6 %. The American cells are rerun with this configuration (dictionary tier plus the first
+  model) while the retrained model finishes; if the retrained model replaces the first, the
+  American cells run once more and the README says so.
 
 ## State of the work (updated 2026-11-02, after the first candidate WER)
 

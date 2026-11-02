@@ -25,7 +25,7 @@ def main(evidence, verdict_path, rss_path, report_path, models_version):
     evidence = pathlib.Path(evidence)
     verdict = json.load(open(verdict_path))
     parity = json.load(open(evidence / "parity" / "seeded-parity-2026-11-01.json"))
-    cases = parity["cases"]
+    cases = parity["perCase"]
     cos = min(c["pcmCosine"] for c in cases); sdr = min(c["signalToDifferenceDb"] for c in cases)
     per_corpus = {}
     for corpus in ("harvard-200", "wikitext103-heldout-200"):
@@ -39,8 +39,17 @@ def main(evidence, verdict_path, rss_path, report_path, models_version):
     report_bytes = pathlib.Path(verdict_path).read_bytes()
     cells = verdict["cells"]
     ours = [c.get("ourPhonemes", {}).get("intelligibility") for c in cells]
-    qualified = bool(cells) and all(v == "PASS" for v in ours) and not verdict["kill"] and not verdict["incomplete"]
     harvard = per_corpus["harvard-200"]
+    # The shipped speech policy's own limits (ModelSpeechQualification in ModelJars): a qualified
+    # entry needs p95 real-time factor <= 2.0 and p95 time-to-first-audio <= 2000 ms, so an entry
+    # measured under load that misses them is written as not qualified, with the reason.
+    blocked = []
+    if not (bool(cells) and all(v == "PASS" for v in ours)): blocked.append("intelligibility gate")
+    if verdict["kill"]: blocked.append("kill criterion: " + "; ".join(verdict["kill"]))
+    if verdict["incomplete"]: blocked.append("incomplete cells: " + ", ".join(verdict["incomplete"]))
+    if harvard["p95RealTimeFactor"] is None or harvard["p95RealTimeFactor"] > 2.0: blocked.append(f"p95 real-time factor {harvard['p95RealTimeFactor']} > 2.0")
+    if harvard["p95TimeToFirstAudioMillis"] is None or harvard["p95TimeToFirstAudioMillis"] > 2000.0: blocked.append(f"p95 time-to-first-audio {harvard['p95TimeToFirstAudioMillis']:.0f} ms > 2000 ms (measured under load on the shared dev box)")
+    qualified = not blocked
     entry = {
         "modelId": "sahilmahendrakar_paradee_8m_v1_2_onnx_int8",
         "model": "Paradee-8M v1.2 ONNX INT8",
@@ -66,7 +75,7 @@ def main(evidence, verdict_path, rss_path, report_path, models_version):
         "p95TimeToFirstAudioMillis": round(harvard["p95TimeToFirstAudioMillis"], 3),
         "peakRssBytes": rss,
     }
-    json.dump({"entry": entry, "latencyByCorpus": per_corpus, "intelligibilityVerdictPerCell": [
+    json.dump({"entry": entry, "qualifiedBlockedBy": blocked, "latencyByCorpus": per_corpus, "intelligibilityVerdictPerCell": [
         {"corpus": c["corpus"], "voice": c["voice"], "ourPhonemes": c.get("ourPhonemes", {}).get("intelligibility"),
          "publisherPhonemes": c.get("publisherPhonemes", {}).get("intelligibility")} for c in cells]}, sys.stdout, indent=1); print()
 

@@ -1,0 +1,22 @@
+us: 174945 words, 46 symbols, train 247597 (extra 76150), dev 3498
+epoch 1 loss 0.6757 dev word-accuracy 0.5074 per 0.0998 (135s)
+epoch 2 loss 0.3243 dev word-accuracy 0.5660 per 0.0870 (133s)
+epoch 3 loss 0.2877 dev word-accuracy 0.5820 per 0.0813 (133s)
+epoch 4 loss 0.2644 dev word-accuracy 0.6032 per 0.0758 (133s)
+epoch 5 loss 0.2460 dev word-accuracy 0.6155 per 0.0720 (133s)
+epoch 6 loss 0.2312 dev word-accuracy 0.6344 per 0.0690 (134s)
+epoch 7 loss 0.2203 dev word-accuracy 0.6372 per 0.0672 (136s)
+epoch 8 loss 0.2144 dev word-accuracy 0.6398 per 0.0671 (137s)
+Traceback (most recent call last):
+  File "/root/train_g2p.py", line 181, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/train_g2p.py", line 153, in main
+    torch.onnx.export(model, dummy, out / f"g2p-{a.accent}.onnx", opset_version=17, input_names=["letters"],
+  File "/root/g2p/lib/python3.12/site-packages/torch/onnx/__init__.py", line 289, in export
+    from torch.onnx._internal.exporter import _compat
+  File "/root/g2p/lib/python3.12/site-packages/torch/onnx/_internal/exporter/_compat.py", line 16, in <module>
+    from torch.onnx._internal.exporter import (
+  File "/root/g2p/lib/python3.12/site-packages/torch/onnx/_internal/exporter/_core.py", line 19, in <module>
+    import onnxscript
+ModuleNotFoundError: No module named 'onnxscript'
