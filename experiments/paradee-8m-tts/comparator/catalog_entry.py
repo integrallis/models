@@ -8,7 +8,10 @@ sentence-level streamer), the seeded-parity record (the oracle block: PCM cosine
 signal-to-difference against the publisher's runtime with the noise tensor shared), the peak RSS
 sample, and the artifact and report digests.
 
-usage: catalog_entry.py EVIDENCE_DIR VERDICT_JSON PEAK_RSS_TXT REPORT_PATH_IN_REPO MODELS_VERSION
+usage: catalog_entry.py EVIDENCE_DIR VERDICT_JSON PEAK_RSS_TXT REPORT_PATH_IN_REPO MODELS_VERSION [LATENCY_ROOT]
+
+LATENCY_ROOT (default EVIDENCE_DIR/devbox) is the directory whose candidate/ passes supply the
+latency block; the quiet-box passes against the released library go there.
 """
 import hashlib, json, pathlib, sys
 
@@ -21,7 +24,7 @@ def p95(values):
     return values[max(0, int(round(0.95 * (len(values) - 1))))] if values else None
 
 
-def main(evidence, verdict_path, rss_path, report_path, models_version):
+def main(evidence, verdict_path, rss_path, report_path, models_version, latency_root=None):
     evidence = pathlib.Path(evidence)
     verdict = json.load(open(verdict_path))
     parity = json.load(open(evidence / "parity" / "seeded-parity-2026-11-01.json"))
@@ -30,7 +33,8 @@ def main(evidence, verdict_path, rss_path, report_path, models_version):
     per_corpus = {}
     for corpus in ("harvard-200", "wikitext103-heldout-200"):
         rtf, ttfa, passes = [], [], 0
-        for p in sorted((evidence / "devbox" / "candidate" / corpus).glob("*/t1/pass*/pass.json")):
+        root = pathlib.Path(latency_root) if latency_root else evidence / "devbox"
+        for p in sorted((root / "candidate" / corpus).glob("*/t1/pass*/pass.json")):
             d = json.load(open(p)); passes += 1
             rtf += [r["realTimeFactor"] for r in d["rows"] if r["realTimeFactor"] is not None]
             ttfa += [r["timeToFirstAudioSeconds"] * 1000.0 for r in d["rows"]]
@@ -81,4 +85,4 @@ def main(evidence, verdict_path, rss_path, report_path, models_version):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:6])
+    main(*sys.argv[1:7])

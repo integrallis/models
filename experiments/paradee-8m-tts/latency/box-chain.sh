@@ -34,6 +34,14 @@ cd $ROOT/comparator && uv sync -q
 ART=$ROOT/comparator/.artifacts
 log "comparator, 1 thread, three passes"
 THREADS="1" ./run_comparator_passes.sh $EV/comparator
+log "comparator, 6 threads, three passes"
+THREADS="6" ./run_comparator_passes.sh $EV/comparator
+log "waiting for com.integrallis:models-audio:$MODELS_VERSION on Maven Central"
+for i in $(seq 1 120); do
+  curl -sf -o /dev/null "https://repo1.maven.org/maven2/com/integrallis/models-audio/$MODELS_VERSION/models-audio-$MODELS_VERSION.pom" && break
+  sleep 60
+done
+curl -sf -o /dev/null "https://repo1.maven.org/maven2/com/integrallis/models-audio/$MODELS_VERSION/models-audio-$MODELS_VERSION.pom" || { log "release not on Central after two hours"; exit 1; }
 log "candidate against the released library, three passes"
 for pass in 1 2 3; do for corpus in wikitext103-heldout-200 harvard-200; do for voice in af_heart bf_isabella am_puck bm_fable; do
   out=$EV/candidate/$corpus/$voice/t1/pass$pass
@@ -41,7 +49,5 @@ for pass in 1 2 3; do for corpus in wikitext103-heldout-200 harvard-200; do for 
   mkdir -p $out; uptime | sed 's/.*load averages*: *//' > $out/load.txt
   jbang -Dmodels.version=$MODELS_VERSION $ROOT/latency/ParadeeLatencyArm.java $ART/onnx_paradee_int8.onnx $ART/config.json $ROOT/corpus/$corpus.json $voice $pass $out 2>&1 | grep PARADEE_ARM
 done; done; done
-log "comparator, 6 threads, three passes"
-THREADS="6" ./run_comparator_passes.sh $EV/comparator
 log "done; pass.json files under $EV"
 cd $ROOT && tar czf /root/paradee-box-evidence.tgz --exclude='*.wav' --exclude='*.txt' evidence
