@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.11] - 2026-11-02
+
 - Execute ONNX graphs in process, in pure Java, with no ONNX Runtime: `models-backend-onnx` gains a
   protobuf wire reader, a tensor type with float, double, 64-bit integer and byte stores, an eager
   graph executor with constant folding and an injectable noise source, and the 56 operators the
@@ -30,7 +32,6 @@ All notable changes to models are documented here.
   point for feeding the publisher's phonemes. Paradee is **not qualified** by this change: the
   frozen protocol in `experiments/paradee-8m-tts/README.md` names the comparator arm, the judge
   and the gates, and none of its numbers exist yet.
-
 - Pronounce the words misaki's lexicon path cannot: `models-audio` bundles two small
   letter-to-phoneme models (`g2p-us.onnx`, `g2p-gb.onnx`, about 2 MB together) trained on
   misaki 0.9.4's own dictionaries with a CTC objective and run by `models-backend-onnx`, so the
@@ -40,8 +41,20 @@ All notable changes to models are documented here.
   to misaki's spelling), with possessives and plurals inflected by misaki's suffix rule.
   `LetterToPhonemeFallback` is the API; the phonemizer still reports the words it had to guess. The tagger now reads complementizer `that`
   as misaki's tagger does and treats all-caps words in mixed-case text as proper nouns.
+- This focused release is based on 0.5.10, as 0.5.10 was on 0.5.9: the GGUF tokenization and
+  decoder changes of the main-branch campaign are deferred until their qualification records
+  are re-run, and existing generation behavior is unchanged. Paradee-8M is **not qualified** by
+  this release; the catalog decides that from the frozen protocol's evidence, measured on the
+  Paradee sources this release carries.
+- `backend-cuda` is unchanged. Its last recorded G1 result is exact token parity on RTX 4090 at
+  31.26 tok/s; G4 is 6.184x against the 3.00x gate. No new device measurement is claimed.
 
 ## [0.5.10] - 2026-10-31
+
+> The 0.5.10 published to Maven Central on 2026-11-02 was a focused release of the GLiNER
+> classification runtime on the 0.5.9 baseline (branch `release/gliner-0.5.10`), not this section.
+> The items below were prepared on `main` under this number and have **not shipped**; they stay
+> deferred until the twelve `llama3` qualification records they invalidate are re-run.
 
 - Restore the publisher's default beginning-of-sequence token for GGUF Llama 3 BPE
   tokenizers when the optional `add_bos_token` flag is absent. Explicit flags still win.
