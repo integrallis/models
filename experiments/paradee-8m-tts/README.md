@@ -1,12 +1,50 @@
 # Qualifying Paradee-8M v1.2: protocol, frozen before data
 
 **Verdict 2026-11-02: the intelligibility gate passes in all eight cells, on our own phonemizer,
-three passes each; the throughput gate is not measured (shared machine); seeded parity closed.**
+three passes each; seeded parity closed on both routes; the throughput gate fails on the released
+libraries, 0.30 to 0.32 on 0.5.11 and 0.45 to 0.48 on 0.5.12 against 0.80. The shipped speech
+policy's latency block passes on both.**
 Every threshold and every corpus was fixed in this file before the first synthesis so that none
 could be chosen after seeing numbers; the one change made after seeing data was to the candidate
 (the out-of-vocabulary fallback and its dictionary tier, both recorded below), never to a floor. The candidate record that decided to run this is
 `modeljars/docs/CANDIDATE-PARADEE-8M-20261101.md`; the artifact triage is
 `modeljars/docs/model-evidence/paradee-8m/TRIAGE-v1.2.md`.
+
+## Throughput and latency on a quiet box, released 0.5.12 (2026-11-02, `evidence/box-0.5.12/`)
+
+The same chain against the **released** `com.integrallis:models-audio:0.5.12`, whose default route
+runs the executor's matrix products, sines and erf on the bundled Rust kernels: all 24 candidate
+passes name `onnx-kernels=rust-ffm` in their runtime string. Both arms ran on one EC2 c7a.2xlarge
+(8 AMD EPYC 9R14 cores, nothing else running; `machine-box.txt`, per-pass `load.txt`), one thread
+each, three passes per cell. Hetzner could not host it (both quotas held by another campaign; box
+log). This is a different machine from the 0.5.11 box, so only the ratios compare across the two,
+not the absolute multiples. Derived by `derive.py` into `report.json` and by
+`verdict.py --timing-is-gate` into `verdict-timing.json`; the table is generated from the latter.
+
+| corpus | voice | candidate, x real time (min of 3) | onnxruntime, x real time (max of 3) | ratio (gate 0.80) |
+| --- | --- | ---: | ---: | ---: |
+| WikiText | af_heart | 16.69 | 37.29 | 0.448 |
+| WikiText | bf_isabella | 16.83 | 37.18 | 0.453 |
+| WikiText | am_puck | 16.76 | 37.54 | 0.446 |
+| WikiText | bm_fable | 16.80 | 37.06 | 0.453 |
+| Harvard | af_heart | 17.39 | 36.57 | 0.476 |
+| Harvard | bf_isabella | 17.63 | 36.72 | 0.480 |
+| Harvard | am_puck | 17.21 | 36.36 | 0.473 |
+| Harvard | bm_fable | 17.63 | 36.92 | 0.477 |
+
+- **The protocol's throughput gate still fails: 0.45 to 0.48 against 0.80.** The Rust kernels raised
+  the ratio from 0.30 to 0.32 on 0.5.11 and did not close it. This stands as measured; the floor is
+  not moved.
+- **The shipped speech policy's latency block passes** on the Harvard passes: p95 real-time factor
+  0.066 against 2.0, p95 time to first audio 196 ms against 2,000 ms (WikiText 0.072 and 647 ms).
+  Derived by `comparator/catalog_entry.py` with this directory as the latency source into
+  `catalog-entry.json`, which now takes the oracle block from the rust-ffm seeded-parity record
+  (cosine 1.000000, worst 62.10 dB) and labels the entry `rust-ffm`. Its `qualified` field is the
+  shipped policy's verdict only; the protocol's throughput gate is not part of that policy.
+- `peakRssBytes` is now a committed measurement: `rss/harvard-af_heart-time-l.txt`, macOS
+  `/usr/bin/time -l` over one full Harvard pass of the released 0.5.12 on the dev box (JVM defaults,
+  so it includes the default heap ceiling; the pass's timing there is not used).
+- onnxruntime at six threads reaches 70.1x to 81.9x on the same box.
 
 ## Throughput and latency on a quiet box, released 0.5.11 (2026-11-02, `evidence/box/`)
 

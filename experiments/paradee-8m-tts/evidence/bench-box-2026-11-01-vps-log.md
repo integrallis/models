@@ -111,3 +111,39 @@ Local evidence destination:    experiments/paradee-8m-tts/evidence/box/ and this
 - 2026-11-02T14:47:54Z server `paradee-box-20261102` created: id 174176518, ccx33, fsn1, IPv4 138.201.184.110, firewall `paradee-box-ssh` id 11952344; the other server in the account (memory-cell-20261102-g11) belongs to another campaign and is not touched.
 - 2026-11-02T17:08:38Z chain complete (72 pass.json fetched at 15:58Z). Before deletion the idle box ran one standalone probe for models #331 (SwiGluSplitProbe.java, jbang against the published com.integrallis:vectors-core:0.1.32; nothing from the repository copied).
 - 2026-11-02T17:09:28Z server 174176518 and firewall 11952344 deleted. Inventory after: 1 server (memory-cell-20261102-g11, another campaign's), 1 firewall (its). Billed about 2 h 25 min.
+
+## Fourth box, 2026-11-02: throughput ratio and latency block against the released 0.5.12
+
+The same chain as the third box, against `com.integrallis:models-audio:0.5.12`, whose default route
+runs the executor's matrix products, sines and erf on the bundled Rust kernels (`onnx-kernels=rust-ffm`
+in each pass's runtime string, checked locally against the released jar before provisioning). Nothing
+private is copied. Hetzner could not host it: the account's dedicated-core quota and its shared-vCPU
+quota are both held by another campaign's two servers, which are not touched, and a ccx23 was refused
+with "dedicated core limit exceeded" (2026-11-02T20:09:43Z; the firewall created for it was deleted
+unused). The box is therefore an EC2 worker in the qualification fleet's account, launched the fleet's
+way: Ubuntu 24.04 (the fleet AMI), the `models-qual-worker` instance profile, no ssh, inputs pulled
+from and evidence pushed to S3, shutdown terminates. Both arms run on it, so the 1-thread ratio stays
+paired; it is a different machine from the third box, so its absolute multiples are not compared with
+that box's. The informational multi-thread comparator uses min(6, nproc) threads. The box tarball now
+keeps the `*.txt` files the third box lost (`load.txt`, `machine-box.txt`).
+
+```text
+Experiment:                    throughput gate (candidate/comparator real-time multiple >= 0.80 at 1
+                               thread) and the shipped speech policy's latency block on Harvard, for
+                               the catalog entry, on the released 0.5.12.
+Provider / plan:               AWS EC2 us-east-1, c7a.2xlarge (8 vCPU, each a physical AMD core, 16 GB),
+                               on demand, ami-0045d7fc2ad003464, sg-0e9ff523da4140d55.
+Expected duration:             about 2 h; the worker powers off after 4 h whatever happens.
+Maximum authorized spend:      USD 2.50.
+Deletion:                      instance-initiated shutdown terminates; checked after the run.
+Correctness gate:              48 comparator and 24 candidate pass.json files, all finite, every
+                               candidate runtime string naming onnx-kernels=rust-ffm; derive.py and
+                               verdict.py --timing-is-gate over the copied evidence.
+Secrets on the box:            none (the instance role reaches the fleet bucket only).
+Local evidence destination:    experiments/paradee-8m-tts/evidence/box-0.5.12/ and this log.
+```
+- 2026-11-02T20:08:53Z Hetzner inventory: servers 2 (another campaign's cpx62 and ccx33), firewalls 2 (theirs), volumes 0, floating IPs 0, snapshots 0. EC2 inventory: no pending or running instances.
+- 2026-11-02T20:11:10Z worker `paradee-throughput-0512` launched: i-038fd0755bc3dc000, c7a.2xlarge, us-east-1a; input `s3://models-qual-077051030817/paradee-0512/input.tgz` sha256 7b9a2ce0e9ce04cb0c54ed6ad8210c9458deb00805a9e6c390b70be4f5e27f26 (the latency arm, box-chain.sh, the comparator scripts and lock, the three corpora).
+- 2026-11-02T20:17:47Z i-038fd0755bc3dc000 powered off 41 s after boot without running the chain: the `models-qual-worker` role reads only `payload/*` and writes only `results/*` of the bucket, and the input and output had been placed under `paradee-0512/`, so every S3 call failed and the script reached its final shutdown. It terminated; billed under ten minutes.
+- 2026-11-02T20:22:39Z relaunched as i-04483bbc28bce29c1 (`paradee-throughput-0512-1`) with the same input re-uploaded as `payload/paradee-0512-input-1.tgz` (same sha256) and evidence going to `results/paradee-0512-1/`.
+- 2026-11-02T22:06:37Z chain complete: STATUS COMPLETE, 48 comparator and 24 candidate pass.json files fetched from `results/paradee-0512-1/` into `evidence/box-0.5.12/` with the worker log; every candidate runtime string names onnx-kernels=rust-ffm. The instance shut itself down and is terminated. EC2 inventory after: no pending or running instances. Billed about 1 h 45 min of c7a.2xlarge.

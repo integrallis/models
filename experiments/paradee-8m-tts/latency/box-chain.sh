@@ -7,7 +7,7 @@
 #   run_comparator_passes.sh,pyproject.toml,uv.lock}  corpus/*.json
 # into /root/paradee/{latency,comparator,corpus}.
 #
-#   MODELS_VERSION=0.5.11 bash /root/paradee/latency/box-chain.sh
+#   MODELS_VERSION=0.5.12 bash /root/paradee/latency/box-chain.sh
 set -euo pipefail
 MODELS_VERSION=${MODELS_VERSION:?set MODELS_VERSION to the released models version}
 ROOT=/root/paradee
@@ -34,8 +34,10 @@ cd $ROOT/comparator && uv sync -q
 ART=$ROOT/comparator/.artifacts
 log "comparator, 1 thread, three passes"
 THREADS="1" ./run_comparator_passes.sh $EV/comparator
-log "comparator, 6 threads, three passes"
-THREADS="6" ./run_comparator_passes.sh $EV/comparator
+# The multi-thread arm is informational. It uses six threads, or every core on a smaller box.
+MT=$(( $(nproc) < 6 ? $(nproc) : 6 ))
+log "comparator, $MT threads, three passes"
+THREADS="$MT" ./run_comparator_passes.sh $EV/comparator
 log "waiting for com.integrallis:models-audio:$MODELS_VERSION on Maven Central"
 for i in $(seq 1 120); do
   curl -sf -o /dev/null "https://repo1.maven.org/maven2/com/integrallis/models-audio/$MODELS_VERSION/models-audio-$MODELS_VERSION.pom" && break
@@ -50,4 +52,4 @@ for pass in 1 2 3; do for corpus in wikitext103-heldout-200 harvard-200; do for 
   jbang -Dmodels.version=$MODELS_VERSION $ROOT/latency/ParadeeLatencyArm.java $ART/onnx_paradee_int8.onnx $ART/config.json $ROOT/corpus/$corpus.json $voice $pass $out 2>&1 | grep PARADEE_ARM
 done; done; done
 log "done; pass.json files under $EV"
-cd $ROOT && tar czf /root/paradee-box-evidence.tgz --exclude='*.wav' --exclude='*.txt' evidence
+cd $ROOT && tar czf /root/paradee-box-evidence.tgz --exclude='*.wav' evidence
