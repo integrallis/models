@@ -39,4 +39,10 @@ operations they serve and need no invented, independent JVM limitation.
 
 The BF16 and SwiGLU candidate entries remain UNPROVEN. Their [inventory](bf16-swiglu-candidate-inventory.md) separates measured compiler/allocation mechanisms, completed artifact-specific functional and Bonsai quality campaigns, and component screens from unresolved causal/resource and final-composition gates. Raw rejected experiments remain outside project repositories.
 
+
+The ONNX executor kernels (`onnx-executor-kernels`) are inventoried as **UNPROVEN** on the same
+basis: the owner asked for a Rust shim to bring Paradee-8M toward onnxruntime's throughput, and
+seeded parity against onnxruntime on the new route (40 of 40, worst 62.10 dB) justifies shipping
+it as the default route. That record is correctness, not causality; the throughput effect and a
+Java alternative for each kernel remain to be measured before any `PROVEN_REQUIRED` claim.
 [ABI7 symbol retirement](abi7-symbol-retirement.md) lists removed compatibility wrappers and the retained generic entry points.

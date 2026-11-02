@@ -50,6 +50,10 @@
       "jmodels_kernels_context_destroy",
       "jmodels_kernels_context_set_active_threads",
       "jmodels_kernels_context_set_poll_nanos",
+      "jmodels_onnx_abi",
+      "jmodels_onnx_erf_f32",
+      "jmodels_onnx_sgemm",
+      "jmodels_onnx_sin_f32",
       "jmodels_quantized_f32_batched_matmul_with_context",
       "jmodels_quantized_f32_grouped_batched_matmul_with_context",
       "jmodels_quantized_f32_independent_batched_matmul_with_context",
@@ -88,7 +92,8 @@
     "worker-context",
     "tq1_0-projection",
     "hf-tokenizer-adapter",
-    "deberta-f32-kernels"
+    "deberta-f32-kernels",
+    "onnx-executor-kernels"
   ],
   "operations": [
     {
@@ -978,6 +983,62 @@
         "Adopt only with passing end-to-end quality and reranker regression; otherwise remove candidate production code.",
         "Complete platform checks and necessity review; no JVM limitation or catalog admission is claimed."
       ]
+    },
+    {
+      "id": "onnx-executor-kernels",
+      "status": "UNPROVEN",
+      "summary": "Owner-authorized acceleration of the pure-Java ONNX executor (models-backend-onnx) for Paradee-8M: single-threaded matrixmultiply sgemm for MatMul, Gemm and the im2col form of every Conv, a range-reduced AVX2/FMA sine and libm erf, bound per executor run through OnnxKernels. Seeded parity against onnxruntime is a correctness record, not a JVM-limitation certificate.",
+      "capabilities": [],
+      "exports": {
+        "cpu": [
+          "jmodels_onnx_abi",
+          "jmodels_onnx_erf_f32",
+          "jmodels_onnx_sgemm",
+          "jmodels_onnx_sin_f32"
+        ]
+      },
+      "dispatch": [
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeOnnxKernels.java",
+          "anchor": "jmodels_onnx_abi"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeOnnxKernels.java",
+          "anchor": "jmodels_onnx_erf_f32"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeOnnxKernels.java",
+          "anchor": "jmodels_onnx_sgemm"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeOnnxKernels.java",
+          "anchor": "jmodels_onnx_sin_f32"
+        }
+      ],
+      "requiredProfiles": [
+        "linux-x86_64",
+        "linux-aarch64",
+        "macos-x86_64",
+        "macos-aarch64",
+        "windows-x86_64",
+        "windows-aarch64"
+      ],
+      "evidence": [
+        {
+          "path": "experiments/paradee-8m-tts/evidence/parity/seeded-parity-rust-ffm-2026-11-02.json",
+          "sha256": "d5b5ee738d74017c1a1acf4df69d6a252bf1f4f7d20451866435abe7a5e647c2"
+        },
+        {
+          "path": "experiments/paradee-8m-tts/evidence/parity/seeded-parity-rust-ffm-2026-11-02.junit.xml",
+          "sha256": "e3c3e1ecbbd9b80f4d647ffe401b76abf8e592462309e855a8c70a383465d43f"
+        }
+      ],
+      "remaining": [
+        "Measure the throughput effect on a quiet dedicated box against the released library (the 0.5.11 baseline is 0.30 to 0.32 of onnxruntime at one thread, experiments/paradee-8m-tts README); no speed-up is claimed yet.",
+        "Investigate the Java alternative for each kernel separately (Vector API gemm tiling, a Vector API polynomial sine without the lane-wise intrinsic that measured slower, a Java erf) before any PROVEN_REQUIRED claim.",
+        "Repeat seeded parity on the released artifact on each advertised platform; the current record covers macos-x86_64 only."
+      ],
+      "sourceScope": "onnx-executor-kernels"
     }
   ],
   "sourceScopes": {
@@ -1406,6 +1467,17 @@
       "backend-native/src/main/rust/model-kernels/Cargo.lock",
       "backend-java/src/main/java/com/integrallis/models/backend/purejava/deberta/DebertaV2Kernels.java",
       "backend-java/src/main/java/com/integrallis/models/backend/purejava/deberta/DebertaV2ForwardPass.java"
+    ],
+    "onnx-executor-kernels": [
+      "backend-native/src/main/rust/model-kernels/src/onnx_kernels.rs",
+      "backend-native/src/main/rust/model-kernels/src/lib.rs",
+      "backend-native/src/main/rust/model-kernels/Cargo.toml",
+      "backend-native/src/main/rust/model-kernels/Cargo.lock",
+      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeOnnxKernels.java",
+      "models-backend-onnx/src/main/java/com/integrallis/models/backend/onnx/OnnxKernels.java",
+      "models-backend-onnx/src/main/java/com/integrallis/models/backend/onnx/KernelScope.java",
+      "models-audio/src/main/java/com/integrallis/models/audio/ParadeeTextToSpeechModel.java",
+      "backend-native/build.gradle.kts"
     ]
   },
   "retiredCapabilityBits": {
