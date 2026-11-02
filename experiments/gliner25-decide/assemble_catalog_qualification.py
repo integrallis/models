@@ -58,7 +58,7 @@ def assemble(quality_path, performance):
             rows.append({'pair':index,'shape':shape,'samples':bucket['candidate']['samples'],
                 'throughputRatio':bucket['throughputRatio'],'p95LatencyRatio':bucket['p95LatencyRatio']})
     for item in quality['evidence'].values():
-        if '.models' not in Path(item['rawFile']).stem and not Path(item['rawFile']).stem.endswith('-models'):
+        if not Path(item['rawFile']).stem.endswith('-models'):
             continue
         with Path(item['rawFile']).open() as stream: ready=json.loads(stream.readline())
         if ready['nativeSha256'] != receipts[0]['nativeSha256']:
