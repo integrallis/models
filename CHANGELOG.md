@@ -4,6 +4,49 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.11] - 2026-11-02
+
+- Execute ONNX graphs in process, in pure Java, with no ONNX Runtime: `models-backend-onnx` gains a
+  protobuf wire reader, a tensor type with float, double, 64-bit integer and byte stores, an eager
+  graph executor with constant folding and an injectable noise source, and the 56 operators the
+  Paradee-8M graphs use (1-D `Conv` and `ConvTranspose`, bidirectional `LSTM`, `MatMul`, `Gemm`,
+  `LayerNormalization`, `InstanceNormalization`, nearest `Resize`, reflect `Pad`,
+  `DequantizeLinear`, `RandomNormalLike`, and the elementwise, structural and reduction set). A
+  structural integration test checks the decoded Paradee-8M v1.2 graphs against their header
+  triage: 2,117 nodes over 53 operator types in fp32 and 2,535 over 56 in int8, with 8,581,449 and
+  7,867,227 initializer elements. Operators are implemented in scalar Java and are not yet
+  optimized; no throughput claim is made. The module is published as
+  `com.integrallis:models-backend-onnx`, because `models-audio` now depends on it.
+- Add a Java port of misaki's English grapheme-to-phoneme path
+  (`com.integrallis.models.audio.phonemizer`): the gold and silver dictionaries at misaki revision
+  `fba1236`, the stem, number, currency and stress rules, and compound handling. The spaCy
+  tokenizer and tagger are replaced by a rule-based approximation and there is no eSpeak fallback,
+  because eSpeak NG is GPL-licensed; unresolved words are reported rather than guessed. Agreement
+  with misaki itself is to be measured in the Paradee qualification record, not assumed. The four
+  dictionaries ship inside `models-audio` under `META-INF/models/misaki/en/`, byte-identical to
+  the misaki 0.9.4 wheel's files (Apache-2.0; digests in the jar's `META-INF/NOTICE`), so
+  `ParadeeTextToSpeechModel.load(onnx, config)` needs nothing beyond the published artifact.
+- Add `ParadeeTextToSpeechModel`, the publisher's own pipeline for Paradee-8M v1.2 over the two:
+  sentence splitting, accent-matched phonemization, a 510-phoneme cap with pad tokens, the `speed`
+  and `voice` inputs, sentence-level streaming, a seedable noise draw, and a phoneme-level entry
+  point for feeding the publisher's phonemes. Paradee is **not qualified** by this change: the
+  frozen protocol in `experiments/paradee-8m-tts/README.md` names the comparator arm, the judge
+  and the gates, and none of its numbers exist yet.
+- Pronounce the words misaki's lexicon path cannot: `models-audio` bundles two small
+  letter-to-phoneme models (`g2p-us.onnx`, `g2p-gb.onnx`, about 2 MB together) trained on
+  misaki 0.9.4's own dictionaries with a CTC objective and run by `models-backend-onnx`, so the
+  Paradee phonemizer no longer drops out-of-vocabulary words where the publisher's pipeline would
+  hand them to eSpeak NG (GPL, not bundled). `LetterToPhonemeFallback` is the API; the
+  phonemizer still reports the words it had to guess. The tagger now reads complementizer `that`
+  as misaki's tagger does and treats all-caps words in mixed-case text as proper nouns.
+- This focused release is based on 0.5.10, as 0.5.10 was on 0.5.9: the GGUF tokenization and
+  decoder changes of the main-branch campaign are deferred until their qualification records
+  are re-run, and existing generation behavior is unchanged. Paradee-8M is **not qualified** by
+  this release; the catalog decides that from the frozen protocol's evidence, measured on the
+  Paradee sources this release carries.
+- `backend-cuda` is unchanged. Its last recorded G1 result is exact token parity on RTX 4090 at
+  31.26 tok/s; G4 is 6.184x against the 3.00x gate. No new device measurement is claimed.
+
 ## [0.5.10] - 2026-11-01
 
 - Add the public schema classification API and GLiNER2.5-Decide runtime, using the
