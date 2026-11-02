@@ -1,0 +1,9 @@
+output hash, rows=7168 cols=2304 batch=32 threads=1: IDENTICAL across both arms (50c4c25fb419ff1f)
+output hash, rows=2304 cols=7168 batch=16 threads=1: IDENTICAL across both arms (4a7e70205a9bc2ab)
+output hash, rows=7168 cols=2304 batch=32 threads=8: IDENTICAL across both arms (50c4c25fb419ff1f)
+
+| shape | extracted best_ms (median) | parent best_ms (median) | ratio | passes extracted faster |
+|---|---:|---:|---:|---:|
+| rows=7168 cols=2304 batch=32 threads=1 | 18.825 (n=10, 18.527-19.197) | 19.399 (n=10, 19.135-19.530) | 0.9704 | 10/10 |
+| rows=2304 cols=7168 batch=16 threads=1 | 9.963 (n=10, 9.703-10.522) | 10.169 (n=10, 10.009-10.408) | 0.9796 | 7/10 |
+| rows=7168 cols=2304 batch=32 threads=8 | 3.879 (n=10, 3.568-4.316) | 3.825 (n=10, 3.704-4.232) | 1.0143 | 5/10 |

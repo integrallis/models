@@ -4262,22 +4262,14 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
             for batch in 0..batch_size {
                 let activation_offset = batch * cols + block * QK_K;
                 let sum_offset = batch * sums_per_batch + block * QK_K / Q8_K_SUM_BLOCK;
-                let mut quantized_lanes = _mm256_setzero_si256();
-                for group in 0..8 {
-                    // SAFETY: every decoded group and activation group contains 32 bytes.
-                    let activation = unsafe {
-                        _mm256_loadu_si256(
-                            quantized
-                                .as_ptr()
-                                .add(activation_offset + group * 32)
-                                .cast(),
-                        )
-                    };
-                    let products = _mm256_maddubs_epi16(decoded[group], activation);
-                    let scale = _mm256_set1_epi16(group_scales[group] as i16);
-                    quantized_lanes =
-                        _mm256_add_epi32(quantized_lanes, _mm256_madd_epi16(products, scale));
-                }
+                // SAFETY: the activation row holds 256 signed bytes from this offset.
+                let quantized_lanes = unsafe {
+                    qk_batched_tile_lanes(
+                        &decoded,
+                        &group_scales,
+                        quantized.as_ptr().add(activation_offset),
+                    )
+                };
                 // Match the single-row reduction order: the minimum correction is a
                 // scalar FMA per block, added only after reducing the quantized lanes.
                 // Folding it into SIMD lanes changes rounding when prefill batch size changes.
@@ -6386,6 +6378,45 @@ fn horizontal_sum_i32_avx2(values: __m256i) -> i32 {
     );
     let pairs = _mm_hadd_epi32(halves, halves);
     _mm_cvtsi128_si32(_mm_hadd_epi32(pairs, pairs))
+}
+
+#[cfg(target_arch = "x86_64")]
+#[inline]
+#[target_feature(enable = "avx2")]
+/// One batched-GEMM tile: eight decoded nibble groups against one batch row's activations.
+///
+/// This is the whole of the lane-layout decision for the quantised prefill GEMM, deliberately in
+/// one place. Today the eight i32 lanes hold partial sums of a **single** output element, so the
+/// caller reduces them horizontally once per (output row, batch row). ggml's interleaved
+/// `block_q4_Kx8` layout instead puts **eight different output rows** in those lanes, which removes
+/// the horizontal reduction and lets one weight load feed eight outputs. Swapping to it is a change
+/// to this function, not to its callers, which is why it is factored out here.
+///
+/// That swap was built and measured, and it does not pay on this caller: see
+/// `benchmark-results/2026-11-02-mellum-q4k-kernel-verification`. The batch loop already hoists the
+/// nibble decode, so both layouts issue the same 2048 `maddubs` per block and the interleave buys
+/// back only the horizontal reduction.
+///
+/// Extracted from `compute_q4_k_batched_row_range_avx2` with no arithmetic change: same order, same
+/// intrinsics, same operands.
+///
+/// # Safety
+///
+/// `activation` must address at least 256 readable signed bytes.
+unsafe fn qk_batched_tile_lanes(
+    decoded: &[__m256i; 8],
+    group_scales: &[i32; 8],
+    activation: *const i8,
+) -> __m256i {
+    let mut quantized_lanes = _mm256_setzero_si256();
+    for group in 0..8 {
+        // SAFETY: every decoded group and activation group contains 32 bytes.
+        let activations = unsafe { _mm256_loadu_si256(activation.add(group * 32).cast()) };
+        let products = _mm256_maddubs_epi16(decoded[group], activations);
+        let scale = _mm256_set1_epi16(group_scales[group] as i16);
+        quantized_lanes = _mm256_add_epi32(quantized_lanes, _mm256_madd_epi16(products, scale));
+    }
+    quantized_lanes
 }
 
 #[cfg(target_arch = "x86_64")]

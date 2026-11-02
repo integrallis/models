@@ -1,0 +1,69 @@
+# host: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz / 6 physical, 12 logical, MacBookPro16,1
+# vector: AVX2 FMA F16C, no AVX-512 (machdep.cpu.leaf7_features)
+# date: 2026-11-02T21:25:04Z
+# harness: ab.c -> jmodels_quantized_f32_batched_matmul_with_context, format 2 (Q4K)
+# best_ms = min over 20 reps after 3 warmups; hash = FNV-1a over the whole output buffer
+# passes alternate which arm runs first, to keep run order from favouring either
+## rows=7168 cols=2304 batch=32 threads=1
+extracted hash=50c4c25fb419ff1f best_ms=18.894 mean_ms=19.748 best_gflops=55.94
+parent    hash=50c4c25fb419ff1f best_ms=19.284 mean_ms=25.462 best_gflops=54.81
+parent    hash=50c4c25fb419ff1f best_ms=19.456 mean_ms=20.231 best_gflops=54.33
+extracted hash=50c4c25fb419ff1f best_ms=18.756 mean_ms=19.529 best_gflops=56.35
+extracted hash=50c4c25fb419ff1f best_ms=18.894 mean_ms=20.121 best_gflops=55.94
+parent    hash=50c4c25fb419ff1f best_ms=19.530 mean_ms=20.490 best_gflops=54.12
+parent    hash=50c4c25fb419ff1f best_ms=19.342 mean_ms=22.326 best_gflops=54.65
+extracted hash=50c4c25fb419ff1f best_ms=19.197 mean_ms=22.842 best_gflops=55.06
+extracted hash=50c4c25fb419ff1f best_ms=18.527 mean_ms=19.629 best_gflops=57.05
+parent    hash=50c4c25fb419ff1f best_ms=19.496 mean_ms=19.976 best_gflops=54.21
+parent    hash=50c4c25fb419ff1f best_ms=19.457 mean_ms=23.388 best_gflops=54.32
+extracted hash=50c4c25fb419ff1f best_ms=19.012 mean_ms=19.687 best_gflops=55.59
+extracted hash=50c4c25fb419ff1f best_ms=18.931 mean_ms=19.616 best_gflops=55.83
+parent    hash=50c4c25fb419ff1f best_ms=19.493 mean_ms=20.098 best_gflops=54.22
+parent    hash=50c4c25fb419ff1f best_ms=19.263 mean_ms=25.984 best_gflops=54.87
+extracted hash=50c4c25fb419ff1f best_ms=18.704 mean_ms=19.896 best_gflops=56.51
+extracted hash=50c4c25fb419ff1f best_ms=18.669 mean_ms=20.387 best_gflops=56.62
+parent    hash=50c4c25fb419ff1f best_ms=19.135 mean_ms=20.318 best_gflops=55.24
+parent    hash=50c4c25fb419ff1f best_ms=19.160 mean_ms=20.868 best_gflops=55.17
+extracted hash=50c4c25fb419ff1f best_ms=18.728 mean_ms=22.661 best_gflops=56.44
+## rows=2304 cols=7168 batch=16 threads=1
+extracted hash=4a7e70205a9bc2ab best_ms=9.949 mean_ms=10.832 best_gflops=53.12
+parent    hash=4a7e70205a9bc2ab best_ms=10.408 mean_ms=10.974 best_gflops=50.78
+parent    hash=4a7e70205a9bc2ab best_ms=10.179 mean_ms=11.058 best_gflops=51.92
+extracted hash=4a7e70205a9bc2ab best_ms=10.522 mean_ms=10.973 best_gflops=50.23
+extracted hash=4a7e70205a9bc2ab best_ms=10.190 mean_ms=10.499 best_gflops=51.86
+parent    hash=4a7e70205a9bc2ab best_ms=10.160 mean_ms=10.833 best_gflops=52.02
+parent    hash=4a7e70205a9bc2ab best_ms=10.284 mean_ms=10.817 best_gflops=51.39
+extracted hash=4a7e70205a9bc2ab best_ms=9.973 mean_ms=13.249 best_gflops=52.99
+extracted hash=4a7e70205a9bc2ab best_ms=9.952 mean_ms=10.417 best_gflops=53.10
+parent    hash=4a7e70205a9bc2ab best_ms=10.114 mean_ms=10.566 best_gflops=52.25
+parent    hash=4a7e70205a9bc2ab best_ms=10.009 mean_ms=14.013 best_gflops=52.80
+extracted hash=4a7e70205a9bc2ab best_ms=9.929 mean_ms=10.415 best_gflops=53.23
+extracted hash=4a7e70205a9bc2ab best_ms=9.703 mean_ms=10.629 best_gflops=54.47
+parent    hash=4a7e70205a9bc2ab best_ms=10.261 mean_ms=10.896 best_gflops=51.50
+parent    hash=4a7e70205a9bc2ab best_ms=10.082 mean_ms=10.608 best_gflops=52.42
+extracted hash=4a7e70205a9bc2ab best_ms=9.856 mean_ms=10.440 best_gflops=53.62
+extracted hash=4a7e70205a9bc2ab best_ms=10.312 mean_ms=10.806 best_gflops=51.25
+parent    hash=4a7e70205a9bc2ab best_ms=10.083 mean_ms=10.518 best_gflops=52.41
+parent    hash=4a7e70205a9bc2ab best_ms=10.309 mean_ms=10.839 best_gflops=51.26
+extracted hash=4a7e70205a9bc2ab best_ms=10.042 mean_ms=10.621 best_gflops=52.63
+## rows=7168 cols=2304 batch=32 threads=8
+extracted hash=50c4c25fb419ff1f best_ms=3.568 mean_ms=5.325 best_gflops=296.23
+parent    hash=50c4c25fb419ff1f best_ms=3.814 mean_ms=4.887 best_gflops=277.13
+parent    hash=50c4c25fb419ff1f best_ms=3.772 mean_ms=4.578 best_gflops=280.21
+extracted hash=50c4c25fb419ff1f best_ms=4.051 mean_ms=4.678 best_gflops=260.91
+extracted hash=50c4c25fb419ff1f best_ms=4.316 mean_ms=5.305 best_gflops=244.89
+parent    hash=50c4c25fb419ff1f best_ms=3.990 mean_ms=4.887 best_gflops=264.90
+parent    hash=50c4c25fb419ff1f best_ms=4.232 mean_ms=4.686 best_gflops=249.76
+extracted hash=50c4c25fb419ff1f best_ms=3.885 mean_ms=4.632 best_gflops=272.06
+extracted hash=50c4c25fb419ff1f best_ms=3.611 mean_ms=4.623 best_gflops=292.71
+parent    hash=50c4c25fb419ff1f best_ms=3.711 mean_ms=4.724 best_gflops=284.82
+parent    hash=50c4c25fb419ff1f best_ms=3.713 mean_ms=4.682 best_gflops=284.67
+extracted hash=50c4c25fb419ff1f best_ms=4.029 mean_ms=4.675 best_gflops=262.34
+extracted hash=50c4c25fb419ff1f best_ms=3.873 mean_ms=4.634 best_gflops=272.91
+parent    hash=50c4c25fb419ff1f best_ms=3.983 mean_ms=4.892 best_gflops=265.37
+parent    hash=50c4c25fb419ff1f best_ms=3.914 mean_ms=4.925 best_gflops=270.05
+extracted hash=50c4c25fb419ff1f best_ms=3.612 mean_ms=4.470 best_gflops=292.63
+extracted hash=50c4c25fb419ff1f best_ms=4.302 mean_ms=8.736 best_gflops=245.69
+parent    hash=50c4c25fb419ff1f best_ms=3.835 mean_ms=4.834 best_gflops=275.61
+parent    hash=50c4c25fb419ff1f best_ms=3.704 mean_ms=4.809 best_gflops=285.36
+extracted hash=50c4c25fb419ff1f best_ms=3.859 mean_ms=4.686 best_gflops=273.90
