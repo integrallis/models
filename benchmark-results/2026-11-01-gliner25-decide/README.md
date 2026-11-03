@@ -21,6 +21,38 @@ The original worker was terminated after an S3 upload permission failure, before
 Its replacement uses direct object copies without requiring ListBucket permission.
 The original two-hour aggregate rented-compute ceiling was retained.
 
+## Released-runtime repeat, 2026-11-03: qualified
+
+Both runtimes against the **released** `com.integrallis:models-api`, `backend-java` and
+`backend-native` **0.5.12** from Maven Central (`build_released_payload.py`; the payload receipt is
+`released-runtime.json` in each run), the publisher at GLiNER2 `ca4f6823`, the original pinned
+weights, eight threads per arm. Launched by `evaluate_finetune_controller.py` with the launch
+template `restart-1-request.json` (user data and client token removed; the controller sets both).
+
+- **Performance** (`gliner25-eval-20261103T040449Z`, m6a.4xlarge, `performance-replications-report.json`):
+  three complete pairs, every one of 13 shapes passing, replication gate passed.
+
+| pair | passed | shapes | worst throughput ratio (floor 0.80) | worst p95 latency ratio |
+| --- | --- | ---: | ---: | ---: |
+| 1 | True | 13 | 0.9542 | 1.2299 |
+| 2 | True | 13 | 0.9403 | 1.3102 |
+| 3 | True | 13 | 0.9273 | 1.2179 |
+
+- **Numerical parity** on the released runtime: passed, worst absolute logit error
+  4.63e-06 over 9 diagnostic cases.
+- **Accuracy and fidelity** (`gliner25-eval-20261103T040519Z`, m6a.16xlarge, `upstream-v2-quality.json` from
+  `assess_upstream_fidelity.py` over the independent scores written by `audit_publisher_scoring.py` and
+  `audit_emotion_scoring.py` with scikit-learn 1.7.2 and numpy 2.5.4, the versions of the original audit):
+  fidelity passed, maximum quality loss against the publisher 0, label disagreements
+  {'publisher.singleHead': 0, 'publisher.jointHead': 0, 'goemotions.fullTest': 0}. The audit inputs were rebuilt by `prepare_publisher_audit.py` from the
+  digest-pinned sources and match the committed manifests file for file.
+- **Catalog entry**: `catalog-qualification-released-0.5.12.json` from `assemble_catalog_qualification.py`,
+  `qualified: true`, `backendVersion: models-0.5.12`.
+- **Cleanup**: both instances terminated and their root volumes absent, checked against the EC2 API
+  (`cleanup-verification.json` in each run). Rented time: 1904 s and
+  2274 s; aggregate upper bound 25229 s of the
+  28800 s authorized.
+
 ## Correctness and accuracy
 
 | Check | Result |
