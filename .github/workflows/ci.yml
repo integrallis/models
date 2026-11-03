@@ -118,6 +118,13 @@ jobs:
       - name: Compliance Check
         run: ./gradlew complianceCheck
 
+      # verifyDocumentation keeps every page consistent with the modeljarsVersion property, but
+      # nothing checked whether that property is current: it is another project's release, so no
+      # module depends on it and no build resolves it. It drifted ten releases, was corrected, and
+      # went stale again within the hour.
+      - name: Check the documented ModelJars version is the one Central serves
+        run: python3 scripts/verify-modeljars-currency.py .
+
       - name: Test dependency policy rejection cases
         run: |
           python3 scripts/test-dependency-policy.py
