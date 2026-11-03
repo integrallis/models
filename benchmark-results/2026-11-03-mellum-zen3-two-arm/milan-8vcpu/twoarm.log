@@ -1,0 +1,67 @@
+### 03:41:57 jdk
+### 03:42:00 ollama
+### 03:42:17 model
+### 03:43:15 build kernels
+### base sha=58bd64dab094862d
+### combo sha=3835404baa02c8b0
+ AMD EPYC-Milan Processor
+8
+avx2 
+58bd64dab094862d607546df9e01f1da5fa6c54f4e93c1e67de82292573503a8  /root/kern-base/target/release/libjmodels_kernels.so
+3835404baa02c8b0226729766bafe601fba139eaec5a4e11191d7ad286fc6fd9  /root/kern-combo/target/release/libjmodels_kernels.so
+489cf0d7ca86ef4683e34e2efe8a46a9b52573bfe994a6ad9c86bf57c7173ccb  /root/mellum/m.gguf
+source_revision=3fef5ad035520456211f49d236d4fa031a431269
+### 03:45:13 PAIR pass=1 kernel=base
+### comparator rc=0
+### host loadavg after: 6.95 4.47 2.33 1/219 35276   [host-wide, not ours]
+### verdict: QUALIFIED qualified= True
+### absoluteTier: USABLE
+### contribution: answerRate=0.7778 (min 0.3333)  correctRate=1.0000 (min 0.9000)
+### vs ollama: decodeRatio=0.8668 e2eRatio=0.6064 qualified=True
+### 03:49:45 PAIR pass=1 kernel=combo
+### comparator rc=0
+### host loadavg after: 7.18 6.03 3.51 1/224 35779   [host-wide, not ours]
+### verdict: QUALIFIED qualified= True
+### absoluteTier: USABLE
+### contribution: answerRate=0.7778 (min 0.3333)  correctRate=1.0000 (min 0.9000)
+### vs ollama: decodeRatio=0.8816 e2eRatio=0.5864 qualified=True
+### 03:54:05 PAIR pass=2 kernel=base
+### comparator rc=0
+### host loadavg after: 6.68 6.58 4.38 1/224 36270   [host-wide, not ours]
+### verdict: QUALIFIED qualified= True
+### absoluteTier: USABLE
+### contribution: answerRate=0.7778 (min 0.3333)  correctRate=1.0000 (min 0.9000)
+### vs ollama: decodeRatio=0.8664 e2eRatio=0.5948 qualified=True
+### 03:58:24 PAIR pass=2 kernel=combo
+### comparator rc=0
+### host loadavg after: 7.12 6.85 5.03 1/222 36703   [host-wide, not ours]
+### verdict: QUALIFIED qualified= True
+### absoluteTier: USABLE
+### contribution: answerRate=0.7778 (min 0.3333)  correctRate=1.0000 (min 0.9000)
+### vs ollama: decodeRatio=0.8792 e2eRatio=0.5978 qualified=True
+### 04:02:42 PAIR pass=3 kernel=base
+### comparator rc=0
+### host loadavg after: 7.07 6.92 5.50 1/223 37167   [host-wide, not ours]
+### verdict: QUALIFIED qualified= True
+### absoluteTier: USABLE
+### contribution: answerRate=0.7778 (min 0.3333)  correctRate=1.0000 (min 0.9000)
+### vs ollama: decodeRatio=0.8717 e2eRatio=0.5910 qualified=True
+### 04:06:57 PAIR pass=3 kernel=combo
+### comparator rc=0
+### host loadavg after: 7.07 7.02 5.90 1/222 37601   [host-wide, not ours]
+### verdict: QUALIFIED qualified= True
+### absoluteTier: USABLE
+### contribution: answerRate=0.7778 (min 0.3333)  correctRate=1.0000 (min 0.9000)
+### vs ollama: decodeRatio=0.8623 e2eRatio=0.6180 qualified=True
+######## RESULT ########
+--- base ---
+  p1: ours 29.64  ollama 34.19  ratio 0.8668  QUALIFIED
+  p2: ours 29.48  ollama 34.02  ratio 0.8664  QUALIFIED
+  p3: ours 30.16  ollama 34.6  ratio 0.8717  QUALIFIED
+  MEAN ratio 0.8683 sd 0.0030  passes 3/3  floor 0.80
+--- combo ---
+  p1: ours 29.61  ollama 33.59  ratio 0.8816  QUALIFIED
+  p2: ours 30.07  ollama 34.2  ratio 0.8792  QUALIFIED
+  p3: ours 29.29  ollama 33.97  ratio 0.8623  QUALIFIED
+  MEAN ratio 0.8744 sd 0.0105  passes 3/3  floor 0.80
+######## DONE ########

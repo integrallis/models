@@ -1,0 +1,23 @@
+CMAKE_BUILD_TYPE=Release
+[100%] Built target ggml-cpu
+[100%] Built target ggml-base
+### built
+type=q4_K rows=512 cols=4096 weights=1.12 MiB  (L3 on this box is 12 MiB)
+BEST   ggml  16.76 GB/s   ours  13.62 GB/s   ours/ggml 0.813   ggml/ours 1.231x
+agreement: mean rel diff 2.487e-07  max 1.157e-04  (sanity: both computed the same dot)
+type=q4_K rows=4096 cols=4096 weights=9.00 MiB  (L3 on this box is 12 MiB)
+BEST   ggml  16.57 GB/s   ours  14.81 GB/s   ours/ggml 0.894   ggml/ours 1.119x
+agreement: mean rel diff 1.471e-08  max 1.321e-05  (sanity: both computed the same dot)
+type=q4_K rows=16384 cols=4096 weights=36.00 MiB  (L3 on this box is 12 MiB)
+BEST   ggml  14.77 GB/s   ours  13.58 GB/s   ours/ggml 0.920   ggml/ours 1.087x
+agreement: mean rel diff 7.813e-09  max 9.641e-06  (sanity: both computed the same dot)
+type=q5_K rows=512 cols=4096 weights=1.38 MiB  (L3 on this box is 12 MiB)
+BEST   ggml  13.38 GB/s   ours  12.63 GB/s   ours/ggml 0.944   ggml/ours 1.059x
+agreement: mean rel diff 1.064e-06  max 1.768e-04  (sanity: both computed the same dot)
+type=q5_K rows=4096 cols=4096 weights=11.00 MiB  (L3 on this box is 12 MiB)
+BEST   ggml  13.22 GB/s   ours  13.58 GB/s   ours/ggml 1.028   ggml/ours 0.973x
+agreement: mean rel diff 2.576e-07  max 6.960e-05  (sanity: both computed the same dot)
+type=q5_K rows=16384 cols=4096 weights=44.00 MiB  (L3 on this box is 12 MiB)
+BEST   ggml  12.39 GB/s   ours  12.60 GB/s   ours/ggml 1.017   ggml/ours 0.983x
+agreement: mean rel diff 3.109e-06  max 3.715e-02  (sanity: both computed the same dot)
+### KAB DONE

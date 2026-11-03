@@ -1,0 +1,52 @@
+######## PAIRED RUN 1 of 3 ########
+### host loadavg before: 179.28 156.19 146.11 63/13962 8261   [host-wide, not ours]
+### protocol: warmups=1 iterations=3 threads=16
+### ARM 1 candidate (rust-ffm) model=mellum2_12b_a2_5b_thinking_q4_k_m wl=coding tpl=chatml-no-think topk=1
+### candidate rc=0
+### ollama ready after 2s
+### ARM 2 comparator (ollama)
+### comparator rc=0
+### host loadavg after: 103.51 136.75 143.71 90/13736 9179   [host-wide, not ours]
+### verdict: FAILED_RELATIVE_GATE qualified= False
+### absoluteTier: PERFORMANCE_REDUCED
+### contribution: answerRate=0.7778 (min 0.3333)  correctRate=1.0000 (min 0.9000)
+### vs ollama: decodeRatio=0.7889 e2eRatio=0.4262 qualified=False
+######## PAIRED RUN 2 of 3 ########
+### host loadavg before: 104.11 136.32 143.54 79/13719 9226   [host-wide, not ours]
+### protocol: warmups=1 iterations=3 threads=16
+### ARM 1 candidate (rust-ffm) model=mellum2_12b_a2_5b_thinking_q4_k_m wl=coding tpl=chatml-no-think topk=1
+### candidate rc=0
+### ollama ready after 1s
+### ARM 2 comparator (ollama)
+### comparator rc=0
+### host loadavg after: 71.69 93.27 121.32 51/14828 10071   [host-wide, not ours]
+### verdict: FAILED_RELATIVE_GATE qualified= False
+### absoluteTier: PERFORMANCE_REDUCED
+### contribution: answerRate=0.7778 (min 0.3333)  correctRate=1.0000 (min 0.9000)
+### vs ollama: decodeRatio=0.7825 e2eRatio=1.0900 qualified=False
+######## PAIRED RUN 3 of 3 ########
+### host loadavg before: 71.69 93.27 121.32 51/14925 10118   [host-wide, not ours]
+### protocol: warmups=1 iterations=3 threads=16
+### ARM 1 candidate (rust-ffm) model=mellum2_12b_a2_5b_thinking_q4_k_m wl=coding tpl=chatml-no-think topk=1
+### candidate rc=0
+### ollama ready after 1s
+### ARM 2 comparator (ollama)
+### comparator rc=0
+### host loadavg after: 58.84 75.34 104.38 26/13028 10950   [host-wide, not ours]
+### verdict: FAILED_RELATIVE_GATE qualified= False
+### absoluteTier: PERFORMANCE_REDUCED
+### contribution: answerRate=0.7778 (min 0.3333)  correctRate=1.0000 (min 0.9000)
+### vs ollama: decodeRatio=0.7901 e2eRatio=0.5521 qualified=False
+
+######## REPLICATED RESULT ########
+ run     ours   ollama    ratio  verdict
+   1    29.43    37.31   0.7889  FAILED_RELATIVE_GATE
+   2    29.65    37.90   0.7825  FAILED_RELATIVE_GATE
+   3    30.54    38.66   0.7901  FAILED_RELATIVE_GATE
+
+  ours      mean 29.88 sd 0.59
+  ollama    mean 37.95 sd 0.68
+  RATIO     mean 0.7872 sd 0.0041   floor 0.80
+  passes    0 of 3
+  DECISION  NOT EARNED - entry must be withdrawn
+######## DONE ########
