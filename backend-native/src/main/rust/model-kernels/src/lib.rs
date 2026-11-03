@@ -4217,13 +4217,12 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
     let sums_per_batch = cols / Q8_K_SUM_BLOCK;
     let nibble_mask = _mm256_set1_epi8(0x0f);
     batch_scratch!(sums, batch_size, _mm256_setzero_ps(), __m256);
-    batch_scratch!(minimum_sums, batch_size, 0_f32, f32);
+    batch_scratch!(minimum_sums, batch_size, _mm_setzero_ps(), __m128);
     let mut decoded = [_mm256_setzero_si256(); 8];
     let mut group_scales = [0_i32; 8];
-    let mut group_mins = [0_i32; 8];
     for row in start_row..end_row {
         sums.fill(_mm256_setzero_ps());
-        minimum_sums.fill(0_f32);
+        minimum_sums.fill(_mm_setzero_ps());
         for block in 0..blocks_per_row {
             record_k_quant_weight_block_decode();
             let weight_offset = (row * blocks_per_row + block) * Q4_K_BLOCK_BYTES;
@@ -4243,21 +4242,14 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
                 decoded[pair * 2] = _mm256_and_si256(packed, nibble_mask);
                 decoded[pair * 2 + 1] = _mm256_and_si256(_mm256_srli_epi16(packed, 4), nibble_mask);
             }
+            // One unpack per block, as the single-row kernel does. This replaced eight
+            // `qk_scale` and eight `qk_min` calls, each a branchy six-bit field extraction from
+            // memory -- the cost dcd8b172 removed from the row kernel and never removed from here.
+            let (scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
             for group in 0..8 {
-                group_scales[group] = qk_scale(scales, group);
-                group_mins[group] = qk_min(scales, group);
+                group_scales[group] = scale_values[group] as i32;
             }
-
-            let minimum_values = _mm256_setr_epi32(
-                group_mins[0],
-                group_mins[1],
-                group_mins[2],
-                group_mins[3],
-                group_mins[4],
-                group_mins[5],
-                group_mins[6],
-                group_mins[7],
-            );
+            let group_minima = _mm256_extracti128_si256(mins_and_scales, 1);
 
             for batch in 0..batch_size {
                 let activation_offset = batch * cols + block * QK_K;
@@ -4270,18 +4262,16 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
                         quantized.as_ptr().add(activation_offset),
                     )
                 };
-                // Match the single-row reduction order: the minimum correction is a
-                // scalar FMA per block, added only after reducing the quantized lanes.
-                // Folding it into SIMD lanes changes rounding when prefill batch size changes.
-                // Integer summation is exact here: eight groups of 32 signed bytes
-                // multiplied by six-bit minima cannot overflow i32. Vectorize this
-                // portion without changing the scalar floating-point FMA contract.
+                // The minimum correction goes through the same four-lane helper the single-row
+                // kernel uses, and accumulates the same way, so the two kernels agree bit-for-bit
+                // by construction rather than by two implementations happening to match.
                 // SAFETY: one Q8_K block contains sixteen complete i16 group sums.
-                let activation_sum_values =
-                    unsafe { _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast()) };
-                let paired_sums = _mm256_madd_epi16(activation_sum_values, _mm256_set1_epi16(1));
-                let block_minimum_sum =
-                    horizontal_sum_i32_avx2(_mm256_mullo_epi32(minimum_values, paired_sums));
+                let min_products = unsafe {
+                    qk_block_minimum_products(
+                        group_minima,
+                        activation_sums.as_ptr().add(sum_offset),
+                    )
+                };
                 let activation_scale = activation_scales[batch * blocks_per_row + block];
                 let d = weight_scale * activation_scale;
                 let d_min = weight_min_scale * activation_scale;
@@ -4290,17 +4280,20 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
                     _mm256_cvtepi32_ps(quantized_lanes),
                     sums[batch],
                 );
-                minimum_sums[batch] =
-                    (-d_min).mul_add(block_minimum_sum as f32, minimum_sums[batch]);
+                minimum_sums[batch] = _mm_fmadd_ps(
+                    _mm_set1_ps(-d_min),
+                    _mm_cvtepi32_ps(min_products),
+                    minimum_sums[batch],
+                );
             }
         }
         for (batch, &sum) in sums.iter().enumerate() {
             record_q4_k_batch_horizontal_reduction();
             // SAFETY: each worker owns this row across all batch-major output planes.
             unsafe {
-                output
-                    .add(batch * rows + row)
-                    .write(horizontal_sum_f32_avx2(sum) + minimum_sums[batch]);
+                output.add(batch * rows + row).write(
+                    horizontal_sum_f32_avx2(sum) + horizontal_sum_f32_sse2(minimum_sums[batch]),
+                );
             }
         }
     }
@@ -6093,7 +6086,7 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
     let blocks_per_row = cols / QK_K;
     let nibble_mask = _mm256_set1_epi8(0x0f);
     let mut accumulated = _mm256_setzero_ps();
-    let mut minimum_sum = 0_f32;
+    let mut minimum_accumulated = _mm_setzero_ps();
     let mut ordered_sum = 0_f32;
     for block in 0..blocks_per_row {
         record_k_quant_weight_block_decode();
@@ -6113,18 +6106,13 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
         let quants = weights.as_ptr().wrapping_add(weight_offset + 16);
         let mut quantized_lanes = _mm256_setzero_si256();
         let (scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
-        // The mins term, vectorised: sum over groups of min[g] * (sums[2g] + sums[2g+1]).
-        // Pair sums fit i16 (16 q8 values, |v| <= 127, so |pair| <= 4064) and the products fit
-        // i32, so this is bit-identical to the scalar loop it replaces -- integer addition is
-        // associative, and no lane overflows.
         // SAFETY: every block carries QK_K / Q8_K_SUM_BLOCK = 16 activation sums.
-        let q8sums = unsafe { _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast()) };
-        let q8s = _mm_hadd_epi16(
-            _mm256_extracti128_si256(q8sums, 0),
-            _mm256_extracti128_si256(q8sums, 1),
-        );
-        let min_products = _mm_madd_epi16(_mm256_extracti128_si256(mins_and_scales, 1), q8s);
-        let block_minimum_sum = horizontal_sum_i32_sse2(min_products);
+        let min_products = unsafe {
+            qk_block_minimum_products(
+                _mm256_extracti128_si256(mins_and_scales, 1),
+                activation_sums.as_ptr().add(sum_offset),
+            )
+        };
         for pair in 0..4 {
             // SAFETY: each Q4_K block contains four complete 32-byte packed groups.
             let packed = unsafe { _mm256_loadu_si256(quants.add(pair * 32).cast()) };
@@ -6151,21 +6139,26 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
             // Integer lanes may fold freely; floating-point blocks must follow Java's order.
             let integer_sum = horizontal_sum_i32_avx2(quantized_lanes);
             ordered_sum = d.mul_add(integer_sum as f32, ordered_sum);
-            ordered_sum = (-d_min).mul_add(block_minimum_sum as f32, ordered_sum);
+            ordered_sum =
+                (-d_min).mul_add(horizontal_sum_i32_sse2(min_products) as f32, ordered_sum);
         } else {
             accumulated = _mm256_fmadd_ps(
                 _mm256_set1_ps(d),
                 _mm256_cvtepi32_ps(quantized_lanes),
                 accumulated,
             );
-            minimum_sum = (-d_min).mul_add(block_minimum_sum as f32, minimum_sum);
+            minimum_accumulated = _mm_fmadd_ps(
+                _mm_set1_ps(-d_min),
+                _mm_cvtepi32_ps(min_products),
+                minimum_accumulated,
+            );
         }
     }
     if ORDERED {
         ordered_sum
     } else {
         record_q4_k_single_horizontal_reduction();
-        horizontal_sum_f32_avx2(accumulated) + minimum_sum
+        horizontal_sum_f32_avx2(accumulated) + horizontal_sum_f32_sse2(minimum_accumulated)
     }
 }
 
@@ -6353,6 +6346,43 @@ unsafe fn unsigned_signed_products_avx2(unsigned: __m256i, signed: *const i8) ->
     // SAFETY: callers provide 32 signed activation bytes.
     let signed = unsafe { _mm256_loadu_si256(signed.cast()) };
     _mm256_maddubs_epi16(unsigned, signed)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[inline]
+#[target_feature(enable = "sse2")]
+/// Sums the four f32 lanes of a minimum-correction accumulator, once per row.
+fn horizontal_sum_f32_sse2(values: __m128) -> f32 {
+    let folded = _mm_add_ps(values, _mm_movehl_ps(values, values));
+    let total = _mm_add_ss(folded, _mm_shuffle_ps(folded, folded, 0b0000_0001));
+    _mm_cvtss_f32(total)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[inline]
+#[target_feature(enable = "avx2")]
+/// The per-block minimum correction, in the four-lane layout both Q4_K kernels share.
+///
+/// `mins` is lanes 8..15 of `qk_unpack_scales_and_mins`, the eight i16 group minima. The sixteen
+/// i16 activation group sums are folded pairwise, multiplied against the minima and added in pairs
+/// by `madd_epi16`, giving four i32 partial products. Integer arithmetic is exact here: a pair sum
+/// of sixteen bytes bounded by 127 cannot exceed 4064, and the products cannot overflow i32.
+///
+/// Both the single-row and the batched kernel call this and accumulate its result the same way, so
+/// `q4_k_avx2_preserves_single_row_rounding_across_batch_sizes` holds by construction rather than
+/// by two implementations happening to agree.
+///
+/// # Safety
+///
+/// `activation_sums` must address sixteen readable i16 group sums.
+unsafe fn qk_block_minimum_products(mins: __m128i, activation_sums: *const i16) -> __m128i {
+    // SAFETY: the caller guarantees sixteen i16 sums at this offset.
+    let sums = unsafe { _mm256_loadu_si256(activation_sums.cast()) };
+    let paired = _mm_hadd_epi16(
+        _mm256_extracti128_si256(sums, 0),
+        _mm256_extracti128_si256(sums, 1),
+    );
+    _mm_madd_epi16(mins, paired)
 }
 
 #[cfg(target_arch = "x86_64")]
