@@ -1,0 +1,31 @@
+### 00:52:36 apt
+debconf: delaying package configuration, since apt-utils is not installed
+### 00:52:50 jdk 25
+openjdk version "25.0.5" 2026-10-20 LTS
+OpenJDK Runtime Environment Temurin-25.0.5+8 (build 25.0.5+8-LTS)
+### 00:52:54 rust 1.96.0 (the repo's pinned toolchain)
+info: downloading installer
+info: profile set to minimal
+info: default host tuple is x86_64-unknown-linux-gnu
+info: syncing channel updates for 1.96.0-x86_64-unknown-linux-gnu
+info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
+info: downloading 3 components
+info: default toolchain set to 1.96.0-x86_64-unknown-linux-gnu
+rustc 1.96.0 (ac68faa20 2026-05-25)
+### 00:53:03 build the kernel on this box
+   Compiling tokenizers v0.22.2
+   Compiling jmodels-kernels v0.5.12 (/root/work/rust/model-kernels)
+    Finished `release` profile [optimized] target(s) in 1m 06s
+### 00:54:10 ollama
+### 00:54:20 mellum gguf
+### 00:55:24 model sha256 verified against the catalog entry
+### 00:55:24 HOST.txt
+ AMD EPYC 7713 64-Core Processor
+16
+avx2 fma 
+58bd64dab094862d607546df9e01f1da5fa6c54f4e93c1e67de82292573503a8  /root/libkernels-fixed.so
+489cf0d7ca86ef4683e34e2efe8a46a9b52573bfe994a6ad9c86bf57c7173ccb  /root/mellum/m.gguf
+Warning: could not connect to a running Ollama instance
+source_revision=3fef5ad035520456211f49d236d4fa031a431269
+host_cores=256 cpu_max=max 100000
+### 00:55:31 BOOTSTRAP COMPLETE
