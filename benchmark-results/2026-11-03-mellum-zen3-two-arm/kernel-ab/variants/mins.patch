@@ -1,0 +1,69 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -6093,7 +6093,7 @@
+     let blocks_per_row = cols / QK_K;
+     let nibble_mask = _mm256_set1_epi8(0x0f);
+     let mut accumulated = _mm256_setzero_ps();
+-    let mut minimum_sum = 0_f32;
++    let mut minimum_accumulated = _mm_setzero_ps();
+     let mut ordered_sum = 0_f32;
+     for block in 0..blocks_per_row {
+         record_k_quant_weight_block_decode();
+@@ -6124,7 +6124,6 @@
+             _mm256_extracti128_si256(q8sums, 1),
+         );
+         let min_products = _mm_madd_epi16(_mm256_extracti128_si256(mins_and_scales, 1), q8s);
+-        let block_minimum_sum = horizontal_sum_i32_sse2(min_products);
+         for pair in 0..4 {
+             // SAFETY: each Q4_K block contains four complete 32-byte packed groups.
+             let packed = unsafe { _mm256_loadu_si256(quants.add(pair * 32).cast()) };
+@@ -6151,21 +6150,29 @@
+             // Integer lanes may fold freely; floating-point blocks must follow Java's order.
+             let integer_sum = horizontal_sum_i32_avx2(quantized_lanes);
+             ordered_sum = d.mul_add(integer_sum as f32, ordered_sum);
+-            ordered_sum = (-d_min).mul_add(block_minimum_sum as f32, ordered_sum);
++            ordered_sum =
++                (-d_min).mul_add(horizontal_sum_i32_sse2(min_products) as f32, ordered_sum);
+         } else {
+             accumulated = _mm256_fmadd_ps(
+                 _mm256_set1_ps(d),
+                 _mm256_cvtepi32_ps(quantized_lanes),
+                 accumulated,
+             );
+-            minimum_sum = (-d_min).mul_add(block_minimum_sum as f32, minimum_sum);
++            // The minimum correction accumulates in four lanes and is reduced once for the row,
++            // the way the quantized term above already does. The per-block horizontal reduction it
++            // replaces sat on the critical path of every block.
++            minimum_accumulated = _mm_fmadd_ps(
++                _mm_set1_ps(-d_min),
++                _mm_cvtepi32_ps(min_products),
++                minimum_accumulated,
++            );
+         }
+     }
+     if ORDERED {
+         ordered_sum
+     } else {
+         record_q4_k_single_horizontal_reduction();
+-        horizontal_sum_f32_avx2(accumulated) + minimum_sum
++        horizontal_sum_f32_avx2(accumulated) + horizontal_sum_f32_sse2(minimum_accumulated)
+     }
+ }
+ 
+@@ -6358,6 +6365,16 @@
+ #[cfg(target_arch = "x86_64")]
+ #[inline]
+ #[target_feature(enable = "sse2")]
++/// Sums the four f32 lanes of a minimum-correction accumulator, once per row.
++fn horizontal_sum_f32_sse2(values: __m128) -> f32 {
++    let folded = _mm_add_ps(values, _mm_movehl_ps(values, values));
++    let total = _mm_add_ss(folded, _mm_shuffle_ps(folded, folded, 0b0000_0001));
++    _mm_cvtss_f32(total)
++}
++
++#[cfg(target_arch = "x86_64")]
++#[inline]
++#[target_feature(enable = "sse2")]
+ fn horizontal_sum_i32_sse2(values: __m128i) -> i32 {
+     let shuffled = _mm_add_epi32(values, _mm_shuffle_epi32(values, 0b0100_1110));
+     let folded = _mm_add_epi32(shuffled, _mm_shuffle_epi32(shuffled, 0b1011_0001));
