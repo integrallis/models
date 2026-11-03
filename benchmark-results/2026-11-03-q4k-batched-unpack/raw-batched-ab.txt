@@ -1,0 +1,25 @@
+# host: Intel(R) Core(TM) i7-9750H, 6 physical / 12 logical, MacBookPro16,1, AVX2 FMA F16C, no AVX-512
+# harness: ab.c -> jmodels_quantized_f32_batched_matmul_with_context, format 2 (Q4K), batch_size 32
+#          batch_size 32 routes to compute_q4_k_batched_row_range_avx2 (batch_size==1 would route
+#          to the single-row dot instead, which is a different kernel).
+# best_ms = min over 15 reps after 3 warmups; alternating arms
+base    best_ms=14.831 gflops=71.27
+unified best_ms=12.975 gflops=81.46
+unified best_ms=12.958 gflops=81.57
+base    best_ms=15.491 gflops=68.23
+base    best_ms=14.614 gflops=72.33
+unified best_ms=13.295 gflops=79.50
+unified best_ms=13.086 gflops=80.77
+base    best_ms=14.690 gflops=71.95
+base    best_ms=14.521 gflops=72.79
+unified best_ms=13.478 gflops=78.42
+unified best_ms=13.395 gflops=78.91
+base    best_ms=15.227 gflops=69.41
+base    best_ms=14.663 gflops=72.08
+unified best_ms=13.316 gflops=79.38
+unified best_ms=13.173 gflops=80.24
+base    best_ms=14.836 gflops=71.24
+# base    mean 14.859 ms  range 14.521-15.491
+# unified mean 13.210 ms  range 12.958-13.478
+# ranges do not overlap; unified faster in 8 of 8 passes
+# output hash: base 50c4c25fb419ff1f -> unified 48f5a9b0edbf0ebd (numerics changed, see README)
