@@ -1,0 +1,38 @@
+--- /dev/fd/12	2026-11-02 20:20:30
++++ /private/tmp/claude-501/-Users-briansam-bodden-Code-java-ai/b2264b88-5cfa-4127-acd9-1f3058f0b59a/scratchpad/ortprof/instrumented-executor.java	2026-11-02 19:37:45
+@@ -129,6 +129,23 @@
+     return inScope(() -> runInScope(feeds, requested, observer, noiseSource));
+   }
+ 
++  // SCRATCH PROFILING ONLY, never committed.
++  static final java.util.concurrent.ConcurrentHashMap<String, Long> PROF_NANOS = new java.util.concurrent.ConcurrentHashMap<>();
++  static final java.util.concurrent.ConcurrentHashMap<String, Long> PROF_CALLS = new java.util.concurrent.ConcurrentHashMap<>();
++  static {
++    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
++      long total = PROF_NANOS.values().stream().mapToLong(Long::longValue).sum();
++      StringBuilder out = new StringBuilder("{\"totalNanos\":" + total + ",\"byOp\":[");
++      PROF_NANOS.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue(), a.getValue())).forEach(e ->
++          out.append("{\"op\":\"").append(e.getKey()).append("\",\"nanos\":").append(e.getValue())
++             .append(",\"calls\":").append(PROF_CALLS.get(e.getKey())).append("},"));
++      if (out.charAt(out.length() - 1) == ',') out.setLength(out.length() - 1);
++      out.append("]}");
++      try { java.nio.file.Files.writeString(java.nio.file.Path.of(System.getProperty("onnx.prof.out", "onnx-prof.json")), out); }
++      catch (java.io.IOException ignored) { }
++    }));
++  }
++
+   private Map<String, Tensor> runInScope(
+       Map<String, Tensor> feeds,
+       Collection<String> requested,
+@@ -144,7 +161,11 @@
+       Tensor[] inputs = resolve(node, values);
+       Tensor[] outputs;
+       try {
++        long profT0 = System.nanoTime();
+         outputs = Operators.apply(node, inputs, noiseSource);
++        long profDt = System.nanoTime() - profT0;
++        PROF_NANOS.merge(node.opType(), profDt, Long::sum);
++        PROF_CALLS.merge(node.opType(), 1L, Long::sum);
+       } catch (RuntimeException failure) {
+         throw new IllegalStateException(
+             describe(node, inputs) + ": " + failure.getMessage(), failure);

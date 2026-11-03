@@ -55,8 +55,11 @@
       "jmodels_kernels_context_set_poll_nanos",
       "jmodels_onnx_abi",
       "jmodels_onnx_erf_f32",
+      "jmodels_onnx_exp_f32",
+      "jmodels_onnx_logistic_f32",
       "jmodels_onnx_sgemm",
       "jmodels_onnx_sin_f32",
+      "jmodels_onnx_tanh_f32",
       "jmodels_quantized_f32_batched_matmul_with_context",
       "jmodels_quantized_f32_grouped_batched_matmul_with_context",
       "jmodels_quantized_f32_independent_batched_matmul_with_context",
@@ -383,7 +386,7 @@
       "remaining": [
         "Reproduce the best exact Java alternative and native route with matched scheduling and actual model calls.",
         "Identify a controlled JVM cause, qualify whole-model cost and resources on every retained profile, then adopt or remove.",
-        "Qualify the composed AVX2/FMA/F16C and NEON row-reuse route with batches1\u201332; retain the prior allocation outlier and incomplete precision verdict."
+        "Qualify the composed AVX2/FMA/F16C and NEON row-reuse route with batches1–32; retain the prior allocation outlier and incomplete precision verdict."
       ],
       "sourceScope": "cpu"
     },
@@ -993,14 +996,17 @@
     {
       "id": "onnx-executor-kernels",
       "status": "UNPROVEN",
-      "summary": "Owner-authorized acceleration of the pure-Java ONNX executor (models-backend-onnx) for Paradee-8M: single-threaded matrixmultiply sgemm for MatMul, Gemm and the im2col form of every Conv, a range-reduced AVX2/FMA sine and libm erf, bound per executor run through OnnxKernels. Seeded parity against onnxruntime is a correctness record, not a JVM-limitation certificate.",
+      "summary": "Owner-authorized acceleration of the pure-Java ONNX executor (models-backend-onnx) for Paradee-8M: single-threaded matrixmultiply sgemm for MatMul, Gemm and the im2col form of every Conv, a range-reduced AVX2/FMA sine, and onnxruntime's MLAS exp, tanh, logistic and erf approximations (MIT, translated with their constants), bound per executor run through OnnxKernels. Seeded parity against onnxruntime is a correctness record, not a JVM-limitation certificate.",
       "capabilities": [],
       "exports": {
         "cpu": [
           "jmodels_onnx_abi",
           "jmodels_onnx_erf_f32",
+          "jmodels_onnx_exp_f32",
+          "jmodels_onnx_logistic_f32",
           "jmodels_onnx_sgemm",
-          "jmodels_onnx_sin_f32"
+          "jmodels_onnx_sin_f32",
+          "jmodels_onnx_tanh_f32"
         ]
       },
       "dispatch": [
@@ -1014,11 +1020,23 @@
         },
         {
           "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeOnnxKernels.java",
+          "anchor": "jmodels_onnx_exp_f32"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeOnnxKernels.java",
+          "anchor": "jmodels_onnx_logistic_f32"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeOnnxKernels.java",
           "anchor": "jmodels_onnx_sgemm"
         },
         {
           "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeOnnxKernels.java",
           "anchor": "jmodels_onnx_sin_f32"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeOnnxKernels.java",
+          "anchor": "jmodels_onnx_tanh_f32"
         }
       ],
       "requiredProfiles": [
@@ -1031,17 +1049,17 @@
       ],
       "evidence": [
         {
-          "path": "experiments/paradee-8m-tts/evidence/parity/seeded-parity-rust-ffm-2026-11-02.json",
-          "sha256": "d5b5ee738d74017c1a1acf4df69d6a252bf1f4f7d20451866435abe7a5e647c2"
+          "path": "experiments/paradee-8m-tts/evidence/parity/seeded-parity-rust-ffm-2026-11-03.json",
+          "sha256": "44e334452a28db0bbea1ad31c68549a5a10d99500b5c8a05d4e0c963c2dcde13"
         },
         {
-          "path": "experiments/paradee-8m-tts/evidence/parity/seeded-parity-rust-ffm-2026-11-02.junit.xml",
-          "sha256": "e3c3e1ecbbd9b80f4d647ffe401b76abf8e592462309e855a8c70a383465d43f"
+          "path": "experiments/paradee-8m-tts/evidence/parity/seeded-parity-rust-ffm-2026-11-03.junit.xml",
+          "sha256": "5cd033f8bb656486af8ff6dc5ad9ad9421a85236f7872d4751ad640be2172b46"
         }
       ],
       "remaining": [
-        "Measure the throughput effect on a quiet dedicated box against the released library (the 0.5.11 baseline is 0.30 to 0.32 of onnxruntime at one thread, experiments/paradee-8m-tts README); no speed-up is claimed yet.",
-        "Investigate the Java alternative for each kernel separately (Vector API gemm tiling, a Vector API polynomial sine without the lane-wise intrinsic that measured slower, a Java erf) before any PROVEN_REQUIRED claim.",
+        "Measure the throughput effect of the MLAS activations and the executor's row-copy and broadcast fixes on a quiet dedicated box against the released library; the released 0.5.12 measured 0.45 to 0.48 of onnxruntime at one thread (experiments/paradee-8m-tts README).",
+        "The Java alternative for the activations exists and is the fallback (models-backend-onnx VectorMath, the same MLAS formulas, bit-identical to these exports per NativeOnnxKernelsTest); it is kept off the default route because the Vector API runs at speed only after C2 compiles it (benchmark-results/2026-11-03-onnx-executor-parity). The gemm and sine Java alternatives remain to be investigated before any PROVEN_REQUIRED claim.",
         "Repeat seeded parity on the released artifact on each advertised platform; the current record covers macos-x86_64 only."
       ],
       "sourceScope": "onnx-executor-kernels"

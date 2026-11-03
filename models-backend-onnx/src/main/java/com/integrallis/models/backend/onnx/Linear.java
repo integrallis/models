@@ -23,6 +23,15 @@ final class Linear {
   private Linear() {}
 
   /** Numpy-style {@code MatMul}: 1-D operands are promoted, leading batch dims broadcast. */
+  private static boolean isIdentity(int[] map) {
+    for (int i = 0; i < map.length; i++) {
+      if (map[i] != i) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   static Tensor matMul(Tensor a, Tensor b) {
     boolean promoteA = a.rank() == 1;
     boolean promoteB = b.rank() == 1;
@@ -52,7 +61,14 @@ final class Linear {
     double[] db = dbl ? b.toDouble().doubles() : null;
     float[] outF = dbl ? null : new float[batches * m * n];
     double[] outD = dbl ? new double[batches * m * n] : null;
-    for (int batchIndex = 0; batchIndex < batches; batchIndex++) {
+    // A shared right-hand matrix and a contiguous left-hand batch fold into one product over
+    // batches * m rows, as onnxruntime's MatMul helper folds them: [1, 433, 8, 80] x [80, 301] is
+    // one 3464-row product, not 433 products of 8 rows.
+    boolean foldable = !dbl && Tensor.elementCount(batchB) == 1 && isIdentity(mapA);
+    if (foldable) {
+      Simd.gemm(fa, 0, k, fb, 0, n, outF, 0, n, batches * m, k, n);
+    }
+    for (int batchIndex = 0; batchIndex < (foldable ? 0 : batches); batchIndex++) {
       int baseA = mapA[batchIndex] * m * k;
       int baseB = mapB[batchIndex] * k * n;
       int baseO = batchIndex * m * n;

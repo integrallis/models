@@ -344,21 +344,19 @@ final class Convolution {
           for (int tap = 0; tap < k; tap++) {
             int row = (ic * k + tap) * outLength;
             int offset = tap * dilation - padBegin;
-            java.util.Arrays.fill(columns, row, row + outLength, 0f);
+            // Each column row is written exactly once, padding included; the buffer is reused
+            // across groups and taps, so out-of-range positions must still be cleared.
+            int tStart = Math.min(outLength, Math.max(0, ceilDiv(-offset, stride)));
+            int tEnd = Math.max(tStart, Math.min(outLength, ceilDiv(length - offset, stride)));
+            java.util.Arrays.fill(columns, row, row + tStart, 0f);
             if (stride == 1) {
-              int tStart = Math.max(0, -offset);
-              int tEnd = Math.min(outLength, length - offset);
-              if (tEnd > tStart) {
-                System.arraycopy(xs, xBase + tStart + offset, columns, row + tStart, tEnd - tStart);
-              }
+              System.arraycopy(xs, xBase + tStart + offset, columns, row + tStart, tEnd - tStart);
             } else {
-              for (int t = 0; t < outLength; t++) {
-                int src = t * stride + offset;
-                if (src >= 0 && src < length) {
-                  columns[row + t] = xs[xBase + src];
-                }
+              for (int t = tStart, src = tStart * stride + offset; t < tEnd; t++, src += stride) {
+                columns[row + t] = xs[xBase + src];
               }
             }
+            java.util.Arrays.fill(columns, row + tEnd, row + outLength, 0f);
           }
         }
         int omStart = groupIndex * mPerGroup;

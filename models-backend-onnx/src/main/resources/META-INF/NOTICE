@@ -1,0 +1,10 @@
+Integrallis Models: in-process ONNX execution in Java
+Copyright 2025-2026 Integrallis Software, LLC. Licensed under the Apache License, Version 2.0.
+
+VectorMath.java translates onnxruntime's MLAS exp, tanh, logistic and erf approximations:
+  Copyright (c) Microsoft Corporation. Licensed under the MIT License.
+  Upstream: https://github.com/microsoft/onnxruntime, tag v1.23.2 (commit a83fc4d)
+  Files: onnxruntime/core/mlas/lib/compute.cpp (MlasComputeExpVector), tanh.cpp
+  (MlasTanhKernel), logistic.cpp (MlasLogisticKernel), erf.cpp (MlasErfKernel)
+  License text: META-INF/licenses/onnxruntime.txt
+  Modifications: Java Vector API formulation with the constants unchanged.

@@ -83,20 +83,28 @@ final class Resampling {
     if (mode.equals("constant")) {
       Tensor fill = constantValue == null ? x.emptyLike(new long[] {1}) : constantValue;
       Tensor result = x.emptyLike(out);
-      int count = result.size();
-      for (int i = 0; i < count; i++) {
-        result.copyElement(fill, 0, i);
+      if (fill.sameKind(result)) {
+        result.fillWith(fill);
+      } else {
+        for (int i = 0; i < result.size(); i++) {
+          result.copyElement(fill, 0, i);
+        }
+      }
+      if (rank == 0) {
+        result.copyElement(x, 0, 0);
+        return result;
       }
       long[] outStrides = result.strides();
-      int inCount = x.size();
+      int width = (int) in[rank - 1];
+      int rows = width == 0 ? 0 : x.size() / width;
       long[] counter = new long[rank];
-      for (int flat = 0; flat < inCount; flat++) {
-        long target = 0;
-        for (int axis = 0; axis < rank; axis++) {
+      for (int row = 0; row < rows; row++) {
+        long target = p[rank - 1] * outStrides[rank - 1];
+        for (int axis = 0; axis < rank - 1; axis++) {
           target += (counter[axis] + p[axis]) * outStrides[axis];
         }
-        result.copyElement(x, flat, (int) target);
-        for (int axis = rank - 1; axis >= 0; axis--) {
+        result.copyStrided(x, row * width, 1, (int) target, width);
+        for (int axis = rank - 2; axis >= 0; axis--) {
           if (++counter[axis] < in[axis]) {
             break;
           }
@@ -109,9 +117,7 @@ final class Resampling {
     if (!reflect && !mode.equals("edge")) {
       throw new UnsupportedOperationException("Pad mode " + mode + " is not implemented");
     }
-    return remap(
-        x,
-        out,
+    AxisMap map =
         (axis, o) -> {
           long dim = in[axis];
           long index = o - p[axis];
@@ -127,7 +133,55 @@ final class Resampling {
             return (int) index;
           }
           return (int) Math.max(0, Math.min(dim - 1, index));
-        });
+        };
+    if (rank == 0 || p[rank - 1] < 0 || p[2 * rank - 1] < 0) {
+      return remap(x, out, map);
+    }
+    return padRows(x, in, p, out, map);
+  }
+
+  /**
+   * Reflect or edge padding with non-negative padding on the last axis: every output row is its
+   * input row copied whole into the middle, plus the few mapped elements on either side. Mapping
+   * every element instead, through the axis function, measured at 1.1 ms for one 64,800-sample
+   * waveform where onnxruntime's block copies ({@code pad.cc}) take a few microseconds.
+   */
+  private static Tensor padRows(Tensor x, long[] in, long[] p, long[] out, AxisMap map) {
+    int rank = in.length;
+    int last = rank - 1;
+    Tensor result = x.emptyLike(out);
+    long[] inStrides = x.strides();
+    int width = (int) out[last];
+    int dim = (int) in[last];
+    int begin = (int) p[last];
+    int rightStart = begin + dim;
+    int[] left = new int[begin];
+    for (int o = 0; o < begin; o++) {
+      left[o] = map.source(last, o);
+    }
+    int[] right = new int[width - rightStart];
+    for (int o = 0; o < right.length; o++) {
+      right[o] = map.source(last, rightStart + o);
+    }
+    int rows = width == 0 ? 0 : result.size() / width;
+    long[] counter = new long[rank];
+    for (int row = 0; row < rows; row++) {
+      long base = 0;
+      for (int axis = 0; axis < last; axis++) {
+        base += map.source(axis, (int) counter[axis]) * inStrides[axis];
+      }
+      int to = row * width;
+      result.gatherRow(x, (int) base, left, to);
+      result.copyStrided(x, (int) base, 1, to + begin, dim);
+      result.gatherRow(x, (int) base, right, to + rightStart);
+      for (int axis = last - 1; axis >= 0; axis--) {
+        if (++counter[axis] < out[axis]) {
+          break;
+        }
+        counter[axis] = 0;
+      }
+    }
+    return result;
   }
 
   interface AxisMap {
@@ -141,16 +195,28 @@ final class Resampling {
   private static Tensor remap(Tensor x, long[] shape, AxisMap map) {
     int rank = shape.length;
     Tensor result = x.emptyLike(shape);
+    if (rank == 0) {
+      result.copyElement(x, 0, 0);
+      return result;
+    }
     long[] inStrides = x.strides();
-    int count = result.size();
+    // The innermost axis is mapped once into source offsets; each output row then costs one
+    // offset sum over the outer axes and one typed gather, never a per-element map call.
+    int last = rank - 1;
+    int width = (int) shape[last];
+    int[] inner = new int[width];
+    for (int o = 0; o < width; o++) {
+      inner[o] = (int) (map.source(last, o) * inStrides[last]);
+    }
+    int rows = width == 0 ? 0 : result.size() / width;
     long[] counter = new long[rank];
-    for (int flat = 0; flat < count; flat++) {
-      long source = 0;
-      for (int axis = 0; axis < rank; axis++) {
-        source += map.source(axis, (int) counter[axis]) * inStrides[axis];
+    for (int row = 0; row < rows; row++) {
+      long base = 0;
+      for (int axis = 0; axis < last; axis++) {
+        base += map.source(axis, (int) counter[axis]) * inStrides[axis];
       }
-      result.copyElement(x, (int) source, flat);
-      for (int axis = rank - 1; axis >= 0; axis--) {
+      result.gatherRow(x, (int) base, inner, row * width);
+      for (int axis = last - 1; axis >= 0; axis--) {
         if (++counter[axis] < shape[axis]) {
           break;
         }

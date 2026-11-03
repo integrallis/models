@@ -18,6 +18,8 @@ package com.integrallis.models.backend.onnx;
 import java.util.function.DoubleBinaryOperator;
 import java.util.function.DoubleUnaryOperator;
 import java.util.function.LongBinaryOperator;
+import jdk.incubator.vector.FloatVector;
+import jdk.incubator.vector.VectorOperators;
 
 /**
  * Elementwise operators with numpy-style broadcasting.
@@ -53,16 +55,38 @@ final class Elementwise {
     return unary(x, Math::sqrt);
   }
 
+  /**
+   * Applies one of {@link Activations}' whole-array float kernels to a float tensor, or returns
+   * {@code null} for any other storage so the caller keeps its double-precision path.
+   */
+  private static Tensor floatKernel(Tensor x, FloatArrayKernel kernel) {
+    if (!x.isFloat()) {
+      return null;
+    }
+    float[] in = x.floats();
+    float[] out = new float[in.length];
+    kernel.apply(in, out, in.length);
+    return Tensor.ofFloats(x.shape(), out);
+  }
+
+  @FunctionalInterface
+  private interface FloatArrayKernel {
+    void apply(float[] in, float[] out, int n);
+  }
+
   static Tensor exp(Tensor x) {
-    return unary(x, Math::exp);
+    Tensor fast = floatKernel(x, (in, out, n) -> Activations.exp(in, 0, out, 0, n));
+    return fast != null ? fast : unary(x, Math::exp);
   }
 
   static Tensor tanh(Tensor x) {
-    return unary(x, Math::tanh);
+    Tensor fast = floatKernel(x, (in, out, n) -> Activations.tanh(in, 0, out, 0, n));
+    return fast != null ? fast : unary(x, Math::tanh);
   }
 
   static Tensor sigmoid(Tensor x) {
-    return unary(x, v -> 1.0 / (1.0 + Math.exp(-v)));
+    Tensor fast = floatKernel(x, (in, out, n) -> Activations.logistic(in, 0, out, 0, n));
+    return fast != null ? fast : unary(x, v -> 1.0 / (1.0 + Math.exp(-v)));
   }
 
   /**
@@ -86,17 +110,56 @@ final class Elementwise {
   }
 
   static Tensor erf(Tensor x) {
-    OnnxKernels kernels = KernelScope.current();
-    if (kernels != null && x.isFloat()) {
-      float[] in = x.floats();
-      float[] out = new float[in.length];
-      kernels.erf(in, out, in.length);
-      return Tensor.ofFloats(x.shape(), out);
+    Tensor fast = floatKernel(x, Activations::erf);
+    return fast != null ? fast : unary(x, Elementwise::erf);
+  }
+
+  /**
+   * {@code x^2} and {@code x^3} as products, the two exponents the Paradee graph uses and the two
+   * onnxruntime special-cases ({@code element_wise_ops.cc}, {@code PowImpl}). The products are
+   * formed in double and rounded once to float: {@code (double) x * x} is exact for a float, so the
+   * square equals the general path bit for bit, and the cube differs from {@code Math.pow} only
+   * where its last double rounding does. Returns {@code null} for any other exponent, or when
+   * broadcasting the exponent's shape would change the result's shape.
+   */
+  private static Tensor smallIntegerPower(Tensor a, long[] exponentShape, double exponent) {
+    if (exponent != 2.0 && exponent != 3.0) {
+      return null;
     }
-    return unary(x, Elementwise::erf);
+    long[] shape = a.shape();
+    if (!Broadcast.same(shape, Broadcast.shape(shape, exponentShape))) {
+      return null;
+    }
+    float[] in = a.floats();
+    float[] out = new float[in.length];
+    if (exponent == 2.0) {
+      for (int i = 0; i < in.length; i++) {
+        double v = in[i];
+        out[i] = (float) (v * v);
+      }
+    } else {
+      for (int i = 0; i < in.length; i++) {
+        double v = in[i];
+        out[i] = (float) (v * v * v);
+      }
+    }
+    return Tensor.ofFloats(shape, out);
   }
 
   static Tensor leakyRelu(Tensor x, float alpha) {
+    if (x.isFloat()) {
+      float[] in = x.floats();
+      float[] out = new float[in.length];
+      int i = 0;
+      for (int bound = Simd.F.loopBound(in.length); i < bound; i += Simd.LANES) {
+        FloatVector v = FloatVector.fromArray(Simd.F, in, i);
+        v.blend(v.mul(alpha), v.compare(VectorOperators.LT, 0f)).intoArray(out, i);
+      }
+      for (; i < in.length; i++) {
+        out[i] = in[i] >= 0 ? in[i] : alpha * in[i];
+      }
+      return Tensor.ofFloats(x.shape(), out);
+    }
     return unary(x, v -> v >= 0 ? v : alpha * v);
   }
 
@@ -199,6 +262,12 @@ final class Elementwise {
   }
 
   static Tensor arithmetic(Arithmetic op, Tensor a, Tensor b) {
+    if (op == Arithmetic.POW && a.isFloat() && b.size() == 1 && b.isFloatingPoint()) {
+      Tensor power = smallIntegerPower(a, b.shape(), b.doubleAt(0));
+      if (power != null) {
+        return power;
+      }
+    }
     long[] shape = Broadcast.shape(a.shape(), b.shape());
     boolean basic =
         op == Arithmetic.ADD
@@ -322,9 +391,25 @@ final class Elementwise {
           default -> Simd.divScalar(out, oi, fa, oa, s, inner);
         }
       } else if (innerA == 0 && innerB == 1) {
+        // A scalar run on the left, e.g. [1, 64, 1] * [1, 1, 64800]: the commutative operators
+        // reuse
+        // the vector kernels with the operands swapped, and the other two are plain loops C2 can
+        // vectorize. A per-element dispatch here made Paradee's largest Mul cost twice
+        // onnxruntime's.
         float s = fa[oa];
-        for (int i = 0; i < inner; i++) {
-          out[oi + i] = apply(op, s, fb[ob + i]);
+        switch (op) {
+          case ADD -> Simd.addScalar(out, oi, fb, ob, s, inner);
+          case MUL -> Simd.mulScalar(out, oi, fb, ob, s, inner);
+          case SUB -> {
+            for (int i = 0; i < inner; i++) {
+              out[oi + i] = s - fb[ob + i];
+            }
+          }
+          default -> {
+            for (int i = 0; i < inner; i++) {
+              out[oi + i] = s / fb[ob + i];
+            }
+          }
         }
       } else {
         float v = apply(op, fa[oa], fb[ob]);

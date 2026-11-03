@@ -358,6 +358,89 @@ public final class Tensor {
     }
   }
 
+  /**
+   * Copies {@code count} elements of {@code source}, starting at {@code from} and advancing by
+   * {@code step}, into consecutive elements of this tensor starting at {@code to}. A unit step is
+   * one {@link System#arraycopy}; any other step is one loop over the backing array, so the storage
+   * kind is resolved once per run rather than once per element as {@link #copyElement} does.
+   */
+  public void copyStrided(Tensor source, int from, int step, int to, int count) {
+    if (step == 1) {
+      if (floats != null) {
+        System.arraycopy(source.floats, from, floats, to, count);
+      } else if (doubles != null) {
+        System.arraycopy(source.doubles, from, doubles, to, count);
+      } else if (longs != null) {
+        System.arraycopy(source.longs, from, longs, to, count);
+      } else {
+        System.arraycopy(source.bytes, from, bytes, to, count);
+      }
+      return;
+    }
+    if (floats != null) {
+      float[] src = source.floats;
+      for (int i = 0, s = from; i < count; i++, s += step) {
+        floats[to + i] = src[s];
+      }
+    } else if (doubles != null) {
+      double[] src = source.doubles;
+      for (int i = 0, s = from; i < count; i++, s += step) {
+        doubles[to + i] = src[s];
+      }
+    } else if (longs != null) {
+      long[] src = source.longs;
+      for (int i = 0, s = from; i < count; i++, s += step) {
+        longs[to + i] = src[s];
+      }
+    } else {
+      byte[] src = source.bytes;
+      for (int i = 0, s = from; i < count; i++, s += step) {
+        bytes[to + i] = src[s];
+      }
+    }
+  }
+
+  /**
+   * Copies {@code source[base + offsets[i]]} into element {@code to + i} of this tensor for every
+   * {@code i} of {@code offsets}: one row of an index-mapped copy such as a reflect pad.
+   */
+  public void gatherRow(Tensor source, int base, int[] offsets, int to) {
+    if (floats != null) {
+      float[] src = source.floats;
+      for (int i = 0; i < offsets.length; i++) {
+        floats[to + i] = src[base + offsets[i]];
+      }
+    } else if (doubles != null) {
+      double[] src = source.doubles;
+      for (int i = 0; i < offsets.length; i++) {
+        doubles[to + i] = src[base + offsets[i]];
+      }
+    } else if (longs != null) {
+      long[] src = source.longs;
+      for (int i = 0; i < offsets.length; i++) {
+        longs[to + i] = src[base + offsets[i]];
+      }
+    } else {
+      byte[] src = source.bytes;
+      for (int i = 0; i < offsets.length; i++) {
+        bytes[to + i] = src[base + offsets[i]];
+      }
+    }
+  }
+
+  /** Sets every element of this tensor to element 0 of {@code value}, which has the same kind. */
+  public void fillWith(Tensor value) {
+    if (floats != null) {
+      java.util.Arrays.fill(floats, value.floats[0]);
+    } else if (doubles != null) {
+      java.util.Arrays.fill(doubles, value.doubles[0]);
+    } else if (longs != null) {
+      java.util.Arrays.fill(longs, value.longs[0]);
+    } else {
+      java.util.Arrays.fill(bytes, value.bytes[0]);
+    }
+  }
+
   /** Whether {@code other} uses the same storage kind and declared type. */
   public boolean sameKind(Tensor other) {
     return type == other.type
