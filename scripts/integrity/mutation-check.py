@@ -65,6 +65,16 @@ def oversized_tracked_path(root):
 # name, guard command, the defect to inject, what the guard is supposed to notice
 MUTATIONS = [
     (
+        "modeljars-currency/documented-version-behind-central",
+        ["python3", "scripts/verify-modeljars-currency.py", ".", "0.1.76"],
+        sub("gradle.properties",
+            "modeljarsVersion = 0.1.76",
+            "modeljarsVersion = 0.1.65"),
+        "documentation advertising ModelJars 0.1.65 against a published 0.1.76 -- shipped on "
+        "2026-11-03, and 0.1.65 predates the ONNX intake and the speech loader, so a reader "
+        "following the docs got a runtime that could not load models the catalog advertises",
+    ),
+    (
         "portable-paths/windows-checkout-limit",
         ["python3", "scripts/integrity/check-portable-paths.py"],
         oversized_tracked_path,
