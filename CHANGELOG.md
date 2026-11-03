@@ -4,6 +4,18 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+- Close most of the ONNX executor's per-operator gap to onnxruntime on Paradee-8M
+  (`benchmark-results/2026-11-03-onnx-executor-parity`): Transpose, Slice, Concat, Gather, Expand,
+  Pad and Resize copy whole rows instead of single elements; Pow by 2 and 3 is a product; exp,
+  tanh, logistic and erf use onnxruntime's MLAS approximations (MIT), as new Rust exports
+  (`jmodels_onnx_{exp,tanh,logistic}_f32`, ONNX kernel ABI 2) with a bit-identical Vector API
+  fallback, replacing the per-element `libm` erf and the `libm` dependency; the LSTM input side is
+  one matrix product; a broadcast scalar on the left of float arithmetic is vectorized; MatMul
+  folds a batch over a shared right-hand matrix. Operator time on 50 Harvard sentences fell from
+  14.92 s to 9.45 s against onnxruntime's 7.56 s on the loaded dev box; seeded parity holds on both
+  routes (40 of 40, worst 61.43 dB native, 60.87 dB pure Java). The throughput gate itself is
+  measured on a quiet box against a released library.
+
 ## [0.5.12] - 2026-11-02
 
 - Run the ONNX executor's matrix products, sines and erf on Models-owned Rust kernels when the

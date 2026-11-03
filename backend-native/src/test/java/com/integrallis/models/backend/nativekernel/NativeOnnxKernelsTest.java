@@ -88,4 +88,69 @@ class NativeOnnxKernelsTest {
           .isCloseTo(expected[i], org.assertj.core.data.Offset.offset(1e-6f));
     }
   }
+
+  /** The interface's default methods: the executor's Java translation of the same MLAS formulas. */
+  private static final com.integrallis.models.backend.onnx.OnnxKernels JAVA_DEFAULTS =
+      new com.integrallis.models.backend.onnx.OnnxKernels() {
+        @Override
+        public String name() {
+          return "java-defaults";
+        }
+
+        @Override
+        public void gemm(
+            float[] a,
+            int ao,
+            int lda,
+            float[] b,
+            int bo,
+            int ldb,
+            float[] c,
+            int co,
+            int ldc,
+            int m,
+            int k,
+            int n) {
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void sin(float[] x, float[] y, int n) {
+          throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void erf(float[] x, float[] y, int n) {
+          throw new UnsupportedOperationException();
+        }
+      };
+
+  @Test
+  void activationsEqualTheJavaTranslationBitForBitAtOffsets() {
+    int n = 50_007;
+    float[] x = new float[n + 3];
+    SplittableRandom random = new SplittableRandom(7);
+    for (int i = 0; i < x.length; i++) {
+      x[i] = (float) (random.nextDouble() * 60.0 - 30.0);
+    }
+    NativeOnnxKernels nat = kernels();
+    float[] fromNative = new float[n + 5];
+    float[] fromJava = new float[n + 5];
+    nat.exp(x, 3, fromNative, 5, n);
+    JAVA_DEFAULTS.exp(x, 3, fromJava, 5, n);
+    assertThat(fromNative).as("exp").isEqualTo(fromJava);
+    nat.tanh(x, 3, fromNative, 5, n);
+    JAVA_DEFAULTS.tanh(x, 3, fromJava, 5, n);
+    assertThat(fromNative).as("tanh").isEqualTo(fromJava);
+    nat.logistic(x, 3, fromNative, 5, n);
+    JAVA_DEFAULTS.logistic(x, 3, fromJava, 5, n);
+    assertThat(fromNative).as("logistic").isEqualTo(fromJava);
+    assertThat(fromNative[0]).isZero();
+  }
+
+  @Test
+  void activationExtentsAreChecked() {
+    assertThatThrownBy(() -> kernels().tanh(new float[4], 2, new float[4], 0, 3))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
 }

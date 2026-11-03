@@ -76,29 +76,50 @@ final class Recurrent {
           }
         }
         int length = sequenceLens == null ? seq : (int) sequenceLens.longAt(n);
-        // The input projection does not depend on the recurrence: compute it for every step up
-        // front, bias included, so the per-step work is only the recurrent product.
-        float[][] projected = new float[length][4 * hidden];
+        // The input side of every gate at every timestep is one matrix product,
+        // projected[g][t] = W[g] . x[t], as onnxruntime computes it (uni_directional_lstm.cc,
+        // ComputeGemm over all rows) instead of one dot product per gate per step.
+        int gatesCount = 4 * hidden;
+        float[] inputsByColumn = new float[input * length];
         for (int t = 0; t < length; t++) {
           int xBase = (t * batch + n) * input;
-          for (int gate = 0; gate < 4 * hidden; gate++) {
-            float acc = bs == null ? 0f : bs[bBase + gate] + bs[bBase + 4 * hidden + gate];
-            projected[t][gate] = acc + Simd.dot(ws, wBase + gate * input, xs, xBase, input);
+          for (int i = 0; i < input; i++) {
+            inputsByColumn[i * length + t] = xs[xBase + i];
           }
         }
+        float[] projected = new float[gatesCount * length];
+        Simd.gemm(
+            ws,
+            wBase,
+            input,
+            inputsByColumn,
+            0,
+            length,
+            projected,
+            0,
+            length,
+            gatesCount,
+            input,
+            length);
+        float[] cellTanh = new float[hidden];
         for (int step = 0; step < length; step++) {
           int t = reverse ? length - 1 - step : step;
-          float[] xw = projected[t];
-          for (int gate = 0; gate < 4 * hidden; gate++) {
-            gates[gate] = xw[gate] + Simd.dot(rs, rBase + gate * hidden, h, 0, hidden);
+          for (int gate = 0; gate < gatesCount; gate++) {
+            float bias = bs == null ? 0f : bs[bBase + gate] + bs[bBase + gatesCount + gate];
+            gates[gate] =
+                projected[gate * length + t]
+                    + bias
+                    + Simd.dot(rs, rBase + gate * hidden, h, 0, hidden);
           }
+          // Gate order is i, o, f, c: the first three take the logistic, the last one tanh.
+          Activations.logistic(gates, 0, gates, 0, 3 * hidden);
+          Activations.tanh(gates, 3 * hidden, gates, 3 * hidden, hidden);
           for (int j = 0; j < hidden; j++) {
-            float ig = sigmoid(gates[j]);
-            float og = sigmoid(gates[hidden + j]);
-            float fg = sigmoid(gates[2 * hidden + j]);
-            float cg = (float) Math.tanh(gates[3 * hidden + j]);
-            c[j] = fg * c[j] + ig * cg;
-            h[j] = og * (float) Math.tanh(c[j]);
+            c[j] = gates[2 * hidden + j] * c[j] + gates[j] * gates[3 * hidden + j];
+          }
+          Activations.tanh(c, 0, cellTanh, 0, hidden);
+          for (int j = 0; j < hidden; j++) {
+            h[j] = gates[hidden + j] * cellTanh[j];
           }
           int yBase = ((t * dirs + d) * batch + n) * hidden;
           System.arraycopy(h, 0, y, yBase, hidden);
@@ -112,9 +133,5 @@ final class Recurrent {
       Tensor.ofFloats(new long[] {dirs, batch, hidden}, yh),
       Tensor.ofFloats(new long[] {dirs, batch, hidden}, yc)
     };
-  }
-
-  private static float sigmoid(float v) {
-    return (float) (1.0 / (1.0 + Math.exp(-v)));
   }
 }

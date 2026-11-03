@@ -49,7 +49,27 @@ public interface OnnxKernels {
   void sin(float[] x, float[] y, int n);
 
   /**
-   * {@code y[i] = erf(x[i])} for the first {@code n} elements, in double precision rounded once.
+   * {@code y[i] = erf(x[i])} for the first {@code n} elements, with onnxruntime's MLAS
+   * approximation ({@code MlasErfKernel}).
    */
   void erf(float[] x, float[] y, int n);
+
+  /**
+   * {@code y[yOffset + i] = exp(x[xOffset + i])} for {@code i < n}, with onnxruntime's MLAS
+   * approximation ({@code MlasComputeExpVector}). The default is the executor's Vector API
+   * translation of the same formula.
+   */
+  default void exp(float[] x, int xOffset, float[] y, int yOffset, int n) {
+    VectorMath.exp(x, xOffset, y, yOffset, n);
+  }
+
+  /** As {@link #exp}, for tanh ({@code MlasTanhKernel}). */
+  default void tanh(float[] x, int xOffset, float[] y, int yOffset, int n) {
+    VectorMath.tanh(x, xOffset, y, yOffset, n);
+  }
+
+  /** As {@link #exp}, for the logistic sigmoid ({@code MlasLogisticKernel}). */
+  default void logistic(float[] x, int xOffset, float[] y, int yOffset, int n) {
+    VectorMath.logistic(x, xOffset, y, yOffset, n);
+  }
 }

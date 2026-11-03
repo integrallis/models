@@ -28,10 +28,11 @@ import java.nio.file.Path;
 import java.util.Objects;
 
 /**
- * The ONNX executor's matrix product and sine on the Models-owned Rust kernels: a single-threaded
- * {@code matrixmultiply} sgemm and a double-precision, range-reduced sine. Calls are critical
- * downcalls that read and write the Java arrays in place, so nothing is copied per call. The
- * library is the same integrity-checked bundled artifact the other native kernels load.
+ * The ONNX executor's matrix product, sine and activations on the Models-owned Rust kernels: a
+ * single-threaded {@code matrixmultiply} sgemm, a double-precision, range-reduced sine, and
+ * onnxruntime's MLAS exp, tanh, logistic and erf approximations. Calls are critical downcalls that
+ * read and write the Java arrays in place, so nothing is copied per call. The library is the same
+ * integrity-checked bundled artifact the other native kernels load.
  */
 @SuppressWarnings("restricted")
 public final class NativeOnnxKernels implements OnnxKernels {
@@ -39,6 +40,9 @@ public final class NativeOnnxKernels implements OnnxKernels {
   private final MethodHandle sgemm;
   private final MethodHandle sin;
   private final MethodHandle erf;
+  private final MethodHandle exp;
+  private final MethodHandle tanh;
+  private final MethodHandle logistic;
 
   private NativeOnnxKernels(Path library) {
     SymbolLookup symbols = SymbolLookup.libraryLookup(library, Arena.global());
@@ -48,7 +52,7 @@ public final class NativeOnnxKernels implements OnnxKernels {
           linker.downcallHandle(
               symbols.find("jmodels_onnx_abi").orElseThrow(),
               FunctionDescriptor.of(ValueLayout.JAVA_INT));
-      if ((int) abi.invokeExact() != 1) {
+      if ((int) abi.invokeExact() != 2) {
         throw new IllegalStateException("unsupported ONNX kernel ABI");
       }
     } catch (Throwable failure) {
@@ -71,6 +75,9 @@ public final class NativeOnnxKernels implements OnnxKernels {
             CRITICAL);
     sin = unary(linker, symbols, "jmodels_onnx_sin_f32");
     erf = unary(linker, symbols, "jmodels_onnx_erf_f32");
+    exp = unary(linker, symbols, "jmodels_onnx_exp_f32");
+    tanh = unary(linker, symbols, "jmodels_onnx_tanh_f32");
+    logistic = unary(linker, symbols, "jmodels_onnx_logistic_f32");
   }
 
   private static MethodHandle unary(Linker linker, SymbolLookup symbols, String name) {
@@ -145,13 +152,40 @@ public final class NativeOnnxKernels implements OnnxKernels {
     applyUnary(erf, "erf", x, y, n);
   }
 
+  @Override
+  public void exp(float[] x, int xOffset, float[] y, int yOffset, int n) {
+    applyUnary(exp, "exp", x, xOffset, y, yOffset, n);
+  }
+
+  @Override
+  public void tanh(float[] x, int xOffset, float[] y, int yOffset, int n) {
+    applyUnary(tanh, "tanh", x, xOffset, y, yOffset, n);
+  }
+
+  @Override
+  public void logistic(float[] x, int xOffset, float[] y, int yOffset, int n) {
+    applyUnary(logistic, "logistic", x, xOffset, y, yOffset, n);
+  }
+
   private static void applyUnary(MethodHandle handle, String what, float[] x, float[] y, int n) {
-    if (n < 0 || n > x.length || n > y.length) {
+    applyUnary(handle, what, x, 0, y, 0, n);
+  }
+
+  private static void applyUnary(
+      MethodHandle handle, String what, float[] x, int xOffset, float[] y, int yOffset, int n) {
+    if (n < 0
+        || xOffset < 0
+        || yOffset < 0
+        || (long) xOffset + n > x.length
+        || (long) yOffset + n > y.length) {
       throw new IllegalArgumentException(what + " extent " + n + " exceeds its buffers");
+    }
+    if (n == 0) {
+      return;
     }
     int rc;
     try {
-      rc = (int) handle.invokeExact(MemorySegment.ofArray(x), MemorySegment.ofArray(y), (long) n);
+      rc = (int) handle.invokeExact(slice(x, xOffset), slice(y, yOffset), (long) n);
     } catch (Throwable failure) {
       throw new IllegalStateException("native " + what + " failed", failure);
     }

@@ -132,12 +132,31 @@ final class Structural {
       strides[i] = inStrides[order[i]];
     }
     Tensor out = x.emptyLike(shape);
-    int count = out.size();
+    copyRows(out, x, shape, strides, 0);
+    return out;
+  }
+
+  /**
+   * Fills {@code out} (row-major, of {@code shape}) from {@code x}, where output multi-index {@code
+   * i} reads input element {@code base + sum(i[a] * strides[a])}. Each output row along the last
+   * axis is one strided run, so the storage kind is resolved per row: a unit stride is a single
+   * array copy. Transpose and Slice are both this with different strides and base.
+   */
+  static void copyRows(Tensor out, Tensor x, long[] shape, long[] strides, long base) {
+    int rank = shape.length;
+    if (rank == 0) {
+      out.copyElement(x, (int) base, 0);
+      return;
+    }
+    int last = rank - 1;
+    int width = (int) shape[last];
+    int step = (int) strides[last];
+    int rows = width == 0 ? 0 : out.size() / width;
     long[] counter = new long[rank];
-    long index = 0;
-    for (int flat = 0; flat < count; flat++) {
-      out.copyElement(x, (int) index, flat);
-      for (int axis = rank - 1; axis >= 0; axis--) {
+    long index = base;
+    for (int row = 0; row < rows; row++) {
+      out.copyStrided(x, (int) index, step, row * width, width);
+      for (int axis = last - 1; axis >= 0; axis--) {
         counter[axis]++;
         index += strides[axis];
         if (counter[axis] < shape[axis]) {
@@ -147,7 +166,6 @@ final class Structural {
         counter[axis] = 0;
       }
     }
-    return out;
   }
 
   static Tensor concat(Tensor[] inputs, long axisAttribute) {
@@ -175,9 +193,7 @@ final class Structural {
       for (long o = 0; o < outer; o++) {
         int from = (int) (o * chunk);
         int to = (int) (o * total * inner + offset);
-        for (int k = 0; k < chunk; k++) {
-          out.copyElement(source, from + k, to + k);
-        }
+        out.copyStrided(source, from, 1, to, (int) chunk);
       }
       offset += (int) chunk;
     }
@@ -234,25 +250,13 @@ final class Structural {
     }
     Tensor out = x.emptyLike(shape);
     long[] inStrides = x.strides();
-    int count = out.size();
-    long[] counter = new long[rank];
     long base = 0;
+    long[] runSteps = new long[rank];
     for (int i = 0; i < rank; i++) {
       base += begin[i] * inStrides[i];
+      runSteps[i] = stride[i] * inStrides[i];
     }
-    long index = base;
-    for (int flat = 0; flat < count; flat++) {
-      out.copyElement(x, (int) index, flat);
-      for (int axis = rank - 1; axis >= 0; axis--) {
-        counter[axis]++;
-        index += stride[axis] * inStrides[axis];
-        if (counter[axis] < shape[axis]) {
-          break;
-        }
-        index -= stride[axis] * inStrides[axis] * counter[axis];
-        counter[axis] = 0;
-      }
-    }
+    copyRows(out, x, shape, runSteps, base);
     return out;
   }
 
@@ -284,9 +288,8 @@ final class Structural {
               "Gather index " + index + " outside dimension " + dim);
         }
         int from = (int) ((o * dim + k) * inner);
-        for (int j = 0; j < inner; j++) {
-          out.copyElement(data, from + j, to++);
-        }
+        out.copyStrided(data, from, 1, to, (int) inner);
+        to += (int) inner;
       }
     }
     return out;
@@ -325,9 +328,7 @@ final class Structural {
     }
     int[] map = Broadcast.indexMap(x.shape(), target);
     Tensor out = x.emptyLike(target);
-    for (int i = 0; i < map.length; i++) {
-      out.copyElement(x, map[i], i);
-    }
+    out.gatherRow(x, 0, map, 0);
     return out;
   }
 
@@ -370,8 +371,8 @@ final class Structural {
     int count = (int) Tensor.elementCount(shape);
     Tensor fill = value == null ? Tensor.scalar(0f) : value;
     Tensor out = fill.emptyLike(shape);
-    for (int i = 0; i < count; i++) {
-      out.copyElement(fill, 0, i);
+    if (count > 0) {
+      out.fillWith(fill);
     }
     return out;
   }
