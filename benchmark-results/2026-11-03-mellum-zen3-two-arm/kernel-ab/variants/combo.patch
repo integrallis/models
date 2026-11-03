@@ -1,0 +1,147 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -6093,7 +6093,7 @@
+     let blocks_per_row = cols / QK_K;
+     let nibble_mask = _mm256_set1_epi8(0x0f);
+     let mut accumulated = _mm256_setzero_ps();
+-    let mut minimum_sum = 0_f32;
++    let mut minimum_accumulated = _mm_setzero_ps();
+     let mut ordered_sum = 0_f32;
+     for block in 0..blocks_per_row {
+         record_k_quant_weight_block_decode();
+@@ -6112,7 +6112,8 @@
+         let scales = &weights[weight_offset + 4..weight_offset + 16];
+         let quants = weights.as_ptr().wrapping_add(weight_offset + 16);
+         let mut quantized_lanes = _mm256_setzero_si256();
+-        let (scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
++        let (_scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
++        let scale_source = qk_scale_broadcast_source(mins_and_scales);
+         // The mins term, vectorised: sum over groups of min[g] * (sums[2g] + sums[2g+1]).
+         // Pair sums fit i16 (16 q8 values, |v| <= 127, so |pair| <= 4064) and the products fit
+         // i32, so this is bit-identical to the scalar loop it replaces -- integer addition is
+@@ -6124,7 +6125,6 @@
+             _mm256_extracti128_si256(q8sums, 1),
+         );
+         let min_products = _mm_madd_epi16(_mm256_extracti128_si256(mins_and_scales, 1), q8s);
+-        let block_minimum_sum = horizontal_sum_i32_sse2(min_products);
+         for pair in 0..4 {
+             // SAFETY: each Q4_K block contains four complete 32-byte packed groups.
+             let packed = unsafe { _mm256_loadu_si256(quants.add(pair * 32).cast()) };
+@@ -6138,8 +6138,8 @@
+             let low_products = unsafe { unsigned_signed_products_avx2(low, low_activation) };
+             // SAFETY: every activation group contains 32 signed bytes.
+             let high_products = unsafe { unsigned_signed_products_avx2(high, high_activation) };
+-            let low_scale = _mm256_set1_epi16(scale_values[pair * 2]);
+-            let high_scale = _mm256_set1_epi16(scale_values[pair * 2 + 1]);
++            let low_scale = qk_broadcast_scale(scale_source, pair * 2);
++            let high_scale = qk_broadcast_scale(scale_source, pair * 2 + 1);
+             quantized_lanes =
+                 _mm256_add_epi32(quantized_lanes, _mm256_madd_epi16(low_products, low_scale));
+             quantized_lanes = _mm256_add_epi32(
+@@ -6151,21 +6151,29 @@
+             // Integer lanes may fold freely; floating-point blocks must follow Java's order.
+             let integer_sum = horizontal_sum_i32_avx2(quantized_lanes);
+             ordered_sum = d.mul_add(integer_sum as f32, ordered_sum);
+-            ordered_sum = (-d_min).mul_add(block_minimum_sum as f32, ordered_sum);
++            ordered_sum =
++                (-d_min).mul_add(horizontal_sum_i32_sse2(min_products) as f32, ordered_sum);
+         } else {
+             accumulated = _mm256_fmadd_ps(
+                 _mm256_set1_ps(d),
+                 _mm256_cvtepi32_ps(quantized_lanes),
+                 accumulated,
+             );
+-            minimum_sum = (-d_min).mul_add(block_minimum_sum as f32, minimum_sum);
++            // The minimum correction accumulates in four lanes and is reduced once for the row,
++            // the way the quantized term above already does. The per-block horizontal reduction it
++            // replaces sat on the critical path of every block.
++            minimum_accumulated = _mm_fmadd_ps(
++                _mm_set1_ps(-d_min),
++                _mm_cvtepi32_ps(min_products),
++                minimum_accumulated,
++            );
+         }
+     }
+     if ORDERED {
+         ordered_sum
+     } else {
+         record_q4_k_single_horizontal_reduction();
+-        horizontal_sum_f32_avx2(accumulated) + minimum_sum
++        horizontal_sum_f32_avx2(accumulated) + horizontal_sum_f32_sse2(minimum_accumulated)
+     }
+ }
+ 
+@@ -6345,9 +6353,48 @@
+     }
+     record_q6_k_single_horizontal_reduction();
+     horizontal_sum_f32_avx2(accumulated)
++}
++
++#[cfg(target_arch = "x86_64")]
++/// Byte selectors that broadcast one of eight i16 scales across all sixteen lanes (ggml's
++/// `get_scale_shuffle_k4`, MIT, ggml-org/ggml), as a const table.
++static QK_SCALE_SHUFFLE: [u8; 256] = {
++    let mut table = [0_u8; 256];
++    let mut group = 0;
++    while group < 8 {
++        let mut lane = 0;
++        while lane < 16 {
++            table[group * 32 + lane * 2] = (group * 2) as u8;
++            table[group * 32 + lane * 2 + 1] = (group * 2 + 1) as u8;
++            lane += 1;
++        }
++        group += 1;
++    }
++    table
++};
++
++#[cfg(target_arch = "x86_64")]
++#[inline]
++#[target_feature(enable = "avx2")]
++/// Duplicates the eight packed i16 scales into both 128-bit halves for `qk_broadcast_scale`.
++fn qk_scale_broadcast_source(mins_and_scales: __m256i) -> __m256i {
++    let low = _mm256_extracti128_si256(mins_and_scales, 0);
++    _mm256_set_m128i(low, low)
++}
++
++#[cfg(target_arch = "x86_64")]
++#[inline]
++#[target_feature(enable = "avx2")]
++/// Splats scale `group` across sixteen i16 lanes with one `vpshufb`, with no detour through memory.
++/// Bit-exact against `_mm256_set1_epi16(scale_values[group])`: same i16 in all sixteen lanes.
++fn qk_broadcast_scale(source: __m256i, group: usize) -> __m256i {
++    // SAFETY: group is below eight and the table holds eight 32-byte selectors.
++    let selector = unsafe { _mm256_loadu_si256(QK_SCALE_SHUFFLE.as_ptr().add(group * 32).cast()) };
++    _mm256_shuffle_epi8(source, selector)
+ }
+ 
+ #[cfg(target_arch = "x86_64")]
++#[inline]
+ #[target_feature(enable = "avx2")]
+ unsafe fn unsigned_signed_products_avx2(unsigned: __m256i, signed: *const i8) -> __m256i {
+     // SAFETY: callers provide 32 signed activation bytes.
+@@ -6358,6 +6405,16 @@
+ #[cfg(target_arch = "x86_64")]
+ #[inline]
+ #[target_feature(enable = "sse2")]
++/// Sums the four f32 lanes of a minimum-correction accumulator, once per row.
++fn horizontal_sum_f32_sse2(values: __m128) -> f32 {
++    let folded = _mm_add_ps(values, _mm_movehl_ps(values, values));
++    let total = _mm_add_ss(folded, _mm_shuffle_ps(folded, folded, 0b0000_0001));
++    _mm_cvtss_f32(total)
++}
++
++#[cfg(target_arch = "x86_64")]
++#[inline]
++#[target_feature(enable = "sse2")]
+ fn horizontal_sum_i32_sse2(values: __m128i) -> i32 {
+     let shuffled = _mm_add_epi32(values, _mm_shuffle_epi32(values, 0b0100_1110));
+     let folded = _mm_add_epi32(shuffled, _mm_shuffle_epi32(shuffled, 0b1011_0001));
+@@ -6416,6 +6473,7 @@
+ }
+ 
+ #[cfg(target_arch = "x86_64")]
++#[inline]
+ #[target_feature(enable = "avx2")]
+ fn horizontal_sum_f32_avx2(values: __m256) -> f32 {
+     let mut sum = _mm256_extractf128_ps(values, 1);
