@@ -118,6 +118,34 @@ public final class GgufTokenizer implements Tokenizer {
   private final String[] vocab;
   private final float[] scores;
   private final Map<String, Integer> tokenToId;
+
+  /**
+   * The id of {@code <0xNN>} for every byte value, resolved once.
+   *
+   * <p>Three byte-fallback sites each built that name with {@code String.format} and then looked it
+   * up, so every character the vocabulary could not match parsed a format string, allocated a
+   * nine-character {@code String} and hashed it. There are exactly 256 possible answers and they
+   * cannot change after construction.
+   *
+   * <p>A value of {@code -1} means the vocabulary has no byte token for that value, which is
+   * distinct from "not looked up yet" and is what the unknown-token fallback tests.
+   */
+  private final int[] byteFallbackIds = new int[256];
+
+  /**
+   * The longest vocabulary entry in UTF-8 bytes.
+   *
+   * <p>The greedy longest-match loop probed downwards from a hardcoded 64 bytes, allocating a
+   * decoded {@code String} per length per position just to miss the map. Nothing longer than the
+   * longest token can ever match, so every probe above this bound was guaranteed to fail.
+   *
+   * <p>Clamped to the old 64 rather than used raw. A vocabulary with an entry longer than 64 bytes
+   * would otherwise start matching tokens the previous code could not reach, which would change how
+   * text tokenises -- a different output, not a faster one. This is an optimisation, so it only
+   * ever skips probes that were certain to miss.
+   */
+  private final int longestTokenBytes;
+
   private final Map<String, Integer> mergeRanks;
   private final int bosTokenId;
   private final int eosTokenId;
@@ -192,6 +220,18 @@ public final class GgufTokenizer implements Tokenizer {
     this.vocab = vocab;
     this.scores = scores;
     this.tokenToId = tokenToId;
+    int longest = 1;
+    for (String entry : tokenToId.keySet()) {
+      int length = entry.getBytes(StandardCharsets.UTF_8).length;
+      if (length > longest) {
+        longest = length;
+      }
+    }
+    this.longestTokenBytes = Math.min(longest, 64);
+    for (int value = 0; value < byteFallbackIds.length; value++) {
+      Integer resolved = tokenToId.get(String.format("<0x%02X>", value));
+      byteFallbackIds[value] = resolved == null ? -1 : resolved;
+    }
     this.mergeRanks = mergeRanks;
     this.bosTokenId = bosTokenId;
     this.eosTokenId = eosTokenId;
@@ -1064,8 +1104,8 @@ public final class GgufTokenizer implements Tokenizer {
 
   private void appendByteFallback(List<Integer> tokens, String symbol) {
     for (byte value : symbol.getBytes(StandardCharsets.UTF_8)) {
-      Integer token = tokenToId.get(String.format("<0x%02X>", value & 0xFF));
-      tokens.add(token != null ? token : unknownTokenId);
+      int token = byteFallbackIds[value & 0xFF];
+      tokens.add(token >= 0 ? token : unknownTokenId);
     }
   }
 
@@ -1207,10 +1247,9 @@ public final class GgufTokenizer implements Tokenizer {
       if (id != null) {
         tokens.add(id);
       } else {
-        // Fallback: try <0xNN> byte token for the original byte
-        String byteToken = String.format("<0x%02X>", textBytes[i] & 0xFF);
-        Integer byteId = tokenToId.get(byteToken);
-        tokens.add(byteId != null ? byteId : unknownTokenId);
+        // Fallback: the <0xNN> byte token for the original byte, resolved at construction.
+        int byteId = byteFallbackIds[textBytes[i] & 0xFF];
+        tokens.add(byteId >= 0 ? byteId : unknownTokenId);
       }
     }
 
@@ -1237,7 +1276,7 @@ public final class GgufTokenizer implements Tokenizer {
       int bestId = -1;
 
       // Try matching substrings of decreasing length
-      for (int len = Math.min(textBytes.length - i, 64); len >= 1; len--) {
+      for (int len = Math.min(textBytes.length - i, longestTokenBytes); len >= 1; len--) {
         String candidate = new String(textBytes, i, len, StandardCharsets.UTF_8);
         Integer id = tokenToId.get(candidate);
         if (id != null) {
@@ -1251,10 +1290,9 @@ public final class GgufTokenizer implements Tokenizer {
         tokens.add(bestId);
         i += bestLen;
       } else {
-        // Fall back to byte-level token <0xNN>
-        String byteToken = String.format("<0x%02X>", textBytes[i] & 0xFF);
-        Integer id = tokenToId.get(byteToken);
-        tokens.add(id != null ? id : unknownTokenId);
+        // Fall back to the byte-level token <0xNN>, resolved at construction.
+        int id = byteFallbackIds[textBytes[i] & 0xFF];
+        tokens.add(id >= 0 ? id : unknownTokenId);
         i += 1;
       }
     }
