@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.14] - 2026-11-04
+
 ### Fixed
 
 - **The default session context is the model's declared maximum again, and the caches grow**
