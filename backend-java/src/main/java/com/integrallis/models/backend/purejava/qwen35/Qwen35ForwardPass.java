@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava.qwen35;
 
+import com.integrallis.models.backend.purejava.cache.SequenceGrowth;
 import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliff;
 import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.edgerock.EdgeRockMemory;
@@ -51,7 +52,7 @@ public final class Qwen35ForwardPass {
   public static final class Session {
     private final Qwen35ForwardPass owner;
     private final int capacity;
-    private final int[] tokenHistory;
+    private int[] tokenHistory;
     private SessionState state;
     private int checkpoint;
 
@@ -62,7 +63,7 @@ public final class Qwen35ForwardPass {
       }
       this.owner = owner;
       this.capacity = capacity;
-      this.tokenHistory = new int[capacity];
+      this.tokenHistory = new int[Math.min(capacity, 16)];
       this.state =
           new SessionState(
               owner.config,
@@ -75,6 +76,42 @@ public final class Qwen35ForwardPass {
 
     public int checkpoint() {
       return checkpoint;
+    }
+
+    /**
+     * Bytes currently held by this session's key and value storage.
+     *
+     * <p>Exposed because growth is otherwise unobservable, and an unobservable allocation policy is
+     * one no test can hold to account: #357 was a session quietly reserving its ceiling, and the
+     * only way to assert it no longer does is to be able to read what it holds.
+     */
+    public long allocatedCacheBytes() {
+      return state.allocatedCacheBytes();
+    }
+
+    /** The ceiling this session may grow to: the context it was opened for. */
+    public int capacity() {
+      return capacity;
+    }
+
+    /**
+     * Widens the retained token prefix to hold {@code positions}, doubling, never past {@link
+     * #capacity}.
+     *
+     * <p>Sized with the caches rather than at the ceiling for the same reason: a session opened for
+     * a 262,144-token declared context should not reserve a megabyte of history to answer one short
+     * question. {@code rewind} and prefix validation read only the positions below {@link
+     * #checkpoint}, which is always within what has been grown.
+     */
+    private void retain(int position, int token) {
+      if (position >= tokenHistory.length) {
+        int grown = Math.max(tokenHistory.length, 1);
+        while (grown <= position) {
+          grown = grown <= capacity / 2 ? grown * 2 : capacity;
+        }
+        tokenHistory = Arrays.copyOf(tokenHistory, grown);
+      }
+      tokenHistory[position] = token;
     }
   }
 
@@ -429,8 +466,9 @@ public final class Qwen35ForwardPass {
       throw new IllegalStateException("session context capacity exhausted: " + session.capacity);
     }
     int position = session.checkpoint;
+    session.state.ensureCapacity(position + 1);
     float[] hidden = forwardToken(token, position, session.state);
-    session.tokenHistory[position] = token;
+    session.retain(position, token);
     session.checkpoint++;
     return projectLogits ? projectLogits(hidden, session.state.scratch) : null;
   }
@@ -556,6 +594,9 @@ public final class Qwen35ForwardPass {
           "question of " + longest + " tokens exceeds group capacity " + group.suffixCapacity());
     }
 
+    // Only the shared prefix: each question's own positions are written into its branch's
+    // storage, which the group sized from the questions themselves.
+    state.ensureCapacity(prefixLength);
     for (int index = 0; index < count; index++) {
       group.forkBranch(
           index,
@@ -1220,6 +1261,9 @@ public final class Qwen35ForwardPass {
     BatchScratch batch = sessionState.batchScratch;
     int dimension = config.embeddingDim();
     int startPosition = session.checkpoint;
+    // Grown once for the whole batch: every row below writes its key and value at its own
+    // position, and the batch attends across all of them.
+    sessionState.ensureCapacity(Math.addExact(startPosition, batchSize));
     for (int index = 0; index < batchSize; index++) {
       weights.embedToken(tokens[tokenOffset + index], batch.rowState);
       System.arraycopy(batch.rowState, 0, batch.state, index * dimension, dimension);
@@ -1289,7 +1333,7 @@ public final class Qwen35ForwardPass {
     }
 
     for (int index = 0; index < batchSize; index++) {
-      session.tokenHistory[startPosition + index] = tokens[tokenOffset + index];
+      session.retain(startPosition + index, tokens[tokenOffset + index]);
     }
     session.checkpoint += batchSize;
   }
@@ -2070,6 +2114,25 @@ public final class Qwen35ForwardPass {
   }
 
   private static final class SessionState {
+    /**
+     * Key and value storage grows rather than opening at the session's ceiling.
+     *
+     * <p>A session is sized for the model's declared context, which is the only honest ceiling: the
+     * model states what it can attend to and a caller is entitled to all of it. Allocating that
+     * ceiling at open is a separate decision, and it was the wrong one -- Qwen3.5 declares 262,144
+     * positions, whose fp32 keys and values come to about 17 GB across the full-attention layers,
+     * so {@code openRuntime} died of heap exhaustion before reading a token on a machine with ample
+     * room for the weights.
+     *
+     * <p>The growth policy itself lives in {@link SequenceGrowth}, shared with every other cache
+     * and score buffer here: this architecture routes through neither {@code KvCache} nor {@code
+     * LayeredKvCache}, and that divergence is what let the defect survive here after both of those
+     * had been made lazy.
+     */
+    private final Qwen35Config config;
+
+    private final int maxCapacity;
+    private int allocatedCapacity;
     private final float[][] keys;
     private final float[][] values;
 
@@ -2093,6 +2156,9 @@ public final class Qwen35ForwardPass {
       // One bank per layer per session: the bank is sequence state, so sharing it across sessions
       // would let one sequence read anchors another wrote.
       memoryBanks = memory == null ? null : memory.newBanks();
+      this.config = config;
+      this.maxCapacity = capacity;
+      this.allocatedCapacity = 0;
       keys = new float[config.numLayers()][];
       values = new float[config.numLayers()][];
       convolutionHistory = new float[config.numLayers()][];
@@ -2101,12 +2167,18 @@ public final class Qwen35ForwardPass {
       recurrentState = new float[config.numLayers()][];
       scratch = new ProjectionScratch(weights);
       gatedDeltaNetScratch = new GatedDeltaNetScratch(config, kernel);
-      batchScratch = new BatchScratch(config, weights, capacity, prefillBatchSize, kernel);
+      batchScratch =
+          new BatchScratch(
+              config,
+              weights,
+              Math.min(capacity, SequenceGrowth.INITIAL_CAPACITY),
+              prefillBatchSize,
+              kernel);
+      // A full-attention layer's keys and values are left null here and allocated by
+      // ensureCapacity at the first position it stores. Recurrent and convolution state is sized
+      // by the architecture rather than by the sequence, so it is allocated once, up front.
       for (int layer = 0; layer < config.numLayers(); layer++) {
-        if (config.usesFullAttention(layer)) {
-          keys[layer] = new float[Math.multiplyExact(capacity, config.attentionKeyDim())];
-          values[layer] = new float[Math.multiplyExact(capacity, config.attentionKeyDim())];
-        } else {
+        if (!config.usesFullAttention(layer)) {
           convolutionHistory[layer] =
               new float[Math.multiplyExact(config.gdnConvDim(), config.gdnConvKernel() - 1)];
           if (convolutionHistoryViews != null) {
@@ -2119,6 +2191,52 @@ public final class Qwen35ForwardPass {
                       config.gdnHeadDim())];
         }
       }
+    }
+
+    /**
+     * Grows key and value storage so every position below {@code positions} can be stored.
+     *
+     * <p>Doubling, never past {@link #maxCapacity}, which is the model's declared context. Growth
+     * is one-way: {@link #clear()} keeps what a previous sequence reached, because a session that
+     * answers repeatedly settles at its working size and reallocating on every reset is what once
+     * made a repeated decision slower than the decision itself.
+     */
+    private long allocatedCacheBytes() {
+      return Math.addExact(linearStateBytes(keys), linearStateBytes(values));
+    }
+
+    private void ensureCapacity(int positions) {
+      if (positions <= allocatedCapacity) {
+        return;
+      }
+      if (positions > maxCapacity) {
+        throw new IllegalArgumentException(
+            "positions exceed session capacity " + maxCapacity + ": " + positions);
+      }
+      int grown = SequenceGrowth.nextCapacity(allocatedCapacity, positions, maxCapacity);
+      int keyDimension = config.attentionKeyDim();
+      for (int layer = 0; layer < config.numLayers(); layer++) {
+        if (config.usesFullAttention(layer)) {
+          keys[layer] = growRows(keys[layer], grown, keyDimension);
+          values[layer] = growRows(values[layer], grown, keyDimension);
+        }
+      }
+      batchScratch.ensureScores(grown);
+      allocatedCapacity = grown;
+    }
+
+    /**
+     * Reallocates one cache at {@code capacity} rows, carrying the stored rows over.
+     *
+     * <p>The copy is what makes growth invisible to attention: rows are contiguous in position with
+     * a fixed stride, so position {@code p} keeps the same offset in the larger array.
+     */
+    private static float[] growRows(float[] existing, int capacity, int dimension) {
+      float[] grown = new float[Math.multiplyExact(capacity, dimension)];
+      if (existing != null) {
+        System.arraycopy(existing, 0, grown, 0, existing.length);
+      }
+      return grown;
     }
 
     /**
@@ -2176,7 +2294,7 @@ public final class Qwen35ForwardPass {
     private final float[] key;
     private final float[] value;
     private final float[] attended;
-    private final float[] attentionScores;
+    private float[] attentionScores;
     private final float[] mixed;
     private final FloatArrayView mixedView;
     private final float[] outputGate;
@@ -2198,6 +2316,13 @@ public final class Qwen35ForwardPass {
     private final float[] memory;
     private final float[] delta;
     private final BatchProjectionScratch projectionScratch;
+
+    /** Widens the shared score row so a batch can attend to {@code positions} earlier positions. */
+    private void ensureScores(int positions) {
+      if (attentionScores.length < positions) {
+        attentionScores = new float[positions];
+      }
+    }
 
     private BatchScratch(
         Qwen35Config config,

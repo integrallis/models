@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava.cact;
 
+import com.integrallis.models.backend.purejava.cache.SequenceGrowth;
 import com.integrallis.vectors.core.RotatedCodebookMatrix;
 import java.util.Arrays;
 import java.util.Objects;
@@ -39,11 +40,12 @@ public final class Needle2ForwardPass {
   private final int modelWidth;
   private final int attentionWidth;
   private final int kvWidth;
-  private final int[] tokenHistory;
+  private int[] tokenHistory;
   private final Needle2AttentionWindow attentionWindow;
   private final float[][][] keyCache;
   private final float[][][] valueCache;
   private final float[][][] engramValueHistory;
+  private int allocatedCapacity;
   private int checkpoint;
 
   public Needle2ForwardPass(Needle2Weights weights, int capacity) {
@@ -62,11 +64,49 @@ public final class Needle2ForwardPass {
     this.modelWidth = config.modelWidth();
     this.attentionWidth = Math.multiplyExact(config.queryHeadCount(), config.headWidth());
     this.kvWidth = Math.multiplyExact(config.kvHeadCount(), config.headWidth());
-    this.tokenHistory = new int[capacity];
     this.attentionWindow = new Needle2AttentionWindow(config.kvWindow(), toolDocumentEndToken);
-    this.keyCache = new float[config.layerCount()][capacity][kvWidth];
-    this.valueCache = new float[config.layerCount()][capacity][kvWidth];
-    this.engramValueHistory = new float[config.engramSites().size()][capacity][modelWidth];
+    // Rows are grown by ensureCapacity rather than allocated at the declared ceiling: a graph
+    // opened for a long context must not pay for it before a sequence reaches it. See #357.
+    this.tokenHistory = new int[0];
+    this.keyCache = new float[config.layerCount()][][];
+    this.valueCache = new float[config.layerCount()][][];
+    this.engramValueHistory = new float[config.engramSites().size()][][];
+    this.allocatedCapacity = 0;
+  }
+
+  /**
+   * Grows cache rows so every position below {@code positions} can be stored.
+   *
+   * <p>Sixteen, doubling, never past {@link #capacity}: the same policy as {@code KvCache} and
+   * {@code LayeredKvCache}, which this graph does not route through. Rows are kept by reference
+   * across a growth, because attention reads earlier rows directly and copying them would change
+   * identity under an aliasing read.
+   */
+  private void ensureCapacity(int positions) {
+    if (positions <= allocatedCapacity) {
+      return;
+    }
+    int grown = SequenceGrowth.nextCapacity(allocatedCapacity, positions, capacity);
+    for (int layer = 0; layer < keyCache.length; layer++) {
+      keyCache[layer] = growRows(keyCache[layer], grown, kvWidth);
+      valueCache[layer] = growRows(valueCache[layer], grown, kvWidth);
+    }
+    for (int site = 0; site < engramValueHistory.length; site++) {
+      engramValueHistory[site] = growRows(engramValueHistory[site], grown, modelWidth);
+    }
+    tokenHistory = Arrays.copyOf(tokenHistory, grown);
+    allocatedCapacity = grown;
+  }
+
+  /** Widens one cache to {@code capacity} rows, keeping the rows already stored. */
+  private static float[][] growRows(float[][] existing, int capacity, int width) {
+    float[][] grown = existing == null ? new float[capacity][] : Arrays.copyOf(existing, capacity);
+    for (int row = 0; row < capacity; row++) {
+      if (grown[row] == null) {
+        grown[row] = new float[width];
+      }
+    }
+    return grown;
   }
 
   public float[] forward(int token, int position) {
@@ -127,6 +167,7 @@ public final class Needle2ForwardPass {
     if (position >= capacity) {
       throw new IllegalArgumentException("Needle context capacity exceeded: " + capacity);
     }
+    ensureCapacity(position + 1);
     tokenHistory[position] = token;
     attentionWindow.accept(token, position);
     int[] visiblePositions = attentionWindow.visiblePositions(position);

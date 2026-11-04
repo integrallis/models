@@ -33,7 +33,6 @@ import java.util.Set;
  */
 public final class KvCache {
 
-  private static final int INITIAL_SEQUENCE_CAPACITY = 16;
   private static final float[] EMPTY_FLOATS = new float[0];
   private static final boolean[] EMPTY_OCCUPANCY = new boolean[0];
 
@@ -271,7 +270,7 @@ public final class KvCache {
     this.valueDim = valueDim;
     this.sharedPrefix = null;
     this.localStartPosition = 0;
-    validateInitialStorageSize(Math.min(maxSeqLen, INITIAL_SEQUENCE_CAPACITY));
+    validateInitialStorageSize(Math.min(maxSeqLen, SequenceGrowth.INITIAL_CAPACITY));
   }
 
   private KvCache(SharedPrefix prefix) {
@@ -282,7 +281,7 @@ public final class KvCache {
     this.sharedPrefix = prefix;
     this.localStartPosition = prefix.length;
     int remainingPositions = maxSeqLen - localStartPosition;
-    validateInitialStorageSize(Math.min(remainingPositions, INITIAL_SEQUENCE_CAPACITY));
+    validateInitialStorageSize(Math.min(remainingPositions, SequenceGrowth.INITIAL_CAPACITY));
   }
 
   /** Stores a key and value vector for a given layer and position. */
@@ -915,12 +914,9 @@ public final class KvCache {
       return;
     }
 
-    int newCapacity = allocatedSequenceCapacity;
     int localLimit = maxSeqLen - localStartPosition;
-    if (newCapacity == 0) newCapacity = Math.min(localLimit, INITIAL_SEQUENCE_CAPACITY);
-    while (newCapacity < requiredLocalCapacity) {
-      newCapacity = Math.min(localLimit, Math.multiplyExact(newCapacity, 2));
-    }
+    int newCapacity =
+        SequenceGrowth.nextCapacity(allocatedSequenceCapacity, requiredLocalCapacity, localLimit);
 
     float[] grownKeys = allocateStore("key cache", newCapacity, keyDim);
     float[] grownValues = allocateStore("value cache", newCapacity, valueDim);

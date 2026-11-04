@@ -22,13 +22,13 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * How many tokens a session is sized for when nobody says.
+ * How many tokens a session is sized for when nobody says: the model's declared maximum.
  *
- * <p>A session allocates its whole key and value cache at open, so this is a memory decision rather
- * than only a limit, and taking the model's declared ceiling made it badly: a 262,144-token context
- * is about 17 GB of fp32 cache, which exhausted the heap before the first answer on a machine with
- * room to spare for the weights. Asserted here and not through a real model because the policy is
- * arithmetic -- a multi-gigabyte download would make the check too expensive to keep.
+ * <p>This file previously asserted a bound of 8192 chosen here. That was the wrong fix for #357 and
+ * is deliberately recorded as such: the OOM came from allocating the ceiling at session open, not
+ * from the ceiling being the model's own, and capping the default traded a crash for the quieter
+ * failure of refusing prompts the model accepts. The ceiling is back to what the model declares,
+ * and the allocation is what grows -- asserted in {@code Qwen35SessionGrowthTest}.
  */
 class SessionContextSizingTest {
 
@@ -53,19 +53,14 @@ class SessionContextSizingTest {
   }
 
   @Test
-  void anUnconfiguredLongContextModelIsBoundedRatherThanTakingItsDeclaredCeiling() {
-    int capacity =
-        PureJavaBackend.runtimeContextLength(LONG_CONTEXT, PureJavaPlanConfiguration.defaults());
+  void anUnconfiguredModelIsSizedForEverythingItDeclares() {
+    // Including the long-context architecture that OOMed: the ceiling is not the defect.
+    assertThat(
+            PureJavaBackend.runtimeContextLength(
+                LONG_CONTEXT, PureJavaPlanConfiguration.defaults()))
+        .isEqualTo(LONG_CONTEXT);
 
-    assertThat(capacity).isEqualTo(PureJavaBackend.DEFAULT_MAXIMUM_CONTEXT);
-    assertThat(capacity).isLessThan(LONG_CONTEXT);
-  }
-
-  @Test
-  void aModelAlreadyWithinTheDefaultIsUnaffected() {
-    // Most of the catalog is here, and this is the assertion that says so: bounding the default
-    // must not quietly shorten a model that never reached the bound.
-    for (int declared : new int[] {512, 2048, 4096, 8192}) {
+    for (int declared : new int[] {512, 2048, 4096, 8192, 32_768, 131_072, 1_024_000}) {
       assertThat(
               PureJavaBackend.runtimeContextLength(declared, PureJavaPlanConfiguration.defaults()))
           .as("declared context %s", declared)
@@ -74,13 +69,13 @@ class SessionContextSizingTest {
   }
 
   @Test
-  void anExplicitRequestWinsOverTheDefaultInBothDirections() {
-    // Up: a caller that wants the long context asks for it and pays for it.
-    assertThat(PureJavaBackend.runtimeContextLength(LONG_CONTEXT, recommending(131_072)))
-        .isEqualTo(131_072);
-    // Down: and a caller that knows its prompts are short can go below the default.
+  void aRecommendationOrDeploymentSettingCanAskForLess() {
+    // Still useful: a deployment that knows its prompts are short can cap the growth ceiling and
+    // get a hard refusal rather than letting a runaway sequence grow into the heap.
     assertThat(PureJavaBackend.runtimeContextLength(LONG_CONTEXT, recommending(2048)))
         .isEqualTo(2048);
+    assertThat(PureJavaBackend.runtimeContextLength(LONG_CONTEXT, recommending(131_072)))
+        .isEqualTo(131_072);
   }
 
   @Test
@@ -88,17 +83,5 @@ class SessionContextSizingTest {
     // Asking for more than the model declares is not a licence to allocate it: the cache would be
     // addressable beyond any position the model can represent.
     assertThat(PureJavaBackend.runtimeContextLength(4096, recommending(131_072))).isEqualTo(4096);
-  }
-
-  @Test
-  void theDefaultKeepsALongContextCacheWithinAWorkableHeap() {
-    // The arithmetic the default exists for, stated so a future change to it has to argue with a
-    // number. Qwen3.5's full-attention cache measures about 17 GB over 262,144 tokens, so roughly
-    // 68 KiB per token for keys and values together.
-    long bytesPerToken = 17L * 1024 * 1024 * 1024 / LONG_CONTEXT;
-    long atDefault = bytesPerToken * PureJavaBackend.DEFAULT_MAXIMUM_CONTEXT;
-
-    // Comfortably inside a 1 GiB allowance, where the declared ceiling needed seventeen.
-    assertThat(atDefault).isLessThan(1024L * 1024 * 1024);
   }
 }

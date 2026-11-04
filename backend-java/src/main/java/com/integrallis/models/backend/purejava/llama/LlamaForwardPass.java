@@ -19,6 +19,7 @@ import com.integrallis.models.api.ActivatedAdapterMetadata;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.cache.KvCache;
 import com.integrallis.models.backend.purejava.cache.KvCache.AttentionView;
+import com.integrallis.models.backend.purejava.cache.SequenceGrowth;
 import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliff;
 import com.integrallis.models.backend.purejava.diagnostics.PerformanceCliffs;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
@@ -186,7 +187,22 @@ public final class LlamaForwardPass {
   private final GgufStagePlan headAttentionPlan;
   private final GgufStagePlan rowAttentionPlan;
   private final GgufStagePlan sessionRowAttentionPlan;
-  private final ThreadLocal<float[]> attentionScratch;
+  private final ThreadLocal<AttentionScratch> attentionScratch;
+
+  /**
+   * One worker's attention score rows, grown with the sequence rather than fixed at the ceiling.
+   *
+   * <p>Sized {@code groupSize} rows of {@link #stride}, indexed by absolute position within a row.
+   * A declared context of 1,024,000 made this 32 MB per pool thread before a token had been read,
+   * which is #357's defect in a different buffer. Thread-local and consumed entirely within one
+   * attention call, so each worker grows its own rows and no stride is shared between threads --
+   * which is what makes this safe without a barrier or a volatile.
+   */
+  private static final class AttentionScratch {
+    private float[] scores = new float[0];
+    private int stride;
+  }
+
   private final boolean nativeGroupedAttention;
 
   private final boolean attentionTemperatureScaling;
@@ -227,7 +243,6 @@ public final class LlamaForwardPass {
   private final float[] k;
   private final float[] v;
   private final float[] attnOut;
-  private final float[] attentionScores;
   private final float[] attnProjected;
   private final float[] ffnGate;
   private final FloatArrayView ffnGateView;
@@ -271,7 +286,6 @@ public final class LlamaForwardPass {
   private final float[] batchQ;
   private final float[] batchK;
   private final float[] batchV;
-  private final float[] batchAttentionScores;
   private final float[] batchAttnOut;
   private final float[] batchAttnProjected;
   private final float[] batchFfnGate;
@@ -519,7 +533,6 @@ public final class LlamaForwardPass {
     this.k = new float[config.keyDim()];
     this.v = new float[config.valueDim()];
     this.attnOut = new float[config.attentionOutputDim()];
-    this.attentionScores = new float[cache.maxSeqLen()];
     this.attnProjected = new float[dim];
     this.ffnGate = new float[hiddenDim];
     this.ffnGateView = prepareActivationArray(ffnGate);
@@ -593,8 +606,6 @@ public final class LlamaForwardPass {
     this.batchQ = batchBuffer(prefillBatchCapacity, config.queryDim());
     this.batchK = batchBuffer(prefillBatchCapacity, config.keyDim());
     this.batchV = batchBuffer(prefillBatchCapacity, config.valueDim());
-    this.batchAttentionScores =
-        stagedQuantizedLayer ? batchBuffer(prefillBatchCapacity, cache.maxSeqLen()) : new float[0];
     this.batchAttnOut = batchBuffer(prefillBatchCapacity, config.attentionOutputDim());
     this.batchAttnProjected = batchBuffer(prefillBatchCapacity, dim);
     this.batchFfnGate = batchBuffer(prefillBatchCapacity, hiddenDim);
@@ -606,8 +617,7 @@ public final class LlamaForwardPass {
     this.batchFfnProjected = batchBuffer(prefillBatchCapacity, dim);
     this.batchSessions = new Session[prefillBatchCapacity];
     int attentionGroupSize = config.numHeads() / config.numKvHeads();
-    this.attentionScratch =
-        ThreadLocal.withInitial(() -> new float[attentionGroupSize * cache.maxSeqLen()]);
+    this.attentionScratch = ThreadLocal.withInitial(AttentionScratch::new);
     // Native grouped attention is wired for Granite only: the Rust kernel's arithmetic differs
     // from the Java kernels in the last bits, and the pinned greedy expectations of other
     // architectures stay on the Java path they were recorded with.
@@ -2792,8 +2802,9 @@ public final class LlamaForwardPass {
     int layer = activeHeadLayer;
     int position = activeHeadPosition;
     KvCache sequenceCache = activeHeadCache;
-    float[] scores = attentionScratch.get();
-    int scoresHeadStride = cache.maxSeqLen();
+    AttentionScratch scratch = attentionScratch(position + 1, groupSize);
+    float[] scores = scratch.scores;
+    int scoresHeadStride = scratch.stride;
     int firstPosition = config.attentionStartPosition(layer, position);
     AttentionView view = sequenceCache.attentionView(layer, firstPosition, position + 1);
     for (int kvHead = fromKvHead; kvHead < toKvHead; kvHead++) {
@@ -2920,8 +2931,9 @@ public final class LlamaForwardPass {
     int numKvHeads = config.numKvHeads();
     int groupSize = config.numHeads() / numKvHeads;
     float scale = config.attentionScale();
-    float[] scores = attentionScratch.get();
-    int scoresHeadStride = cache.maxSeqLen();
+    AttentionScratch scratch = attentionScratch(position + 1, groupSize);
+    float[] scores = scratch.scores;
+    int scoresHeadStride = scratch.stride;
     java.util.Arrays.fill(output, outputOffset, outputOffset + config.attentionOutputDim(), 0.0f);
     int firstPosition = config.attentionStartPosition(layer, position);
     AttentionView view = sequenceCache.attentionView(layer, firstPosition, position + 1);
@@ -3024,6 +3036,24 @@ public final class LlamaForwardPass {
         scores,
         0,
         scoresHeadStride);
+  }
+
+  /**
+   * This thread's score rows, widened to hold {@code positions} per head.
+   *
+   * <p>Doubling, never past the cache's ceiling, so a sequence that advances one token at a time
+   * reallocates a logarithmic number of times rather than on every token. Rows are indexed by
+   * absolute position, so the stride has to cover the whole attended span and not only its length.
+   */
+  private AttentionScratch attentionScratch(int positions, int groupSize) {
+    AttentionScratch scratch = attentionScratch.get();
+    if (scratch.stride >= positions) {
+      return scratch;
+    }
+    int grown = SequenceGrowth.nextCapacity(scratch.stride, positions, cache.maxSeqLen());
+    scratch.stride = grown;
+    scratch.scores = new float[Math.multiplyExact(groupSize, grown)];
+    return scratch;
   }
 
   /** The head-by-head attention loop: per-head scores, scalar softmax, per-head values. */

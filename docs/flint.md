@@ -53,10 +53,12 @@ layers with a 513-token window and 14 full-attention layers. Only sliding layers
 The fused shared tensors have width 1024; the GGUF shared-count value of 2 describes two
 512-wide expert units, not two separately routed shared branches.
 
-Set an explicit context budget before loading on a laptop, for example
-`-Dmodels.purejava.maxContextLength=4096`. The model advertises 262144 tokens, and allocating
-the full context requires much more memory than the weights alone. A 32 GB Intel laptop is
-a constrained correctness-test host for this 23.4 GB file, not the performance target.
+Setting an explicit context budget before loading, for example
+`-Dmodels.purejava.maxContextLength=4096`, caps how far the key and value cache can grow and
+turns a runaway sequence into a refusal rather than a growing allocation. Since 0.5.14 it is no
+longer needed to open the model: the model advertises 262144 tokens, and the caches and score
+buffers grow with the sequence instead of being allocated for that ceiling at open. A 32 GB Intel
+laptop is a constrained correctness-test host for this 23.4 GB file, not the performance target.
 
 Use the local GGUF directly from a build of this branch with `backend-java` and `models-runtime`
 on the classpath. Launch Java 25+ with `--add-modules=jdk.incubator.vector` and the context property

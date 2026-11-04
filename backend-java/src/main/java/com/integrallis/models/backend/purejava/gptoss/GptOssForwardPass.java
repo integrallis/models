@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.cache.LayeredKvCache;
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache.AttentionSpan;
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache.AttentionView;
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache.LayerSpec;
+import com.integrallis.models.backend.purejava.cache.SequenceGrowth;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.tensor.TensorSource;
@@ -41,14 +42,15 @@ public final class GptOssForwardPass {
     private final float[] key;
     private final float[] value;
     private final float[] attentionOutput;
-    private final float[] attentionScores;
+    private float[] attentionScores;
     private final float[] projectedAttention;
     private final float[] routerLogits;
     private final int[] selectedExperts;
     private final float[] routingWeights;
     private final float[] moeOutput;
     private final float[] logits;
-    private final int[] tokenHistory;
+    private int[] tokenHistory;
+    private int allocatedSequenceCapacity;
     private int nextPosition;
 
     private Session(GptOssForwardPass owner) {
@@ -76,14 +78,36 @@ public final class GptOssForwardPass {
       key = new float[config.keyValueDimension()];
       value = new float[config.keyValueDimension()];
       attentionOutput = new float[config.queryDimension()];
-      attentionScores = new float[owner.maxSequenceLength];
+      // Grown by ensureSequenceCapacity: see #357 -- a session opened for a long
+      // declared context must not allocate it before a sequence reaches it.
+      attentionScores = new float[0];
       projectedAttention = new float[config.hiddenSize()];
       routerLogits = new float[config.numExperts()];
       selectedExperts = new int[config.expertsPerToken()];
       routingWeights = new float[config.expertsPerToken()];
       moeOutput = new float[config.hiddenSize()];
       logits = new float[config.vocabSize()];
-      tokenHistory = new int[owner.maxSequenceLength];
+      tokenHistory = new int[0];
+    }
+
+    /**
+     * Widens the score row and token history to hold {@code positions}.
+     *
+     * <p>Sixteen, doubling, never past the configured context: the same policy as the key and value
+     * caches this session already grew lazily. Sizing these two at the declared ceiling instead was
+     * #357's defect surviving in the buffers beside the cache -- a 1,024,000-token declaration made
+     * them 4 MB each before a token had been read.
+     */
+    private void ensureSequenceCapacity(int positions) {
+      if (positions <= allocatedSequenceCapacity) {
+        return;
+      }
+      int grown =
+          SequenceGrowth.nextCapacity(
+              allocatedSequenceCapacity, positions, owner.maxSequenceLength);
+      attentionScores = new float[grown];
+      tokenHistory = java.util.Arrays.copyOf(tokenHistory, grown);
+      allocatedSequenceCapacity = grown;
     }
 
     /** Returns the next absolute sequence position accepted by this session. */
@@ -214,6 +238,7 @@ public final class GptOssForwardPass {
     if (position >= maxSequenceLength) {
       throw new IllegalArgumentException("position exceeds the configured context: " + position);
     }
+    session.ensureSequenceCapacity(position + 1);
     embedToken(token, session.x);
     session.rope.prepare(position);
 
