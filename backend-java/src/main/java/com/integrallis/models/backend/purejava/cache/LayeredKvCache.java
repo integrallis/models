@@ -27,7 +27,6 @@ import java.util.OptionalInt;
  */
 public final class LayeredKvCache {
 
-  private static final int INITIAL_LINEAR_CAPACITY = 16;
   private static final float[] EMPTY_FLOATS = new float[0];
   private static final int[] EMPTY_POSITIONS = new int[0];
 
@@ -366,15 +365,7 @@ public final class LayeredKvCache {
       return;
     }
 
-    int newCapacity = state.allocatedCapacity;
-    if (newCapacity == 0) {
-      newCapacity = Math.min(maxSeqLen, INITIAL_LINEAR_CAPACITY);
-    }
-    while (newCapacity < requiredCapacity) {
-      int doubled = newCapacity <= maxSeqLen / 2 ? newCapacity * 2 : maxSeqLen;
-      newCapacity = Math.min(maxSeqLen, doubled);
-    }
-    grow(state, newCapacity);
+    grow(state, SequenceGrowth.nextCapacity(state.allocatedCapacity, requiredCapacity, maxSeqLen));
   }
 
   private static void allocate(LayerState state, int capacity) {

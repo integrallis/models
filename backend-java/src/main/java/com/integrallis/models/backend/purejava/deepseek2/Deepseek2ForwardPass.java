@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava.deepseek2;
 
+import com.integrallis.models.backend.purejava.cache.SequenceGrowth;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.ops.ExpertRouting;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
@@ -44,6 +45,7 @@ public final class Deepseek2ForwardPass {
   private final Deepseek2Weights weights;
   private final RotaryTable rotary;
   private final int capacity;
+  private int allocatedCapacity;
 
   private final float[][] keyCache;
   private final float[][] valueCache;
@@ -59,7 +61,7 @@ public final class Deepseek2ForwardPass {
   private final float[] key;
   private final float[] value;
   private final float[] attended;
-  private final float[] scores;
+  private float[] scores;
   private final float[] ffnGate;
   private final float[] ffnUp;
   private final float[] routerLogits;
@@ -106,12 +108,11 @@ public final class Deepseek2ForwardPass {
             : new RotaryTable(config.ropeDimension(), config.ropeTheta(), 1.0f);
 
     int dim = config.embeddingDim();
+    // Left empty and grown by ensureCapacity: a graph opened for a long declared context must
+    // not allocate it. See #357, where the eager form exhausted an 8 GB heap at open.
     this.keyCache = new float[config.numLayers()][];
     this.valueCache = new float[config.numLayers()][];
-    for (int layer = 0; layer < config.numLayers(); layer++) {
-      keyCache[layer] = new float[capacity * config.cachedKeyDim()];
-      valueCache[layer] = new float[capacity * config.cachedValueDim()];
-    }
+    this.allocatedCapacity = 0;
     this.state = new float[dim];
     this.normalized = new float[dim];
     this.projected = new float[dim];
@@ -123,7 +124,7 @@ public final class Deepseek2ForwardPass {
     this.key = new float[config.cachedKeyDim()];
     this.value = new float[config.cachedValueDim()];
     this.attended = new float[config.cachedValueDim()];
-    this.scores = new float[capacity];
+    this.scores = new float[0];
     this.ffnGate = new float[Math.max(config.hiddenDim(), config.sharedExpertHiddenDim())];
     this.ffnUp = new float[Math.max(config.hiddenDim(), config.sharedExpertHiddenDim())];
     this.routerLogits = new float[config.numExperts()];
@@ -156,6 +157,37 @@ public final class Deepseek2ForwardPass {
 
   public void reset() {
     nextPosition = 0;
+  }
+
+  /**
+   * Grows key and value storage so every position below {@code positions} can be stored.
+   *
+   * <p>Sixteen, doubling, never past {@link #capacity}: the same policy as {@code KvCache} and
+   * {@code LayeredKvCache}, which this graph does not route through. A growth policy that differs
+   * per architecture is one nobody can reason about, and the divergence is what let #357 hide here
+   * after the llama-family caches had already been made lazy.
+   */
+  private void ensureCapacity(int positions) {
+    if (positions <= allocatedCapacity) {
+      return;
+    }
+    int grown = SequenceGrowth.nextCapacity(allocatedCapacity, positions, capacity);
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      keyCache[layer] = growRows(keyCache[layer], grown, config.cachedKeyDim());
+      valueCache[layer] = growRows(valueCache[layer], grown, config.cachedValueDim());
+    }
+    // One score per attended position, so it tracks the cache rather than the head count.
+    scores = new float[grown];
+    allocatedCapacity = grown;
+  }
+
+  /** Reallocates one cache at {@code capacity} rows, carrying the stored rows over. */
+  private static float[] growRows(float[] existing, int capacity, int dimension) {
+    float[] grown = new float[Math.multiplyExact(capacity, dimension)];
+    if (existing != null) {
+      System.arraycopy(existing, 0, grown, 0, existing.length);
+    }
+    return grown;
   }
 
   /**
@@ -192,6 +224,7 @@ public final class Deepseek2ForwardPass {
     if (position >= capacity) {
       throw new IllegalArgumentException("position exceeds capacity " + capacity + ": " + position);
     }
+    ensureCapacity(position + 1);
     int dim = config.embeddingDim();
     weights.embedToken(token, state);
 

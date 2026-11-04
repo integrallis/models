@@ -19,6 +19,7 @@ import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache;
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache.AttentionSpan;
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache.AttentionView;
+import com.integrallis.models.backend.purejava.cache.SequenceGrowth;
 import com.integrallis.models.backend.purejava.gemma4.Gemma4TensorLayout.ExpertWeights;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
@@ -81,7 +82,7 @@ final class Gemma4ForwardPass {
   private final float[] key;
   private final float[] value;
   private final float[][] attentionOutputs;
-  private final float[] attentionScores;
+  private float[] attentionScores;
   private final float[] projected;
   private final float[] sharedInput;
   private final float[] sharedGate;
@@ -120,7 +121,20 @@ final class Gemma4ForwardPass {
   private final float[] batchKey;
   private final float[] batchValue;
   private final float[] batchAttentionOutput;
-  private final float[] batchAttentionScores;
+  private float[] batchAttentionScores;
+
+  /**
+   * Row stride into {@link #batchAttentionScores}, grown with the sequence rather than fixed at the
+   * declared ceiling.
+   *
+   * <p>Written on the calling thread before the batch dispatches and read by its workers, each of
+   * which owns one row, so {@code parallelFor}'s own ordering publishes it. A declared 262,144 made
+   * this buffer 128 MB at 128 prefill rows before a token had been read -- #357's defect in the
+   * buffer beside the cache.
+   */
+  private int batchAttentionScoreStride;
+
+  private int allocatedScoreCapacity;
   private final float[] batchProjected;
   private final float[] batchSharedGate;
   private final float[] batchSharedUp;
@@ -219,7 +233,7 @@ final class Gemma4ForwardPass {
     this.query = new float[maxQueryDim];
     this.key = new float[maxKeyDim];
     this.value = new float[maxValueDim];
-    this.attentionScores = new float[defaultCache.maxSeqLen()];
+    this.attentionScores = new float[0];
     this.projected = new float[dim];
     this.sharedInput = new float[dim];
     // Sized for the widest layer: the E-series varies this width per layer.
@@ -264,7 +278,10 @@ final class Gemma4ForwardPass {
     this.batchKey = batchBuffer(prefillBatchCapacity, maxKeyDim);
     this.batchValue = batchBuffer(prefillBatchCapacity, maxValueDim);
     this.batchAttentionOutput = batchBuffer(prefillBatchCapacity, maxAttentionOutputDim);
-    this.batchAttentionScores = batchBuffer(prefillBatchCapacity, defaultCache.maxSeqLen());
+    // Both score buffers are grown by ensureScoreCapacity at the first position attended.
+    this.batchAttentionScores = new float[0];
+    this.batchAttentionScoreStride = 0;
+    this.allocatedScoreCapacity = 0;
     this.batchProjected = batchBuffer(prefillBatchCapacity, dim);
     this.batchSharedGate = batchBuffer(prefillBatchCapacity, config.maxSharedHiddenDim());
     this.batchSharedUp = batchBuffer(prefillBatchCapacity, config.maxSharedHiddenDim());
@@ -516,6 +533,7 @@ final class Gemma4ForwardPass {
     if (position >= sequence.cache.maxSeqLen()) {
       throw new IllegalArgumentException("position exceeds context length: " + position);
     }
+    ensureScoreCapacity(sequence.cache, position + 1);
 
     weights.embedToken(token, state);
     multiply(state, config.embeddingScale());
@@ -594,6 +612,7 @@ final class Gemma4ForwardPass {
       System.arraycopy(state, 0, batchState, batch * dim, dim);
     }
 
+    ensureScoreCapacity(sequenceCache, startPosition + batchSize);
     for (int layer = 0; layer < config.numLayers(); layer++) {
       executeLayerBatch(sequenceCache, layer, startPosition, batchSize);
     }
@@ -617,6 +636,26 @@ final class Gemma4ForwardPass {
         normalized,
         logits);
     Gemma4Math.softcap(logits, config.finalLogitSoftcap());
+  }
+
+  /**
+   * Widens both score buffers so a row can hold {@code positions}.
+   *
+   * <p>Sixteen, doubling, never past the cache's ceiling: the same policy as the layered key and
+   * value cache this pass already grew lazily. The batched buffer keeps one row per prefill slot,
+   * so its cost is the stride times the batch capacity and growing it moves every row -- safe only
+   * between dispatches, which is where this is called from.
+   */
+  private void ensureScoreCapacity(LayeredKvCache sequenceCache, int positions) {
+    if (positions <= allocatedScoreCapacity) {
+      return;
+    }
+    int grown =
+        SequenceGrowth.nextCapacity(allocatedScoreCapacity, positions, sequenceCache.maxSeqLen());
+    attentionScores = new float[grown];
+    batchAttentionScores = batchBuffer(prefillBatchCapacity, grown);
+    batchAttentionScoreStride = grown;
+    allocatedScoreCapacity = grown;
   }
 
   private void executeLayerBatch(
@@ -741,7 +780,7 @@ final class Gemma4ForwardPass {
                 batchAttentionOutput,
                 batch * attentionOutputDim,
                 batchAttentionScores,
-                batch * sequenceCache.maxSeqLen());
+                batch * batchAttentionScoreStride);
           });
     }
 

@@ -117,28 +117,6 @@ public final class PureJavaBackend
 
   public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
 
-  /**
-   * Tokens a session is sized for when nothing asks for a specific context.
-   *
-   * <p>A session allocates its key and value cache for its whole capacity at open, so the capacity
-   * is a memory decision and not only a limit. Taking the model's native maximum as the default
-   * made that decision badly: Qwen3.5 declares 262,144 tokens, whose fp32 cache is about 17 GB, so
-   * {@code openRuntime} died of heap exhaustion before answering anything on a machine that had
-   * ample room for the weights. The model's own ceiling is a statement about what it can attend to,
-   * never a statement about what this process intends to send it.
-   *
-   * <p>8192 because it is the figure that was verified to carry Qwen3.5 2B and 4B on an 8 GB heap,
-   * and because nothing that measures anything here relies on the old default: the experiments and
-   * the controlled benchmark script all set a context explicitly, at 2048. A model whose native
-   * context is already at or below this is completely unaffected, which is most of the catalog.
-   *
-   * <p>Raised three ways, narrowest first: {@code ModelLoadOptions} per runtime, a per-model
-   * recommendation in the ModelJar's profile, or {@link #MAX_CONTEXT_LENGTH_PROPERTY} per
-   * deployment. A caller that needs the model's full context asks for it and pays for it
-   * deliberately.
-   */
-  public static final int DEFAULT_MAXIMUM_CONTEXT = 8192;
-
   private static final System.Logger LOGGER = System.getLogger(PureJavaBackend.class.getName());
 
   private final ModelMemoryArena arenaOwner;
@@ -1709,12 +1687,19 @@ public final class PureJavaBackend
   }
 
   /**
-   * The context a session is sized for.
+   * The context a session is sized for: the model's own declared maximum unless something asks for
+   * less.
    *
-   * <p>A ModelJar can recommend a bound through the plan configuration, which is how a model that
-   * knows its prompts are short avoids being sized for a context it will never reach: at Qwen3.5's
-   * 262,144 tokens the key and value cache alone is about 17 GB, so a default heap dies before the
-   * first answer. A deployment setting still wins over the recommendation.
+   * <p>The declared maximum is the only defensible default. It is the model's statement about what
+   * it can attend to, and a caller is entitled to all of it without having to discover a knob.
+   * Capping it at a figure chosen here would refuse prompts the model accepts, and silently --
+   * which is worse than running out of memory, because it looks like a defect in the model.
+   *
+   * <p>What the OOM in #357 actually came from was allocating that ceiling at session open, not
+   * from the ceiling itself. The caches grow on demand instead, so a declared 262,144 positions
+   * costs a session nothing until a sequence reaches them. A ModelJar can still recommend a lower
+   * bound through the plan configuration, and a deployment setting still wins over the
+   * recommendation.
    */
   // Package-private so the sizing policy can be asserted without opening a multi-gigabyte model.
   static int runtimeContextLength(
@@ -1723,22 +1708,7 @@ public final class PureJavaBackend
     if (recommended != PureJavaPlanConfiguration.MODEL_MAXIMUM_CONTEXT) {
       return Math.min(modelContextLength, recommended);
     }
-    int capacity = Math.min(modelContextLength, DEFAULT_MAXIMUM_CONTEXT);
-    if (capacity < modelContextLength) {
-      // Said once, at the level someone reads, and naming the knob: a capacity a caller did not
-      // choose has to be visible, or a refused prompt looks like a defect in the model.
-      LOGGER.log(
-          System.Logger.Level.INFO,
-          () ->
-              "sized this session for "
-                  + capacity
-                  + " tokens, not the model's "
-                  + modelContextLength
-                  + ": a full-context key and value cache is allocated at open. Raise it with"
-                  + " ModelLoadOptions.maxContextLength, a per-model recommendation, or -D"
-                  + MAX_CONTEXT_LENGTH_PROPERTY);
-    }
-    return capacity;
+    return modelContextLength;
   }
 
   /** Visible for testing: the shared-key-value mapping here is not reachable through load(). */

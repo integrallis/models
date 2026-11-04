@@ -36,15 +36,22 @@ All notable changes to models are documented here.
   they replace by construction, and tested across thread counts with a sentinel that makes an
   unclaimed row visible as itself.
 
-- **A session no longer allocates the model's full declared context at open** (#357). The default
-  capacity was the model's native context, and a session allocates its whole key and value cache up
-  front, so opening Qwen3.5 4B exhausted an 8 GB heap before answering anything: 262,144 tokens is
-  about 17 GB of fp32 cache. A declared context states what a model can attend to, not what the
-  process intends to send it. The default is `min(declared, 8192)` -- the figure verified to carry
-  Qwen3.5 2B and 4B on that heap -- resolved in the one method every architecture's capacity goes
-  through, and it logs once when it bounds, naming the three ways to raise it. **352 of the 461
+- **A session no longer allocates the model's full declared context at open** (#357). Opening
+  Qwen3.5 4B exhausted an 8 GB heap before answering anything: a session allocated its whole key
+  and value cache up front, and 262,144 declared positions is about 17 GB of fp32. **352 of the 461
   catalog models that declare a context declare more than 8192**, the largest at 1,024,000, so this
-  was not one model's problem. A model already at or below the bound is unaffected.
+  was not one model's problem.
+
+  0.5.13 fixed it by capping the default capacity at 8192. That was the wrong fix and 0.5.14
+  replaces it: the cap was a figure chosen here rather than measured from anything, and it traded a
+  crash for the quieter failure of refusing, at 8193 tokens, a prompt the model accepts. The
+  default capacity is the model's declared maximum again. What changed instead is the allocation:
+  the four architectures that held their caches eagerly -- Qwen3.5, DeepSeek-V2, LFM2 and Needle2 --
+  now grow them from 16 positions, doubling, exactly as `KvCache` and `LayeredKvCache` already did
+  for the llama, Gemma 4, GPT-OSS, MobileMoE and Flint paths, which were never affected. A session
+  opened at a declared 262,144 holds about a thousandth of that until a sequence reaches further.
+  `models.purejava.maxContextLength` and a per-model recommendation still cap growth for a
+  deployment that wants a hard refusal rather than a growing cache.
 
 - Close most of the ONNX executor's per-operator gap to onnxruntime on Paradee-8M
   (`benchmark-results/2026-11-03-onnx-executor-parity`): Transpose, Slice, Concat, Gather, Expand,

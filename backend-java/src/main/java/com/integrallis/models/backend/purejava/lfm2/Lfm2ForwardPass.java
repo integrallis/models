@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.purejava.lfm2;
 
+import com.integrallis.models.backend.purejava.cache.SequenceGrowth;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.ExpertRouting;
@@ -59,7 +60,14 @@ public final class Lfm2ForwardPass {
   private final float[] value;
   private final float[] attentionOut;
   private final float[] projected;
-  private final float[] scores;
+  private float[] scores;
+
+  /**
+   * Row stride into {@link #scores}: the allocated capacity, which grows, not {@code maxSeqLen}.
+   */
+  private int scoreStride;
+
+  private int allocatedCapacity;
   private final float[] gate;
   private final float[] up;
   private final float[] ffnOut;
@@ -185,7 +193,10 @@ public final class Lfm2ForwardPass {
     this.projected = new float[dim];
     // One row per query head: scoreGroup writes a whole group at once, so the per-head rows
     // must coexist rather than share one buffer as the scalar loop's did.
-    this.scores = new float[config.numHeads() * maxSeqLen];
+    // Grown with the caches rather than sized at the ceiling: see ensureCapacity.
+    this.scores = new float[0];
+    this.scoreStride = 0;
+    this.allocatedCapacity = 0;
     // The dense feed-forward is feed_forward_length wide and an expert is
     // expert_feed_forward_length wide, and on lfm2moe those differ (7168 against 1792). One buffer
     // sized for the wider of the two serves both branches; sizing it from hiddenDim alone would
@@ -256,14 +267,47 @@ public final class Lfm2ForwardPass {
     this.keyCache = new float[config.numLayers()][];
     this.valueCache = new float[config.numLayers()][];
     this.convState = new float[config.numLayers()][];
+    // An attention layer's keys and values are grown by ensureCapacity at the first position
+    // stored. Convolution state is sized by the architecture, so it is allocated once here.
     for (int layer = 0; layer < config.numLayers(); layer++) {
-      if (config.usesAttention(layer)) {
-        keyCache[layer] = new float[maxSeqLen * config.keyDim(layer)];
-        valueCache[layer] = new float[maxSeqLen * config.keyDim(layer)];
-      } else {
+      if (!config.usesAttention(layer)) {
         convState[layer] = new float[config.shortConvStateSize()];
       }
     }
+  }
+
+  /**
+   * Grows key, value and score storage so every position below {@code positions} can be stored.
+   *
+   * <p>Sixteen, doubling, never past {@code maxSeqLen}: the same policy as {@code KvCache} and
+   * {@code LayeredKvCache}, which this graph does not route through. Note that {@link #scores} is
+   * strided by the allocated capacity rather than by {@code maxSeqLen}, so growing it moves every
+   * head's row -- which is why nothing may read scores across a growth, and nothing does: a score
+   * row is written and consumed within one call to {@code attend}.
+   */
+  private void ensureCapacity(int positions) {
+    if (positions <= allocatedCapacity) {
+      return;
+    }
+    int grown = SequenceGrowth.nextCapacity(allocatedCapacity, positions, maxSeqLen);
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      if (config.usesAttention(layer)) {
+        keyCache[layer] = growRows(keyCache[layer], grown, config.keyDim(layer));
+        valueCache[layer] = growRows(valueCache[layer], grown, config.keyDim(layer));
+      }
+    }
+    scores = new float[Math.multiplyExact(config.numHeads(), grown)];
+    scoreStride = grown;
+    allocatedCapacity = grown;
+  }
+
+  /** Reallocates one cache at {@code capacity} rows, carrying the stored rows over. */
+  private static float[] growRows(float[] existing, int capacity, int dimension) {
+    float[] grown = new float[Math.multiplyExact(capacity, dimension)];
+    if (existing != null) {
+      System.arraycopy(existing, 0, grown, 0, existing.length);
+    }
+    return grown;
   }
 
   /** Clears both kinds of state, so a new sequence starts from position zero. */
@@ -317,6 +361,7 @@ public final class Lfm2ForwardPass {
     if (position >= maxSeqLen) {
       throw new IllegalArgumentException("position exceeds the sequence limit " + maxSeqLen);
     }
+    ensureCapacity(position + 1);
     int dim = config.embeddingDim();
     weights.embedToken(token, state);
 
@@ -482,10 +527,10 @@ public final class Lfm2ForwardPass {
           headDim,
           scale,
           scores,
-          headBase * maxSeqLen,
-          maxSeqLen);
+          headBase * scoreStride,
+          scoreStride);
       for (int offset = 0; offset < groupSize; offset++) {
-        GroupedQueryAttentionKernel.softmax(scores, (headBase + offset) * maxSeqLen, rows);
+        GroupedQueryAttentionKernel.softmax(scores, (headBase + offset) * scoreStride, rows);
       }
       GroupedQueryAttentionKernel.accumulateGroup(
           attentionOut,
@@ -498,8 +543,8 @@ public final class Lfm2ForwardPass {
           rows,
           headDim,
           scores,
-          headBase * maxSeqLen,
-          maxSeqLen);
+          headBase * scoreStride,
+          scoreStride);
     }
     project(layerWeights.attentionOutputProjection(), attentionOut, projected);
   }

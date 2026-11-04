@@ -18,6 +18,7 @@ package com.integrallis.models.backend.purejava.flint;
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache;
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache.AttentionView;
 import com.integrallis.models.backend.purejava.cache.LayeredKvCache.LayerSpec;
+import com.integrallis.models.backend.purejava.cache.SequenceGrowth;
 import com.integrallis.models.backend.purejava.flint.FlintWeights.LayerWeights;
 import com.integrallis.models.backend.purejava.flint.FlintWeights.Matrix;
 import com.integrallis.models.backend.purejava.flint.FlintWeights.MoeFeedForward;
@@ -51,7 +52,7 @@ public final class FlintForwardPass {
     private final float[] key;
     private final float[] value;
     private final float[] attentionOutput;
-    private final float[][] attentionScores;
+    private float[][] attentionScores;
     private final float[] projectedAttention;
     private final float[] routerLogits;
     private final int[] selectedExperts;
@@ -67,8 +68,9 @@ public final class FlintForwardPass {
     private final float[][] expertActivations;
     private final float[][] expertContributions;
     private final float[] logits;
-    private final int[] tokenHistory;
+    private int[] tokenHistory;
     private int nextPosition;
+    private int allocatedSequenceCapacity;
 
     private Session(FlintForwardPass owner) {
       this.owner = owner;
@@ -94,7 +96,10 @@ public final class FlintForwardPass {
       key = new float[config.keyValueDimension()];
       value = new float[config.keyValueDimension()];
       attentionOutput = new float[config.queryDimension()];
-      attentionScores = new float[config.numHeads()][owner.maxSequenceLength];
+      // One row per head, grown by ensureSequenceCapacity rather than opened at the declared
+      // ceiling: #357's defect in the buffer beside the cache. Flint declares 262,144, which
+      // made this tens of megabytes before a token had been read.
+      attentionScores = new float[config.numHeads()][];
       projectedAttention = new float[config.hiddenSize()];
       routerLogits = new float[config.numExperts()];
       selectedExperts = new int[config.expertsPerToken()];
@@ -112,7 +117,27 @@ public final class FlintForwardPass {
       for (int slot = 0; slot < experts; slot++) expertActivations[slot] = expertGateUps[2 * slot];
       expertContributions = new float[experts][config.hiddenSize()];
       logits = new float[config.vocabSize()];
-      tokenHistory = new int[owner.maxSequenceLength];
+      tokenHistory = new int[0];
+    }
+
+    /**
+     * Widens every head's score row and the token history to hold {@code positions}.
+     *
+     * <p>Sixteen, doubling, never past the configured context: the same policy as the layered key
+     * and value cache this session already grew lazily.
+     */
+    private void ensureSequenceCapacity(int positions) {
+      if (positions <= allocatedSequenceCapacity) {
+        return;
+      }
+      int grown =
+          SequenceGrowth.nextCapacity(
+              allocatedSequenceCapacity, positions, owner.maxSequenceLength);
+      for (int head = 0; head < attentionScores.length; head++) {
+        attentionScores[head] = new float[grown];
+      }
+      tokenHistory = java.util.Arrays.copyOf(tokenHistory, grown);
+      allocatedSequenceCapacity = grown;
     }
 
     /** Returns the next absolute sequence position accepted by this session. */
@@ -274,6 +299,7 @@ public final class FlintForwardPass {
     if (position >= maxSequenceLength) {
       throw new IllegalArgumentException("position exceeds the configured context: " + position);
     }
+    session.ensureSequenceCapacity(position + 1);
     embedToken(token, session.x);
     session.rope.prepare(position);
 
