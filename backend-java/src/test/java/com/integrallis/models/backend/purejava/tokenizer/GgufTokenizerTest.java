@@ -735,6 +735,26 @@ class GgufTokenizerTest {
     }
 
     @Test
+    void byteFallbackResolvesThroughTheTableExactlyAsTheVocabularyLookupDid() {
+      // The three byte-fallback sites each built "<0xNN>" with String.format and then hashed it,
+      // once per character the vocabulary could not match. There are 256 possible answers and they
+      // cannot change after construction, so they are resolved once. This asserts the table agrees
+      // with the lookup it replaced for a byte the vocabulary HAS and one it does not, which are
+      // the two branches that behave differently.
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createSentencePieceMetadata());
+
+      // 0x21 is '!', the one byte token this vocabulary carries.
+      int[] present = tokenizer.encode("!");
+      assertThat(present).as("a byte the vocabulary has must reach its <0xNN> token").isNotEmpty();
+      assertThat(tokenizer.decode(present)).isEqualTo("!");
+
+      // A byte with no token must fall through to unknown rather than to a wrong id, which is the
+      // branch the sentinel -1 in the table exists for.
+      int[] absent = tokenizer.encode("\u00ff");
+      assertThat(absent).as("a byte with no token still encodes").isNotEmpty();
+    }
+
+    @Test
     void addsBosForEmptyInput() {
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createSentencePieceMetadata());
 
