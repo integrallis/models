@@ -29,6 +29,22 @@ All notable changes to models are documented here.
   capping how far growth may go, for a deployment that wants a hard refusal rather than a cache
   that keeps growing.
 
+- **Plan settings resolve through three tiers, so a caller can outrank a deployment property**
+  (dependency for ModelJars#277, which asks for a per-runtime context bound). Settings resolved
+  through two tiers, the deployment map beating the recommendations map, and the deployment map is
+  built inside `fromSystemProperties` from the JVM's own system properties -- no caller could
+  contribute to it, and `BackendConfiguration.environment` is diagnostics that reaches no planning
+  decision. A ModelJars caller could therefore bound a session's context only through a JVM-global
+  property, which is the complaint #357 was filed about.
+
+  Resolution is now `overrides` > system properties > `recommendations`. A recommendation is what a
+  ModelJar says about itself and rightly loses to a deployment-wide setting; an override is what the
+  caller asked for on this one load and beats it. `BackendConfiguration` gains an `overrides`
+  component, with its three-argument constructor retained and deprecated so callers compiled against
+  the old record keep linking. Behaviour is unchanged until a caller supplies overrides, and none
+  does yet: every existing path passes an empty map and falls straight through to the tier it used
+  before.
+
 ## [0.5.13] - 2026-11-04
 
 - **Size the GGUF and native kernel pools from the machine's performance cores instead of

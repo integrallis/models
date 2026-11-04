@@ -408,7 +408,8 @@ public final class PureJavaBackend
       Map<String, String> recommendations =
           recommendations(backendConfiguration, batchedMatrixKernel);
       PureJavaPlanConfiguration planConfiguration =
-          PureJavaPlanConfiguration.fromSystemProperties(recommendations);
+          PureJavaPlanConfiguration.fromSystemProperties(
+              backendConfiguration.overrides(), recommendations);
       Tokenizer tokenizer;
       Arena arena = arenaOwner.arena();
       if (Files.isDirectory(modelPath)) {

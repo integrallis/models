@@ -164,7 +164,8 @@ class DefaultOffOptimizationParityTest {
           "true".equals(value) ? OptimizationStatus.ENABLED : OptimizationStatus.DISABLED;
       try (PureJavaBackend backend =
           PureJavaBackend.load(
-              model, new BackendConfiguration(Map.of(), Map.of(property, value), List.of()))) {
+              model,
+              new BackendConfiguration(Map.of(), Map.of(property, value), List.of(), Map.of()))) {
         Optional<OptimizationDecision> decision =
             backend.diagnostics().optimization(optimizationId);
         if (decision.isEmpty() || decision.get().status() != expected) {
@@ -197,7 +198,9 @@ class DefaultOffOptimizationParityTest {
       // topology supports them, and the token comparison is still the evidence.
       try (PureJavaBackend backend =
           PureJavaBackend.load(
-              model, new BackendConfiguration(Map.of(), Map.copyOf(recommendations), List.of()))) {
+              model,
+              new BackendConfiguration(
+                  Map.of(), Map.copyOf(recommendations), List.of(), Map.of()))) {
         Optional<OptimizationDecision> decision =
             backend.diagnostics().optimization(optimizationId);
         if (decision.isEmpty() || decision.get().status() != OptimizationStatus.ENABLED) {

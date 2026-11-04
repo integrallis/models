@@ -122,6 +122,25 @@ public record PureJavaPlanConfiguration(
   /** Reads deployment overrides without running a performance probe. */
   public static PureJavaPlanConfiguration fromSystemProperties(
       Map<String, String> recommendations) {
+    return fromSystemProperties(Map.of(), recommendations);
+  }
+
+  /**
+   * Reads deployment overrides, with a caller's own settings above them.
+   *
+   * <p>Three tiers, strongest first: {@code overrides}, then the JVM's system properties, then
+   * {@code recommendations}. The middle tier is a deployment-wide default and the bottom tier is
+   * the ModelJar's opinion about itself, which is why a system property beats a recommendation.
+   *
+   * <p>The top tier exists because an application that asks for a setting on one runtime is making
+   * a stronger statement than an ambient default: it knows what that runtime is for, and it cannot
+   * express that through a system property without changing the setting for every other runtime in
+   * the JVM. That was the whole complaint in #357 -- a ModelJars caller could bound a session's
+   * context only by setting a JVM-global property.
+   */
+  public static PureJavaPlanConfiguration fromSystemProperties(
+      Map<String, String> overrides, Map<String, String> recommendations) {
+    Objects.requireNonNull(overrides, "overrides");
     Properties systemProperties = System.getProperties();
     Map<String, String> deployment = new LinkedHashMap<>();
     synchronized (systemProperties) {
@@ -135,40 +154,60 @@ public record PureJavaPlanConfiguration(
                 }
               });
     }
-    return from(Map.copyOf(deployment), recommendations);
+    return from(overrides, Map.copyOf(deployment), recommendations);
   }
 
   static PureJavaPlanConfiguration from(
       Map<String, String> deployment, Map<String, String> recommendations) {
+    return from(Map.of(), deployment, recommendations);
+  }
+
+  static PureJavaPlanConfiguration from(
+      Map<String, String> overrides,
+      Map<String, String> deployment,
+      Map<String, String> recommendations) {
+    Objects.requireNonNull(overrides, "overrides");
     Objects.requireNonNull(deployment, "deployment");
     Objects.requireNonNull(recommendations, "recommendations");
+    validateSettings(overrides, "override");
     validateSettings(deployment, "deployment setting");
     validateSettings(recommendations, "recommendation");
     return new PureJavaPlanConfiguration(
-        groupedProjections(configured(GROUPED_PROJECTIONS_PROPERTY, deployment, recommendations)),
-        mixedKProjections(configured(MIXED_K_PROJECTIONS_PROPERTY, deployment, recommendations)),
-        q4Kernel(configured(Q4_KERNEL_PROPERTY, deployment, recommendations)),
-        q6BatchedKernel(configured(Q6_BATCHED_KERNEL_PROPERTY, deployment, recommendations)),
-        prefillBatchSize(configured(PREFILL_BATCH_SIZE_PROPERTY, deployment, recommendations)),
+        groupedProjections(
+            configured(GROUPED_PROJECTIONS_PROPERTY, overrides, deployment, recommendations)),
+        mixedKProjections(
+            configured(MIXED_K_PROJECTIONS_PROPERTY, overrides, deployment, recommendations)),
+        q4Kernel(configured(Q4_KERNEL_PROPERTY, overrides, deployment, recommendations)),
+        q6BatchedKernel(
+            configured(Q6_BATCHED_KERNEL_PROPERTY, overrides, deployment, recommendations)),
+        prefillBatchSize(
+            configured(PREFILL_BATCH_SIZE_PROPERTY, overrides, deployment, recommendations)),
         finalLayerPrefillPruning(
-            configured(FINAL_LAYER_PREFILL_PRUNING_PROPERTY, deployment, recommendations)),
+            configured(
+                FINAL_LAYER_PREFILL_PRUNING_PROPERTY, overrides, deployment, recommendations)),
         finalLayerKvOnlyPrefill(
-            configured(FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY, deployment, recommendations)),
+            configured(
+                FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY, overrides, deployment, recommendations)),
         batchedAttentionScores(
-            configured(BATCHED_ATTENTION_SCORES_PROPERTY, deployment, recommendations)),
+            configured(BATCHED_ATTENTION_SCORES_PROPERTY, overrides, deployment, recommendations)),
         batchedAttentionValues(
-            configured(BATCHED_ATTENTION_VALUES_PROPERTY, deployment, recommendations)),
+            configured(BATCHED_ATTENTION_VALUES_PROPERTY, overrides, deployment, recommendations)),
         fusedGroupedAttention(
-            configured(FUSED_GROUPED_ATTENTION_PROPERTY, deployment, recommendations)),
-        stagedQuantizedFfn(configured(STAGED_QUANTIZED_FFN_PROPERTY, deployment, recommendations)),
+            configured(FUSED_GROUPED_ATTENTION_PROPERTY, overrides, deployment, recommendations)),
+        stagedQuantizedFfn(
+            configured(STAGED_QUANTIZED_FFN_PROPERTY, overrides, deployment, recommendations)),
         stagedQuantizedLayer(
-            configured(STAGED_QUANTIZED_LAYER_PROPERTY, deployment, recommendations)),
+            configured(STAGED_QUANTIZED_LAYER_PROPERTY, overrides, deployment, recommendations)),
         blockMajorQ8Activations(
-            configured(BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, deployment, recommendations)),
-        q8BlockMajorKernel(configured(Q8_BLOCK_MAJOR_KERNEL_PROPERTY, deployment, recommendations)),
+            configured(
+                BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, overrides, deployment, recommendations)),
+        q8BlockMajorKernel(
+            configured(Q8_BLOCK_MAJOR_KERNEL_PROPERTY, overrides, deployment, recommendations)),
         parallelQ8FfnPreparation(
-            configured(PARALLEL_Q8_FFN_PREPARATION_PROPERTY, deployment, recommendations)),
-        maxContextLength(configured(MAX_CONTEXT_LENGTH_PROPERTY, deployment, recommendations)));
+            configured(
+                PARALLEL_Q8_FFN_PREPARATION_PROPERTY, overrides, deployment, recommendations)),
+        maxContextLength(
+            configured(MAX_CONTEXT_LENGTH_PROPERTY, overrides, deployment, recommendations)));
   }
 
   private static void validateSettings(Map<String, String> settings, String source) {
@@ -183,8 +222,15 @@ public record PureJavaPlanConfiguration(
   }
 
   private static String configured(
-      String property, Map<String, String> deployment, Map<String, String> recommendations) {
-    String configured = deployment.get(property);
+      String property,
+      Map<String, String> overrides,
+      Map<String, String> deployment,
+      Map<String, String> recommendations) {
+    String configured = overrides.get(property);
+    if (configured != null) {
+      return configured;
+    }
+    configured = deployment.get(property);
     return configured != null ? configured : recommendations.get(property);
   }
 

@@ -26,22 +26,50 @@ import java.util.Objects;
  *
  * <p>Catalogs such as ModelJars can validate artifact and runtime identity, then pass the resulting
  * configuration to a Models backend without making the backend depend on that catalog.
+ *
+ * <p>{@code recommendations} and {@code overrides} are two different claims and resolve at
+ * different strengths. A recommendation is what the ModelJar says about itself and loses to a
+ * deployment-wide system property. An override is what the caller asked for on this one load, and
+ * beats the property: an application that sizes one runtime for its own sequences cannot say so
+ * through a JVM-global property without changing every other runtime in the process, which is the
+ * complaint #357 was filed about. {@code environment} is neither -- it is diagnostics, merged into
+ * {@link BackendDiagnostics} by {@link #enrich}, and it reaches no planning decision.
  */
 public record BackendConfiguration(
     Map<String, String> environment,
     Map<String, String> recommendations,
-    List<OptimizationDecision> optimizations) {
+    List<OptimizationDecision> optimizations,
+    Map<String, String> overrides) {
 
   public BackendConfiguration {
     environment = Map.copyOf(Objects.requireNonNull(environment, "environment"));
     recommendations = Map.copyOf(Objects.requireNonNull(recommendations, "recommendations"));
     optimizations = List.copyOf(Objects.requireNonNull(optimizations, "optimizations"));
     optimizations.forEach(value -> Objects.requireNonNull(value, "optimization"));
+    overrides = Map.copyOf(Objects.requireNonNull(overrides, "overrides"));
+  }
+
+  /**
+   * Creates a configuration that supplies no caller overrides.
+   *
+   * @param environment provenance and diagnostics for this load
+   * @param recommendations the catalog's settings for this model, weakest of the three tiers
+   * @param optimizations decisions the catalog made about this load
+   * @deprecated use the canonical constructor; this exists so adding {@code overrides} does not
+   *     break callers compiled against the three-component record, and it will go in the next
+   *     major.
+   */
+  @Deprecated(since = "0.5.15", forRemoval = true)
+  public BackendConfiguration(
+      Map<String, String> environment,
+      Map<String, String> recommendations,
+      List<OptimizationDecision> optimizations) {
+    this(environment, recommendations, optimizations, Map.of());
   }
 
   /** Returns a configuration with no external recommendations or diagnostics. */
   public static BackendConfiguration empty() {
-    return new BackendConfiguration(Map.of(), Map.of(), List.of());
+    return new BackendConfiguration(Map.of(), Map.of(), List.of(), Map.of());
   }
 
   /** Adds this configuration's provenance and decisions to backend-native diagnostics. */

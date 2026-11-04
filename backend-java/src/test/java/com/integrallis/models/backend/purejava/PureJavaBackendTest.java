@@ -281,7 +281,8 @@ class PureJavaBackendTest {
                       "profile.nano",
                       OptimizationStatus.ENABLED,
                       "the exact artifact and runtime matched",
-                      Map.of("artifact", "nano"))));
+                      Map.of("artifact", "nano"))),
+              Map.of());
 
       try (PureJavaBackend backend = PureJavaBackend.load(modelPath, profile)) {
         assertThat(backend.diagnostics().environment())

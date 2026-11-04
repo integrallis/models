@@ -41,7 +41,7 @@ class BackendConfigurationTest {
                     "the measured runtime matches",
                     Map.of("source", "catalog"))));
     BackendConfiguration configuration =
-        new BackendConfiguration(environment, recommendations, decisions);
+        new BackendConfiguration(environment, recommendations, decisions, Map.of());
 
     environment.clear();
     recommendations.clear();
@@ -62,6 +62,24 @@ class BackendConfigurationTest {
   }
 
   @Test
+  @SuppressWarnings("removal") // The point of this test is the deprecated form.
+  void theThreeArgumentConstructorStillWorksAndSuppliesNoOverrides() {
+    // Adding `overrides` changed the canonical constructor, which would otherwise stop callers
+    // compiled against the three-component record from linking. The retained constructor is the
+    // compatibility promise, so it is asserted rather than assumed: it must default the new tier
+    // to empty, which is the behaviour those callers already had.
+    BackendConfiguration configuration =
+        new BackendConfiguration(Map.of("a", "1"), Map.of("b", "2"), List.of());
+
+    assertThat(configuration.overrides()).isEmpty();
+    assertThat(configuration.environment()).containsEntry("a", "1");
+    assertThat(configuration.recommendations()).containsEntry("b", "2");
+    assertThat(configuration)
+        .isEqualTo(
+            new BackendConfiguration(Map.of("a", "1"), Map.of("b", "2"), List.of(), Map.of()));
+  }
+
+  @Test
   void rejectsAProfileThatDuplicatesAnExistingOptimizationDecision() {
     BackendConfiguration configuration =
         new BackendConfiguration(
@@ -69,7 +87,8 @@ class BackendConfigurationTest {
             Map.of(),
             List.of(
                 new OptimizationDecision(
-                    "duplicate", OptimizationStatus.ENABLED, "profile decision", Map.of())));
+                    "duplicate", OptimizationStatus.ENABLED, "profile decision", Map.of())),
+            Map.of());
     BackendDiagnostics diagnostics =
         new BackendDiagnostics(
             "test",
