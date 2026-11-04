@@ -50,6 +50,29 @@ public record RuntimeFingerprint(
     int ggufChunksPerThread,
     int processors) {
 
+  /**
+   * Executors that retain one publication across an ordered multi-stage plan.
+   *
+   * <p>The staged plans ask the GGUF executor to run several dependent stages under a single
+   * publication. An executor that does not implement that falls back to running the plan serially,
+   * which is correct and much slower, so the staged optimisations are only worth planning on one
+   * that does.
+   *
+   * <p>**This set is the one place in the planner that knows executor names.** Eight call sites
+   * used to compare against the literal "persistent" each, and when the vectors default became
+   * "countdown" in 0.1.33 every staged optimisation silently turned itself off -- caught by the
+   * build rather than in production, but only because the version pin held it back. The capability
+   * is what the planner cares about; the names are an implementation detail that belongs behind one
+   * predicate, and the next executor is added here and nowhere else.
+   */
+  private static final java.util.Set<String> STAGE_SHARING_EXECUTORS =
+      java.util.Set.of("persistent", "countdown");
+
+  /** Whether this runtime's GGUF executor retains one publication across ordered stages. */
+  public boolean sharesStagePublication() {
+    return STAGE_SHARING_EXECUTORS.contains(ggufExecutor);
+  }
+
   public RuntimeFingerprint {
     javaVersion = requireText(javaVersion, "javaVersion");
     vmName = requireText(vmName, "vmName");

@@ -92,7 +92,7 @@ public record PureJavaExecutionPlan(
     if (stagedQuantizedFfn
         && (prefillBatchSize < 2
             || runtime.processors() < 2
-            || !"persistent".equals(runtime.ggufExecutor())
+            || !runtime.sharesStagePublication()
             || topology.stagedQuantizedFfnLayers() == 0)) {
       throw new IllegalArgumentException(
           "staged quantized FFN contradicts the execution plan topology or runtime");
@@ -101,7 +101,7 @@ public record PureJavaExecutionPlan(
         && (prefillBatchSize < 2
             || runtime.processors() < 2
             || !runtime.ggufParallel()
-            || !"persistent".equals(runtime.ggufExecutor())
+            || !runtime.sharesStagePublication()
             || topology.stagedQuantizedLayerLayers() == 0)) {
       throw new IllegalArgumentException(
           "staged quantized layer contradicts the execution plan topology or runtime");
