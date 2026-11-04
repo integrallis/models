@@ -173,30 +173,41 @@ public record PureJavaPlanConfiguration(
     validateSettings(deployment, "deployment setting");
     validateSettings(recommendations, "recommendation");
     return new PureJavaPlanConfiguration(
-        groupedProjections(configured(GROUPED_PROJECTIONS_PROPERTY, overrides, deployment, recommendations)),
-        mixedKProjections(configured(MIXED_K_PROJECTIONS_PROPERTY, overrides, deployment, recommendations)),
+        groupedProjections(
+            configured(GROUPED_PROJECTIONS_PROPERTY, overrides, deployment, recommendations)),
+        mixedKProjections(
+            configured(MIXED_K_PROJECTIONS_PROPERTY, overrides, deployment, recommendations)),
         q4Kernel(configured(Q4_KERNEL_PROPERTY, overrides, deployment, recommendations)),
-        q6BatchedKernel(configured(Q6_BATCHED_KERNEL_PROPERTY, overrides, deployment, recommendations)),
-        prefillBatchSize(configured(PREFILL_BATCH_SIZE_PROPERTY, overrides, deployment, recommendations)),
+        q6BatchedKernel(
+            configured(Q6_BATCHED_KERNEL_PROPERTY, overrides, deployment, recommendations)),
+        prefillBatchSize(
+            configured(PREFILL_BATCH_SIZE_PROPERTY, overrides, deployment, recommendations)),
         finalLayerPrefillPruning(
-            configured(FINAL_LAYER_PREFILL_PRUNING_PROPERTY, overrides, deployment, recommendations)),
+            configured(
+                FINAL_LAYER_PREFILL_PRUNING_PROPERTY, overrides, deployment, recommendations)),
         finalLayerKvOnlyPrefill(
-            configured(FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY, overrides, deployment, recommendations)),
+            configured(
+                FINAL_LAYER_KV_ONLY_PREFILL_PROPERTY, overrides, deployment, recommendations)),
         batchedAttentionScores(
             configured(BATCHED_ATTENTION_SCORES_PROPERTY, overrides, deployment, recommendations)),
         batchedAttentionValues(
             configured(BATCHED_ATTENTION_VALUES_PROPERTY, overrides, deployment, recommendations)),
         fusedGroupedAttention(
             configured(FUSED_GROUPED_ATTENTION_PROPERTY, overrides, deployment, recommendations)),
-        stagedQuantizedFfn(configured(STAGED_QUANTIZED_FFN_PROPERTY, overrides, deployment, recommendations)),
+        stagedQuantizedFfn(
+            configured(STAGED_QUANTIZED_FFN_PROPERTY, overrides, deployment, recommendations)),
         stagedQuantizedLayer(
             configured(STAGED_QUANTIZED_LAYER_PROPERTY, overrides, deployment, recommendations)),
         blockMajorQ8Activations(
-            configured(BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, overrides, deployment, recommendations)),
-        q8BlockMajorKernel(configured(Q8_BLOCK_MAJOR_KERNEL_PROPERTY, overrides, deployment, recommendations)),
+            configured(
+                BLOCK_MAJOR_Q8_ACTIVATIONS_PROPERTY, overrides, deployment, recommendations)),
+        q8BlockMajorKernel(
+            configured(Q8_BLOCK_MAJOR_KERNEL_PROPERTY, overrides, deployment, recommendations)),
         parallelQ8FfnPreparation(
-            configured(PARALLEL_Q8_FFN_PREPARATION_PROPERTY, overrides, deployment, recommendations)),
-        maxContextLength(configured(MAX_CONTEXT_LENGTH_PROPERTY, overrides, deployment, recommendations)));
+            configured(
+                PARALLEL_Q8_FFN_PREPARATION_PROPERTY, overrides, deployment, recommendations)),
+        maxContextLength(
+            configured(MAX_CONTEXT_LENGTH_PROPERTY, overrides, deployment, recommendations)));
   }
 
   private static void validateSettings(Map<String, String> settings, String source) {

@@ -71,7 +71,7 @@ class SharedWorkerPoolOversubscriptionSlowTest {
 
   private static BackendConfiguration shortContext() {
     return new BackendConfiguration(
-        Map.of(), Map.of(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "256"), List.of());
+        Map.of(), Map.of(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "256"), List.of(), Map.of());
   }
 
   /** Milliseconds for a prefill plus {@value #DECODE_STEPS} greedy steps. */

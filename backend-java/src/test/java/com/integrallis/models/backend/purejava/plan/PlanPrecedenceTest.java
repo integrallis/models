@@ -24,10 +24,10 @@ import org.junit.jupiter.api.Test;
  * Which of the three tiers wins, and why there are three.
  *
  * <p>A recommendation is what a ModelJar says about itself, so a deployment-wide system property
- * beats it. An override is what the caller asked for on this one load, so it beats the property:
- * an application that sizes one runtime for its own sequences cannot say so through a JVM-global
- * property without changing every other runtime in the process. That was the complaint in #357 --
- * a ModelJars caller could bound a session's context only globally.
+ * beats it. An override is what the caller asked for on this one load, so it beats the property: an
+ * application that sizes one runtime for its own sequences cannot say so through a JVM-global
+ * property without changing every other runtime in the process. That was the complaint in #357 -- a
+ * ModelJars caller could bound a session's context only globally.
  */
 class PlanPrecedenceTest {
 
@@ -43,7 +43,8 @@ class PlanPrecedenceTest {
         .isEqualTo(4096);
 
     assertThat(
-            PureJavaPlanConfiguration.from(Map.of(), Map.of(CONTEXT, "8192"), Map.of(CONTEXT, "2048"))
+            PureJavaPlanConfiguration.from(
+                    Map.of(), Map.of(CONTEXT, "8192"), Map.of(CONTEXT, "2048"))
                 .maxContextLength())
         .as("with no override, the deployment setting wins over the ModelJar's opinion")
         .isEqualTo(8192);

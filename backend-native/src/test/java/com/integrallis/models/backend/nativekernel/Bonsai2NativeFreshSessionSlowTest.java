@@ -75,7 +75,10 @@ class Bonsai2NativeFreshSessionSlowTest {
         .isEqualTo("53107f530aa52eb00912263ab1ee29bd199261c87cd7b4ad4ca1318c1fe33ee3");
     var configuration =
         new BackendConfiguration(
-            Map.of(), Map.of(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "64"), List.of());
+            Map.of(),
+            Map.of(PureJavaBackend.MAX_CONTEXT_LENGTH_PROPERTY, "64"),
+            List.of(),
+            Map.of());
     try (var backend = RustFfmBackend.load(model, configuration)) {
       assertThat(backend.diagnostics().environment())
           .containsEntry("native-quantized-decode", "true");

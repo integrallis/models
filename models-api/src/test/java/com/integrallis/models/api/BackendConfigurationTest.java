@@ -75,7 +75,8 @@ class BackendConfigurationTest {
     assertThat(configuration.environment()).containsEntry("a", "1");
     assertThat(configuration.recommendations()).containsEntry("b", "2");
     assertThat(configuration)
-        .isEqualTo(new BackendConfiguration(Map.of("a", "1"), Map.of("b", "2"), List.of(), Map.of()));
+        .isEqualTo(
+            new BackendConfiguration(Map.of("a", "1"), Map.of("b", "2"), List.of(), Map.of()));
   }
 
   @Test

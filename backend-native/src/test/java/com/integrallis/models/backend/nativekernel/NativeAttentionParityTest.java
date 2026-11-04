@@ -94,7 +94,7 @@ class NativeAttentionParityTest {
           RustFfmBackend.load(
               model,
               library,
-              new BackendConfiguration(Map.of(), Map.of(entry[0], "true"), List.of()))) {
+              new BackendConfiguration(Map.of(), Map.of(entry[0], "true"), List.of(), Map.of()))) {
         Optional<OptimizationDecision> decision = backend.diagnostics().optimization(entry[1]);
         if (decision.isEmpty() || decision.get().status() != OptimizationStatus.ENABLED) {
           notRun.add(entry[1] + "=" + decision.map(d -> d.status().name()).orElse("ABSENT"));
