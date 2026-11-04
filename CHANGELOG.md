@@ -4,6 +4,48 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.13] - 2026-11-04
+
+- **Size the GGUF and native kernel pools from the machine's performance cores instead of
+  `Runtime.availableProcessors()`, on Vectors 0.1.33.** One typed decision on Qwen2.5-1.5B Q4_K_M
+  cost 2530 ms on an i9-14900HX (8 performance cores with 2 threads each plus 16 efficiency cores,
+  32 logical) and 877 ms at the eight threads the machine implies: **2.88x**, within 1% over three
+  repeats, with identical accuracy in every arm. `availableProcessors()` counts efficiency cores as
+  equals and counts two hardware threads of one core as two cores, and a pool that divides work
+  evenly and meets at a barrier costs whatever its slowest member costs, so one efficiency-core
+  thread held up all thirty-two. The native pool now asks `VectorUtil.computeThreads()` for the
+  same number the Vectors executor uses, rather than reading the machine independently; a
+  non-positive answer degrades to the processor count rather than becoming a thread count.
+
+- **The execution planner asks whether an executor retains a stage publication, not what it is
+  called.** Eight sites compared against the literal `"persistent"`, so Vectors 0.1.33's new
+  `countdown` default silently switched off every staged-quantized optimisation -- correct output,
+  quietly slower. `RuntimeFingerprint.sharesStagePublication()` is now the single place that knows
+  executor names, and an unknown executor answers false, so a new one is opted in deliberately.
+
+- **Claim kernel work per row chunk and per query head instead of splitting it by worker index.**
+  The native pool divided every job evenly by index, which costs whatever the slowest partition
+  costs on a machine whose cores are not interchangeable; rows are now chunked four times finer than
+  the partition count and claimed from one counter, worth 1.07x at 32 threads on the hybrid part
+  measured with the published Java and only the library swapped. Attention had the same defect
+  twice over and worse: it split over `num_kv_heads`, so a grouped-query model with two KV heads
+  used two threads however many the pool had, and it refused to partition at all when
+  `num_kv_heads == 1`, running every query head of a multi-query model on the calling thread. Query
+  heads are independent and are claimed individually now, four to sixteen times more parallelism.
+  Which thread folds a row or head cannot change its value, so both are bit-identical to the splits
+  they replace by construction, and tested across thread counts with a sentinel that makes an
+  unclaimed row visible as itself.
+
+- **A session no longer allocates the model's full declared context at open** (#357). The default
+  capacity was the model's native context, and a session allocates its whole key and value cache up
+  front, so opening Qwen3.5 4B exhausted an 8 GB heap before answering anything: 262,144 tokens is
+  about 17 GB of fp32 cache. A declared context states what a model can attend to, not what the
+  process intends to send it. The default is `min(declared, 8192)` -- the figure verified to carry
+  Qwen3.5 2B and 4B on that heap -- resolved in the one method every architecture's capacity goes
+  through, and it logs once when it bounds, naming the three ways to raise it. **352 of the 461
+  catalog models that declare a context declare more than 8192**, the largest at 1,024,000, so this
+  was not one model's problem. A model already at or below the bound is unaffected.
+
 - Close most of the ONNX executor's per-operator gap to onnxruntime on Paradee-8M
   (`benchmark-results/2026-11-03-onnx-executor-parity`): Transpose, Slice, Concat, Gather, Expand,
   Pad and Resize copy whole rows instead of single elements; Pow by 2 and 3 is a product; exp,
