@@ -91,6 +91,14 @@ public final class InferenceBenchmarkCli {
       RaggedPrefillProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;
     }
+    if (args.length > 0 && "profile-hotspots".equals(args[0])) {
+      ProfileHotspotCli.run(Arrays.copyOfRange(args, 1, args.length));
+      return;
+    }
+    if (args.length > 0 && "triage-decisions".equals(args[0])) {
+      TriageDecisionBenchCli.run(Arrays.copyOfRange(args, 1, args.length));
+      return;
+    }
     if (args.length > 0 && "compare".equals(args[0])) {
       BenchmarkComparisonCli.run(Arrays.copyOfRange(args, 1, args.length));
       return;

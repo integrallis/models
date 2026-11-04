@@ -237,6 +237,19 @@ configure(libraryProjects) {
         // Panama Vector API in its shared PanamaConstants class, so any test that exercises a
         // VectorCollection must have jdk.incubator.vector in the module graph or it fails to link.
         jvmArgs("--add-modules", "jdk.incubator.vector")
+        // Forward the execution-policy switches to the test JVM. These select between two real code
+        // paths, so a test run has to be able to ask for either one; each is read into a static
+        // final at class initialisation, which a test cannot flip once the class has loaded. Without
+        // this, asserting the alternative path means rebuilding to change a default, which is how a
+        // configuration stops being re-measured.
+        listOf(
+            "models.purejava.swiGluSharedPool",
+            "models.purejava.swiGluParallelThreshold",
+            "vectors.gguf.executor",
+            "vectors.gguf.threads",
+            "vectors.gguf.chunksPerThread",
+            "vectors.gguf.pollMillis",
+        ).forEach { key -> System.getProperty(key)?.let { systemProperty(key, it) } }
     }
 
     tasks.register<Test>("unitTest") {

@@ -67,6 +67,9 @@ dependencies {
     implementation(project(":models-runtime"))
     implementation(project(":backend-java"))
     implementation(project(":models-router"))
+    // The typed-decision answer spaces and letter-logit scorer, so a decision benchmark puts the
+    // same Choice and the same rendered rubric to a model as the shipped decision path does.
+    implementation(project(":models-decisions"))
     if (nativeBenchmarkRuntime && !aggregateNativeRelease) {
         // The platform artifact contains only the compiled library and metadata. The Java FFM
         // bridge lives in backend-native's ordinary JAR and must be present as well.

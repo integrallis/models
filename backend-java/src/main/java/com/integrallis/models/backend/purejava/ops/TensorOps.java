@@ -2019,6 +2019,7 @@ public final class TensorOps {
       int size) {
     int workers = swiGluWorkers(size);
     if (workers < 2) {
+      lastSwiGluRoute = SwiGluRoute.SERIAL;
       swiGluRange(out, outOffset, gate, gateOffset, up, upOffset, 0, size);
       return;
     }
@@ -2028,10 +2029,87 @@ public final class TensorOps {
     // the per-element arithmetic and were rejected (audit-artifacts/swiglu-table-exp at 2.07-2.68x
     // SLOWER, audit-artifacts/swiglu-native-fdlibm at 4.44-4.55x worse warm latency on x86).
     // Parallelism is the one lever neither of them touched.
+    if (SWIGLU_ON_SHARED_POOL) {
+      lastSwiGluRoute = SwiGluRoute.SHARED_POOL;
+      // One pool for the whole token instead of two. The matmuls either side of this activation run
+      // on the vectors GGUF executor, whose workers poll for milliseconds after a dispatch before
+      // they park -- so fanning out to a second pool here puts this pool's threads on the cores
+      // that
+      // pool's threads are still spinning on. The same collision measured on the native path cost
+      // prefill 126 -> 40 tok/s and 24 M context switches per run
+      // (RustGgufBatchedMatrixKernel.parkJavaExecutor), which is why that path parks the Java
+      // executor rather than running beside it. Routing the activation onto the executor that is
+      // already hot removes the collision instead of managing it, and nesting needs no guard here
+      // because that executor runs a dispatch made from inside one of its own callbacks serially.
+      GgufStagePlan.of(
+              GgufStagePlan.stage(
+                  size,
+                  (from, to) ->
+                      swiGluRange(out, outOffset, gate, gateOffset, up, upOffset, from, to)))
+          .execute();
+      return;
+    }
+    lastSwiGluRoute = SwiGluRoute.DEDICATED_POOL;
     int chunk = (size + workers - 1) / workers;
+    // The guard is bound for the dynamic scope of the fan-out rather than set and removed on the
+    // thread. A ScopedValue cannot outlive its scope, so an exception escaping the join cannot
+    // leave a pool thread believing it is still inside a parallel region -- which a ThreadLocal
+    // could, since it relies on the finally block running. Reads are also cheaper: a ScopedValue
+    // get is a lookup in the thread's immutable binding snapshot rather than a ThreadLocalMap
+    // probe.
+    ScopedValue.where(SWIGLU_IN_PARALLEL_REGION, Boolean.TRUE)
+        .run(
+            () ->
+                swiGluFanOut(out, outOffset, gate, gateOffset, up, upOffset, size, chunk, workers));
+  }
+
+  /** How the last SwiGLU fan-out reached its workers. */
+  enum SwiGluRoute {
+    /** Stayed on the calling thread, below the fan-out threshold or already inside a region. */
+    SERIAL,
+    /** This class's own pool. */
+    DEDICATED_POOL,
+    /** The shared GGUF executor, which the surrounding matmuls also use. */
+    SHARED_POOL
+  }
+
+  /**
+   * The route the last fan-out took, for tests and diagnostics.
+   *
+   * <p>Recorded rather than inferred. The obvious check -- look for a pool's threads by name -- is
+   * unsound in a shared JVM: thread names are global, any other caller can have started either pool
+   * already, and a test asserting one is absent passes or fails on which tests ran first. That is
+   * how this was first written and it passed locally and failed in CI. A switch between two real
+   * code paths has to be observable directly, or an experiment on it measures the harness.
+   */
+  private static volatile SwiGluRoute lastSwiGluRoute = SwiGluRoute.SERIAL;
+
+  static SwiGluRoute lastSwiGluRoute() {
+    return lastSwiGluRoute;
+  }
+
+  /**
+   * Whether SwiGLU fans out on the shared GGUF executor rather than this class's own pool.
+   *
+   * <p>A seam, not a preference: which of the two is faster is a measurement, and it is selectable
+   * here so the question can be re-asked on another box without a rebuild. The default is the pool
+   * this class has always used, until the comparison says otherwise.
+   */
+  private static final boolean SWIGLU_ON_SHARED_POOL =
+      Boolean.getBoolean("models.purejava.swiGluSharedPool");
+
+  private static void swiGluFanOut(
+      float[] out,
+      int outOffset,
+      float[] gate,
+      int gateOffset,
+      float[] up,
+      int upOffset,
+      int size,
+      int chunk,
+      int workers) {
     List<Future<?>> pending = new ArrayList<>(workers - 1);
-    SWIGLU_IN_PARALLEL_REGION.set(Boolean.TRUE);
-    try {
+    {
       for (int worker = 1; worker < workers; worker++) {
         int from = worker * chunk;
         if (from >= size) {
@@ -2061,8 +2139,6 @@ public final class TensorOps {
           throw new IllegalStateException("SwiGLU worker failed", cause);
         }
       }
-    } finally {
-      SWIGLU_IN_PARALLEL_REGION.remove();
     }
   }
 
@@ -2082,8 +2158,8 @@ public final class TensorOps {
     }
   }
 
-  /** Set while a thread is inside a parallel SwiGLU region, so chunks never fan out again. */
-  private static final ThreadLocal<Boolean> SWIGLU_IN_PARALLEL_REGION = new ThreadLocal<>();
+  /** Bound while a thread is inside a parallel SwiGLU region, so chunks never fan out again. */
+  private static final ScopedValue<Boolean> SWIGLU_IN_PARALLEL_REGION = ScopedValue.newInstance();
 
   /**
    * Minimum elements before fanning SwiGLU out. Below this the pool round-trip costs more than the
@@ -2094,7 +2170,8 @@ public final class TensorOps {
       Integer.getInteger("models.purejava.swiGluParallelThreshold", 1024);
 
   private static int swiGluWorkers(int size) {
-    if (size < SWIGLU_PARALLEL_THRESHOLD || Boolean.TRUE.equals(SWIGLU_IN_PARALLEL_REGION.get())) {
+    if (size < SWIGLU_PARALLEL_THRESHOLD
+        || Boolean.TRUE.equals(SWIGLU_IN_PARALLEL_REGION.orElse(Boolean.FALSE))) {
       return 1;
     }
     return Math.max(1, Math.min(PackedProjectionThreads.COUNT, size / SWIGLU_PARALLEL_THRESHOLD));

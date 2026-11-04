@@ -14,7 +14,7 @@ mod swiglu;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::slice;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::{self, JoinHandle};
 
@@ -188,6 +188,32 @@ const Q4_K_BLOCK_BYTES: usize = 144;
 const Q5_K_BLOCK_BYTES: usize = 176;
 const Q6_K_BLOCK_BYTES: usize = 210;
 const PARALLEL_OUTPUT_THRESHOLD: usize = 64;
+/// Row chunks published per partition, so a slow core claims fewer of them.
+///
+/// Four rather than one is what turns a static split into a self-balancing one. One chunk per
+/// partition is the static split: every dispatch then costs whatever its SLOWEST partition cost,
+/// and on a machine whose cores are not interchangeable -- two SMT siblings sharing one core's
+/// vector units, or an Intel P core beside an E core -- that is most of them. Finer than this and
+/// the atomic claim plus the lost weight locality start to show.
+const DEFAULT_MATRIX_CHUNKS_PER_PARTITION: usize = 4;
+
+/// Resolved once from `JMODELS_MATRIX_CHUNKS_PER_PARTITION`, defaulting to
+/// [`DEFAULT_MATRIX_CHUNKS_PER_PARTITION`].
+///
+/// Settable so the static split this replaced stays measurable: 1 chunk per partition is that
+/// split's granularity, so one binary can run both arms and the comparison does not need two
+/// builds. A benchmark that has to be recompiled to answer a new question stops being asked new
+/// questions.
+fn matrix_chunks_per_partition() -> usize {
+    static CHUNKS: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *CHUNKS.get_or_init(|| {
+        std::env::var("JMODELS_MATRIX_CHUNKS_PER_PARTITION")
+            .ok()
+            .and_then(|value| value.trim().parse::<usize>().ok())
+            .filter(|chunks| *chunks > 0)
+            .unwrap_or(DEFAULT_MATRIX_CHUNKS_PER_PARTITION)
+    })
+}
 const WORKER_SPIN_ITERS: usize = 4_000;
 
 /// Default poll budget before a worker parks: 5 ms, longer than any gap between two dispatches
@@ -454,11 +480,27 @@ struct WorkerShared {
     remaining: CachePadded<AtomicUsize>,
     /// Workers (including the caller at index 0) that take rows on the published job.
     partitions: CachePadded<AtomicUsize>,
+    /// Next unclaimed work chunk of the published job, reset before each publication.
+    ///
+    /// One counter for every job kind, because the pool publishes one job at a time: the execution
+    /// lock is held across publish-and-complete, so a matrix job's chunks and an attention job's
+    /// heads can never be in flight together.
+    next_job_chunk: CachePadded<AtomicUsize>,
     /// Generation that was current when the active count last grew; a worker leaving idleness
     /// resumes from it so it cannot skip a job published right after its activation.
     activation_generation: CachePadded<AtomicU64>,
     /// Nanoseconds a worker (and the caller's completion wait) polls before parking.
     poll_nanos: CachePadded<AtomicU64>,
+    /// Shutdown and failure, read on the hot path without the state mutex.
+    ///
+    /// Both were fields of the mutex-protected state, which cost every worker a lock per job just
+    /// to read a flag, and cost the caller one per dispatch to read `failed` after a lock-free
+    /// completion poll had already succeeded. With one mutex and N workers that was about 2N+1
+    /// acquisitions of the same lock per dispatch, which is why dispatch cost grew with the thread
+    /// count. Both are still written while holding the state mutex so the condvar predicates cannot
+    /// lose a wakeup; only the reads moved out.
+    shutdown: CachePadded<AtomicBool>,
+    failed: CachePadded<AtomicBool>,
     state: Mutex<WorkerState>,
     work_available: Condvar,
     work_complete: Condvar,
@@ -468,9 +510,7 @@ struct WorkerShared {
 }
 
 struct WorkerState {
-    shutdown: bool,
     job: Option<WorkerJob>,
-    failed: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -564,15 +604,16 @@ impl WorkerPool {
     fn new(requested_threads: usize) -> Result<Self, ()> {
         let total_threads = requested_threads.max(1);
         let shared = Arc::new(WorkerShared {
+            next_job_chunk: CachePadded(AtomicUsize::new(0)),
             generation: CachePadded(AtomicU64::new(0)),
             remaining: CachePadded(AtomicUsize::new(0)),
             partitions: CachePadded(AtomicUsize::new(total_threads)),
             activation_generation: CachePadded(AtomicU64::new(0)),
             poll_nanos: CachePadded(AtomicU64::new(default_poll_nanos())),
+            shutdown: CachePadded(AtomicBool::new(false)),
+            failed: CachePadded(AtomicBool::new(false)),
             state: Mutex::new(WorkerState {
-                shutdown: false,
                 job: None,
-                failed: false,
             }),
             work_available: Condvar::new(),
             work_complete: Condvar::new(),
@@ -625,9 +666,12 @@ impl WorkerPool {
             || partitions == 1
             || job.output_elements < PARALLEL_OUTPUT_THRESHOLD
         {
+            self.shared.next_job_chunk.0.store(0, Ordering::Relaxed);
             return catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: the caller owns all matrix buffers for this synchronous execution.
-                unsafe { execute_matrix_job_partition(job, 0, 1) }
+                unsafe {
+                    execute_matrix_job_partition(job, 0, 1, &self.shared.next_job_chunk.0)
+                }
             }))
             .is_ok();
         }
@@ -636,7 +680,7 @@ impl WorkerPool {
         {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::Matrix(job));
-            state.failed = false;
+            self.shared.failed.0.store(false, Ordering::Relaxed);
             // `shared.partitions` is the pool's ACTIVATION GATE -- a worker parks while its index is
             // at or beyond it, and only an increase in the active count notifies it again. It is not
             // this job's partition count, which travels in the generation word and is read back by
@@ -648,6 +692,9 @@ impl WorkerPool {
                 .remaining
                 .0
                 .store(partitions - 1, Ordering::Relaxed);
+            // Reset before the generation is published: the release store below is what makes this
+            // visible, so a worker cannot observe the new job against the previous job's claims.
+            self.shared.next_job_chunk.0.store(0, Ordering::Relaxed);
             let current = self.shared.generation.0.load(Ordering::Acquire);
             self.shared.generation.0.store(
                 job_word(job_generation(current) + 1, partitions),
@@ -657,8 +704,10 @@ impl WorkerPool {
         }
 
         let caller_succeeded = catch_unwind(AssertUnwindSafe(|| {
-            // SAFETY: worker zero receives matrix rows disjoint from every persistent worker.
-            unsafe { execute_matrix_job_partition(job, 0, job.partitions) }
+            // SAFETY: every row chunk is claimed exactly once, so no two threads write a row.
+            unsafe {
+                execute_matrix_job_partition(job, 0, job.partitions, &self.shared.next_job_chunk.0)
+            }
         }))
         .is_ok();
 
@@ -692,7 +741,7 @@ impl WorkerPool {
         {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::GatedDeltaNet(job));
-            state.failed = false;
+            self.shared.failed.0.store(false, Ordering::Relaxed);
             self.shared
                 .partitions
                 .0
@@ -719,11 +768,17 @@ impl WorkerPool {
     }
 
     fn execute_attention(&self, job: AttentionJob) -> bool {
-        if self.workers.is_empty() || job.num_kv_heads == 1 {
+        // Gated on QUERY heads. This used to refuse to parallelise a single KV head, which left
+        // multi-query attention -- one KV head by definition -- running every query head on the
+        // calling thread. Work is claimed per query head now, so one KV head partitions as well as
+        // any other; only a single query head has nothing to divide.
+        if self.workers.is_empty() || job.num_heads <= 1 {
             return catch_unwind(AssertUnwindSafe(|| {
+                self.shared.next_job_chunk.0.store(0, Ordering::Relaxed);
                 // SAFETY: the caller owns all recurrence buffers for this synchronous execution.
-                // A single KV head has nothing to partition.
-                unsafe { execute_attention_partition(job, 0, 1) }
+                unsafe {
+                    execute_attention_partition(job, 0, 1, &self.shared.next_job_chunk.0)
+                }
             }))
             .is_ok();
         }
@@ -734,8 +789,11 @@ impl WorkerPool {
             .clamp(1, self.total_threads);
         if partitions == 1 {
             return catch_unwind(AssertUnwindSafe(|| {
+                self.shared.next_job_chunk.0.store(0, Ordering::Relaxed);
                 // SAFETY: the caller owns all recurrence buffers for this synchronous execution.
-                unsafe { execute_attention_partition(job, 0, 1) }
+                unsafe {
+                    execute_attention_partition(job, 0, 1, &self.shared.next_job_chunk.0)
+                }
             }))
             .is_ok();
         }
@@ -743,7 +801,7 @@ impl WorkerPool {
         {
             let mut state = lock(&self.shared.state);
             state.job = Some(WorkerJob::Attention(job));
-            state.failed = false;
+            self.shared.failed.0.store(false, Ordering::Relaxed);
             self.shared
                 .partitions
                 .0
@@ -752,6 +810,9 @@ impl WorkerPool {
                 .remaining
                 .0
                 .store(partitions - 1, Ordering::Relaxed);
+            // Reset before the release store below, so no worker can observe the new generation
+            // against the previous job's claims.
+            self.shared.next_job_chunk.0.store(0, Ordering::Relaxed);
             let current = self.shared.generation.0.load(Ordering::Acquire);
             self.shared.generation.0.store(
                 job_word(job_generation(current) + 1, partitions),
@@ -761,8 +822,10 @@ impl WorkerPool {
         }
 
         let caller_succeeded = catch_unwind(AssertUnwindSafe(|| {
-            // SAFETY: each worker owns disjoint recurrent heads and output rows.
-            unsafe { execute_attention_partition(job, 0, partitions) }
+            // SAFETY: each query head is claimed exactly once, so no two threads write a row.
+            unsafe {
+                execute_attention_partition(job, 0, partitions, &self.shared.next_job_chunk.0)
+            }
         }))
         .is_ok();
 
@@ -770,23 +833,28 @@ impl WorkerPool {
     }
 
     fn await_workers(&self, caller_succeeded: bool) -> bool {
-        let completed = poll_completion(
+        if poll_completion(
             &self.shared.remaining.0,
             self.shared.poll_nanos.0.load(Ordering::Relaxed),
-        );
+        ) {
+            // The whole point of the spin: every worker finished inside it, so there is nothing to
+            // wait on and no reason to touch the mutex that every worker also wants.
+            return caller_succeeded && !self.shared.failed.0.load(Ordering::Acquire);
+        }
         let mut state = lock(&self.shared.state);
-        while !completed && self.shared.remaining.0.load(Ordering::Acquire) != 0 {
+        while self.shared.remaining.0.load(Ordering::Acquire) != 0 {
             state = wait(&self.shared.work_complete, state);
         }
-        caller_succeeded && !state.failed
+        drop(state);
+        caller_succeeded && !self.shared.failed.0.load(Ordering::Acquire)
     }
 }
 
 impl Drop for WorkerPool {
     fn drop(&mut self) {
         {
-            let mut state = lock(&self.shared.state);
-            state.shutdown = true;
+            let _state = lock(&self.shared.state);
+            self.shared.shutdown.0.store(true, Ordering::Release);
             let current = self.shared.generation.0.load(Ordering::Acquire);
             self.shared
                 .generation
@@ -806,14 +874,23 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: u
     loop {
         // Idle workers sleep on the activation condvar and resume from the generation that was
         // current when they were re-activated, so they skip nothing published after that point.
-        {
+        // An active worker takes no lock to learn that it is active. This ran once per worker per
+        // job on the mutex the caller and every other worker also want, purely to compare an index
+        // against an atomic.
+        if shared.shutdown.0.load(Ordering::Acquire) {
+            return;
+        }
+        if worker_index >= shared.partitions.0.load(Ordering::Acquire) {
             let mut state = lock(&shared.state);
             let mut was_idle = false;
-            while !state.shutdown && worker_index >= shared.partitions.0.load(Ordering::Acquire) {
+            while !shared.shutdown.0.load(Ordering::Acquire)
+                && worker_index >= shared.partitions.0.load(Ordering::Acquire)
+            {
                 was_idle = true;
                 state = wait(&shared.activation, state);
             }
-            if state.shutdown {
+            drop(state);
+            if shared.shutdown.0.load(Ordering::Acquire) {
                 return;
             }
             if was_idle {
@@ -827,7 +904,7 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: u
                 shared.poll_nanos.0.load(Ordering::Relaxed),
             );
             let mut state = lock(&shared.state);
-            while !state.shutdown && next_generation.is_none() {
+            while !shared.shutdown.0.load(Ordering::Acquire) && next_generation.is_none() {
                 let published_generation = shared.generation.0.load(Ordering::Acquire);
                 if published_generation != observed_generation {
                     next_generation = Some(published_generation);
@@ -835,7 +912,7 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: u
                 }
                 state = wait(&shared.work_available, state);
             }
-            if state.shutdown {
+            if shared.shutdown.0.load(Ordering::Acquire) {
                 return;
             }
             observed_generation =
@@ -849,8 +926,15 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: u
         }
         let succeeded = match job {
             Some(WorkerJob::Matrix(job)) => catch_unwind(AssertUnwindSafe(|| {
-                // SAFETY: every worker receives a distinct output range and read-only shared inputs.
-                unsafe { execute_matrix_job_partition(job, worker_index, partitions) }
+                // SAFETY: every row chunk is claimed exactly once and the inputs are read-only.
+                unsafe {
+                    execute_matrix_job_partition(
+                        job,
+                        worker_index,
+                        partitions,
+                        &shared.next_job_chunk.0,
+                    )
+                }
             }))
             .is_ok(),
             Some(WorkerJob::GatedDeltaNet(job)) => catch_unwind(AssertUnwindSafe(|| {
@@ -861,13 +945,20 @@ fn worker_loop(shared: Arc<WorkerShared>, worker_index: usize, _total_threads: u
             Some(WorkerJob::Attention(job)) => catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: every worker receives disjoint KV-head groups, hence disjoint output
                 // heads and score rows; the caller validated every buffer length.
-                unsafe { execute_attention_partition(job, worker_index, partitions) }
+                unsafe {
+                    execute_attention_partition(
+                        job,
+                        worker_index,
+                        partitions,
+                        &shared.next_job_chunk.0,
+                    )
+                }
             }))
             .is_ok(),
             None => false,
         };
         if !succeeded {
-            lock(&shared.state).failed = true;
+            shared.failed.0.store(true, Ordering::Release);
         }
         let previous_remaining = shared.remaining.0.fetch_sub(1, Ordering::AcqRel);
         debug_assert!(previous_remaining > 0);
@@ -923,15 +1014,71 @@ fn poll_completion(remaining: &AtomicUsize, poll_nanos: u64) -> bool {
     }
 }
 
+/// Runs claimed row chunks of a published matrix job until none are left.
+///
+/// Rows are chunked finer than the partition count and each thread claims the next unclaimed chunk,
+/// rather than taking a fixed range derived from its own index. A static range makes a dispatch cost
+/// whatever its SLOWEST partition cost, and that is the wrong shape for any machine whose cores are
+/// not interchangeable: two SMT siblings share one core's vector units, and a hybrid part puts P and
+/// E cores in the same pool, so equal work finishes at very different times and the barrier waits
+/// for the slowest on every dispatch. Claiming lets a slow core take fewer chunks.
+///
+/// Which thread computes a row cannot change that row's value -- each output row is its own dot
+/// product folded in a fixed order -- so this is bit-identical to the static split by construction
+/// rather than by measurement.
 unsafe fn execute_matrix_job_partition(
     job: ParallelJob,
     worker_index: usize,
     total_threads: usize,
+    next_chunk: &AtomicUsize,
 ) {
     if worker_index >= total_threads {
         return;
     }
-    for matrix in job.matrices[..job.matrix_count].iter().flatten() {
+    // Every thread derives the same chunk map from the job alone, so no map has to be shared.
+    let target_chunks = total_threads
+        .saturating_mul(matrix_chunks_per_partition())
+        .max(1);
+    let mut rows_per_chunk = [0usize; MAX_GROUPED_MATRICES];
+    let mut chunk_end = [0usize; MAX_GROUPED_MATRICES];
+    let mut total_chunks = 0usize;
+    for slot in 0..job.matrix_count {
+        let rows = job.matrices[slot].as_ref().map_or(0, |matrix| matrix.rows);
+        if rows > 0 {
+            let per_chunk = rows.div_ceil(target_chunks).max(1);
+            rows_per_chunk[slot] = per_chunk;
+            total_chunks += rows.div_ceil(per_chunk);
+        }
+        chunk_end[slot] = total_chunks;
+    }
+    if total_chunks == 0 {
+        return;
+    }
+
+    loop {
+        let claimed = next_chunk.fetch_add(1, Ordering::Relaxed);
+        if claimed >= total_chunks {
+            return;
+        }
+        // At most MAX_GROUPED_MATRICES slots, so walking them is cheaper than keeping a second
+        // shared structure in step with the job.
+        let mut slot = 0usize;
+        while slot < job.matrix_count && claimed >= chunk_end[slot] {
+            slot += 1;
+        }
+        if slot >= job.matrix_count {
+            return;
+        }
+        let Some(matrix) = job.matrices[slot].as_ref() else {
+            continue;
+        };
+        let first_chunk = if slot == 0 { 0 } else { chunk_end[slot - 1] };
+        let start_row = (claimed - first_chunk) * rows_per_chunk[slot];
+        if start_row >= matrix.rows {
+            continue;
+        }
+        let end_row = (start_row + rows_per_chunk[slot]).min(matrix.rows);
+
         let quantized = unsafe {
             slice::from_raw_parts(matrix.quantized as *const i8, matrix.quantized_elements)
         };
@@ -954,12 +1101,8 @@ unsafe fn execute_matrix_job_partition(
                 slice::from_raw_parts(matrix.activations as *const f32, matrix.activation_elements)
             }
         };
-        let start_row = matrix.rows * worker_index / total_threads;
-        let end_row = matrix.rows * (worker_index + 1) / total_threads;
-        if start_row == end_row {
-            continue;
-        }
-        // SAFETY: KernelContext::execute is synchronous and partitions every output matrix by row.
+        // SAFETY: KernelContext::execute is synchronous and every row chunk is claimed once, so
+        // no two threads write the same output row.
         let weights =
             unsafe { slice::from_raw_parts(matrix.weights as *const u8, matrix.weight_bytes) };
         unsafe {
@@ -988,15 +1131,20 @@ unsafe fn execute_attention_partition(
     job: AttentionJob,
     worker_index: usize,
     total_threads: usize,
+    next_chunk: &AtomicUsize,
 ) {
     if worker_index >= total_threads {
         return;
     }
-    let start_kv = job.num_kv_heads * worker_index / total_threads;
-    let end_kv = job.num_kv_heads * (worker_index + 1) / total_threads;
-    if start_kv >= end_kv {
-        return;
-    }
+    // Claimed per QUERY head, not split over KV heads.
+    //
+    // Splitting over KV heads capped this at `num_kv_heads`, which grouped-query attention makes
+    // small on purpose: a model with 2 KV heads used 2 threads however many the pool had, and the
+    // other thirty arrived at the barrier having done nothing. Every query head is independent --
+    // its own query row, its own score row, its own softmax, its own output row -- and only the
+    // keys and values are shared, read-only, within a group. So the available parallelism is
+    // `num_heads`, four to sixteen times larger, and claiming rather than splitting means a slow
+    // core takes fewer heads instead of holding up the barrier.
     let group = job.num_heads / job.num_kv_heads;
     let total_positions = job.positions[0] + job.positions[1];
     // SAFETY: the exported entry point validated every length against the shapes below.
@@ -1006,28 +1154,29 @@ unsafe fn execute_attention_partition(
             job.num_heads * job.key_length,
         )
     };
-    // Each worker must borrow only its own heads, not the entire shared output/scores.
-    let first_head = start_kv * group;
-    let owned_heads = (end_kv - start_kv) * group;
-    let output = unsafe {
-        slice::from_raw_parts_mut(
-            (job.output as *mut f32).add(job.output_offset + first_head * job.value_length),
-            owned_heads * job.value_length,
-        )
-    };
-    let scores = unsafe {
-        slice::from_raw_parts_mut(
-            (job.scores as *mut f32).add(first_head * total_positions),
-            owned_heads * total_positions,
-        )
-    };
     let vectorized = gated_delta_net_avx2_available();
-    for kv in start_kv..end_kv {
-        for head in kv * group..(kv + 1) * group {
+    loop {
+        let head = next_chunk.fetch_add(1, Ordering::Relaxed);
+        if head >= job.num_heads {
+            return;
+        }
+        {
+            let kv = head / group;
             let q = &query[head * job.key_length..(head + 1) * job.key_length];
-            let local_head = head - first_head;
-            let row_scores =
-                &mut scores[local_head * total_positions..(local_head + 1) * total_positions];
+            // One head's slices, taken per claim: a claimed head is claimed exactly once, so no two
+            // threads ever address the same score or output row.
+            let row_scores = unsafe {
+                slice::from_raw_parts_mut(
+                    (job.scores as *mut f32).add(head * total_positions),
+                    total_positions,
+                )
+            };
+            let out = unsafe {
+                slice::from_raw_parts_mut(
+                    (job.output as *mut f32).add(job.output_offset + head * job.value_length),
+                    job.value_length,
+                )
+            };
             let mut written = 0;
             for span in 0..2 {
                 let positions = job.positions[span];
@@ -1048,8 +1197,6 @@ unsafe fn execute_attention_partition(
                 written += positions;
             }
             attention_softmax(row_scores);
-            let out =
-                &mut output[local_head * job.value_length..(local_head + 1) * job.value_length];
             out.fill(0.0);
             let mut consumed = 0;
             for span in 0..2 {
@@ -7253,13 +7400,103 @@ mod tests {
             partitions: 2,
         };
         // Workers at or beyond the partition count take nothing, even on an empty job.
-        unsafe { execute_matrix_job_partition(job, 2, job.partitions) };
-        unsafe { execute_matrix_job_partition(job, 0, job.partitions) };
+        let chunks = AtomicUsize::new(0);
+        unsafe { execute_matrix_job_partition(job, 2, job.partitions, &chunks) };
+        unsafe { execute_matrix_job_partition(job, 0, job.partitions, &chunks) };
         let pool = WorkerPool::new(4).expect("pool");
         assert_eq!(pool.set_active_threads(0), 1);
         assert_eq!(pool.set_active_threads(2), 2);
         assert_eq!(pool.set_active_threads(99), 4);
         assert_eq!(pool.active_threads.load(Ordering::Acquire), 4);
+    }
+
+    fn attention_claims_every_query_head_exactly_once(num_kv: usize, threads: usize) {
+        // Multi-query attention (num_kv = 1) is the case this exists for: it used to refuse to
+        // partition at all, so every query head ran on the calling thread however many threads the
+        // pool had. Work is claimed per query head now, which makes the path reachable and makes
+        // dropping or double-counting a head possible for the first time.
+        let group = 4;
+        let num_heads = num_kv * group;
+        let (key_length, value_length) = (32, 32);
+        let (key_dim, value_dim) = (num_kv * key_length, num_kv * value_length);
+        let positions = [6_usize, 2_usize];
+        let total = positions[0] + positions[1];
+        let mut seed = 987_654_321_u32;
+        let mut next = || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            ((seed >> 8) as f32 / (1u32 << 24) as f32) - 0.5
+        };
+        let query: Vec<f32> = (0..num_heads * key_length).map(|_| next()).collect();
+        let keys_a: Vec<f32> = (0..positions[0] * key_dim).map(|_| next()).collect();
+        let values_a: Vec<f32> = (0..positions[0] * value_dim).map(|_| next()).collect();
+        let keys_b: Vec<f32> = (0..positions[1] * key_dim).map(|_| next()).collect();
+        let values_b: Vec<f32> = (0..positions[1] * value_dim).map(|_| next()).collect();
+        let scale = 0.03125_f32;
+
+        // A value the kernel cannot produce: an untouched output row stays recognisable rather
+        // than looking like a plausible zero.
+        const UNCLAIMED: f32 = -98765.0;
+        let run = |thread_count: usize| -> Vec<f32> {
+            let context = jmodels_kernels_context_create(thread_count as u32);
+            assert!(!context.is_null());
+            let mut output = vec![UNCLAIMED; num_heads * value_length];
+            let mut scores = vec![0.0_f32; num_heads * total];
+            let status = unsafe {
+                jmodels_grouped_attention_f32_with_context(
+                    context,
+                    query.as_ptr(), 0, query.len() as u64,
+                    keys_a.as_ptr(), 0, keys_a.len() as u64,
+                    values_a.as_ptr(), 0, values_a.len() as u64,
+                    positions[0] as u32,
+                    keys_b.as_ptr(), 0, keys_b.len() as u64,
+                    values_b.as_ptr(), 0, values_b.len() as u64,
+                    positions[1] as u32,
+                    output.as_mut_ptr(), 0, output.len() as u64,
+                    scores.as_mut_ptr(), scores.len() as u64,
+                    key_dim as u32, value_dim as u32,
+                    key_length as u32, value_length as u32,
+                    num_heads as u32, num_kv as u32,
+                    scale,
+                )
+            };
+            assert_eq!(status, STATUS_OK, "kv={num_kv} threads={thread_count}");
+            unsafe { jmodels_kernels_context_destroy(context) };
+            output
+        };
+
+        let reference = run(1);
+        for (index, value) in reference.iter().enumerate() {
+            assert_ne!(
+                *value, UNCLAIMED,
+                "kv={num_kv}: serial run left output row {index} unclaimed"
+            );
+        }
+        let parallel = run(threads);
+        for (index, value) in parallel.iter().enumerate() {
+            assert_ne!(
+                *value, UNCLAIMED,
+                "kv={num_kv} threads={threads}: output row {index} was never claimed"
+            );
+        }
+        // Bit-identical, not close: which thread folds a head cannot change that head's value, so
+        // any difference is a head computed twice or not at all.
+        assert_eq!(parallel, reference, "kv={num_kv} threads={threads}");
+    }
+
+    #[test]
+    fn multi_query_attention_partitions_across_query_heads() {
+        for threads in [1, 2, 3, 4, 8] {
+            attention_claims_every_query_head_exactly_once(1, threads);
+        }
+    }
+
+    #[test]
+    fn grouped_query_attention_claims_every_head_at_any_thread_count() {
+        for num_kv in [2, 3] {
+            for threads in [1, 2, 4, 8] {
+                attention_claims_every_query_head_exactly_once(num_kv, threads);
+            }
+        }
     }
 
     #[test]
@@ -7491,6 +7728,179 @@ mod tests {
         }
     }
 
+    /// Dispatch cost against thread count, for whichever chunk granularity is configured.
+    ///
+    /// Ignored because it is a measurement and not an assertion: it has no pass condition and its
+    /// numbers belong to the machine that produced them. Run both arms to compare the static split
+    /// against the claimed one:
+    ///
+    /// ```text
+    /// JMODELS_MATRIX_CHUNKS_PER_PARTITION=1 cargo test --release -- --ignored --nocapture scaling
+    /// JMODELS_MATRIX_CHUNKS_PER_PARTITION=4 cargo test --release -- --ignored --nocapture scaling
+    /// ```
+    ///
+    /// 1 is the granularity the static per-index split had, so the first arm reproduces it.
+    #[test]
+    #[ignore]
+    fn matrix_dispatch_thread_scaling() {
+        let rows = 4096usize;
+        let cols = 2048usize;
+        let weights = vec![0x11_u8; rows * cols / QK_0 * Q4_0_BLOCK_BYTES];
+        let quantized = vec![1_i8; cols];
+        let scales = vec![1.0_f32; cols / QK_0];
+        let sums = vec![0_i16; cols / Q8_K_SUM_BLOCK];
+        let mut output = vec![0.0_f32; rows];
+
+        let chunks = matrix_chunks_per_partition();
+        let processors = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(8);
+        println!(
+            "\nmatrix dispatch scaling: rows={rows} cols={cols} Q4_0 \
+chunks_per_partition={chunks} available_parallelism={processors}"
+        );
+        println!("{:>8}  {:>12}  {:>10}  {:>9}", "threads", "mean us/op", "speedup", "efficiency");
+
+        let mut baseline = f64::NAN;
+        let mut counts: Vec<usize> = vec![1, 2, 4, 6, 8, 12, 16, 24, 32]
+            .into_iter()
+            .filter(|t| *t <= processors)
+            .collect();
+        if !counts.contains(&processors) {
+            counts.push(processors);
+        }
+        for threads in counts {
+            let pool = WorkerPool::new(threads).expect("pool");
+            pool.set_active_threads(threads);
+            let job = |out: &mut Vec<f32>| {
+                let mut matrices: [Option<MatrixJob>; MAX_GROUPED_MATRICES] =
+                    [None; MAX_GROUPED_MATRICES];
+                matrices[0] = Some(MatrixJob {
+                    weights: weights.as_ptr() as usize,
+                    weight_bytes: weights.len(),
+                    output: out.as_mut_ptr() as usize,
+                    rows,
+                    kernel: DotKernel::Q4,
+                    quantized: quantized.as_ptr() as usize,
+                    quantized_elements: quantized.len(),
+                    activation_scales: scales.as_ptr() as usize,
+                    scale_elements: scales.len(),
+                    activation_sums: sums.as_ptr() as usize,
+                    sum_elements: sums.len(),
+                    activations: 0,
+                    activation_elements: 0,
+                    batch_size: 1,
+                    cols,
+                });
+                ParallelJob {
+                    matrices,
+                    matrix_count: 1,
+                    output_elements: rows,
+                    partitions: threads,
+                }
+            };
+            // Warm the pool and the code path before timing: an unwarmed first dispatch measures
+            // thread start-up and whatever the compiler had not reached yet.
+            for _ in 0..20 {
+                assert!(pool.execute_matrix(job(&mut output)));
+            }
+            let iterations = 200;
+            let started = std::time::Instant::now();
+            for _ in 0..iterations {
+                assert!(pool.execute_matrix(job(&mut output)));
+            }
+            let micros = started.elapsed().as_secs_f64() * 1e6 / iterations as f64;
+            if baseline.is_nan() {
+                baseline = micros;
+            }
+            let speedup = baseline / micros;
+            println!(
+                "{threads:>8}  {micros:>12.1}  {speedup:>9.2}x  {:>8.0}%",
+                100.0 * speedup / threads as f64
+            );
+        }
+    }
+
+    #[test]
+    fn claimed_chunks_cover_every_row_of_every_matrix_exactly_once() {
+        // The row chunk space spans ALL of a grouped job's matrices, so the index arithmetic that
+        // maps a claim back to a matrix and a row range is what this guards. Uneven row counts on
+        // purpose: equal ones cannot fail on the axis the mapping is most likely to get wrong, and
+        // a count smaller than the chunk target exercises the matrix that produces a single chunk.
+        let cols = 256;
+        let row_counts = [257usize, 1, 64, 130];
+        let weights: Vec<Vec<u8>> = row_counts
+            .iter()
+            .map(|rows| vec![0x11_u8; rows * cols / QK_0 * Q4_0_BLOCK_BYTES])
+            .collect();
+        let quantized = vec![1_i8; cols];
+        let scales = vec![1.0_f32; cols / QK_0];
+        let sums = vec![0_i16; cols / Q8_K_SUM_BLOCK];
+
+        let build = |outputs: &mut Vec<Vec<f32>>| {
+            let mut matrices: [Option<MatrixJob>; MAX_GROUPED_MATRICES] =
+                [None; MAX_GROUPED_MATRICES];
+            for (slot, rows) in row_counts.iter().enumerate() {
+                matrices[slot] = Some(MatrixJob {
+                    weights: weights[slot].as_ptr() as usize,
+                    weight_bytes: weights[slot].len(),
+                    output: outputs[slot].as_mut_ptr() as usize,
+                    rows: *rows,
+                    kernel: DotKernel::Q4,
+                    quantized: quantized.as_ptr() as usize,
+                    quantized_elements: quantized.len(),
+                    activation_scales: scales.as_ptr() as usize,
+                    scale_elements: scales.len(),
+                    activation_sums: sums.as_ptr() as usize,
+                    sum_elements: sums.len(),
+                    activations: 0,
+                    activation_elements: 0,
+                    batch_size: 1,
+                    cols,
+                });
+            }
+            ParallelJob {
+                matrices,
+                matrix_count: row_counts.len(),
+                output_elements: row_counts.iter().sum(),
+                partitions: 1,
+            }
+        };
+
+        // A sentinel no row kernel can produce, so a row nobody claimed is visible as itself
+        // rather than as a plausible zero.
+        const UNCLAIMED: f32 = -12345.0;
+        let fresh = || -> Vec<Vec<f32>> {
+            row_counts.iter().map(|rows| vec![UNCLAIMED; *rows]).collect()
+        };
+
+        let pool = WorkerPool::new(4).expect("pool");
+        let mut reference = fresh();
+        assert!(pool.execute_matrix(build(&mut reference)));
+        for (slot, output) in reference.iter().enumerate() {
+            for (row, value) in output.iter().enumerate() {
+                assert_ne!(
+                    *value, UNCLAIMED,
+                    "reference left matrix {slot} row {row} unclaimed"
+                );
+            }
+        }
+
+        for active in [1, 2, 3, 4, 2, 4, 1] {
+            pool.set_active_threads(active);
+            let mut outputs = fresh();
+            assert!(pool.execute_matrix(build(&mut outputs)), "active={active}");
+            for slot in 0..row_counts.len() {
+                // Bit-identical, not merely close: which thread folds a row cannot change its
+                // value, so any difference here is a row computed twice or not at all.
+                assert_eq!(
+                    outputs[slot], reference[slot],
+                    "active={active} matrix={slot}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn worker_poll_observes_a_published_generation_without_parking() {
         let generation = std::sync::atomic::AtomicU64::new(7);
@@ -7511,16 +7921,15 @@ mod tests {
     #[test]
     fn worker_accounts_for_a_published_generation_without_a_job() {
         let shared = Arc::new(WorkerShared {
+            next_job_chunk: CachePadded(AtomicUsize::new(0)),
             generation: CachePadded(AtomicU64::new(job_word(1, 2))),
             remaining: CachePadded(AtomicUsize::new(1)),
             partitions: CachePadded(AtomicUsize::new(2)),
             activation_generation: CachePadded(AtomicU64::new(0)),
             poll_nanos: CachePadded(AtomicU64::new(default_poll_nanos())),
-            state: Mutex::new(WorkerState {
-                shutdown: false,
-                job: None,
-                failed: false,
-            }),
+            shutdown: CachePadded(AtomicBool::new(false)),
+            failed: CachePadded(AtomicBool::new(false)),
+            state: Mutex::new(WorkerState { job: None }),
             work_available: Condvar::new(),
             work_complete: Condvar::new(),
             activation: Condvar::new(),
@@ -7535,14 +7944,14 @@ mod tests {
             thread::sleep(std::time::Duration::from_millis(1));
         }
         {
-            let mut state = lock(&shared.state);
-            state.shutdown = true;
+            let _state = lock(&shared.state);
+            shared.shutdown.0.store(true, Ordering::Release);
             shared.generation.0.store(job_word(2, 0), Ordering::Release);
             shared.work_available.notify_all();
         }
 
         assert_eq!(shared.remaining.0.load(Ordering::Acquire), 0);
-        assert!(lock(&shared.state).failed);
+        assert!(shared.failed.0.load(Ordering::Acquire));
         assert!(worker.join().is_ok());
     }
 
