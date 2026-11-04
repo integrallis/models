@@ -36,11 +36,11 @@ import java.util.Set;
  * wanted a catalog model wrote the resolution themselves, which is the opposite of the catalog
  * being authoritative.
  *
- * <p><b>The engine is this one.</b> Resolution ends at {@link PureJavaBackend#loadAutomatic}, so a
- * catalog says where the weights are and the Java decoder runs them, with the native shims picked
- * up underneath through {@code PureJavaBackendProvider} exactly as they are for any other load.
- * There is deliberately no way to select a different engine here: an engine chosen at the call site
- * is a measurement seam, and the shipped path has to be the one the qualification measured.
+ * <p><b>The engine is this one.</b> Resolution ends at {@link PureJavaBackend#load(Path,
+ * BackendConfiguration)}, so a catalog says where the weights are and the Java decoder runs them,
+ * with the native shims picked up underneath exactly as they are for any other load. There is
+ * deliberately no way to select a different engine here: an engine chosen at the call site is a
+ * measurement seam, and the shipped path has to be the one the qualification measured.
  *
  * <p><b>Nothing is downloaded.</b> {@link ModelCatalogProvider#locate} reports only what is on
  * disk, so a catalog entry whose weights have not been fetched is a refusal with that fact in the
@@ -77,7 +77,7 @@ public final class CatalogBackends {
   static PureJavaBackend open(
       Iterable<ModelCatalogProvider> providers, String id, BackendConfiguration configuration) {
     Resolution resolution = resolve(providers, id);
-    return PureJavaBackend.loadAutomatic(resolution.path(), configuration);
+    return PureJavaBackend.load(resolution.path(), configuration);
   }
 
   /**

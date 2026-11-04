@@ -31,10 +31,10 @@ import org.junit.jupiter.api.Test;
 /**
  * Resolving a catalog id to an artifact, which is the step that made the catalog authoritative.
  *
- * <p>No model is opened here. {@code open} ends at {@link PureJavaBackend#loadAutomatic}, which
- * needs real weights; what these tests pin is everything before that — which catalog wins, what
- * happens when two do, and the difference between an id nobody knows and an id whose weights are
- * simply not on this machine. That last distinction is the one a caller acts on.
+ * <p>No model is opened here. {@code open} ends at {@link PureJavaBackend#load}, which needs real
+ * weights; what these tests pin is everything before that — which catalog wins, what happens when
+ * two do, and the difference between an id nobody knows and an id whose weights are simply not on
+ * this machine. That last distinction is the one a caller acts on.
  */
 @Tag("unit")
 class CatalogBackendsTest {

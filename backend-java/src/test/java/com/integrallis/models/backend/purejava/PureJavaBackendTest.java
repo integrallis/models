@@ -198,7 +198,7 @@ class PureJavaBackendTest {
         throws IOException {
       Path modelPath = buildNanoModelFile(dir, new Random(43));
 
-      try (PureJavaBackend backend = PureJavaBackend.loadAutomatic(modelPath)) {
+      try (PureJavaBackend backend = PureJavaBackend.load(modelPath)) {
         assertThat(backend.name()).isEqualTo("pure-java");
         assertThat(backend.forward(5, 0)).hasSize(VOCAB_SIZE);
       }

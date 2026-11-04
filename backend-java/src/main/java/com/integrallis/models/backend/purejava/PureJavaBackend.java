@@ -81,7 +81,6 @@ import com.integrallis.models.backend.purejava.qwen35.Qwen35ForwardPass;
 import com.integrallis.models.backend.purejava.safetensors.SafetensorsBundle;
 import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
-import com.integrallis.models.backend.purejava.spi.PureJavaBackendProvider;
 import com.integrallis.models.backend.purejava.tensor.SafetensorsTensorSource;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
 import com.integrallis.models.backend.purejava.tokenizer.HuggingFaceTokenizer;
@@ -99,8 +98,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.ServiceConfigurationError;
-import java.util.ServiceLoader;
 import java.util.Set;
 
 /**
@@ -284,36 +281,21 @@ public final class PureJavaBackend
   }
 
   /**
-   * Loads an optional in-process accelerator with artifact-qualified recommendations, then falls
-   * back to the ordinary Java Vector API backend.
+   * Loads a GGUF model on the Vector API path.
+   *
+   * @param modelPath the GGUF model to load
+   * @param backendConfiguration catalog recommendations, overrides and provenance
+   * @return a loaded backend
+   * @deprecated the {@code PureJavaBackendProvider} discovery this used to perform is gone: its
+   *     only implementation was removed with {@code backend-tornado}, so the lookup had been
+   *     finding nothing. Identical to {@link #load(Path, BackendConfiguration)} now; call that.
+   *     Acceleration is chosen explicitly through the kernel-taking overloads, because a discovered
+   *     provider would apply to every caller and the Rust kernels do not match the Java ones bit
+   *     for bit on every type.
    */
+  @Deprecated(since = "0.5.15", forRemoval = true)
   public static PureJavaBackend loadAutomatic(
       Path modelPath, BackendConfiguration backendConfiguration) {
-    Objects.requireNonNull(modelPath, "modelPath");
-    Objects.requireNonNull(backendConfiguration, "backendConfiguration");
-    try {
-      for (PureJavaBackendProvider provider :
-          ServiceLoader.load(
-              PureJavaBackendProvider.class, PureJavaBackend.class.getClassLoader())) {
-        try {
-          Optional<PureJavaBackend> accelerated = provider.tryLoad(modelPath, backendConfiguration);
-          if (accelerated.isPresent()) {
-            return accelerated.orElseThrow();
-          }
-        } catch (LinkageError | RuntimeException failure) {
-          LOGGER.log(
-              System.Logger.Level.WARNING,
-              "Models accelerator provider {0} failed; using the next available path: {1}",
-              provider.getClass().getName(),
-              failure.getClass().getSimpleName());
-        }
-      }
-    } catch (ServiceConfigurationError failure) {
-      LOGGER.log(
-          System.Logger.Level.WARNING,
-          "Models accelerator discovery failed; using the Vector API: {0}",
-          failure.getClass().getSimpleName());
-    }
     return load(modelPath, backendConfiguration);
   }
 
