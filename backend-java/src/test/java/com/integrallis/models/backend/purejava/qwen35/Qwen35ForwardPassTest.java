@@ -1112,4 +1112,26 @@ class Qwen35ForwardPassTest {
     }
     return buffer.array();
   }
+
+  @Test
+  void decodingTwiceReusesOneSetOfBuffersRatherThanAllocatingPerToken(@TempDir Path directory)
+      throws Exception {
+    // The pinned-output test cannot catch a regression here: allocating per token produces
+    // identical numbers. Only identity shows the reuse.
+    Path model = writeToyModel(directory);
+
+    try (Arena arena = Arena.ofConfined()) {
+      Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(GgufParser.parse(model, arena));
+      Qwen35ForwardPass.Session session = graph.openSession(4);
+
+      graph.forward(session, 1, 0);
+      float[] afterFirst = session.decodeScratchIdentity();
+      graph.forward(session, 2, 1);
+      float[] afterSecond = session.decodeScratchIdentity();
+
+      assertThat(afterFirst)
+          .as("the decode path must not allocate a fresh state buffer per token")
+          .isSameAs(afterSecond);
+    }
+  }
 }
