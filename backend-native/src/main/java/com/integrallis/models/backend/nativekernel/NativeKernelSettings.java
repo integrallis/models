@@ -15,6 +15,7 @@
  */
 package com.integrallis.models.backend.nativekernel;
 
+import com.integrallis.vectors.core.VectorUtil;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -91,8 +92,13 @@ record NativeKernelSettings(int threadCount, List<String> ignoredRemovedSettings
                 }
               });
     }
-    return resolve(
-            recommendations, Map.copyOf(deployment), Runtime.getRuntime().availableProcessors())
+    // The same number the vectors GGUF executor sizes itself to, not an independent reading of the
+    // machine. Two pools each taking availableProcessors() put twice the machine's threads on it,
+    // and on a hybrid part availableProcessors() counts efficiency cores as equals: MEASURED on a
+    // 32-logical i9-14900HX (8 performance cores, 16 efficiency), one typed decision cost 2530 ms
+    // at that default and 877 ms at the eight threads this resolves to. A barrier makes a dispatch
+    // cost whatever its slowest member cost, so an efficiency-core thread held up all thirty-two.
+    return resolve(recommendations, Map.copyOf(deployment), sharedComputeThreads())
         .withIgnored(ignored);
   }
 
@@ -128,6 +134,23 @@ record NativeKernelSettings(int threadCount, List<String> ignoredRemovedSettings
             configured(NativeKernelLibrary.THREAD_COUNT_PROPERTY, deployment, recommendations),
             defaultThreadCount),
         ignored);
+  }
+
+  /**
+   * The thread count the vectors GGUF executor sizes itself to, or this JVM's processor count if it
+   * cannot say.
+   *
+   * <p>The fallback is not decoration. A thread count is a number this class validates to be
+   * between 1 and 256, so it must not accept whatever an external provider hands back: a provider
+   * that cannot answer, or one replaced wholesale -- a test that calls {@code
+   * mockStatic(VectorUtil.class)} leaves every unstubbed static returning 0 -- would otherwise turn
+   * a missing answer into a settings failure far from its cause. Guarding here keeps the dependency
+   * one-directional: this class asks for a recommendation and remains responsible for the number it
+   * uses.
+   */
+  private static int sharedComputeThreads() {
+    int shared = VectorUtil.computeThreads();
+    return shared > 0 ? shared : Math.max(1, Runtime.getRuntime().availableProcessors());
   }
 
   private static String configured(
