@@ -74,6 +74,11 @@ public final class Qwen35ForwardPass {
               owner.batchedMatrixKernel);
     }
 
+    /** Visible for testing: lets a test assert the scratch is reused rather than reallocated. */
+    float[] decodeScratchIdentity() {
+      return state.tokenScratch.state;
+    }
+
     public int checkpoint() {
       return checkpoint;
     }
@@ -1057,18 +1062,19 @@ public final class Qwen35ForwardPass {
 
   private float[] forwardToken(int token, int position, SessionState session) {
     int embeddingDimension = config.embeddingDim();
-    float[] state = new float[embeddingDimension];
-    float[] normalized = new float[embeddingDimension];
-    float[] projected = new float[embeddingDimension];
-    float[] memoryContribution = memory == null ? null : new float[embeddingDimension];
-    float[] ffnGate = new float[config.hiddenDim()];
-    FloatArrayView ffnGateView = batchedMatrixKernel.prepareFloatArray(ffnGate);
-    float[] ffnUp = new float[config.hiddenDim()];
-    FloatArrayView ffnUpView = batchedMatrixKernel.prepareFloatArray(ffnUp);
-    float[] ffn = new float[config.hiddenDim()];
-    FloatArrayView ffnView = batchedMatrixKernel.prepareFloatArray(ffn);
-    MoeScratch moeScratch =
-        config.usesMixtureOfExperts() ? new MoeScratch(config, batchedMatrixKernel) : null;
+    TokenScratch scratch = session.tokenScratch;
+    scratch.clear();
+    float[] state = scratch.state;
+    float[] normalized = scratch.normalized;
+    float[] projected = scratch.projected;
+    float[] memoryContribution = scratch.memoryContribution;
+    float[] ffnGate = scratch.ffnGate;
+    FloatArrayView ffnGateView = scratch.ffnGateView;
+    float[] ffnUp = scratch.ffnUp;
+    FloatArrayView ffnUpView = scratch.ffnUpView;
+    float[] ffn = scratch.ffn;
+    FloatArrayView ffnView = scratch.ffnView;
+    MoeScratch moeScratch = scratch.moeScratch;
     weights.embedToken(token, state);
 
     for (int layerIndex = 0; layerIndex < config.numLayers(); layerIndex++) {
@@ -2113,6 +2119,50 @@ public final class Qwen35ForwardPass {
         valueDimension);
   }
 
+  /** Per-token working buffers, held for the session rather than allocated on every call. */
+  private static final class TokenScratch {
+    private final float[] state;
+    private final float[] normalized;
+    private final float[] projected;
+    private final float[] memoryContribution;
+    private final float[] ffnGate;
+    private final FloatArrayView ffnGateView;
+    private final float[] ffnUp;
+    private final FloatArrayView ffnUpView;
+    private final float[] ffn;
+    private final FloatArrayView ffnView;
+    private final MoeScratch moeScratch;
+
+    private TokenScratch(
+        Qwen35Config config, EdgeRockMemory memory, GgufBatchedMatrixKernel kernel) {
+      int embeddingDimension = config.embeddingDim();
+      state = new float[embeddingDimension];
+      normalized = new float[embeddingDimension];
+      projected = new float[embeddingDimension];
+      memoryContribution = memory == null ? null : new float[embeddingDimension];
+      ffnGate = new float[config.hiddenDim()];
+      ffnGateView = kernel.prepareFloatArray(ffnGate);
+      ffnUp = new float[config.hiddenDim()];
+      ffnUpView = kernel.prepareFloatArray(ffnUp);
+      ffn = new float[config.hiddenDim()];
+      ffnView = kernel.prepareFloatArray(ffn);
+      moeScratch = config.usesMixtureOfExperts() ? new MoeScratch(config, kernel) : null;
+    }
+
+    /** {@code new float[]} zero-fills, so reuse clears to keep the arithmetic identical. */
+    private void clear() {
+      Arrays.fill(state, 0.0f);
+      Arrays.fill(normalized, 0.0f);
+      Arrays.fill(projected, 0.0f);
+      if (memoryContribution != null) {
+        Arrays.fill(memoryContribution, 0.0f);
+      }
+      Arrays.fill(ffnGate, 0.0f);
+      Arrays.fill(ffnUp, 0.0f);
+      Arrays.fill(ffn, 0.0f);
+    }
+  }
+
   private static final class SessionState {
     /**
      * Key and value storage grows rather than opening at the session's ceiling.
@@ -2145,6 +2195,7 @@ public final class Qwen35ForwardPass {
     private final ProjectionScratch scratch;
     private final GatedDeltaNetScratch gatedDeltaNetScratch;
     private final BatchScratch batchScratch;
+    private final TokenScratch tokenScratch;
 
     private SessionState(
         Qwen35Config config,
@@ -2167,6 +2218,7 @@ public final class Qwen35ForwardPass {
       recurrentState = new float[config.numLayers()][];
       scratch = new ProjectionScratch(weights);
       gatedDeltaNetScratch = new GatedDeltaNetScratch(config, kernel);
+      tokenScratch = new TokenScratch(config, memory, kernel);
       batchScratch =
           new BatchScratch(
               config,
