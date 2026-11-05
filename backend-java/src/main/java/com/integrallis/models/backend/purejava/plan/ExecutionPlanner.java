@@ -468,7 +468,7 @@ public final class ExecutionPlanner {
             && prefillBatchSize > 1
             && runtime.processors() > 1
             && runtime.ggufParallel()
-            && runtime.sharesStagePublication();
+            && "persistent".equals(runtime.ggufExecutor());
     OptimizationStatus status;
     String reason;
     if (enabled) {
@@ -487,7 +487,7 @@ public final class ExecutionPlanner {
     } else if (!runtime.ggufParallel()) {
       status = OptimizationStatus.DISABLED;
       reason = "staged quantized layer requires parallel GGUF execution";
-    } else if (!runtime.sharesStagePublication()) {
+    } else if (!"persistent".equals(runtime.ggufExecutor())) {
       status = OptimizationStatus.DISABLED;
       reason = "staged quantized layer requires the persistent GGUF executor";
     } else {
@@ -525,7 +525,7 @@ public final class ExecutionPlanner {
             && prefillBatchSize > 1
             && runtime.processors() > 1
             && runtime.ggufParallel()
-            && runtime.sharesStagePublication();
+            && "persistent".equals(runtime.ggufExecutor());
     OptimizationStatus status;
     String reason;
     if (enabled) {
@@ -543,7 +543,7 @@ public final class ExecutionPlanner {
     } else if (!runtime.ggufParallel()) {
       status = OptimizationStatus.DISABLED;
       reason = "staged quantized FFN requires parallel GGUF execution";
-    } else if (!runtime.sharesStagePublication()) {
+    } else if (!"persistent".equals(runtime.ggufExecutor())) {
       status = OptimizationStatus.DISABLED;
       reason = "staged quantized FFN requires the persistent GGUF executor";
     } else {
@@ -1008,7 +1008,7 @@ public final class ExecutionPlanner {
               + ", processors="
               + runtime.processors());
     }
-    boolean enabled = runtime.sharesStagePublication();
+    boolean enabled = "persistent".equals(runtime.ggufExecutor());
     if (!enabled) {
       PerformanceCliffs.report(
           PerformanceCliff.PERSISTENT_EXECUTOR_NOT_USED,
