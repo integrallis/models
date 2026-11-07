@@ -116,6 +116,10 @@ public final class InferenceBenchmarkCli {
       System.exit(TaskIndexCli.run(Arrays.copyOfRange(args, 1, args.length)));
       return;
     }
+    if (args.length > 0 && "vision-qualification".equals(args[0])) {
+      VisionQualificationCli.main(java.util.Arrays.copyOfRange(args, 1, args.length));
+      return;
+    }
     if (args.length > 0 && "embedding-equivalence".equals(args[0])) {
       // A gate rather than a benchmark, so its verdict travels in the exit status.
       System.exit(EmbeddingEquivalenceCli.run(Arrays.copyOfRange(args, 1, args.length)));

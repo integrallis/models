@@ -35,7 +35,7 @@ class ClipVisionEncoderQ8_0PathTest {
 
   @Test
   void q8_0KernelPathProducesSameShapeAsFallback(@TempDir Path directory) throws Exception {
-    Path mmproj = SyntheticMmproj.writeDefault(directory);
+    Path mmproj = SyntheticMmproj.write(directory, 8, 2, 32, 2, 4, 64);
     try (Arena arena = Arena.ofConfined()) {
       var file = GgufParser.parse(mmproj, arena);
       var config = ClipVisionConfig.fromGguf(file);
@@ -44,7 +44,7 @@ class ClipVisionEncoderQ8_0PathTest {
       // Quantize to Q8_0
       var q8Weights = weights.withQ8_0(arena);
 
-      int imageSize = SyntheticMmproj.DEFAULT_IMAGE_SIZE;
+      int imageSize = 8;
       int hiddenSize = SyntheticMmproj.DEFAULT_HIDDEN_SIZE;
       int patchSize = SyntheticMmproj.DEFAULT_PATCH_SIZE;
       float[] image = new float[3 * imageSize * imageSize];
@@ -66,7 +66,13 @@ class ClipVisionEncoderQ8_0PathTest {
       // The Q8_0 path should have triggered the kernel for projections
       // 4 projections per layer * 6 layers = 24 calls
       assertThat(countingKernel.q8_0Calls).isGreaterThan(0);
-      System.out.println("Q8_0 kernel calls: " + countingKernel.q8_0Calls);
+      double error = 0;
+      double norm = 0;
+      for (int i = 0; i < embQ8.length; i++) {
+        error += Math.pow(embQ8[i] - embFallback[i], 2);
+        norm += Math.pow(embFallback[i], 2);
+      }
+      assertThat(Math.sqrt(error / norm)).isLessThan(0.02);
     }
     Files.deleteIfExists(mmproj);
   }
@@ -96,13 +102,13 @@ class ClipVisionEncoderQ8_0PathTest {
       if (type == GgufTensorType.Q8_0) {
         q8_0Calls++;
       }
-      // Do a simple reference matmul for correctness
-      for (int b = 0; b < batchSize; b++) {
-        for (int r = 0; r < rows; r++) {
-          float sum = 0.0f;
-          for (int c = 0; c < cols; c++) {
-            sum += input[b * cols + c] * 0.01f;
-          }
+      float[] decoded = new float[cols];
+      for (int r = 0; r < rows; r++) {
+        com.integrallis.models.backend.purejava.gguf.GgufTensorValues.dequantizeRow(
+            weights, type, r, cols, decoded);
+        for (int b = 0; b < batchSize; b++) {
+          float sum = 0;
+          for (int c = 0; c < cols; c++) sum += input[b * cols + c] * decoded[c];
           output[b * rows + r] = sum;
         }
       }

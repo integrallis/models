@@ -215,7 +215,12 @@ public final class PureJavaBackend
     this.batchedAttentionKernel = batchedAttentionKernel;
   }
 
-  /** Loads a GGUF model file and returns a ready-to-use backend. */
+  /** Loads a matched LLaVA text model and its separate vision projector. */
+  public static com.integrallis.models.api.ImageInferenceBackend load(
+      Path modelPath, Path mmprojPath) {
+    return LlavaBackend.load(modelPath, mmprojPath);
+  }
+
   public static PureJavaBackend load(Path modelPath) {
     return load(
         modelPath,
@@ -1207,6 +1212,30 @@ public final class PureJavaBackend
   public int maxBatchSize() {
     checkOpen();
     return decoder.maxBatchSize();
+  }
+
+  /** Whether this loaded graph accepts projected image rows. */
+  public boolean supportsEmbeddingInput() {
+    checkOpen();
+    return decoder instanceof LlamaDecoder llama
+        && llama.config().architecture()
+            == com.integrallis.models.backend.purejava.llama.DecoderArchitecture.LLAMA;
+  }
+
+  /** Dimension of the supported decoder's image input rows. */
+  public int embeddingInputDimension() {
+    checkOpen();
+    if (!supportsEmbeddingInput())
+      throw new UnsupportedOperationException("Image input requires a Llama decoder");
+    return ((LlamaDecoder) decoder).config().embeddingDim();
+  }
+
+  /** Consumes projected image rows in the same sequence as text prefill and decode. */
+  public float[] prefillEmbeddings(float[] embeddings, int startPosition) {
+    checkOpen();
+    if (!supportsEmbeddingInput())
+      throw new UnsupportedOperationException("Image input requires a Llama decoder");
+    return ((LlamaDecoder) decoder).prefillEmbeddings(embeddings, startPosition);
   }
 
   @Override

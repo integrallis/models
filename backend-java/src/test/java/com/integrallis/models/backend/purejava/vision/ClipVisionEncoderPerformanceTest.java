@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Performance characterization for ClipVisionEncoder. */
-@Tag("unit")
+@Tag("benchmark")
 class ClipVisionEncoderPerformanceTest {
 
   @Test

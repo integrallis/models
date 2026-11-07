@@ -142,6 +142,46 @@ class LlamaHiddenStatePrefillTest {
     assertThat(session.checkpoint()).isEqualTo(PROMPT.length);
   }
 
+  @Test
+  void injectedTokenRowsMatchTextLogitsAndSubsequentDecode() {
+    Fixture fixture = new Fixture();
+    LlamaForwardPass text = fixture.newPass();
+    LlamaForwardPass image = fixture.newPass();
+    int[] tokens = {1, 3, 2};
+    float[] rows = new float[tokens.length * DIM];
+    float[] row = new float[DIM];
+    float[] expected = null;
+    for (int i = 0; i < tokens.length; i++) {
+      fixture.weights.embedToken(tokens[i], row);
+      System.arraycopy(row, 0, rows, i * DIM, DIM);
+      expected = text.forward(tokens[i], i);
+    }
+    float[] actual = image.prefillEmbeddings(rows, 0);
+    assertThat(actual).containsExactly(expected);
+    assertThat(image.forward(4, 3)).containsExactly(text.forward(4, 3));
+    assertThat(actual).containsExactly(expected); // stable after decode
+    image.reset();
+    assertThat(image.prefillEmbeddings(rows, 0)).containsExactly(expected);
+  }
+
+  @Test
+  void invalidEmbeddingRowsDoNotAdvanceTheSequence() {
+    Fixture fixture = new Fixture();
+    LlamaForwardPass image = fixture.newPass();
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> image.prefillEmbeddings(new float[DIM + 1], 0))
+        .isInstanceOf(IllegalArgumentException.class);
+    float[] invalid = new float[DIM];
+    invalid[DIM - 1] = Float.NaN;
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> image.prefillEmbeddings(invalid, 0))
+        .isInstanceOf(IllegalArgumentException.class);
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> image.prefillEmbeddings(new float[DIM], 1))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThat(image.checkpoint()).isZero();
+    assertThat(image.forward(1, 0)).containsExactly(fixture.newPass().forward(1, 0));
+  }
+
   private static float[] sequentialHiddenState(LlamaForwardPass pass, int[] tokens) {
     float[] hidden = null;
     for (int position = 0; position < tokens.length; position++) {

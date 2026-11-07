@@ -30,6 +30,7 @@ public final class ClipVisionConfig {
   private final int intermediateSize;
   private final int numPositions;
   private final float layerNormEps;
+  private boolean quickGelu;
 
   public ClipVisionConfig(
       int hiddenSize,
@@ -40,6 +41,23 @@ public final class ClipVisionConfig {
       int intermediateSize,
       int numPositions,
       float layerNormEps) {
+    if (hiddenSize <= 0
+        || numLayers <= 0
+        || numHeads <= 0
+        || hiddenSize % numHeads != 0
+        || patchSize <= 0
+        || imageSize <= 0
+        || imageSize % patchSize != 0
+        || intermediateSize <= 0
+        || !Float.isFinite(layerNormEps)
+        || layerNormEps <= 0) {
+      throw new IllegalArgumentException("Invalid CLIP dimensions or normalization epsilon");
+    }
+    int patches = Math.multiplyExact(imageSize / patchSize, imageSize / patchSize);
+    if (numPositions != Math.addExact(patches, 1)) {
+      throw new IllegalArgumentException("CLIP position count must equal patch count plus CLS");
+    }
+    Math.multiplyExact(Math.multiplyExact(imageSize, imageSize), 3);
     this.hiddenSize = hiddenSize;
     this.numLayers = numLayers;
     this.numHeads = numHeads;
@@ -82,6 +100,10 @@ public final class ClipVisionConfig {
     return layerNormEps;
   }
 
+  public boolean quickGelu() {
+    return quickGelu;
+  }
+
   public int headDim() {
     return hiddenSize / numHeads;
   }
@@ -97,19 +119,33 @@ public final class ClipVisionConfig {
     return patches + 1; // +1 for CLS token
   }
 
+  private static int integer(GgufMetadata metadata, String key) {
+    return metadata
+        .getUint32(key)
+        .or(() -> metadata.getInt32(key))
+        .orElseThrow(() -> new IllegalArgumentException("Missing integer metadata: " + key));
+  }
+
   /** Loads config from mmproj GGUF metadata. */
   public static ClipVisionConfig fromGguf(GgufFile file) {
     Objects.requireNonNull(file, "file");
     GgufMetadata meta = file.metadata();
 
-    int hiddenSize = meta.getInt32("clip.vision.embedding_length").orElse(768);
-    int numLayers = meta.getInt32("clip.vision.block_count").orElse(12);
-    int numHeads = meta.getInt32("clip.vision.attention.head_count").orElse(12);
-    int patchSize = meta.getInt32("clip.vision.patch_size").orElse(14);
-    int imageSize = meta.getInt32("clip.vision.image_size").orElse(336);
-    int intermediateSize = meta.getInt32("clip.vision.feed_forward_length").orElse(hiddenSize * 4);
-    int expectedTokens = (imageSize / patchSize) * (imageSize / patchSize) + 1;
-    int numPositions = meta.getInt32("clip.vision.num_position_embeddings").orElse(expectedTokens);
+    int hiddenSize = integer(meta, "clip.vision.embedding_length");
+    int numLayers = integer(meta, "clip.vision.block_count");
+    int numHeads = integer(meta, "clip.vision.attention.head_count");
+    int patchSize = integer(meta, "clip.vision.patch_size");
+    int imageSize = integer(meta, "clip.vision.image_size");
+    int intermediateSize = integer(meta, "clip.vision.feed_forward_length");
+    if (patchSize <= 0 || imageSize <= 0 || imageSize % patchSize != 0) {
+      throw new IllegalArgumentException("Image size must be a positive multiple of patch size");
+    }
+    int expectedTokens =
+        Math.addExact(Math.multiplyExact(imageSize / patchSize, imageSize / patchSize), 1);
+    int numPositions =
+        meta.getUint32("clip.vision.num_position_embeddings")
+            .or(() -> meta.getInt32("clip.vision.num_position_embeddings"))
+            .orElse(expectedTokens);
     if (numPositions != expectedTokens) {
       throw new IllegalArgumentException(
           "numPosition_embeddings ("
@@ -120,14 +156,17 @@ public final class ClipVisionConfig {
     }
     float layerNormEps = meta.getFloat32("clip.vision.attention.layer_norm_epsilon").orElse(1e-5f);
 
-    return new ClipVisionConfig(
-        hiddenSize,
-        numLayers,
-        numHeads,
-        patchSize,
-        imageSize,
-        intermediateSize,
-        numPositions,
-        layerNormEps);
+    ClipVisionConfig config =
+        new ClipVisionConfig(
+            hiddenSize,
+            numLayers,
+            numHeads,
+            patchSize,
+            imageSize,
+            intermediateSize,
+            numPositions,
+            layerNormEps);
+    config.quickGelu = !meta.getBool("clip.use_gelu").orElse(true);
+    return config;
   }
 }

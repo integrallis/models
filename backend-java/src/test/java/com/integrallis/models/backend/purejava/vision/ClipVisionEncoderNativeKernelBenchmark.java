@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Benchmark comparing pure-Java F32 vs Rust-accelerated Q8_0 vision encoding. */
-@Tag("unit")
+@Tag("benchmark")
 class ClipVisionEncoderNativeKernelBenchmark {
 
   @Test
