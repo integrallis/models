@@ -6705,6 +6705,19 @@ fn quantize_q8_k_batch(
     scales: &mut [f32],
     sums: &mut [i16],
 ) {
+    #[cfg(target_arch = "x86_64")]
+    if std::is_x86_feature_detected!("avx2") {
+        // SAFETY: dispatch checks AVX2; callers provide complete validated Q8_K blocks.
+        unsafe { quantize_q8_k_batch_avx2(input, batch_size, cols, quantized, scales, sums); }
+        return;
+    }
+    quantize_q8_k_batch_scalar(input, batch_size, cols, quantized, scales, sums);
+}
+
+fn quantize_q8_k_batch_scalar(
+    input: &[f32], batch_size: usize, cols: usize, quantized: &mut [i8],
+    scales: &mut [f32], sums: &mut [i16],
+) {
     let blocks_per_row = cols / QK_K;
     let sums_per_row = cols / Q8_K_SUM_BLOCK;
     for batch in 0..batch_size {
@@ -6742,6 +6755,78 @@ fn quantize_q8_k_batch(
                 }
             }
             scales[batch * blocks_per_row + block] = 1.0 / inverse_scale;
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn quantize_q8_k_batch_avx2(
+    input: &[f32], batch_size: usize, cols: usize, quantized: &mut [i8],
+    scales: &mut [f32], sums: &mut [i16],
+) {
+    let sign = _mm256_set1_ps(-0.0);
+    let pack_permutation = _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7);
+    let magic = _mm256_set1_ps(12582912.0);
+    let mantissa = _mm256_set1_epi32(0x007fffff);
+    let bias = _mm256_set1_epi32(0x00400000);
+    let upper = _mm256_set1_epi32(127);
+    for block in 0..batch_size * (cols / QK_K) {
+        let offset = block * QK_K;
+        let values = unsafe { input.as_ptr().add(offset) };
+        let mut maxima = _mm256_setzero_ps();
+        let mut nonfinite = _mm256_setzero_ps();
+        for lane in (0..QK_K).step_by(8) {
+            let absolute = _mm256_andnot_ps(sign, unsafe { _mm256_loadu_ps(values.add(lane)) });
+            nonfinite = _mm256_or_ps(nonfinite, _mm256_cmp_ps::<_CMP_NLE_UQ>(absolute, _mm256_set1_ps(f32::MAX)));
+            maxima = _mm256_blendv_ps(maxima, absolute, _mm256_cmp_ps::<_CMP_GT_OQ>(absolute, maxima));
+        }
+        let m128 = _mm_max_ps(_mm256_castps256_ps128(maxima), _mm256_extractf128_ps(maxima, 1));
+        let m64 = _mm_max_ps(m128, _mm_movehl_ps(m128, m128));
+        let absolute_max = _mm_cvtss_f32(_mm_max_ss(m64, _mm_movehdup_ps(m64)));
+        if absolute_max == 0.0 {
+            quantized[offset..offset + QK_K].fill(0);
+            sums[block * 16..block * 16 + 16].fill(0);
+            scales[block] = 0.0;
+            continue;
+        }
+        if _mm256_movemask_ps(nonfinite) != 0 || !(127.0 / absolute_max).is_finite() {
+            quantize_q8_k_batch_scalar(&input[offset..offset + QK_K], 1, QK_K,
+                &mut quantized[offset..offset + QK_K], &mut scales[block..block + 1],
+                &mut sums[block * 16..block * 16 + 16]);
+            continue;
+        }
+        let maximum = _mm256_set1_ps(absolute_max);
+        let mut signed_max = absolute_max;
+        // Preserve the scalar contract: the sign comes from the first absolute-maximum lane.
+        for lane in (0..QK_K).step_by(8) {
+            let absolute = _mm256_andnot_ps(sign, unsafe { _mm256_loadu_ps(values.add(lane)) });
+            let mask = _mm256_movemask_ps(_mm256_cmp_ps::<_CMP_EQ_OQ>(absolute, maximum));
+            if mask != 0 { signed_max = input[offset + lane + mask.trailing_zeros() as usize]; break; }
+        }
+        let inverse = -127.0 / signed_max;
+        scales[block] = 1.0 / inverse;
+        let multiplier = _mm256_set1_ps(inverse);
+        for group in 0..8 {
+            let mut quants = [_mm256_setzero_si256(); 4];
+            for (i, quant) in quants.iter_mut().enumerate() {
+                let value = unsafe { _mm256_loadu_ps(values.add(group * 32 + i * 8)) };
+                // Same magic-number rounding and clamp as ggml_nearest_int, with no FMA.
+                let bits = _mm256_castps_si256(_mm256_add_ps(_mm256_mul_ps(value, multiplier), magic));
+                *quant = _mm256_min_epi32(_mm256_sub_epi32(_mm256_and_si256(bits, mantissa), bias), upper);
+            }
+            let packed = _mm256_permutevar8x32_epi32(_mm256_packs_epi16(
+                _mm256_packs_epi32(quants[0], quants[1]), _mm256_packs_epi32(quants[2], quants[3])), pack_permutation);
+            unsafe { _mm256_storeu_si256(quantized.as_mut_ptr().add(offset + group * 32).cast(), packed); }
+            let lo = _mm256_cvtepi8_epi16(_mm256_castsi256_si128(packed));
+            let hi = _mm256_cvtepi8_epi16(_mm256_extracti128_si256(packed, 1));
+            let ones = _mm256_set1_epi16(1);
+            for (i, v) in [lo, hi].into_iter().enumerate() {
+                let pairs = _mm256_madd_epi16(v, ones);
+                let halves = _mm_add_epi32(_mm256_castsi256_si128(pairs), _mm256_extracti128_si256(pairs, 1));
+                let reduced = _mm_hadd_epi32(halves, halves);
+                sums[block * 16 + group * 2 + i] = _mm_cvtsi128_si32(_mm_hadd_epi32(reduced, reduced)) as i16;
+            }
         }
     }
 }
@@ -6941,6 +7026,34 @@ fn f32_to_f16(value: f32) -> u16 {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn q8_k_simd_matches_scalar_bytes_scales_and_sums() {
+        if !std::is_x86_feature_detected!("avx2") { return; }
+        for batch in [1, 3, 8, 33] {
+            let cols = 3 * QK_K;
+            let mut input: Vec<f32> = (0..batch * cols)
+                .map(|i| (((i * 73 + 17) % 8191) as f32 - 4095.0) / 31.0).collect();
+            input[..256].fill(0.0);
+            input[256..512].fill(0.5);
+            input[270] = -127.0; input[271] = 127.0;
+            input[520] = 127.0; input[521] = -127.0;
+            for index in 0..16 { input[530 + index] = index as f32 + 0.5; }
+            for special in [None, Some(f32::MIN_POSITIVE / 1024.0), Some(f32::NAN), Some(f32::INFINITY)] {
+                let mut values = input.clone();
+                if let Some(value) = special { values[256..512].fill(value); }
+                let mut expected = vec![0; values.len()]; let mut actual = expected.clone();
+                let mut es = vec![0.0; values.len() / 256]; let mut a_s = es.clone();
+                let mut sums = vec![0; values.len() / 16]; let mut a_sums = sums.clone();
+                quantize_q8_k_batch_scalar(&values, batch, cols, &mut expected, &mut es, &mut sums);
+                unsafe { quantize_q8_k_batch_avx2(&values, batch, cols, &mut actual, &mut a_s, &mut a_sums); }
+                assert_eq!(actual, expected);
+                assert_eq!(a_sums, sums);
+                assert_eq!(a_s.iter().map(|x| x.to_bits()).collect::<Vec<_>>(), es.iter().map(|x| x.to_bits()).collect::<Vec<_>>());
+            }
+        }
+    }
+
     /// `ggml_vec_dot_tq1_0_q8_K` written out literally, as an independent expectation.
     ///
     /// Deliberately NOT factored against the kernel: this keeps the reference's own index

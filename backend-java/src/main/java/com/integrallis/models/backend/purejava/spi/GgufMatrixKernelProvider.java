@@ -23,7 +23,7 @@ public interface GgufMatrixKernelProvider {
   Optional<GgufBatchedMatrixKernel> open(int threads);
 
   /** Opens the matching retained attention kernel, when supported. */
-  default BatchedCausalAttentionKernel openAttention(int threads) {
+  default BatchedCausalAttentionKernel openAttention(int threads, GgufBatchedMatrixKernel matrix) {
     return BatchedCausalAttentionKernel.none();
   }
 }

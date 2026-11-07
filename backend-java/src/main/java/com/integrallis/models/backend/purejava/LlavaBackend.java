@@ -69,7 +69,7 @@ public final class LlavaBackend implements ImageInferenceBackend {
         var kernel = available.orElseThrow();
         com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel attention;
         try {
-          attention = provider.openAttention(threads);
+          attention = provider.openAttention(threads, kernel);
         } catch (RuntimeException | Error failure) {
           kernel.close();
           throw failure;

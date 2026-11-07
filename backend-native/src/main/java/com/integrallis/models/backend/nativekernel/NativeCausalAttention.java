@@ -21,7 +21,8 @@ import java.util.Map;
 
 /** Owned continuous MHA prefix for the LLaVA decoder, sharing the dense GEMM implementation. */
 final class NativeCausalAttention implements BatchedCausalAttentionKernel {
-  private final NativeDebertaKernels kernels;
+  private final com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel kernels;
+  private float[] scores = new float[0];
   private final Map<Integer, Layer> layers = new HashMap<>();
   private boolean closed;
 
@@ -38,7 +39,8 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
     }
   }
 
-  NativeCausalAttention(NativeDebertaKernels kernels) {
+  NativeCausalAttention(
+      com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel kernels) {
     this.kernels = kernels;
   }
 
@@ -95,8 +97,34 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
     Layer state = layers.computeIfAbsent(layer, ignored -> new Layer(dimension, capacity));
     System.arraycopy(key, 0, state.keys, start * dimension, count);
     System.arraycopy(value, 0, state.values, start * dimension, count);
-    kernels.causalAttention(
-        output, query, state.keys, state.values, batch, start + batch, dimension, heads);
+    int needed = Math.multiplyExact(heads, start + batch);
+    if (scores.length < needed) scores = new float[needed];
+    float scale = (float) (1.0 / Math.sqrt(keyLength));
+    for (int row = 0; row < batch; row++) {
+      kernels.groupedAttention(
+          query,
+          row * dimension,
+          state.keys,
+          0,
+          state.values,
+          0,
+          start + row + 1,
+          null,
+          0,
+          null,
+          0,
+          0,
+          output,
+          row * dimension,
+          scores,
+          dimension,
+          dimension,
+          keyLength,
+          valueLength,
+          heads,
+          kvHeads,
+          scale);
+    }
     state.positions = start + batch;
   }
 
@@ -116,7 +144,7 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
     if (!closed) {
       closed = true;
       layers.clear();
-      kernels.close();
+      scores = new float[0];
     }
   }
 }

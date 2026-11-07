@@ -27,6 +27,68 @@ import org.junit.jupiter.api.Test;
 
 class NativeDebertaKernelsTest {
   @Test
+  void causalAttentionPreservesPrefixThroughChunksDecodeResetAndRewind() {
+    var nativeKernels =
+        RustGgufBatchedMatrixKernel.open(
+            Path.of(System.getProperty("models.native.kernels.library")), 3);
+    try (nativeKernels;
+        var attention = new NativeCausalAttention(nativeKernels)) {
+      int dim = 15, heads = 3, width = 5, capacity = 16;
+      var random = new Random(6081);
+      float[] fullQ = new float[capacity * dim], fullK = fullQ.clone(), fullV = fullQ.clone();
+      for (float[] a : new float[][] {fullQ, fullK, fullV})
+        for (int i = 0; i < a.length; i++) a[i] = random.nextFloat() * 4 - 2;
+      for (int repeat = 0; repeat < 2; repeat++) {
+        attention.reset();
+        int start = 0;
+        for (int count : new int[] {3, 1, 7, 2}) {
+          assertThat(
+                  attention.isEligible(
+                      0, start + 1, count, heads, heads, width, width, capacity, 0))
+              .isFalse();
+          float[] q = Arrays.copyOfRange(fullQ, start * dim, (start + count) * dim);
+          float[] k = Arrays.copyOfRange(fullK, start * dim, (start + count) * dim);
+          float[] v = Arrays.copyOfRange(fullV, start * dim, (start + count) * dim);
+          float[] output = new float[count * dim + 2];
+          Arrays.fill(output, 99);
+          attention.attend(
+              output, q, k, v, 0, start, count, heads, heads, width, width, capacity, 0);
+          for (int row = 0; row < count; row++) {
+            int visible = start + row + 1;
+            for (int h = 0; h < heads; h++) {
+              double[] scores = new double[visible];
+              for (int pos = 0; pos < visible; pos++) {
+                for (int c = 0; c < width; c++)
+                  scores[pos] +=
+                      (double) q[row * dim + h * width + c] * fullK[pos * dim + h * width + c];
+                scores[pos] /= Math.sqrt(width);
+              }
+              double max = Arrays.stream(scores).max().orElseThrow(), sum = 0;
+              for (int pos = 0; pos < visible; pos++) {
+                scores[pos] = Math.exp(scores[pos] - max);
+                sum += scores[pos];
+              }
+              for (int c = 0; c < width; c++) {
+                double expected = 0;
+                for (int pos = 0; pos < visible; pos++)
+                  expected += scores[pos] / sum * fullV[pos * dim + h * width + c];
+                assertThat((double) output[row * dim + h * width + c])
+                    .isCloseTo(expected, within(2e-5));
+              }
+            }
+          }
+          assertThat(output[count * dim]).isEqualTo(99);
+          start += count;
+        }
+        attention.rewind(3);
+        assertThat(attention.isEligible(0, 3, 1, heads, heads, width, width, capacity, 0)).isTrue();
+        assertThat(attention.isEligible(0, 13, 1, heads, heads, width, width, capacity, 0))
+            .isFalse();
+      }
+    }
+  }
+
+  @Test
   void denseAttentionMatchesScalarWithUnevenHeadsAndReusesScratch() {
     var kernels =
         NativeDebertaKernels.load(Path.of(System.getProperty("models.native.kernels.library")), 3);
