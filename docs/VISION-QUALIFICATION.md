@@ -6,6 +6,11 @@ MLP projector, consumes the projected patches in the existing Llama KV sequence,
 generation. The first concrete candidate is LLaVA 1.5 7B Q4_K_M with its F16 projector. The pinned
 files and SHA-256 values are in `experiments/vision-qualification/artifacts.json`.
 
+The [recorded remote run](../experiments/vision-qualification/results/2026-11-07/README.md) passes
+all three numerical probes and generates the correct photographic subjects through the two-file
+API. It also measures a 7.2–7.9× encoder latency gap and a 174-second image/text prefill. Those
+performance gaps and the published-task campaign remain before catalog admission.
+
 ## Public API
 
 ```java
