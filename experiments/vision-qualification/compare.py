@@ -7,7 +7,9 @@ from pathlib import Path
 import numpy as np
 
 
-def compare(candidate, oracle):
+def compare(candidate, oracle, max_latency_ratio=None):
+    if max_latency_ratio is not None and (not np.isfinite(max_latency_ratio) or max_latency_ratio <= 0):
+        raise ValueError("Latency ratio must be positive and finite")
     a = json.loads((candidate / "report.json").read_text())
     b = json.loads((oracle / "report.json").read_text())
     for key in ("schema", "host", "threads", "mmprojSha256", "imageSha256", "imageSize", "tokens", "dimension", "warmups", "repetitions"):
@@ -35,6 +37,9 @@ def compare(candidate, oracle):
     result["candidateToOracleLatencyRatio"] = result["candidateMedianMs"] / result["oracleMedianMs"]
     result["numericalPass"] = result["pixels"]["maxAbs"] <= 0.02 and result["embeddings"]["cosine"] >= 0.999 and result["embeddings"]["normalizedRmse"] <= 0.01
     result["catalogQualified"] = False
+    if max_latency_ratio is not None:
+        result["performancePass"] = result["candidateToOracleLatencyRatio"] <= max_latency_ratio
+        result["maximumLatencyRatio"] = max_latency_ratio
     return result
 
 
@@ -43,8 +48,9 @@ if __name__ == "__main__":
     p.add_argument("candidate", type=Path)
     p.add_argument("oracle", type=Path)
     p.add_argument("output", type=Path)
+    p.add_argument("--max-latency-ratio", type=float)
     args = p.parse_args()
-    verdict = compare(args.candidate, args.oracle)
+    verdict = compare(args.candidate, args.oracle, args.max_latency_ratio)
     args.output.write_text(json.dumps(verdict, indent=2) + "\n")
     print(json.dumps({k:v for k,v in verdict.items() if k not in ("candidate", "oracle")}))
-    sys.exit(0 if verdict["numericalPass"] else 1)
+    sys.exit(0 if verdict["numericalPass"] and verdict.get("performancePass", True) else 1)

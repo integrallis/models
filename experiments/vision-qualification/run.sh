@@ -13,6 +13,13 @@ output=$(realpath "$3")
 python=${VISION_PYTHON:-python3}
 java=${VISION_JAVA:-java}
 threads=${VISION_THREADS:-8}
+warmups=${VISION_WARMUPS:-2}
+repetitions=${VISION_REPETITIONS:-5}
+native_args=()
+if [[ -n ${VISION_NATIVE_LIBRARY:-} ]]; then
+    native_library=$(realpath "$VISION_NATIVE_LIBRARY")
+    native_args=("-Dmodels.native.kernels.library=$native_library")
+fi
 artifacts=${VISION_ARTIFACT_DIRECTORY:-$output/artifacts}
 mkdir -p "$output/results"
 "$python" -m unittest discover -s "$script_dir" -p 'test_*.py'
@@ -22,19 +29,22 @@ mkdir -p "$output/results"
 "$java" -version > "$output/java-version.txt" 2>&1
 lscpu > "$output/cpu.txt"
 sha256sum "$distribution"/lib/*.jar > "$output/payload-sha256.txt"
+if [[ -n ${VISION_NATIVE_LIBRARY:-} ]]; then
+    sha256sum "$native_library" > "$output/native-library-sha256.txt"
+fi
 printf '%s\n' "$revision" > "$output/candidate-commit.txt"
 mmproj=$artifacts/llava-v1.5-7b-mmproj-model-f16.gguf
 text=$artifacts/llava-v1.5-7b-Q4_K_M.gguf
 for probe in cats wide-gradient tall-bands; do
     image=$output/images/$probe.png
-    "$python" "$script_dir/oracle.py" "$mmproj" "$image" "$output/results/$probe/oracle" --threads "$threads" --warmups 1 --repetitions 3
+    "$python" "$script_dir/oracle.py" "$mmproj" "$image" "$output/results/$probe/oracle" --threads "$threads" --warmups "$warmups" --repetitions "$repetitions"
     extra=()
     [[ $probe == cats ]] && extra=("$text")
-    "$java" --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx12g \
+    "$java" "${native_args[@]}" --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx12g \
         -Dvectors.gguf.threads="$threads" -Dmodels.purejava.maxContextLength=1024 \
         -Dmodels.qualification.revision="$revision" -cp "$distribution/lib/*" \
         com.integrallis.models.bench.VisionQualificationCli \
-        "$mmproj" "$image" "$output/results/$probe/candidate" 1 3 "${extra[@]}"
-    "$python" "$script_dir/compare.py" "$output/results/$probe/candidate" "$output/results/$probe/oracle" "$output/results/$probe/verdict.json"
+        "$mmproj" "$image" "$output/results/$probe/candidate" "$warmups" "$repetitions" "${extra[@]}"
+    "$python" "$script_dir/compare.py" "$output/results/$probe/candidate" "$output/results/$probe/oracle" "$output/results/$probe/verdict.json" --max-latency-ratio 1.10
 done
 printf 'INTEGRATION_PASS\n' > "$output/STATUS"

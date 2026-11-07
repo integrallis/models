@@ -33,6 +33,17 @@ class ComparisonTest(unittest.TestCase):
         np.array([4, 3, 2, 1], dtype="<f4").tofile(self.candidate / "embeddings.f32")
         self.assertFalse(compare(self.candidate, self.oracle)["numericalPass"])
 
+    def test_latency_gate_is_independent_of_numerical_fidelity(self):
+        (self.candidate / "report.json").write_text(json.dumps(
+            self.report | {"encoderProjectorMs": [2, 4, 6]}))
+        result = compare(self.candidate, self.oracle, 1.10)
+        self.assertTrue(result["numericalPass"])
+        self.assertFalse(result["performancePass"])
+        self.assertEqual(result["candidateToOracleLatencyRatio"], 2.0)
+        for limit in (0, -1, float("nan"), float("inf")):
+            with self.assertRaises(ValueError):
+                compare(self.candidate, self.oracle, limit)
+
     def test_mismatched_provenance_and_partial_timings_are_rejected(self):
         for key, value in (("host", "other"), ("threads", 4), ("imageSha256", "different"),
                            ("mmprojSha256", "different"), ("encoderProjectorMs", [1.0]),
