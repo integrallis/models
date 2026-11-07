@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.spi.DenseProjectionKernels;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import com.integrallis.vectors.core.GgufStagePlan;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
@@ -253,9 +254,16 @@ public final class ClipVisionEncoder {
 
     // 8. GELU activation
     if (config.quickGelu()) {
-      for (int i = 0; i < tokens * hiddenDim; i++) {
-        feedForward[i] = (float) (feedForward[i] / (1.0 + Math.exp(-1.702 * feedForward[i])));
-      }
+      GgufStagePlan.of(
+              GgufStagePlan.stage(
+                  tokens,
+                  (from, to) -> {
+                    for (int i = from * hiddenDim; i < to * hiddenDim; i++) {
+                      feedForward[i] =
+                          (float) (feedForward[i] / (1.0 + Math.exp(-1.702 * feedForward[i])));
+                    }
+                  }))
+          .execute();
     } else {
       TensorOps.gelu(feedForward, 0, feedForward, 0, tokens * hiddenDim);
     }
@@ -338,10 +346,17 @@ public final class ClipVisionEncoder {
 
   private void normalizeRows(float[] out, float[] in, int rows, float[] weight, float[] bias) {
     int dim = config.hiddenSize();
-    for (int r = 0; r < rows; r++) {
-      int offset = r * dim;
-      TensorOps.layerNorm(out, offset, in, offset, weight, bias, dim, config.layerNormEps());
-    }
+    GgufStagePlan.of(
+            GgufStagePlan.stage(
+                rows,
+                (from, to) -> {
+                  for (int r = from; r < to; r++) {
+                    int offset = r * dim;
+                    TensorOps.layerNorm(
+                        out, offset, in, offset, weight, bias, dim, config.layerNormEps());
+                  }
+                }))
+        .execute();
   }
 
   /**
