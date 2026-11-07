@@ -25,6 +25,7 @@ import javax.imageio.ImageIO;
 public final class ClipImagePreprocessor {
   private ClipImagePreprocessor() {}
 
+  /** Decodes an image and returns model-normalized RGB pixels in CHW order. */
   public static float[] preprocess(byte[] encoded, int size, float[] mean, float[] std) {
     Objects.requireNonNull(encoded, "encoded");
     try {
@@ -36,6 +37,7 @@ public final class ClipImagePreprocessor {
     }
   }
 
+  /** Pads and resizes an RGB view without changing the source image or normalization arrays. */
   public static float[] preprocess(BufferedImage image, int size, float[] mean, float[] std) {
     Objects.requireNonNull(image, "image");
     if (size <= 0 || mean.length != 3 || std.length != 3) {

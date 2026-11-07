@@ -32,6 +32,7 @@ public final class ClipVisionConfig {
   private final float layerNormEps;
   private boolean quickGelu;
 
+  /** Builds a validated GELU profile; {@link #fromGguf} also reads the declared activation mode. */
   public ClipVisionConfig(
       int hiddenSize,
       int numLayers,
@@ -70,42 +71,52 @@ public final class ClipVisionConfig {
     this.layerNormEps = layerNormEps;
   }
 
+  /** Width of each CLIP feature row, before the trained projector. */
   public int hiddenSize() {
     return hiddenSize;
   }
 
+  /** Stored transformer blocks; converted LLaVA files already omit the upstream final block. */
   public int numLayers() {
     return numLayers;
   }
 
+  /** Number of attention heads, which divides the hidden feature width exactly. */
   public int numHeads() {
     return numHeads;
   }
 
+  /** Width and height of each non-overlapping image patch, in pixels. */
   public int patchSize() {
     return patchSize;
   }
 
+  /** Width and height of the preprocessed square image, in pixels. */
   public int imageSize() {
     return imageSize;
   }
 
+  /** Width of the expanded feed-forward representation in each transformer block. */
   public int intermediateSize() {
     return intermediateSize;
   }
 
+  /** Learned position-embedding rows, including the leading class-token position. */
   public int numPositions() {
     return numPositions;
   }
 
+  /** Positive finite stabilizer added to variance in CLIP layer normalization. */
   public float layerNormEps() {
     return layerNormEps;
   }
 
+  /** Whether the checkpoint selects QuickGELU instead of GELU for its feed-forward layers. */
   public boolean quickGelu() {
     return quickGelu;
   }
 
+  /** Feature coordinates assigned to each attention head. */
   public int headDim() {
     return hiddenSize / numHeads;
   }

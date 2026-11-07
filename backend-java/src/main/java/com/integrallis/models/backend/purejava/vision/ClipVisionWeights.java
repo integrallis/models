@@ -49,7 +49,6 @@ final class ClipVisionWeights {
 
   private final Matrix patchEmbed;
   private final float[] patchEmbedBias;
-  private final Matrix positionEmbed;
   private final float[] positionEmbedF32;
   private final float[] preLnWeight;
   private final float[] preLnBias;
@@ -61,7 +60,6 @@ final class ClipVisionWeights {
   private ClipVisionWeights(
       Matrix patchEmbed,
       float[] patchEmbedBias,
-      Matrix positionEmbed,
       float[] positionEmbedF32,
       float[] preLnWeight,
       float[] preLnBias,
@@ -71,7 +69,6 @@ final class ClipVisionWeights {
       Layer[] layers) {
     this.patchEmbed = patchEmbed;
     this.patchEmbedBias = patchEmbedBias;
-    this.positionEmbed = positionEmbed;
     this.positionEmbedF32 = positionEmbedF32;
     this.preLnWeight = preLnWeight;
     this.preLnBias = preLnBias;
@@ -87,10 +84,6 @@ final class ClipVisionWeights {
 
   float[] patchEmbedBias() {
     return patchEmbedBias;
-  }
-
-  Matrix positionEmbed() {
-    return positionEmbed;
   }
 
   float[] positionEmbedF32() {
@@ -141,7 +134,7 @@ final class ClipVisionWeights {
     Matrix patchEmbed = new Matrix(patch.dataSegment(), patch.type(), dim, patchPixels);
     float[] patchEmbedBias = vectorOrZero(file, "v.patch_embd.bias", dim);
 
-    Matrix positionEmbed = matrix(file, "v.position_embd.weight", numPositions, dim);
+    matrix(file, "v.position_embd.weight", numPositions, dim);
     float[] positionEmbedF32 = toFloatArray(file.getTensor("v.position_embd.weight"));
 
     float[] preLnWeight = optionalVector(file, "v.pre_ln.weight", dim);
@@ -155,14 +148,12 @@ final class ClipVisionWeights {
     for (int layer = 0; layer < layers.length; layer++) {
       String p = "v.blk." + layer + ".";
       Matrix qkv;
-      float[] qkvValues;
       float[] qkvBias;
       if (file.hasTensor(p + "attn_qkv.weight")) {
         qkv = matrix(file, p + "attn_qkv.weight", dim * 3, dim);
-        qkvValues = toFloatArray(file.getTensor(p + "attn_qkv.weight"));
         qkvBias = vectorOrZero(file, p + "attn_qkv.bias", dim * 3);
       } else {
-        qkvValues = new float[Math.multiplyExact(3, Math.multiplyExact(dim, dim))];
+        float[] qkvValues = new float[Math.multiplyExact(3, Math.multiplyExact(dim, dim))];
         qkvBias = new float[3 * dim];
         String[] names = {"attn_q", "attn_k", "attn_v"};
         for (int i = 0; i < names.length; i++) {
@@ -205,7 +196,6 @@ final class ClipVisionWeights {
     return new ClipVisionWeights(
         patchEmbed,
         patchEmbedBias,
-        positionEmbed,
         positionEmbedF32,
         preLnWeight,
         preLnBias,

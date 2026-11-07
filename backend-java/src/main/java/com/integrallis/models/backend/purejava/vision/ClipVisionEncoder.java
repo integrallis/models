@@ -17,13 +17,12 @@ package com.integrallis.models.backend.purejava.vision;
 
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.spi.DenseProjectionKernels;
-import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufStagePlan;
 import com.integrallis.vectors.core.VectorUtil;
 import java.util.Arrays;
 
 /**
- * Pure-Java CLIP vision encoder.
+ * CLIP vision encoder using the selected projection and attention kernels.
  *
  * <p>Loads weights from a CLIP mmproj GGUF and runs a full ViT forward pass, producing vision
  * feature tokens. A trained projector is required before decoder injection.
@@ -43,7 +42,7 @@ import java.util.Arrays;
  * <p>Quantized weight types supported: F32, F16, BF16, Q4_0, Q5_0, Q8_0 and K-quants through the
  * standard GGUF dequantization path.
  */
-public final class ClipVisionEncoder {
+final class ClipVisionEncoder {
 
   private final java.util.Map<
           ClipVisionWeights.Matrix,
@@ -51,7 +50,6 @@ public final class ClipVisionEncoder {
       projections = new java.util.IdentityHashMap<>();
   private final ClipVisionConfig config;
   private final ClipVisionWeights weights;
-  private final GgufBatchedMatrixKernel matrixKernel;
 
   // Working buffers, sized for one image at a time
   private final DenseProjectionKernels denseKernels;
@@ -70,19 +68,12 @@ public final class ClipVisionEncoder {
   private final float[] feedForwardProjected;
   private final float[] scores;
 
-  public ClipVisionEncoder(
-      ClipVisionConfig config, ClipVisionWeights weights, GgufBatchedMatrixKernel matrixKernel) {
-    this(config, weights, matrixKernel, null);
-  }
-
   ClipVisionEncoder(
       ClipVisionConfig config,
       ClipVisionWeights weights,
-      GgufBatchedMatrixKernel matrixKernel,
       com.integrallis.models.backend.purejava.spi.DenseProjectionKernels denseKernels) {
     this.config = config;
     this.weights = weights;
-    this.matrixKernel = matrixKernel != null ? matrixKernel : GgufBatchedMatrixKernel.none();
 
     for (int i = 0; i < config.numLayers(); i++) {
       var layer = weights.layer(i);
@@ -352,18 +343,7 @@ public final class ClipVisionEncoder {
 
   private void project(
       float[] output, float[] input, int sequenceLength, ClipVisionWeights.Matrix matrix) {
-    if (matrixKernel.isEligible(matrix.type(), sequenceLength, matrix.rows(), matrix.columns())) {
-      matrixKernel.multiply(
-          output,
-          input,
-          matrix.data(),
-          matrix.type(),
-          sequenceLength,
-          matrix.rows(),
-          matrix.columns());
-    } else {
-      projections.get(matrix).project(output, input, sequenceLength);
-    }
+    projections.get(matrix).project(output, input, sequenceLength);
   }
 
   private static void addBias(float[] values, int rows, int columns, float[] bias) {
