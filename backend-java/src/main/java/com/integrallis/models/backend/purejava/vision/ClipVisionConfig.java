@@ -1,0 +1,133 @@
+/*
+ * Copyright 2025-2026 Integrallis Software, LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.integrallis.models.backend.purejava.vision;
+
+import com.integrallis.models.backend.purejava.gguf.GgufFile;
+import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
+import java.util.Objects;
+
+/** Configuration for a CLIP-style vision encoder as stored in an mmproj GGUF file. */
+public final class ClipVisionConfig {
+
+  private final int hiddenSize;
+  private final int numLayers;
+  private final int numHeads;
+  private final int patchSize;
+  private final int imageSize;
+  private final int intermediateSize;
+  private final int numPositions;
+  private final float layerNormEps;
+
+  public ClipVisionConfig(
+      int hiddenSize,
+      int numLayers,
+      int numHeads,
+      int patchSize,
+      int imageSize,
+      int intermediateSize,
+      int numPositions,
+      float layerNormEps) {
+    this.hiddenSize = hiddenSize;
+    this.numLayers = numLayers;
+    this.numHeads = numHeads;
+    this.patchSize = patchSize;
+    this.imageSize = imageSize;
+    this.intermediateSize = intermediateSize;
+    this.numPositions = numPositions;
+    this.layerNormEps = layerNormEps;
+  }
+
+  public int hiddenSize() {
+    return hiddenSize;
+  }
+
+  public int numLayers() {
+    return numLayers;
+  }
+
+  public int numHeads() {
+    return numHeads;
+  }
+
+  public int patchSize() {
+    return patchSize;
+  }
+
+  public int imageSize() {
+    return imageSize;
+  }
+
+  public int intermediateSize() {
+    return intermediateSize;
+  }
+
+  public int numPositions() {
+    return numPositions;
+  }
+
+  public float layerNormEps() {
+    return layerNormEps;
+  }
+
+  public int headDim() {
+    return hiddenSize / numHeads;
+  }
+
+  /**
+   * Returns the number of vision tokens including the class token.
+   *
+   * <p>CLIP ViT prepends a learnable class token to the patch tokens, so the total is {@code
+   * patches + 1}. The position embedding table has the same count.
+   */
+  public int numTokens() {
+    int patches = (imageSize / patchSize) * (imageSize / patchSize);
+    return patches + 1; // +1 for CLS token
+  }
+
+  /** Loads config from mmproj GGUF metadata. */
+  public static ClipVisionConfig fromGguf(GgufFile file) {
+    Objects.requireNonNull(file, "file");
+    GgufMetadata meta = file.metadata();
+
+    int hiddenSize = meta.getInt32("clip.vision.embedding_length").orElse(768);
+    int numLayers = meta.getInt32("clip.vision.block_count").orElse(12);
+    int numHeads = meta.getInt32("clip.vision.attention.head_count").orElse(12);
+    int patchSize = meta.getInt32("clip.vision.patch_size").orElse(14);
+    int imageSize = meta.getInt32("clip.vision.image_size").orElse(336);
+    int intermediateSize = meta.getInt32("clip.vision.feed_forward_length").orElse(hiddenSize * 4);
+    int expectedTokens = (imageSize / patchSize) * (imageSize / patchSize) + 1;
+    int numPositions = meta.getInt32("clip.vision.num_position_embeddings").orElse(expectedTokens);
+    if (numPositions != expectedTokens) {
+      throw new IllegalArgumentException(
+          "numPosition_embeddings ("
+              + numPositions
+              + ") must equal expected tokens ("
+              + expectedTokens
+              + ")");
+    }
+    float layerNormEps = meta.getFloat32("clip.vision.attention.layer_norm_epsilon").orElse(1e-5f);
+
+    return new ClipVisionConfig(
+        hiddenSize,
+        numLayers,
+        numHeads,
+        patchSize,
+        imageSize,
+        intermediateSize,
+        numPositions,
+        layerNormEps);
+  }
+}

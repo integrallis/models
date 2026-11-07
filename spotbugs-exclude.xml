@@ -23,6 +23,12 @@
         <Package name="com.integrallis.models.backend.purejava"/>
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
+    <!-- CLIP vision weights: optionalVector legitimately checks for missing GGUF tensors -->
+    <Match>
+        <Class name="com.integrallis.models.backend.purejava.vision.ClipVisionWeights" />
+        <Method name="optionalVector" />
+        <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
+    </Match>
     <!-- Decoder-internal weight holders, same reason as the packages above: a Weights record hands
          the forward pass the mapped weight arrays by reference, because copying a norm vector per
          token is the cost these classes exist to avoid. <Package> does not match subpackages, so
