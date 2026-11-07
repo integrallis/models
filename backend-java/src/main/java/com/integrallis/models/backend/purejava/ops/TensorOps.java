@@ -440,7 +440,7 @@ public final class TensorOps {
    * this never holds up JVM exit.
    */
   private static final class PackedProjectionThreads {
-    static final int COUNT = Math.max(1, Runtime.getRuntime().availableProcessors());
+    static final int COUNT = Math.max(1, VectorUtil.runtimeCapabilities().ggufThreads());
 
     /**
      * A thread that is never started, used only to ask a segment whether a thread other than the

@@ -4352,65 +4352,72 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
         return;
     }
 
-    for row in start_row..end_row {
-        let mut batch = 0;
-        while batch + 4 <= batch_size {
-            unsafe {
-                compute_q4_k_tile::<4>(
-                    weights,
-                    quantized,
-                    activation_scales,
-                    activation_sums,
-                    output,
-                    batch,
-                    row,
-                    rows,
-                    cols,
-                );
+    // Bound both operands in the private cache. A row-major sweep of the entire
+    // batch rereads megabytes of activations for every weight row during image prefill.
+    for row_tile in (start_row..end_row).step_by(16) {
+        for batch_tile in (0..batch_size).step_by(16) {
+            let batch_end = (batch_tile + 16).min(batch_size);
+            for row in row_tile..(row_tile + 16).min(end_row) {
+                let mut batch = batch_tile;
+                while batch + 4 <= batch_end {
+                    unsafe {
+                        compute_q4_k_tile::<4>(
+                            weights,
+                            quantized,
+                            activation_scales,
+                            activation_sums,
+                            output,
+                            batch,
+                            row,
+                            rows,
+                            cols,
+                        );
+                    }
+                    batch += 4;
+                }
+                match batch_end - batch {
+                    3 => unsafe {
+                        compute_q4_k_tile::<3>(
+                            weights,
+                            quantized,
+                            activation_scales,
+                            activation_sums,
+                            output,
+                            batch,
+                            row,
+                            rows,
+                            cols,
+                        );
+                    },
+                    2 => unsafe {
+                        compute_q4_k_tile::<2>(
+                            weights,
+                            quantized,
+                            activation_scales,
+                            activation_sums,
+                            output,
+                            batch,
+                            row,
+                            rows,
+                            cols,
+                        );
+                    },
+                    1 => unsafe {
+                        compute_q4_k_tile::<1>(
+                            weights,
+                            quantized,
+                            activation_scales,
+                            activation_sums,
+                            output,
+                            batch,
+                            row,
+                            rows,
+                            cols,
+                        );
+                    },
+                    _ => {}
+                }
             }
-            batch += 4;
-        }
-        match batch_size - batch {
-            3 => unsafe {
-                compute_q4_k_tile::<3>(
-                    weights,
-                    quantized,
-                    activation_scales,
-                    activation_sums,
-                    output,
-                    batch,
-                    row,
-                    rows,
-                    cols,
-                );
-            },
-            2 => unsafe {
-                compute_q4_k_tile::<2>(
-                    weights,
-                    quantized,
-                    activation_scales,
-                    activation_sums,
-                    output,
-                    batch,
-                    row,
-                    rows,
-                    cols,
-                );
-            },
-            1 => unsafe {
-                compute_q4_k_tile::<1>(
-                    weights,
-                    quantized,
-                    activation_scales,
-                    activation_sums,
-                    output,
-                    batch,
-                    row,
-                    rows,
-                    cols,
-                );
-            },
-            _ => {}
         }
     }
 }
@@ -4695,65 +4702,72 @@ unsafe fn compute_q6_k_batched_row_range_avx2(
         return;
     }
 
-    for row in start_row..end_row {
-        let mut batch = 0;
-        while batch + 4 <= batch_size {
-            unsafe {
-                compute_q6_k_tile::<4>(
-                    weights,
-                    quantized,
-                    activation_scales,
-                    activation_sums,
-                    output,
-                    batch,
-                    row,
-                    rows,
-                    cols,
-                );
+    // Bound both operands in the private cache. A row-major sweep of the entire
+    // batch rereads megabytes of activations for every weight row during image prefill.
+    for row_tile in (start_row..end_row).step_by(16) {
+        for batch_tile in (0..batch_size).step_by(16) {
+            let batch_end = (batch_tile + 16).min(batch_size);
+            for row in row_tile..(row_tile + 16).min(end_row) {
+                let mut batch = batch_tile;
+                while batch + 4 <= batch_end {
+                    unsafe {
+                        compute_q6_k_tile::<4>(
+                            weights,
+                            quantized,
+                            activation_scales,
+                            activation_sums,
+                            output,
+                            batch,
+                            row,
+                            rows,
+                            cols,
+                        );
+                    }
+                    batch += 4;
+                }
+                match batch_end - batch {
+                    3 => unsafe {
+                        compute_q6_k_tile::<3>(
+                            weights,
+                            quantized,
+                            activation_scales,
+                            activation_sums,
+                            output,
+                            batch,
+                            row,
+                            rows,
+                            cols,
+                        );
+                    },
+                    2 => unsafe {
+                        compute_q6_k_tile::<2>(
+                            weights,
+                            quantized,
+                            activation_scales,
+                            activation_sums,
+                            output,
+                            batch,
+                            row,
+                            rows,
+                            cols,
+                        );
+                    },
+                    1 => unsafe {
+                        compute_q6_k_tile::<1>(
+                            weights,
+                            quantized,
+                            activation_scales,
+                            activation_sums,
+                            output,
+                            batch,
+                            row,
+                            rows,
+                            cols,
+                        );
+                    },
+                    _ => {}
+                }
             }
-            batch += 4;
-        }
-        match batch_size - batch {
-            3 => unsafe {
-                compute_q6_k_tile::<3>(
-                    weights,
-                    quantized,
-                    activation_scales,
-                    activation_sums,
-                    output,
-                    batch,
-                    row,
-                    rows,
-                    cols,
-                );
-            },
-            2 => unsafe {
-                compute_q6_k_tile::<2>(
-                    weights,
-                    quantized,
-                    activation_scales,
-                    activation_sums,
-                    output,
-                    batch,
-                    row,
-                    rows,
-                    cols,
-                );
-            },
-            1 => unsafe {
-                compute_q6_k_tile::<1>(
-                    weights,
-                    quantized,
-                    activation_scales,
-                    activation_sums,
-                    output,
-                    batch,
-                    row,
-                    rows,
-                    cols,
-                );
-            },
-            _ => {}
         }
     }
 }
@@ -4824,8 +4838,30 @@ unsafe fn compute_q6_k_tile<const B: usize>(
             );
         }
 
+        let mut block_lanes = [_mm256_setzero_si256(); B];
+        for super_block in 0..2 {
+            let decoded_offset = super_block * 4;
+            let scale_base = super_block * 8;
+            for group in 0..4 {
+                let first_scale = _mm_set1_epi16(scales[scale_base + group * 2] as i8 as i16);
+                let second_scale = _mm_set1_epi16(scales[scale_base + group * 2 + 1] as i8 as i16);
+                let scale =
+                    _mm256_inserti128_si256(_mm256_castsi128_si256(first_scale), second_scale, 1);
+                for (batch, lanes) in block_lanes.iter_mut().enumerate() {
+                    let activation = quantized.as_ptr().wrapping_add(
+                        (batch_start + batch) * cols
+                            + block * QK_K
+                            + super_block * 128
+                            + group * 32,
+                    );
+                    let activations = unsafe { _mm256_loadu_si256(activation.cast()) };
+                    let products =
+                        _mm256_maddubs_epi16(decoded[decoded_offset + group], activations);
+                    *lanes = _mm256_add_epi32(*lanes, _mm256_madd_epi16(products, scale));
+                }
+            }
+        }
         for batch in 0..B {
-            let activation_offset = (batch_start + batch) * cols + block * QK_K;
             let activation_sum_offset =
                 (batch_start + batch) * cols / Q8_K_SUM_BLOCK + block * QK_K / Q8_K_SUM_BLOCK;
             let activation_sum_values = unsafe {
@@ -4833,30 +4869,7 @@ unsafe fn compute_q6_k_tile<const B: usize>(
             };
             let offset_lanes =
                 _mm256_slli_epi32(_mm256_madd_epi16(activation_sum_values, scale_lanes), 5);
-            let mut integer_lanes = _mm256_setzero_si256();
-            for super_block in 0..2 {
-                let activation = quantized
-                    .as_ptr()
-                    .wrapping_add(activation_offset + super_block * 128);
-                let decoded_offset = super_block * 4;
-                let scale_base = super_block * 8;
-                for group in 0..4 {
-                    let activations =
-                        unsafe { _mm256_loadu_si256(activation.add(group * 32).cast()) };
-                    let products =
-                        _mm256_maddubs_epi16(decoded[decoded_offset + group], activations);
-                    let first_scale = _mm_set1_epi16(scales[scale_base + group * 2] as i8 as i16);
-                    let second_scale =
-                        _mm_set1_epi16(scales[scale_base + group * 2 + 1] as i8 as i16);
-                    let scale = _mm256_inserti128_si256(
-                        _mm256_castsi128_si256(first_scale),
-                        second_scale,
-                        1,
-                    );
-                    integer_lanes =
-                        _mm256_add_epi32(integer_lanes, _mm256_madd_epi16(products, scale));
-                }
-            }
+            let mut integer_lanes = block_lanes[batch];
             integer_lanes = _mm256_sub_epi32(integer_lanes, offset_lanes);
             let d =
                 weight_scale * activation_scales[(batch_start + batch) * blocks_per_row + block];
