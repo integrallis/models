@@ -749,18 +749,28 @@ public final class LlamaForwardPass {
       if (!Float.isFinite(value)) throw new IllegalArgumentException("nonfinite embedding");
     }
     float[] result = null;
-    for (int row = 0; row < rows; row++) {
-      result =
-          forwardSequenceInternal(
-              0,
-              startPosition + row,
-              row == rows - 1 ? Head.LOGITS : Head.NONE,
-              cache,
-              nextPosition,
-              false,
-              embeddings,
-              row * dim);
-      nextPosition++;
+    int row = 0;
+    while (row < rows) {
+      int count = batchedPrefill ? Math.min(prefillBatchCapacity, rows - row) : 1;
+      boolean last = row + count == rows;
+      if (count > 1) {
+        System.arraycopy(embeddings, row * dim, batchX, 0, count * dim);
+        advancePrefillBatch(count, startPosition + row, last, null, 0);
+        result = logits;
+      } else {
+        result =
+            forwardSequenceInternal(
+                0,
+                startPosition + row,
+                last ? Head.LOGITS : Head.NONE,
+                cache,
+                nextPosition,
+                false,
+                embeddings,
+                row * dim);
+      }
+      nextPosition += count;
+      row += count;
     }
     return result.clone();
   }
@@ -1289,18 +1299,28 @@ public final class LlamaForwardPass {
       float[] batchLogits,
       int batchLogitsOffset) {
     int dim = config.embeddingDim();
+    for (int batch = 0; batch < batchSize; batch++) {
+      weights.embedToken(tokens[tokenOffset + batch], x);
+      scaleActive(x, 0, dim, config.embeddingScale());
+      System.arraycopy(x, 0, batchX, batch * dim, dim);
+    }
+    advancePrefillBatch(
+        batchSize, startPosition, computeFinalLogits, batchLogits, batchLogitsOffset);
+  }
+
+  private void advancePrefillBatch(
+      int batchSize,
+      int startPosition,
+      boolean computeFinalLogits,
+      float[] batchLogits,
+      int batchLogitsOffset) {
+    int dim = config.embeddingDim();
     int queryDim = config.queryDim();
     int keyDim = config.keyDim();
     int valueDim = config.valueDim();
     int attentionOutputDim = config.attentionOutputDim();
     int hiddenDim = config.hiddenDim();
     prepareRopeBatch(startPosition, batchSize);
-
-    for (int batch = 0; batch < batchSize; batch++) {
-      weights.embedToken(tokens[tokenOffset + batch], x);
-      scaleActive(x, 0, dim, config.embeddingScale());
-      System.arraycopy(x, 0, batchX, batch * dim, dim);
-    }
 
     for (int layer = 0; layer < config.numLayers(); layer++) {
       LlamaWeights.LayerWeights lw = weights.layer(layer);
