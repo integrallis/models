@@ -26,6 +26,11 @@ import java.util.List;
 
 /** Owns a converted LLaVA 1.5 CLIP encoder and its trained two-layer MLP projector. */
 public final class LlavaVisionProjector implements AutoCloseable {
+  private final com.integrallis.models.backend.purejava.spi.DenseProjectionKernels denseKernels;
+  private final com.integrallis.models.backend.purejava.spi.DenseProjectionKernels.Projection
+      upProjection;
+  private final com.integrallis.models.backend.purejava.spi.DenseProjectionKernels.Projection
+      downProjection;
   private final Arena arena;
   private final ClipVisionConfig config;
   private final ClipVisionEncoder encoder;
@@ -37,8 +42,12 @@ public final class LlavaVisionProjector implements AutoCloseable {
   private final float[] std;
   private boolean closed;
 
-  private LlavaVisionProjector(Arena arena, GgufFile file) {
+  private LlavaVisionProjector(
+      Arena arena,
+      GgufFile file,
+      com.integrallis.models.backend.purejava.spi.DenseProjectionKernels denseKernels) {
     this.arena = arena;
+    this.denseKernels = denseKernels;
     var meta = file.metadata();
     if (!meta.getString("general.architecture").orElse("").equals("clip")
         || !meta.getString("clip.projector_type").orElse("").equals("mlp")
@@ -83,19 +92,43 @@ public final class LlavaVisionProjector implements AutoCloseable {
     downBias = ClipVisionWeights.vector(file, "mm.2.bias", output);
     mean = channels(meta.getFloat32Array("clip.vision.image_mean").orElseThrow(), "mean");
     std = channels(meta.getFloat32Array("clip.vision.image_std").orElseThrow(), "std");
+    upProjection = VisionProjection.prepare(up, denseKernels);
+    downProjection = VisionProjection.prepare(down, denseKernels);
     encoder =
         new ClipVisionEncoder(
-            config, ClipVisionWeights.fromGgufFile(file, config), GgufBatchedMatrixKernel.none());
+            config,
+            ClipVisionWeights.fromGgufFile(file, config),
+            GgufBatchedMatrixKernel.none(),
+            denseKernels);
   }
 
   public static LlavaVisionProjector load(Path path) {
     Arena arena = Arena.ofShared();
+    com.integrallis.models.backend.purejava.spi.DenseProjectionKernels dense = null;
     try {
-      return new LlavaVisionProjector(arena, GgufParser.parse(path, arena));
+      for (var provider :
+          java.util.ServiceLoader.load(
+              com.integrallis.models.backend.purejava.spi.DenseProjectionProvider.class)) {
+        var available =
+            provider.open(
+                com.integrallis.models.backend.purejava.plan.RuntimeFingerprint.capture()
+                    .ggufThreads());
+        if (available.isPresent()) {
+          dense = available.orElseThrow();
+          break;
+        }
+      }
+      return new LlavaVisionProjector(arena, GgufParser.parse(path, arena), dense);
     } catch (Exception | Error e) {
+      if (dense != null) dense.close();
       arena.close();
       throw new IllegalArgumentException("Cannot load LLaVA projector: " + path, e);
     }
+  }
+
+  public String implementation() {
+    checkOpen();
+    return denseKernels == null ? "vector-api" : denseKernels.implementation();
   }
 
   public int tokenCount() {
@@ -128,14 +161,18 @@ public final class LlavaVisionProjector implements AutoCloseable {
     float[] features = encoder.encode(chw);
     // LLaVA uses patch features, excluding CLS, with no post-layer normalization.
     float[] patches = Arrays.copyOfRange(features, config.hiddenSize(), features.length);
-    float[] intermediate = project(patches, up, upBias);
+    float[] intermediate = project(patches, up, upBias, upProjection);
     TensorOps.geluErf(intermediate, 0, intermediate, 0, intermediate.length);
-    return project(intermediate, down, downBias);
+    return project(intermediate, down, downBias, downProjection);
   }
 
-  private float[] project(float[] input, ClipVisionWeights.Matrix matrix, float[] bias) {
+  private float[] project(
+      float[] input,
+      ClipVisionWeights.Matrix matrix,
+      float[] bias,
+      com.integrallis.models.backend.purejava.spi.DenseProjectionKernels.Projection projection) {
     float[] output = new float[Math.multiplyExact(tokenCount(), matrix.rows())];
-    VisionProjection.multiply(output, input, tokenCount(), matrix);
+    projection.project(output, input, tokenCount());
     for (int i = 0; i < output.length; i++) output[i] += bias[i % bias.length];
     return output;
   }
@@ -160,7 +197,11 @@ public final class LlavaVisionProjector implements AutoCloseable {
   public void close() {
     if (!closed) {
       closed = true;
-      arena.close();
+      try {
+        if (denseKernels != null) denseKernels.close();
+      } finally {
+        arena.close();
+      }
     }
   }
 }

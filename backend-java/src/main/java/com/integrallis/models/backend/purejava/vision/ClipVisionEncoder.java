@@ -45,6 +45,10 @@ import java.util.Arrays;
  */
 public final class ClipVisionEncoder {
 
+  private final java.util.Map<
+          ClipVisionWeights.Matrix,
+          com.integrallis.models.backend.purejava.spi.DenseProjectionKernels.Projection>
+      projections = new java.util.IdentityHashMap<>();
   private final ClipVisionConfig config;
   private final ClipVisionWeights weights;
   private final GgufBatchedMatrixKernel matrixKernel;
@@ -64,10 +68,27 @@ public final class ClipVisionEncoder {
 
   public ClipVisionEncoder(
       ClipVisionConfig config, ClipVisionWeights weights, GgufBatchedMatrixKernel matrixKernel) {
+    this(config, weights, matrixKernel, null);
+  }
+
+  ClipVisionEncoder(
+      ClipVisionConfig config,
+      ClipVisionWeights weights,
+      GgufBatchedMatrixKernel matrixKernel,
+      com.integrallis.models.backend.purejava.spi.DenseProjectionKernels denseKernels) {
     this.config = config;
     this.weights = weights;
     this.matrixKernel = matrixKernel != null ? matrixKernel : GgufBatchedMatrixKernel.none();
 
+    for (int i = 0; i < config.numLayers(); i++) {
+      var layer = weights.layer(i);
+      for (var matrix :
+          new ClipVisionWeights.Matrix[] {
+            layer.attnQkv(), layer.attnOut(), layer.ffnUp(), layer.ffnDown()
+          }) {
+        projections.put(matrix, VisionProjection.prepare(matrix, denseKernels));
+      }
+    }
     int tokens = config.numTokens();
     int dim = config.hiddenSize();
     int hiddenDim = config.intermediateSize();
@@ -271,36 +292,42 @@ public final class ClipVisionEncoder {
     float scale = (float) (1.0 / Math.sqrt(headDim));
     Arrays.fill(attention, 0, tokens * dim, 0.0f);
 
-    for (int position = 0; position < tokens; position++) {
-      int scoreOffset = position * tokens;
-      for (int head = 0; head < numHeads; head++) {
-        int headOffset = head * headDim;
-        VectorUtil.batchDotProductExact(
-            queries,
-            position * dim + headOffset,
-            keys,
-            headOffset,
-            dim,
-            tokens,
-            headDim,
-            scores,
-            scoreOffset);
-        for (int keyPos = 0; keyPos < tokens; keyPos++) {
-          scores[scoreOffset + keyPos] *= scale;
-        }
-        TensorOps.softmax(scores, scoreOffset, tokens);
-        VectorUtil.addWeightedRowsInPlace(
-            attention,
-            position * dim + headOffset,
-            values,
-            headOffset,
-            dim,
-            scores,
-            scoreOffset,
-            tokens,
-            headDim);
-      }
-    }
+    com.integrallis.vectors.core.GgufStagePlan.of(
+            com.integrallis.vectors.core.GgufStagePlan.stage(
+                tokens,
+                (from, to) -> {
+                  for (int position = from; position < to; position++) {
+                    int scoreOffset = position * tokens;
+                    for (int head = 0; head < numHeads; head++) {
+                      int headOffset = head * headDim;
+                      VectorUtil.batchDotProductExact(
+                          queries,
+                          position * dim + headOffset,
+                          keys,
+                          headOffset,
+                          dim,
+                          tokens,
+                          headDim,
+                          scores,
+                          scoreOffset);
+                      for (int keyPos = 0; keyPos < tokens; keyPos++) {
+                        scores[scoreOffset + keyPos] *= scale;
+                      }
+                      TensorOps.softmax(scores, scoreOffset, tokens);
+                      VectorUtil.addWeightedRowsInPlace(
+                          attention,
+                          position * dim + headOffset,
+                          values,
+                          headOffset,
+                          dim,
+                          scores,
+                          scoreOffset,
+                          tokens,
+                          headDim);
+                    }
+                  }
+                }))
+        .execute();
   }
 
   private void splitQueryKeyValue(int tokens, int dim) {
@@ -355,7 +382,7 @@ public final class ClipVisionEncoder {
           matrix.rows(),
           matrix.columns());
     } else {
-      VisionProjection.multiply(output, input, sequenceLength, matrix);
+      projections.get(matrix).project(output, input, sequenceLength);
     }
   }
 
