@@ -11,3 +11,13 @@
 - Secrets: ephemeral SSH public key only; no cloud/API credentials.
 - Evidence: experiments/vision-qualification/results plus java-ai/audit-artifacts/pr380-vision-performance.
 - Quota checked: 192 vCPU; zero instances holding standard quota at launch.
+
+## Completed run
+
+- Frozen candidate: `0f2bb7d6a4b30c6b5297d86456b9320388d86707`; all three probes and both decoder cache comparisons passed.
+- Actual EC2 instance: `i-066d176fab20427fb`; launch `2026-11-07T19:04:15Z`.
+- Final measurements: three warmups and seven measured runs, eight threads per arm, context 1024, 32 emitted greedy tokens.
+- Evidence downloaded and all five verdicts recomputed successfully before termination.
+- Archive: `java-ai/audit-artifacts/pr380-vision-performance/pr380-performance-evidence.tar.gz`.
+- SHA-256: `dd6aa45f05741f3baea161a99451f03bbbd939e9313b43c46dc54722bc13319f`.
+- Cleanup observation UTC: `2026-11-07T21:12:11.981887+00:00`; EC2 state confirmed `terminated`, ephemeral SSH private key removed, and cloud key-pair deletion confirmed (`Return: true`).

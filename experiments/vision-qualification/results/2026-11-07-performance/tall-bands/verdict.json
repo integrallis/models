@@ -1,0 +1,73 @@
+{
+  "candidate": {
+    "schema": "vision-integration-v1",
+    "arm": "models-java",
+    "java": "25.0.5+8-LTS",
+    "os": "Linux amd64",
+    "host": "ip-172-31-11-163",
+    "threads": 8,
+    "mmprojSha256": "50da4e5b0a011615f77686f9b02613571e65d23083c225e107c08c3b1775d9b1",
+    "imageSha256": "299a54a28eb97b2ff1ab7dcaa162a4ad7f0c14778894866e21af0e3218283cf4",
+    "warmups": 3,
+    "repetitions": 7,
+    "candidateRevision": "0f2bb7d6a4b30c6b5297d86456b9320388d86707",
+    "loadMs": 1863.001634,
+    "visionKernel": "rust-matrixmultiply",
+    "preprocessMs": 35.858306,
+    "imageSize": 336,
+    "tokens": 576,
+    "dimension": 4096,
+    "encoderProjectorMs": [
+      839.286822,
+      881.340327,
+      838.449229,
+      842.448241,
+      925.573349,
+      889.558624,
+      832.67327
+    ]
+  },
+  "oracle": {
+    "schema": "vision-integration-v1",
+    "arm": "transformers-pytorch",
+    "host": "ip-172-31-11-163",
+    "torch": "2.9.0+cpu",
+    "transformers": "4.57.1",
+    "mmprojSha256": "50da4e5b0a011615f77686f9b02613571e65d23083c225e107c08c3b1775d9b1",
+    "imageSha256": "299a54a28eb97b2ff1ab7dcaa162a4ad7f0c14778894866e21af0e3218283cf4",
+    "threads": 8,
+    "warmups": 3,
+    "repetitions": 7,
+    "loadMs": 3512.4598499996864,
+    "preprocessMs": 8.47602999965602,
+    "encoderProjectorMs": [
+      912.7101809999658,
+      880.4920689999562,
+      915.7799730000988,
+      899.0285800000493,
+      937.1741889999612,
+      887.8555660003258,
+      920.763206000629
+    ],
+    "imageSize": 336,
+    "tokens": 576,
+    "dimension": 4096
+  },
+  "pixels": {
+    "maxAbs": 0.0,
+    "cosine": 1.0,
+    "normalizedRmse": 0.0
+  },
+  "embeddings": {
+    "maxAbs": 0.0008784830570220947,
+    "cosine": 0.9999999998282129,
+    "normalizedRmse": 1.858751527980738e-05
+  },
+  "candidateMedianMs": 842.448241,
+  "oracleMedianMs": 912.7101809999658,
+  "candidateToOracleLatencyRatio": 0.9230183452944649,
+  "numericalPass": true,
+  "catalogQualified": false,
+  "performancePass": true,
+  "maximumLatencyRatio": 1.1
+}
