@@ -17,6 +17,7 @@ package com.integrallis.models.backend.purejava.vision;
 
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.DenseProjectionKernels;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.VectorUtil;
 import java.lang.foreign.MemorySegment;
@@ -54,6 +55,10 @@ public final class ClipVisionEncoder {
   private final GgufBatchedMatrixKernel matrixKernel;
 
   // Working buffers, sized for one image at a time
+  private final DenseProjectionKernels denseKernels;
+  private final DenseProjectionKernels.Projection patchProjection;
+  private final float[] patchPixels;
+  private final float[] patchOutput;
   private final float[] hidden;
   private final float[] normalized;
   private final float[] queryKeyValues;
@@ -100,6 +105,10 @@ public final class ClipVisionEncoder {
     }
     int batchElements = (int) batchElementsLong;
 
+    this.denseKernels = denseKernels;
+    this.patchProjection = VisionProjection.prepare(weights.patchEmbed(), denseKernels);
+    this.patchPixels = new float[(tokens - 1) * 3 * config.patchSize() * config.patchSize()];
+    this.patchOutput = new float[(tokens - 1) * dim];
     this.hidden = new float[batchElements];
     this.normalized = new float[batchElements];
     this.queryKeyValues = new float[Math.multiplyExact(batchElements, 3)];
@@ -178,38 +187,22 @@ public final class ClipVisionEncoder {
   private void patchEmbed(float[] chw, int imageSize, int patchSize, int channels, int dim) {
     int patchesPerSide = imageSize / patchSize;
     int patchPixels = channels * patchSize * patchSize;
-    float[] patchPixelBuf = new float[patchPixels];
-
     for (int py = 0; py < patchesPerSide; py++) {
       for (int px = 0; px < patchesPerSide; px++) {
-        // +1 because patchIndex 0 → hidden[dim..2*dim] (CLS occupies hidden[0..dim])
-        int patchIndex = py * patchesPerSide + px + 1;
-
-        // Extract patch pixels from CHW layout
+        int patchIndex = py * patchesPerSide + px;
         for (int c = 0; c < channels; c++) {
           for (int y = 0; y < patchSize; y++) {
-            for (int x = 0; x < patchSize; x++) {
-              int imgY = py * patchSize + y;
-              int imgX = px * patchSize + x;
-              int chwIdx = c * imageSize * imageSize + imgY * imageSize + imgX;
-              int patchIdx = c * patchSize * patchSize + y * patchSize + x;
-              patchPixelBuf[patchIdx] = chw[chwIdx];
-            }
+            int src = c * imageSize * imageSize + (py * patchSize + y) * imageSize + px * patchSize;
+            int dst = patchIndex * patchPixels + c * patchSize * patchSize + y * patchSize;
+            System.arraycopy(chw, src, this.patchPixels, dst, patchSize);
           }
-        }
-
-        // Multiply with patch_embd.weight (dim × patchPixels) then add bias
-        float[] patchEmbedWeight = weights.patchEmbedF32();
-        for (int h = 0; h < dim; h++) {
-          float sum = weights.patchEmbedBias()[h];
-          int weightOffset = h * patchPixelBuf.length;
-          for (int p = 0; p < patchPixelBuf.length; p++) {
-            sum += patchPixelBuf[p] * patchEmbedWeight[weightOffset + p];
-          }
-          hidden[patchIndex * dim + h] = sum;
         }
       }
     }
+    int count = patchesPerSide * patchesPerSide;
+    patchProjection.project(patchOutput, this.patchPixels, count);
+    addBias(patchOutput, count, dim, weights.patchEmbedBias());
+    System.arraycopy(patchOutput, 0, hidden, dim, count * dim);
   }
 
   /** Add learned position embeddings to each token. */
@@ -287,6 +280,9 @@ public final class ClipVisionEncoder {
 
   /** Multi-head self-attention (identical to BertForwardPass.attend but without rotary). */
   private void attend(int tokens, int dim) {
+    if (denseKernels != null
+        && denseKernels.attention(attention, queries, keys, values, tokens, dim, config.numHeads()))
+      return;
     int numHeads = config.numHeads();
     int headDim = config.headDim();
     float scale = (float) (1.0 / Math.sqrt(headDim));
