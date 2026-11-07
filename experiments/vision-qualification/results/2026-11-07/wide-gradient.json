@@ -1,0 +1,62 @@
+{
+  "candidate": {
+    "schema": "vision-integration-v1",
+    "arm": "models-java",
+    "java": "25.0.5+8-LTS",
+    "os": "Linux amd64",
+    "host": "ip-172-31-11-30",
+    "threads": 8,
+    "mmprojSha256": "50da4e5b0a011615f77686f9b02613571e65d23083c225e107c08c3b1775d9b1",
+    "imageSha256": "ae486a1ba1ebdb2cec0c1bdb5197a9bb42c22dbf8da32808a235583dccec09b1",
+    "warmups": 1,
+    "repetitions": 3,
+    "candidateRevision": "4a933e8ca50186520b862ab0636ca9184eae3c81",
+    "loadMs": 1215.002492,
+    "preprocessMs": 38.25959,
+    "imageSize": 336,
+    "tokens": 576,
+    "dimension": 4096,
+    "encoderProjectorMs": [
+      6433.286828,
+      6371.395969,
+      6369.784013
+    ]
+  },
+  "oracle": {
+    "schema": "vision-integration-v1",
+    "arm": "transformers-pytorch",
+    "host": "ip-172-31-11-30",
+    "torch": "2.9.0+cpu",
+    "transformers": "4.57.1",
+    "mmprojSha256": "50da4e5b0a011615f77686f9b02613571e65d23083c225e107c08c3b1775d9b1",
+    "imageSha256": "ae486a1ba1ebdb2cec0c1bdb5197a9bb42c22dbf8da32808a235583dccec09b1",
+    "threads": 8,
+    "warmups": 1,
+    "repetitions": 3,
+    "loadMs": 3520.2282839998134,
+    "preprocessMs": 9.075281999912477,
+    "encoderProjectorMs": [
+      893.654288000107,
+      843.9755079998577,
+      676.824900000156
+    ],
+    "imageSize": 336,
+    "tokens": 576,
+    "dimension": 4096
+  },
+  "pixels": {
+    "maxAbs": 0.0,
+    "cosine": 1.0,
+    "normalizedRmse": 0.0
+  },
+  "embeddings": {
+    "maxAbs": 0.006588250398635864,
+    "cosine": 0.9999999973438852,
+    "normalizedRmse": 7.288610886330064e-05
+  },
+  "candidateMedianMs": 6371.395969,
+  "oracleMedianMs": 843.9755079998577,
+  "candidateToOracleLatencyRatio": 7.549266428476826,
+  "numericalPass": true,
+  "catalogQualified": false
+}

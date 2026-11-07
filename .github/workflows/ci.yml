@@ -88,6 +88,9 @@ jobs:
       - name: Test GLiNER qualification evidence
         run: python3 -m unittest discover -s experiments/gliner25-decide -p 'test_*.py' -v
 
+      - name: Test vision qualification evidence
+        run: uv run --no-project --with numpy==2.3.4 python -m unittest discover -s experiments/vision-qualification -p 'test_*.py' -v
+
       - name: Check native Rust dependency notices
         run: python3 scripts/generate-native-rust-notices.py --check
 

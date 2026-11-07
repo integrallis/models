@@ -1,5 +1,11 @@
 # Expanding past text: what it takes, from the real headers
 
+> November 7 update: [LLaVA vision integration](VISION-QUALIFICATION.md) now documents the
+> two-file CLIP/LLaVA runtime and executable independent-oracle harness added in PR 380.
+> The Qwen3-VL work below remains a separate architecture target; a generic CLIP encoder does
+> not implement its merger, deepstack or multimodal position encoding.
+
+
 Written 2026-10-09. **Every architectural fact below was read out of the artifact's own GGUF header
 by range-fetch, not from a model card and not from memory.** That is the rule this repo learned the
 expensive way, and it is what makes the effort estimates below worth anything.
