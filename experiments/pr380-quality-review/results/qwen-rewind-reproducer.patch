@@ -1,0 +1,24 @@
+diff --git a/backend-java/src/test/java/com/integrallis/models/backend/purejava/qwen35/Qwen35ForwardEmbeddingsParityTest.java b/backend-java/src/test/java/com/integrallis/models/backend/purejava/qwen35/Qwen35ForwardEmbeddingsParityTest.java
+index 9087051d..64aed5b4 100644
+--- a/backend-java/src/test/java/com/integrallis/models/backend/purejava/qwen35/Qwen35ForwardEmbeddingsParityTest.java
++++ b/backend-java/src/test/java/com/integrallis/models/backend/purejava/qwen35/Qwen35ForwardEmbeddingsParityTest.java
+@@ -104,6 +104,19 @@ class Qwen35ForwardEmbeddingsParityTest {
+     }
+   }
+ 
++  @Test
++  void embeddingRewindPreservesPrefix(@TempDir Path directory) throws Exception {
++    try (Arena arena = Arena.ofConfined()) {
++      var file = GgufParser.parse(writeToyModel(directory), arena);
++      var graph = Qwen35ForwardPass.fromGgufFile(file);
++      var session = graph.openSession(8);
++      graph.forwardEmbeddings(session, extractTokenEmbedding(file, 3), 0);
++      float[] expected = graph.forward(session, 4, 1);
++      graph.rewind(session, 1);
++      assertThat(graph.forward(session, 4, 1)).containsExactly(expected);
++    }
++  }
++
+   private static float[] extractTokenEmbedding(
+       com.integrallis.models.backend.purejava.gguf.GgufFile file, int token) {
+     var tensor = file.getTensor("token_embd.weight");

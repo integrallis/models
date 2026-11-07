@@ -1,0 +1,3008 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/Users/briansam-bodden/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :spotlessInternalRegisterDependencies UP-TO-DATE
+> Task :backend-java:spotlessJava
+> Task :backend-java:spotlessJavaApply
+> Task :backend-java:spotlessApply
+> Task :backend-native:spotlessJava
+> Task :backend-native:spotlessJavaApply
+> Task :backend-native:spotlessApply
+> Task :models-bench:spotlessJava
+> Task :models-bench:spotlessJavaApply
+> Task :models-bench:spotlessApply
+> Task :models-api:compileJava UP-TO-DATE
+> Task :writeReleaseDependencyManifest UP-TO-DATE
+> Task :models-api:processResources UP-TO-DATE
+> Task :models-api:classes UP-TO-DATE
+> Task :models-api:jar UP-TO-DATE
+> Task :models-api:compileTestJava UP-TO-DATE
+> Task :models-api:processTestResources NO-SOURCE
+> Task :models-api:testClasses UP-TO-DATE
+> Task :models-api:test UP-TO-DATE
+> Task :models-api:jacocoTestCoverageVerification UP-TO-DATE
+> Task :models-api:spotbugsMain UP-TO-DATE
+> Task :models-api:spotbugsTest SKIPPED
+> Task :models-api:spotlessJava UP-TO-DATE
+> Task :models-api:spotlessJavaCheck UP-TO-DATE
+> Task :models-api:spotlessCheck UP-TO-DATE
+> Task :invalidateReleaseDependencyReceipt
+> Task :models-api:verifyDependencyPolicy
+> Task :models-api:check
+> Task :backend-java:compileJava
+> Task :backend-java:processResources UP-TO-DATE
+> Task :backend-java:classes
+> Task :backend-java:jar
+> Task :models-backend-onnx:compileJava UP-TO-DATE
+> Task :backend-native:compileJava
+> Task :models-runtime:compileJava UP-TO-DATE
+> Task :models-test:compileJava UP-TO-DATE
+> Task :backend-java:compileTestJava
+> Task :backend-java:processTestResources UP-TO-DATE
+> Task :backend-java:testClasses
+> Task :backend-native:processResources UP-TO-DATE
+> Task :backend-native:classes
+> Task :backend-native:jar
+> Task :models-backend-onnx:processResources UP-TO-DATE
+> Task :models-backend-onnx:classes UP-TO-DATE
+> Task :models-backend-onnx:jar UP-TO-DATE
+> Task :models-runtime:processResources UP-TO-DATE
+> Task :models-runtime:classes UP-TO-DATE
+> Task :models-runtime:jar UP-TO-DATE
+> Task :models-test:processResources NO-SOURCE
+> Task :models-test:classes UP-TO-DATE
+> Task :models-test:jar UP-TO-DATE
+
+> Task :backend-java:test
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: Using incubator modules: jdk.incubator.vector
+
+CatalogBackendsTest > refusesAnIdTwoInstalledCatalogsBothHold() PASSED
+
+CatalogBackendsTest > listsTheOpenableIdsOfTheProvidersItWasGivenNotOfTheWholeMachine() PASSED
+
+CatalogBackendsTest > treatsACatalogThatReturnsNullAsOneThatHoldsNothing() PASSED
+
+CatalogBackendsTest > skipsACatalogThatThrowsInsteadOfFailingTheLookup() PASSED
+
+CatalogBackendsTest > aCatalogWrittenBeforeLocateExistedStillCompilesAndLocatesNothing() PASSED
+
+CatalogBackendsTest > refusesABlankId() PASSED
+
+CatalogBackendsTest > refusesAnIdItCannotOpenWithTheListOfIdsItCan() PASSED
+
+CatalogBackendsTest > resolvesAnIdTheOneInstalledCatalogHoldsOnDisk() PASSED
+
+CatalogBackendsTest > listsOnlyWhatCanBeOpenedNowNotEverythingDescribed() PASSED
+
+Deepseek2RewindTest > aSecondSessionIsRefused() PASSED
+
+Deepseek2RewindTest > rewindingToTheStartIsTheSameAsAReset() PASSED
+
+Deepseek2RewindTest > aSharedPrefixCanBeReusedAcrossTwoContinuations() PASSED
+
+Deepseek2RewindTest > entriesAboveTheCheckpointAreNotRead() PASSED
+
+Deepseek2RewindTest > aRewoundDecoderProducesExactlyWhatAFreshOneDoes() PASSED
+
+Deepseek2RewindTest > rewindingForwardIsRefused() PASSED
+
+FlintGgufRouteTest > matchesIndependentLlamaCppLogitsAcrossDenseMoeAndSlidingLayers(Path) PASSED
+
+FlintKernelRouteTest > respectsShapeRejectionAndFallsBackToJava(Path) PASSED
+
+FlintGgufRouteTest > independentSessionsDoNotShareMutableState(Path) PASSED
+
+FlintKernelRouteTest > groupedProjectionsPreserveIndependentSessionAndRewindResults(Path) PASSED
+
+FlintGgufRouteTest > loadsFlintAndReplaysAnOverwrittenSlidingWindow(Path) PASSED
+
+FlintKernelRouteTest > invokesInjectedKernelAndClosesItWithBackend(Path) PASSED
+
+FlintGgufRouteTest > rejectsMetadataThatWouldSilentlyChangeTheGraph(Path) PASSED
+
+FlintGgufRouteTest > prefillMatchesSequentialDecodeAndKeepsReturnedLogitsStable(Path) PASSED
+
+Gemma3nBackendRouteTest > theBackendLoadsAGemma3nFileUnderItsOwnArchitecture(Path) PASSED
+
+Gemma3nRewindTest > rewindingForwardIsRefusedRatherThanInventingTokens() PASSED
+
+Gemma3nBackendRouteTest > theBackendCanRewindAGemma3nSequence(Path) PASSED
+
+Gemma3nRewindTest > rewindingToTheStartIsTheSameAsAReset() PASSED
+
+Gemma3nRewindTest > aSharedPrefixCanBeReusedAcrossTwoContinuations() PASSED
+
+Gemma3nRewindTest > aRewindPastTheSlidingWindowStillReconstructsTheState() PASSED
+
+Gemma3nRewindTest > aResetDiscardsTheHistoryItWouldOtherwiseReplay() PASSED
+
+Gemma3nRewindTest > aRewoundDecoderProducesExactlyWhatAFreshOneDoes() PASSED
+
+Gemma3nRewindTest > aSecondSessionIsRefusedRatherThanSharingOneAltUpState() PASSED
+
+GgufEmbeddingBackendTest$Determinism > repeatedCallsAgreeExactly() PASSED
+
+GgufEmbeddingBackendTest$Determinism > oneTextDoesNotLeakIntoTheNext() PASSED
+
+GgufEmbeddingBackendTest$Shape > reportsTheModelEmbeddingWidth() PASSED
+
+GgufEmbeddingBackendTest$Normalization > normalizationCanBeDisabled() PASSED
+
+GgufEmbeddingBackendTest$Normalization > normalizedVectorsAreUnitLength() PASSED
+
+JvmLaunchSupportTest > rejectsInterpretedOnlyExecution() PASSED
+
+JvmLaunchSupportTest > acceptsTheNormalOptimizingCompiler() PASSED
+
+JvmLaunchSupportTest > rejectsAnyTieredLevelThatCannotReachC2() PASSED
+
+JvmLaunchSupportTest > rejectsSpringBootsC1OnlyDevelopmentLaunch() PASSED
+
+ModelMemoryArenaTest > nativeImageArenaUsesAutomaticLifetime() PASSED
+
+ModelMemoryArenaTest > jvmArenaIsClosedDeterministically() PASSED
+
+GgufEmbeddingBackendTest$Shape > embedAllPreservesRowOrderWithinFloatTolerance() PASSED
+
+PureJavaBackendTest > LoadAndInfer > exposesIndependentSessionBatchingThroughTheBackendSpi(Path) PASSED
+
+PureJavaBackendTest > LoadAndInfer > appliesAnExternalBackendProfileWithoutDependingOnItsRegistry(Path) PASSED
+
+PureJavaBackendTest > LoadAndInfer > exposesSpeculativeVerificationAndRollback(Path) PASSED
+
+PureJavaBackendTest > LoadAndInfer > loadsModelAndRunsForward(Path) PASSED
+
+PureJavaBackendTest > LoadAndInfer > reportsTheEndOfGenerationSetAndItsProvenanceInDiagnostics(Path) PASSED
+
+JvmLaunchSupportProcessIntegrationTest > failsFastInARealC1OnlyJvmInsteadOfStartingModelInference() PASSED
+
+LlamaAttentionDiagnosticsTest > callsADeclaredWindowThatNoLayerAppliesUnsupported() PASSED
+
+LlamaAttentionDiagnosticsTest > reportsTheClampedLayerCount() PASSED
+
+LlamaAttentionDiagnosticsTest > reportsBoundedAttentionOnTheLayersThePatternMarksLocal() PASSED
+
+LlamaAttentionDiagnosticsTest > reportsNoClampWhereNoneIsDeclared() PASSED
+
+BertClassificationHeadTest > loadsTheEarlierCorrectedClassifierNames(Path) PASSED
+
+BertClassificationHeadTest > loadsTheStandardGgufClassifierNames(Path) PASSED
+
+DecisionCalibrationQualificationTest > refusesAnUncalibratedBucketThatPublishedAProbabilityAnyway() PASSED
+
+DecisionCalibrationQualificationTest > qualifiesACohortThatClearsEveryGate() PASSED
+
+DecisionCalibrationQualificationTest > reportsTheSameTypeOrderOnEveryConstruction() PASSED
+
+DecisionCalibrationQualificationTest > refusesAStrongMultiWaySubsetCarryingAWeakBinaryOne() PASSED
+
+DecisionCalibrationQualificationTest > reportsZeroExercisedWhenTheCohortCannotReachAnUncalibratedBucket() PASSED
+
+DecisionCalibrationQualificationTest > excludesAnswersThatDeclaredThemselvesUncalibrated() PASSED
+
+DecisionCalibrationQualificationTest > refusesAnEmptyCohort() PASSED
+
+DecisionCalibrationQualificationTest > refusesConfidenceThatDoesNotMatchAccuracy() PASSED
+
+DecisionCalibrationQualificationTest > reportsNotANumberWhenEveryAnswerWasUncalibrated() PASSED
+
+LayaJevBenchQualificationReportTest > keepsElapsedTimeInAnUndigestedSiblingReport() PASSED
+
+LayaJevBenchQualificationReportTest > changesTheDigestWhenAPerCaseMeasurementChanges() PASSED
+
+LayaJevBenchQualificationReportTest > changesTheDigestWhenASummaryMeasurementChanges() PASSED
+
+PureJavaBackendTest > LoadAndInfer > exposesIndependentHighLevelGenerationSessions(Path) PASSED
+
+LayaJevBenchQualificationReportTest > reproducesEvidenceAcrossElapsedTimesAndMapOrders() PASSED
+
+KvCacheTest > roundsThroughHalfPrecisionWhenTheReferenceModeIsEnabled() PASSED
+
+KvCacheTest > doesNotExposeEqualWidthCompatibilityApi() PASSED
+
+KvCacheTest > keepsExactlyRepresentableValuesUnchanged() PASSED
+
+KvCacheTest > BoundsChecking > layerBeyondRangeThrows() PASSED
+
+KvCacheTest > BoundsChecking > reservationBeyondMaxThrows() PASSED
+
+KvCacheTest > BoundsChecking > negativeLayerThrows() PASSED
+
+KvCacheTest > BoundsChecking > positionBeyondMaxThrows() PASSED
+
+KvCacheTest > Growth > constructorStillRejectsAnUnrepresentableInitialShape() PASSED
+
+KvCacheTest > Growth > unusedCacheDoesNotAllocateTokenStorage() PASSED
+
+KvCacheTest > Growth > firstStoreAllocatesTheExistingMinimumAndPreservesLayerIsolation() PASSED
+
+KvCacheTest > Growth > growthPreservesEntriesAndLayerIsolation() PASSED
+
+KvCacheTest > Growth > reservationGrowsStorageBeforeDisjointBatchWrites() PASSED
+
+KvCacheTest > SharedPrefixes > attentionViewSplitsAChronologicalRangeAtTheSharedPrefixBoundary() PASSED
+
+KvCacheTest > SharedPrefixes > extendsAndRefreezesAForkWithoutCopyingEarlierPrefixStorage() PASSED
+
+KvCacheTest > SharedPrefixes > reportsSharedAndBranchOwnedStorageWithoutHidingReservedCapacity() PASSED
+
+KvCacheTest > SharedPrefixes > freezingAndForkingReuseTheExactBackingArraysRatherThanCopies() PASSED
+
+KvCacheTest > SharedPrefixes > freezingRejectsIncompleteOrEmptyPrefixes() PASSED
+
+KvCacheTest > SharedPrefixes > frozenSourceAndForksCannotMutateOrDiscardTheSharedPrefix() PASSED
+
+KvCacheTest > SharedPrefixes > forksReferenceTheSameImmutablePrefixStorageAndOwnIndependentSuffixes() PASSED
+
+KvCacheTest > Clear > discardFromPreservesAcceptedPrefixAndClearsSpeculativeTail() PASSED
+
+KvCacheTest > Clear > clearResetsAllEntries() PASSED
+
+KvCacheTest > MultipleLayer > layersAreIndependent() PASSED
+
+KvCacheTest > Slicing > keySliceRejectsAnUnpopulatedPosition() PASSED
+
+KvCacheTest > Slicing > sliceCorrectRange() PASSED
+
+KvCacheTest > Slicing > valueSliceRejectsAPositionWithoutAllocatedStorage() PASSED
+
+KvCacheTest > StoreAndRetrieve > retrievedVectorsDoNotAliasFlatStorage() PASSED
+
+KvCacheTest > StoreAndRetrieve > sequentialPositions() PASSED
+
+KvCacheTest > StoreAndRetrieve > storesVectorsInContiguousFlatBuffers() PASSED
+
+KvCacheTest > StoreAndRetrieve > storeAndRetrieveSinglePosition() PASSED
+
+KvCacheTest > StoreAndRetrieve > storesVectorsFromBatchOffsets() PASSED
+
+PureJavaBackendTest > LoadAndInfer > loadsGemma4ThroughTheCompleteBackendContract(Path) PASSED
+
+PureJavaBackendTest > LoadAndInfer > automaticLoadingFallsBackToTheVectorApiWithoutAnInstalledProvider(Path) PASSED
+
+PureJavaBackendTest > LoadAndInfer > nonExistentFileThrows(Path) PASSED
+
+CactCqMatrixTest > multipliesPinnedOfficialCq4AndCq2MatricesWhenProvided() SKIPPED
+
+CactCqMatrixTest > executesAHeapBackedCqTensorWithoutExpandingIt() PASSED
+
+CactParserTest > acceptsAttentionProjectionWidthDifferentFromTheResidualWidth() PASSED
+
+CactParserTest > rejectsMisalignedOverlappingAndOutOfRangeTensors() PASSED
+
+CactParserTest > parsesPinnedOfficialNeedle2ArtifactWhenProvided() SKIPPED
+
+CactParserTest > rejectsInvalidTensorMetadataAndCqLayout() PASSED
+
+CactParserTest > rejectsBadMagicAndTruncatedStructures() PASSED
+
+CactParserTest > rejectsAZeroActiveEngramOrder() PASSED
+
+CactParserTest > parsesHeaderDirectoryAndTensorSlices() PASSED
+
+PureJavaBackendTest > LoadAndInfer > freezingTransfersPrefixOwnershipAndDetachesTheSourceSession(Path) PASSED
+
+CactParserTest > parsesMappedFile(Path) PASSED
+
+CactParserTest > fixtureRegistryPreservesTheCactFormat() PASSED
+
+Needle2AttentionWindowTest > rewindingBeforeTheToolDocumentEndForgetsTheOldSink() PASSED
+
+Needle2AttentionWindowTest > anUnboundedContextNeedsNoSinkSpecialCase() PASSED
+
+Needle2AttentionWindowTest > avoidsRepeatingSinkPositionsThatAreStillRecent() PASSED
+
+Needle2AttentionWindowTest > keepsTheToolDocumentPrefixVisibleOutsideTheRecentWindow() PASSED
+
+PureJavaBackendTest > LoadAndInfer > loadsDenseQuantizedGemma4WithAPerLayerFeedForwardWidth(Path) PASSED
+
+Needle2ProbeHeadTest > probePoolingAndProjectionMatchTheReferenceFormula() PASSED
+
+Needle2ProbeHeadTest > contrastiveProjectionIsUnitNormalized() PASSED
+
+Needle2ProbeHeadTest > onlineSoftmaxRemainsStableForLargeProbeScores() PASSED
+
+DebertaV2ParallelTest > unevenRowsAndBufferReuseMatchSingleThreadWithNonzeroWeights() PASSED
+
+Deepseek2ConfigTest > theDerivedWidthsMatchThePublishedTensorShapes() PASSED
+
+Deepseek2ConfigTest > anotherArchitectureIsRefused() PASSED
+
+Deepseek2ConfigTest > aModelWithoutYarnGetsThePlainScales() PASSED
+
+Deepseek2ConfigTest > parsesThePublishedLiteHeader() PASSED
+
+Deepseek2ConfigTest > aRopeDimensionThatLeavesNoNoRopePartIsRefused() PASSED
+
+Deepseek2ConfigTest > theLeadingLayersAreDense() PASSED
+
+Deepseek2ConfigTest > anExpertWeightScaleOfOneMeansNoScaling() PASSED
+
+Deepseek2ConfigTest > theRotaryMagnitudeIsTheReciprocalOfTheGenericYarnTerm() PASSED
+
+Deepseek2ConfigTest > theAttentionScaleCarriesTheYarnMagnitude() PASSED
+
+EdgeRockMemoryLayerParityTest > theFirstTokenReadsNothingAndTheLaterOnesDoNot() PASSED
+
+PureJavaBackendTest > LoadAndInfer > loadsAPinnedActivatedAdapterAndKeepsTheBaseBranchExact(Path) PASSED
+
+EdgeRockMemoryLayerParityTest > reproducesTheReferenceAcrossThreeCommitBoundaries() PASSED
+
+PureJavaBackendTest > LoadAndInfer > closesOwnedArenaWhenRuntimeFailureInterruptsLoading(Path) PASSED
+
+MemoryBankTest > aFullBankEvictsTheWeakestRatherThanGrowing() PASSED
+
+MemoryBankTest > stagedRecordsAreInvisibleUntilTheChunkIsFull() PASSED
+
+MemoryBankTest > commitKeepsTheHighestScoringRecordsAcrossChunks() PASSED
+
+MemoryBankTest > commitHappensExactlyAtTheChunkBoundary() PASSED
+
+MemoryBankTest > positionsAreDerivedFromTheSequenceNotTheChunk() PASSED
+
+MemoryBankTest > resetClearsTheBankForANewSequence() PASSED
+
+QuantizedProjectionTest > rejectsAnOutputOfTheWrongWidth() PASSED
+
+QuantizedProjectionTest > refusesAHadamardRotatedCheckpoint() PASSED
+
+QuantizedProjectionTest > projectsAnF32WeightThroughTheSharedKernel() PASSED
+
+QuantizedProjectionTest > rejectsAnInputOfTheWrongWidth() PASSED
+
+QuantizedProjectionTest > acceptsACheckpointWithoutHadamard() PASSED
+
+ModelFixtureInstallerTest > installsVerifiedArtifactFromPinnedUri() PASSED
+
+ModelFixtureInstallerTest > rejectsInvalidDownloadWithoutReplacingExistingArtifact() PASSED
+
+PureJavaBackendTest > LoadAndInfer > exposesPhysicallySharedPrefixForksThroughThePublicBackendSpi(Path) PASSED
+
+PureJavaBackendTest > LoadAndInfer > closedRawSessionDetachesItsOwnedKvState(Path) PASSED
+
+PureJavaBackendTest > LoadAndInfer > batchedSessionPrefillMatchesTokenAtATimeSessionForward(Path) PASSED
+
+PureJavaBackendTest > LoadAndInfer > capsRuntimeContextLengthWithoutChangingModelMetadata(Path) PASSED
+
+PureJavaBackendTest > LoadAndInfer > exposesActivatedSessionHiddenStateWithoutBreakingPhysicalPrefixSharing(Path) PASSED
+
+PureJavaBackendTest > LoadAndInfer > backendCloseDetachesEveryStillOpenRawSession(Path) PASSED
+
+PureJavaBackendTest > LoadAndInfer > loadsDenseGemma4WithAPerLayerFeedForwardWidth(Path) PASSED
+
+SessionContextSizingTest > aRecommendationOrDeploymentSettingCanAskForLess() PASSED
+
+SessionContextSizingTest > anExplicitRequestNeverExceedsWhatTheModelCanAttendTo() PASSED
+
+SessionContextSizingTest > anUnconfiguredModelIsSizedForEverythingItDeclares() PASSED
+
+BertConfigTest > loadsTheMiniLmGgufContract() PASSED
+
+BertConfigTest > rejectsCausalMetadataInsteadOfSilentlyChangingTheModel() PASSED
+
+BertConfigTest > rejectsAnUnknownPoolingContract() PASSED
+
+BertConfigTest > acceptsTheStandardGgufRankPoolingContract() PASSED
+
+ModernBertConfigTest > separatesTheEncoderBlocksFromTheDecisionBlocks() PASSED
+
+ModernBertConfigTest > clampsTheTemperatureTheReferenceRefusesAndSaysSoBucketByBucket() PASSED
+
+ModernBertConfigTest > alternatesWindowedAndGlobalLayersAndGivesEachItsOwnRotaryBase() PASSED
+
+ModernBertConfigTest > loadsAnEncoderWithNoDecisionHeadAtAll() PASSED
+
+ModernBertConfigTest > refusesAMissingSlidingWindowRotaryBaseInsteadOfReusingTheGlobalOne() PASSED
+
+ModernBertConfigTest > refusesAMissingWindowPatternInsteadOfMakingEveryLayerWindowed() PASSED
+
+ModernBertConfigTest > refusesAFeedForwardArrayThatDoesNotCoverEveryLayer() PASSED
+
+ModernBertConfigTest > refusesADecisionHeadFamilyItDoesNotImplement() PASSED
+
+ModernBertConfigTest > refusesCausalAttentionInsteadOfSilentlyChangingTheModel() PASSED
+
+ModernBertConfigTest > readsTheDecisionHeadAndTranslatesTheBucketSpellings() PASSED
+
+ModernBertConfigTest > mapsEachQuestionTypeToItsRowOfTheTypeEmbedding() PASSED
+
+ModernBertConfigTest > loadsTheLayaGgufContract() PASSED
+
+ModernBertConfigTest > buildsTheBucketKeyTheReferenceLooksUp() PASSED
+
+ModernBertDecisionAnswerTest > refusesAQuestionWithNoOptionsAndANonFiniteLogit() PASSED
+
+ModernBertDecisionAnswerTest > marksTheBucketTheReferenceRefusesAsUncalibratedAndNoOther() PASSED
+
+ModernBertDecisionAnswerTest > reportsConfidenceAndMarginFromTheChosenOption() PASSED
+
+ModernBertDecisionAnswerTest > treatsAnArtifactWithNoDeclaredCalibrationAsUncalibratedAtTemperatureOne() PASSED
+
+ModernBertDecisionAnswerTest > reproducesTheReferenceProbabilitiesForEveryCase() PASSED
+
+ModernBertWeightsTest > claimsEveryTensorTheArtifactCarries(Path) PASSED
+
+ModernBertWeightsTest > loadsEveryBlockKindFromTheFixture(Path) PASSED
+
+ModernBertWeightsTest > namesTheTensorWhenAShapeIsWrong(Path) PASSED
+
+ModernBertWeightsTest > readsOneTypeEmbeddingRowPerQuestionType(Path) PASSED
+
+ModernBertWeightsTest > separatesGatedEncoderBlocksFromBiasCarryingDecisionBlocks(Path) PASSED
+
+DecoderSessionRetentionTest > releasesPartiallyUnwrappedBatchWhenValidationFails(String, String) > [1] family=llama, operation=prefill PASSED
+
+ModernBertWeightsTest > readsBlockZeroWithoutAnAttentionNorm(Path) PASSED
+
+ModernBertWeightsTest > readsTheFusedQkvAndTheScorerInTheReferenceOrder(Path) PASSED
+
+LayeredKvCacheTest > mixedLayerShapesUseIndependentLinearAndRingStorage() PASSED
+
+LayeredKvCacheTest > ringCapacityCanRetainAWindowWhileAnEntirePrefillChunkIsWritten() PASSED
+
+DecoderSessionRetentionTest > releasesPartiallyUnwrappedBatchWhenValidationFails(String, String) > [2] family=llama, operation=hidden PASSED
+
+LayeredKvCacheTest > linearLayerGrowsLazilyAndPreservesAbsoluteHistory() PASSED
+
+DecoderSessionRetentionTest > releasesPartiallyUnwrappedBatchWhenValidationFails(String, String) > [3] family=llama, operation=prefillTransient PASSED
+
+LayeredKvCacheTest > ringLayerRejectsOverwrittenPositionsAndSplitsAViewAtWraparound() PASSED
+
+LayeredKvCacheTest > discardFromPreservesTheAcceptedPrefixAcrossLinearAndRingLayers() PASSED
+
+DecoderSessionRetentionTest > releasesPartiallyUnwrappedBatchWhenValidationFails(String, String) > [4] family=llama, operation=forward PASSED
+
+LayeredKvCacheTest > validatesCoordinatesVectorRangesAndAttentionRanges() PASSED
+
+DecoderSessionRetentionTest > releasesPartiallyUnwrappedBatchWhenValidationFails(String, String) > [5] family=llama, operation=forwardTransient PASSED
+
+CactFp16TensorTest > rejectsNonFp16AndOutOfBoundsAccess() PASSED
+
+CactFp16TensorTest > readsLittleEndianHalfPrecisionRows() PASSED
+
+DebertaV2EncoderTest > encoderLoadsBothStorageTypesWithoutRequiringARerankerHead() PASSED
+
+Deepseek2ForwardPassTest > theCompleteGraphMatchesAnIndependentScalarReference() PASSED
+
+Deepseek2ForwardPassTest > everyLogitIsFinite() PASSED
+
+Deepseek2ForwardPassTest > theLatentNormReachesTheOutput() PASSED
+
+Deepseek2ForwardPassTest > theFixtureExercisesBothFeedForwardPaths() PASSED
+
+Deepseek2ForwardPassTest > resetReturnsTheGraphToItsStartingState() PASSED
+
+Deepseek2ForwardPassTest > aNonSequentialPositionIsRefused() PASSED
+
+Deepseek2ForwardPassTest > theGraphRefusesAForwardRewind() PASSED
+
+Deepseek2ForwardPassTest > theFusedSharedExpertReachesTheOutput() PASSED
+
+PerformanceCliffsTest > enrichAddsCliffKeysAndLeavesEverythingElseUnchanged() PASSED
+
+PerformanceCliffsTest > cliffIdsAreUniqueKebabCase() PASSED
+
+PerformanceCliffsTest > reportedCliffsAppearInTheEnvironmentWithTheirFirstDetail() PASSED
+
+DecoderSessionRetentionTest > releasesPartiallyUnwrappedBatchWhenValidationFails(String, String) > [6] family=gemma4, operation=forward PASSED
+
+DecoderSessionRetentionTest > releasesPartiallyUnwrappedBatchWhenValidationFails(String, String) > [7] family=gemma4, operation=forwardTransient PASSED
+
+DecoderSessionRetentionTest > releasesBorrowedSessionsAfterSuccessAndDelegateFailure(String, String) > [1] family=llama, operation=prefill PASSED
+
+DecoderSessionRetentionTest > releasesBorrowedSessionsAfterSuccessAndDelegateFailure(String, String) > [2] family=llama, operation=hidden PASSED
+
+DecoderSessionRetentionTest > releasesBorrowedSessionsAfterSuccessAndDelegateFailure(String, String) > [3] family=llama, operation=prefillTransient PASSED
+
+DecoderSessionRetentionTest > releasesBorrowedSessionsAfterSuccessAndDelegateFailure(String, String) > [4] family=llama, operation=forward PASSED
+
+DecoderSessionRetentionTest > releasesBorrowedSessionsAfterSuccessAndDelegateFailure(String, String) > [5] family=llama, operation=forwardTransient PASSED
+
+DecoderSessionRetentionTest > releasesBorrowedSessionsAfterSuccessAndDelegateFailure(String, String) > [6] family=gemma4, operation=forward PASSED
+
+DecoderSessionRetentionTest > releasesBorrowedSessionsAfterSuccessAndDelegateFailure(String, String) > [7] family=gemma4, operation=forwardTransient PASSED
+
+ModelFixtureInstallerTest > resumesAHttpDownloadAfterTheServerClosesTheFirstResponseEarly() PASSED
+
+PerformanceCliffsTest > concurrentReportersCommitExactlyOneEvent() PASSED
+
+PerformanceCliffsTest > eventIsNamedAndCategorizedForModels() PASSED
+
+PerformanceCliffsTest > reportsEachReasonOncePerProcessNotPerCall() PASSED
+
+EdgeRockMemoryLayerTest > theSecondTokenReadsTheFirst() PASSED
+
+EdgeRockMemoryLayerTest > aTokenNeverAttendsToItself() PASSED
+
+EdgeRockMemoryLayerTest > anUntrainedLayerContributesExactlyNothing() PASSED
+
+EdgeRockMemoryLayerTest > admissionScoresAllTokensEquallyWhenTheScorerIsFlat() PASSED
+
+MemoryReadTest > theZeroSinkHalvesTheWeightOfASingleTiedRecord() PASSED
+
+MemoryReadTest > headsInAGroupShareKeysButKeepTheirOwnGate() PASSED
+
+MemoryReadTest > theGateScalesTheReadAndCanInvertIt() PASSED
+
+MemoryReadTest > anUntrainedGateIsExactlyZero() PASSED
+
+MemoryReadTest > anEmptyBankReadsZeroBecauseTheSinkTakesEverything() PASSED
+
+MemoryReadTest > twoTiedRecordsShareTheWeightWithTheSink() PASSED
+
+MemoryReadTest > theGateIsBoundedByTwoInMagnitude() PASSED
+
+SlidingWindowAttentionTest > futureKeysAreNeverVisible() PASSED
+
+SlidingWindowAttentionTest > theKeyOneStepOutsideTheWindowIsExcluded() PASSED
+
+SlidingWindowAttentionTest > weightsSumToOneSoTiedKeysAverage() PASSED
+
+SlidingWindowAttentionTest > headsInAGroupShareKeysAndValues() PASSED
+
+SlidingWindowAttentionTest > theRingBufferEvictsExactlyWindowPositionsBack() PASSED
+
+SlidingWindowAttentionTest > readingBeforeAppendingIsACallerBug() PASSED
+
+SlidingWindowAttentionTest > theWindowSpansExactlyWindowKeysIncludingTheQuery() PASSED
+
+SlidingWindowAttentionTest > aSingleVisibleKeyTakesAllTheWeightUnlikeTheMemoryRead() PASSED
+
+FlintAttentionTest > matchesScalarChronologicalArithmeticForLinearAndWrappedGroupedHeads() PASSED
+
+Gemma3nAltUpTest > theSampleStandardDeviationDenominatorIsLoadBearing() PASSED
+
+Gemma3nAltUpTest > correctAddsOneToTheCoefficientsBeforeScalingTheInnovation() PASSED
+
+Gemma3nAltUpTest > theMagnitudeIsTheL2Norm() PASSED
+
+Gemma3nAltUpTest > tanhIsAppliedElementwise() PASSED
+
+Gemma3nAltUpTest > theCorrectedStateMayBeWrittenOverThePredictions() PASSED
+
+Gemma3nAltUpTest > theMergeDividesByTheFullStreamCount() PASSED
+
+Gemma3nAltUpTest > thePerLayerContributionSkipsTheActiveStream() PASSED
+
+Gemma3nAltUpTest > aZeroCorrectionCoefficientStillAppliesTheInnovation() PASSED
+
+Gemma3nAltUpTest > theMergeAveragesTheActiveStreamWithTheProjectedOnes() PASSED
+
+Gemma3nAltUpTest > rescalingMakesTheMagnitudeTheTarget() PASSED
+
+Gemma3nAltUpTest > rescalingAZeroStreamLeavesItAloneRatherThanDividingByZero() PASSED
+
+Gemma3nAltUpTest > gaussianSparsityKeepsWhatIsAboveTheCutoffAndShiftsItDown() PASSED
+
+Gemma3nAltUpTest > aLargeMultiplierZeroesEverything() PASSED
+
+Gemma3nAltUpTest > theInnovationIsMeasuredAgainstTheActiveStream() PASSED
+
+Gemma3nAltUpTest > theCoefficientLayoutIsLoadBearing() PASSED
+
+Gemma3nAltUpTest > predictMixesEveryStreamWithItsOwnCoefficientRow() PASSED
+
+EncoderPathTest > rejectsAPoolingChoiceTheModelAlreadyMakes(Path) PASSED
+
+Gemma4ForwardPassTest > completeToyGraphMatchesAnIndependentScalarReference() PASSED
+
+Gemma4ForwardPassTest > isolatesSessionsAndSupportsSpeculativeVerification() PASSED
+
+Gemma4ForwardPassTest > theSharingLayersOwnKeyAndValueWeightsNeverReachTheOutput() PASSED
+
+Gemma4ForwardPassTest > aDenseModelWithPerLayerFeedForwardWidthsAgreesBetweenItsTwoPaths() PASSED
+
+Gemma4ForwardPassTest > thePerLayerEmbeddingTableChangesTheOutput() PASSED
+
+Gemma4ForwardPassTest > batchedExpertOrderLeavesTheMostRecentPromptRoutesLast() PASSED
+
+Gemma4ForwardPassTest > anESeriesModelWhosePerLayerProjectionIsBf16Loads() PASSED
+
+Gemma4ForwardPassTest > anESeriesModelRunsWithPerLayerEmbeddingsAndASharedKeyValueLayer() PASSED
+
+Gemma4ForwardPassTest > aFeedForwardWidthThatVariesPerLayerMatchesTheScalarReference() PASSED
+
+Gemma4ForwardPassTest > theESeriesDoesNotTakeTheBatchedPrefillPath() PASSED
+
+Gemma4ForwardPassTest > anESeriesModelWhosePerLayerProjectionIsF16MatchesAnF32Twin() PASSED
+
+Gemma4ForwardPassTest > aSharingLayerLoadsAndAgreesWhenItsKeyAndValueTensorsAreAbsentEntirely() PASSED
+
+EncoderPathTest > embeddingIsIndependentOfCallOrder(Path) PASSED
+
+Gemma4ForwardPassTest > singletonQuantizedExpertProjectionFallsBackWhenNativeKernelRequiresBatching() PASSED
+
+EncoderPathTest > refusesToTruncateWiderThanTheModel(Path) PASSED
+
+Gemma4ForwardPassTest > injectedKernelExecutesEligibleGemmaProjections() PASSED
+
+EncoderPathTest > refusesToGenerate(Path) PASSED
+
+Gemma4ForwardPassTest > aDenseGemma4LoadsAndItsBatchedPathAgreesWithOneTokenAtATime() PASSED
+
+Gemma4MappedExpertsTest > precomputesStableExpertViewsAtLoadTime() PASSED
+
+Gemma4MappedExpertsTest > leasesExpertWeightsAsZeroCopySlicesOfTheMappedGguf() PASSED
+
+EncoderPathTest > refusesSequencesLongerThanTheTrainedContext(Path) PASSED
+
+FlintRouterProjectionTest > cachedScoresRetainMappedReductionBitsAcrossWidthsAndRepeatedInputs() PASSED
+
+EmbeddingGemma2ConfigTest > rejectsCausalPoolingSharingAndMismatchedHeadContracts() PASSED
+
+EmbeddingGemma2ConfigTest > readsTheHeaderShapesWithoutConfusingHiddenAndOutputWidths() PASSED
+
+EmbeddingGemma2ConfigTest > rejectsIncompleteOrInvalidShapesAndNonfiniteEpsilon() PASSED
+
+Gemma3nConfigTest > parsesThePublishedE2bHeader() PASSED
+
+GgufTensorValuesTest > dequantizesOneBfloat16RowWithoutExpandingTheMatrix() PASSED
+
+Gemma3nConfigTest > aSharingLayerWhoseComputedSourceHasTheWrongSpanIsRefused() PASSED
+
+GgufValueTypeTest > RoundTrip > allEnumValuesRoundTrip() PASSED
+
+Gemma3nConfigTest > anIntegerSharedKeyValueLayerCountIsRefusedRatherThanSilentlyIgnored() PASSED
+
+GgufValueTypeTest > FromId > throwsForIdBeyondRange() PASSED
+
+Gemma3nConfigTest > theFixtureCarriesTheNegativeInfinityThePublishedFileCarries() PASSED
+
+Gemma3nConfigTest > anotherArchitectureIsRefused() PASSED
+
+Gemma3nConfigTest > theSharedKeyValueLayerCountIsReadFromAFloat() PASSED
+
+EncoderPathTest > rejectsAHalfPresentDenseHead(Path) PASSED
+
+Gemma3nConfigTest > aWrongLengthPerLayerArrayIsRefused() PASSED
+
+Gemma3nConfigTest > aNonFiniteSparsityScaleMeansNoSparsityRatherThanAnInfiniteCutoff() PASSED
+
+Gemma3nConfigTest > theAttentionScaleIsOne() PASSED
+
+Gemma3nConfigTest > aFractionalSharedKeyValueLayerCountIsRefused() PASSED
+
+Gemma3nConfigTest > aPositiveInfinitySparsityScaleIsAlsoRejected() PASSED
+
+Gemma3nConfigTest > aSharingLayerReadsACacheOfItsOwnSpan() PASSED
+
+EncoderPathTest > truncatesToAMatryoshkaPrefixAndRescalesIt(Path) PASSED
+
+Gemma4ConfigTest > sharedKeyValueLayersAreParsedAndMappedToTheSourceTheReferenceUses() PASSED
+
+EncoderPathTest > appliesTheDenseProjectionHead(Path) PASSED
+
+Gemma4ConfigTest > aMixtureOfExpertsGemma4IsStillDetectedAsSuch() PASSED
+
+EncoderPathTest > embedsWholeSequencesToTheModelWidth(Path) PASSED
+
+EncoderPathTest > loadsAsAnEncoderRatherThanADecoder(Path) PASSED
+
+Gemma4SharedKvTopologyTest > aSharingLayerReportsTheKeyValueTypesOfTheLayerItReadsFrom() PASSED
+
+Gemma4ConfigTest > aScalarFeedForwardLengthBroadcastsAcrossEveryLayer() PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [1] id=0, expectedName=UINT8 PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [2] id=1, expectedName=INT8 PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [3] id=2, expectedName=UINT16 PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [4] id=3, expectedName=INT16 PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [5] id=4, expectedName=UINT32 PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [6] id=5, expectedName=INT32 PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [7] id=6, expectedName=FLOAT32 PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [8] id=7, expectedName=BOOL PASSED
+
+Gemma4ConfigTest > aScalarHeadCountKvIsBroadcastOverEveryLayer() PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [9] id=8, expectedName=STRING PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [10] id=9, expectedName=ARRAY PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [11] id=10, expectedName=UINT64 PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [12] id=11, expectedName=INT64 PASSED
+
+GgufValueTypeTest > FromId > mapsIdToCorrectType(int, String) > [13] id=12, expectedName=FLOAT64 PASSED
+
+GgufValueTypeTest > FromId > throwsForNegativeId() PASSED
+
+Gemma4ConfigTest > perLayerInputEmbeddingsAreParsedRatherThanRefused() PASSED
+
+Gemma4ConfigTest > aFeedForwardLengthThatVariesPerLayerIsKeptPerLayer() PASSED
+
+Gemma4ConfigTest > rejectsPerLayerArraysThatDoNotMatchTheBlockCount() PASSED
+
+GgufEmbeddingBackendTest$Contract > embedsEmptyTextWithoutFailing() PASSED
+
+GgufEmbeddingBackendTest$Contract > returnsCallerOwnedArrays() PASSED
+
+GgufEmbeddingBackendTest$Contract > closingReleasesTheUnderlyingBackend() PASSED
+
+Gemma4ConfigTest > parsesThePinnedGemma426BA4BMetadata() PASSED
+
+GptOssForwardPassTest > executesACompleteTokenAgainstAnIndependentScalarOracle(Path) PASSED
+
+Gemma4ConfigTest > aDenseGemma4HasNoExpertMetadataAndIsNotRejected() PASSED
+
+GgufEmbeddingBackendTest$Contract > rejectsNullInput() PASSED
+
+Gemma4ConfigTest > aPerLayerFeedForwardLengthArrayIsAccepted() PASSED
+
+GgufEmbeddingBackendTest$PoolingModes > meanPoolingIsDeterministic() PASSED
+
+Gemma4ConfigTest > halfSpecifiedExpertMetadataIsRejectedRatherThanTreatedAsDense() PASSED
+
+Gemma4ConfigTest > aSharedKeyValueMappingOntoAMismatchedLayerIsRefused() PASSED
+
+Gemma4ExpertCacheTest > aFailedLoadIsNeverPublishedAsACacheHit() PASSED
+
+GgufEmbeddingBackendTest$PoolingModes > meanAndLastTokenDisagreeOnMultiTokenInput() PASSED
+
+Gemma4ExpertCacheTest > aLiveLeasePreventsTheOnlySlotFromBeingReused() PASSED
+
+Gemma4ExpertCacheTest > reusesAHitWithoutReadingOrAllocatingAnotherSlot() PASSED
+
+Gemma4ExpertCacheTest > weightedAcquirePreservesAnExpertUsedBySeveralPromptTokens() PASSED
+
+Gemma4ExpertCacheTest > lfuEvictsTheLessFrequentlyUsedExpertAndBreaksTiesByRecency() PASSED
+
+Gemma4KvCacheTest > mapsSlidingAndFullAttentionLayersToTheirExactDimensionsAndRetention() PASSED
+
+Gemma4KvCacheTest > capsSlidingStorageWhenTheRuntimeContextIsShorterThanTheWindowAndChunk() PASSED
+
+Gemma4KvCacheTest > rejectsInvalidRuntimeContextAndPrefillCapacity() PASSED
+
+Gemma4MathTest > routerInputUsesUnweightedRmsNormAndTheLearnedDimensionScale() PASSED
+
+Gemma4MathTest > finalLogitSoftcapMatchesTheGemma4Definition() PASSED
+
+Gemma4MathTest > routerRejectsNonFiniteLogitsAndMismatchedOutputBuffers() PASSED
+
+Gemma4MathTest > routerSelectsStableTopKThenAppliesSoftmaxAndPerExpertScales() PASSED
+
+Gemma4MathTest > normalizesAnUnweightedHeadInPlaceWithoutTouchingAdjacentValues() PASSED
+
+Gemma4WeightsTest > requiresTheExactFrequencyFactorsUsedByFullAttention() PASSED
+
+Gemma4WeightsTest > rejectsMatrixTypesThatTheExecutionKernelCannotRun() PASSED
+
+Gemma4WeightsTest > loadsResidentWeightsAndLeavesRoutedExpertsInTheSourceLayout() PASSED
+
+GgufConstantsTest > Alignment > defaultAlignmentIsThirtyTwo() PASSED
+
+GgufConstantsTest > Versions > supportsVersionThree() PASSED
+
+GgufConstantsTest > Versions > doesNotSupportVersionZero() PASSED
+
+GgufConstantsTest > Versions > supportsVersionTwo() PASSED
+
+GgufConstantsTest > Versions > doesNotSupportVersionOne() PASSED
+
+GgufConstantsTest > Magic > magicSpellsGgufInLittleEndian() PASSED
+
+GgufConstantsTest > Magic > magicHasExpectedHexValue() PASSED
+
+GgufHeaderParserTest > TypedAccessors > missingKeyReturnsEmpty() PASSED
+
+GgufHeaderParserTest > TypedAccessors > wrongTypeReturnsEmpty() PASSED
+
+GgufHeaderParserTest > ErrorCases > unsupportedVersionThrows() PASSED
+
+GgufHeaderParserTest > ErrorCases > wrongMagicThrows() PASSED
+
+GgufHeaderParserTest > MetadataTypes > parsesFloat32Metadata() PASSED
+
+GgufHeaderParserTest > MetadataTypes > parsesMixedMetadata() PASSED
+
+GgufHeaderParserTest > MetadataTypes > parsesUint32Metadata() PASSED
+
+GgufHeaderParserTest > MetadataTypes > parsesBoolMetadata() PASSED
+
+GgufHeaderParserTest > MetadataTypes > parsesStringMetadata() PASSED
+
+GgufHeaderParserTest > MetadataTypes > parsesStringArrayMetadata() PASSED
+
+GgufHeaderParserTest > MinimalHeader > parsesMinimalV2Header() PASSED
+
+GgufHeaderParserTest > MinimalHeader > parsesMinimalV3Header() PASSED
+
+GgufReaderTest > SequentialReads > cursorAdvancesCorrectly() PASSED
+
+GgufReaderTest > ReadBool > readsTrueFromNonZero() PASSED
+
+GgufReaderTest > ReadBool > readsFalseFromZero() PASSED
+
+GgufReaderTest > ReadString > readsEmptyString() PASSED
+
+GgufReaderTest > ReadString > readsAsciiString() PASSED
+
+GgufReaderTest > ReadString > readsUtf8MultibytString() PASSED
+
+GgufReaderTest > ReadF32 > readsFloat() PASSED
+
+GgufReaderTest > ReadU64 > readsLittleEndianUint64() PASSED
+
+GgufReaderTest > ReadI32 > readsNegativeValue() PASSED
+
+GgufReaderTest > ReadU32 > readsAtOffset() PASSED
+
+GgufReaderTest > ReadU32 > readsLittleEndianUint32() PASSED
+
+GlinerClassificationTest > structuralMarkersAreTrackedBySlotAndTextIsNormalized() PASSED
+
+GptOssForwardPassTest > ownsIndependentSequentialStateAndCanResetIt(Path) PASSED
+
+GlinerClassificationTest > singleLabelSoftmaxHasStableTieAndRejectsNonFiniteLogits() PASSED
+
+GlinerClassificationTest > sigmoidIsIndependentAndFallbackIsExplicit() PASSED
+
+GlinerClassificationTest > overflowAndAmbiguousSchemasAreRejected() PASSED
+
+GptOssMathTest > rejectsInvalidRoutingAndActivationBuffers() PASSED
+
+GptOssMathTest > routingBreaksEqualLogitsByExpertIndex() PASSED
+
+GptOssMathTest > activationMatchesFreeTokenInterleavingAndClampEquation() PASSED
+
+GptOssMathTest > theSplitActivationRejectsMismatchedLengths() PASSED
+
+GptOssMathTest > swigluOaiMatchesItsSplitForm() PASSED
+
+GptOssMathTest > routingMatchesFreeTokenSoftmaxTopKRenormalization() PASSED
+
+GptOssWeightsTest > mapsTheCompleteOfficialTensorContractWithoutExpandingMatrices(Path) PASSED
+
+GptOssWeightsTest > rejectsADenseProjectionThatDoesNotMatchTheConfig(Path) PASSED
+
+Lfm2ConfigTest > readsTheHybridLayerPlanFromTheFile() PASSED
+
+Lfm2ConfigTest > refusesAScalarKvHeadCountBecauseItCannotSayWhichLayersAreConvolutional() PASSED
+
+Lfm2ConfigTest > refusesAConvolutionWidthBelowTwo() PASSED
+
+Lfm2ConfigTest > refusesAPerLayerListThatDoesNotMatchTheBlockCount() PASSED
+
+Lfm2ConfigTest > reportsTheRecurrentStateWidthPerConvolutionalLayer() PASSED
+
+Lfm2ConfigTest > refusesAPoolingCodeItCannotName() PASSED
+
+Lfm2ConfigTest > treatsAFileWithNoCausalityKeyAsADecoder() PASSED
+
+Lfm2ConfigTest > refusesAModelWithNoAttentionAtAll() PASSED
+
+Lfm2ConfigTest > refusesABidirectionalFileThatDeclaresNoPooling() PASSED
+
+Lfm2ConfigTest > readsTheBidirectionalEmbeddingContract() PASSED
+
+GptOssGgufRouteTest > theGgufPathOutputIsPinned(Path) PASSED
+
+Lfm2MoeEquivalenceTest > theRoutedModelIsNotTriviallyEqualToTheDenseOne() PASSED
+
+Lfm2MoeEquivalenceTest > aRoutedModelWithIdenticalExpertsReproducesTheDenseModelsLogits() PASSED
+
+GptOssGgufRouteTest > theUntiedOutputHeadIsUsed(Path) PASSED
+
+GptOssForwardPassTest > advancesPromptTokensWithoutLogitsAndRewindsForPrefixReuse(Path) PASSED
+
+LlamaForwardPassTest > publishedLongRopeDivisorsReachTheGraph() PASSED
+
+GptOssGgufRouteTest > theSlidingPatternIsDerivedWithTheSlidingLayerFirst(Path) PASSED
+
+GptOssGgufRouteTest > theBackendLoadsAGptOssGgufUnderItsOwnArchitecture(Path) PASSED
+
+GptOssGgufRouteTest > theAttentionSinksReachTheOutput(Path) PASSED
+
+Lfm2RewindTest > rewindingForwardIsRefusedRatherThanInventingTokens() PASSED
+
+Lfm2RewindTest > prefillReturnsWhatAdvancingTokenByTokenReturns() PASSED
+
+GptOssForwardPassTest > loadsACompleteGptOssDirectoryThroughThePublicBackend(Path) PASSED
+
+Lfm2RewindTest > aSharedPrefixCanBeReusedAcrossTwoDifferentContinuations() PASSED
+
+Lfm2RewindTest > rewindingToTheStartIsTheSameAsAReset() PASSED
+
+Lfm2RewindTest > rewindingToWhereTheDecoderAlreadyIsDoesNothing() PASSED
+
+Lfm2RewindTest > aResetDiscardsTheHistoryItWouldOtherwiseReplay() PASSED
+
+Lfm2RewindTest > anEmptyPrefillIsRefused() PASSED
+
+Lfm2RewindTest > aRewoundDecoderProducesExactlyWhatAFreshOneDoes() PASSED
+
+GptOssMxfp4MoeTest > expertsOfDifferentStorageShapesAreRefused() PASSED
+
+PureJavaBackendModelFixtureTest > resolvesQwen25Coder3BPureJavaFixtureFromClasspath() PASSED
+
+PureJavaBackendModelFixtureTest > resolvesQwen25Coder7BPureJavaFixtureFromClasspath() PASSED
+
+PureJavaBackendModelFixtureTest > resolvesHuatuoGptPureJavaFixtureFromClasspath() PASSED
+
+GptOssMxfp4MoeTest > theSplitExpertShapeMatchesTheFusedOne() PASSED
+
+PureJavaBackendModelFixtureTest > resolvesQwen25Coder15BPureJavaFixtureFromClasspath() PASSED
+
+GptOssMxfp4MoeTest > w4a8RoutedLayerTracksTheExactPathWithoutExpandingWeights() PASSED
+
+GptOssMxfp4MoeTest > exactRoutedLayerMatchesIndependentDequantizedReference() PASSED
+
+PureJavaBackendModelFixtureTest > resolvesQwen25CoderPureJavaFixtureFromClasspath() PASSED
+
+GptOssMxfp4MoeTest > rejectsAliasingDuplicateRoutesAndMismatchedBuffers() PASSED
+
+PureJavaBackendModelFixtureTest > resolvesQwen25CoderQ8PureJavaFixtureFromClasspath() PASSED
+
+PureJavaBackendModelFixtureTest > resolvesSmolLm2PureJavaFixtureFromClasspath() PASSED
+
+GptOssMxfp4MoeTest > theVaryingFixtureDistinguishesParityFromHalves() PASSED
+
+PureJavaBackendModelFixtureTest > resolvesQwen3OnePointSevenBPureJavaFixtureFromClasspath() PASSED
+
+Qwen2HuggingFaceConfigTest > appliesFreeTokenQwen2Fallbacks(Path) PASSED
+
+PureJavaBackendModelFixtureTest > resolvesTinyLlamaSentencePieceFixtureFromClasspath() PASSED
+
+Qwen2HuggingFaceConfigTest > parsesPinnedOfficialQwen25Config() PASSED
+
+PureJavaBackendModelFixtureTest > resolvesQwenFixtureFromClasspath() PASSED
+
+Qwen2HuggingFaceConfigTest > rejectsDuplicateFields(Path) PASSED
+
+Qwen2HuggingFaceConfigTest > explicitHeadAndRopeValuesTakePrecedence(Path) PASSED
+
+PureJavaBackendModelFixtureTest > resolvesQwen25Coder15BQ8PureJavaFixtureFromClasspath() PASSED
+
+Qwen2HuggingFaceConfigTest > acceptsAListOfEosIdsAndKeepsTheFirstAsThePrimaryEos(Path) PASSED
+
+Qwen2HuggingFaceConfigTest > rejectsWrongArchitecture(Path) PASSED
+
+Radix2FftTest > reconstructsAConstantSignalFromItsRealSpectrum() PASSED
+
+Radix2FftTest > reconstructsAUnitImpulseFromAFlatSpectrum() PASSED
+
+LlamaForwardPassTest > NanoModel > finalLayerPrefillPruningPreservesLogitsKvCacheAndAutoregressiveState() PASSED
+
+LlamaForwardPassTest > NanoModel > hiddenStateLeavesTheSequenceUsableForGeneration() PASSED
+
+Radix2FftTest > rejectsNonPowerOfTwoTransformsAndWrongBinCounts() PASSED
+
+Lfm2MoeConfigTest > theDenseSiblingStillLoadsAndDeclaresNoExperts() PASSED
+
+Lfm2MoeConfigTest > refusesAGatingFunctionThisBackendDoesNotImplement() PASSED
+
+Lfm2MoeConfigTest > theDenseAndRoutedBlocksSplitAtTheDeclaredLeadingCount() PASSED
+
+Lfm2MoeConfigTest > readsTheExpertBlockFromTheArtifactsOwnKeys() PASSED
+
+Lfm2MoeConfigTest > anUnknownArchitectureIsStillRefused() PASSED
+
+Lfm2MoeConfigTest > aMixtureThatDeclaresNoExpertKeysIsRefused() PASSED
+
+Lfm2MoeConfigTest > theAttentionSplitIsADifferentAxisFromTheRoutedSplit() PASSED
+
+Lfm2ShortConvTest > aConvolutionWidthBelowTwoIsRefused() PASSED
+
+Lfm2ShortConvTest > theCentredWindowDisagreesWithTheCausalStepAndThatIsThePoint() PASSED
+
+Lfm2ShortConvTest > anEvenConvolutionWidthHasNoCentreAndIsRefused() PASSED
+
+Lfm2ShortConvTest > theStateAfterAStepHoldsTheLastTwoGates() PASSED
+
+Lfm2ShortConvTest > theGatesAreNotInterchangeable() PASSED
+
+Lfm2ShortConvTest > theCentredWindowIsolatesEachTapWithSymmetricPadding() PASSED
+
+Lfm2ShortConvTest > oneTokenFromAKnownStateIsTheExpectedThreeTapFilter() PASSED
+
+Lfm2ShortConvTest > steppingOneTokenAtATimeMatchesAWholeSequence() PASSED
+
+LlamaAttentionTemperatureTest > aModelWithoutTheKeyScalesByOneAtEveryPosition() PASSED
+
+LlamaAttentionTemperatureTest > mistral3IsPlainLlamaShapedWithInterleavedRope() PASSED
+
+LlamaAttentionTemperatureTest > theScaleIsExactlyOneBelowTheFloorAndGrowsInStepsAboveIt() PASSED
+
+LlamaAttentionTemperatureTest > belowTheFloorTheOutputIsBitIdenticalWithAndWithoutScaling() PASSED
+
+LlamaForwardPassTest > NanoModel > batchedAttentionScoresPreserveCompleteAutoregressiveState() PASSED
+
+LlamaAttentionTemperatureTest > batchedPrefillAgreesWithTokenByTokenAcrossTheFloor() PASSED
+
+LlamaAttentionTemperatureTest > atAndAboveTheFloorTheOutputActuallyChanges() PASSED
+
+LlamaConfigTest > doesNotExposeEqualWidthKvCompatibilityAccessor() PASSED
+
+LlamaConfigTest > RotaryLayoutPerArchitecture > everyRegisteredArchitectureIsCovered() PASSED
+
+LlamaConfigTest > RotaryLayoutPerArchitecture > everyArchitectureMatchesTheReferenceRopeTypeTable() PASSED
+
+LlamaConfigTest > MellumSlidingWindowAndRope > theDeclaredPatternAndTheStrideFallbackAgreeForThisArtifact() PASSED
+
+LlamaConfigTest > MellumSlidingWindowAndRope > theStrideIsNotTheGenericDefaultAndNotTheGemmaOne() PASSED
+
+LlamaConfigTest > MellumSlidingWindowAndRope > bothRopeBasesComeFromTheArtifactRatherThanADefault() PASSED
+
+LlamaConfigTest > MellumSlidingWindowAndRope > honoursTheDeclaredPatternWhichIsWhatTheArtifactCarries() PASSED
+
+LlamaConfigTest > MellumSlidingWindowAndRope > appliesYarnToTheFullAttentionLayersAndPlainRopeToTheSlidingOnes() PASSED
+
+LlamaConfigTest > MellumSlidingWindowAndRope > fallsBackToUpstreamsStrideOfFourRatherThanTheGenericSixWhenNoPatternIsDeclared() PASSED
+
+LlamaConfigTest > MellumSlidingWindowAndRope > routesExpertsWithRenormalisedSoftmaxWeights() PASSED
+
+LlamaConfigTest > FromMetadata > extractsPhi3SemanticsForTheFullRotaryVariants() PASSED
+
+LlamaConfigTest > FromMetadata > aRotaryWidthWiderThanTheHeadOrOddIsRefused() PASSED
+
+LlamaConfigTest > FromMetadata > usesDefaults() PASSED
+
+LlamaConfigTest > FromMetadata > extractsGemma3DecoderSemantics() PASSED
+
+LlamaConfigTest > FromMetadata > extractsGraniteScalingSemanticsWithoutTreatingItAsLlama() PASSED
+
+LlamaConfigTest > FromMetadata > extractsGemma1SemanticsWithoutTheGemma2Norms() PASSED
+
+LlamaConfigTest > FromMetadata > readsModernLinearRopeScalingFactor() PASSED
+
+LlamaConfigTest > FromMetadata > ignoresScalingFactorWhenScalingIsDisabled() PASSED
+
+LlamaConfigTest > FromMetadata > extractsFromMetadata() PASSED
+
+LlamaConfigTest > FromMetadata > refusesAnExpertGatingFunctionThisBuildCannotRoute() PASSED
+
+LlamaConfigTest > FromMetadata > readsExplicitQwenHeadWidthsAndRopeLayout() PASSED
+
+LlamaConfigTest > FromMetadata > honoursAPartialRotaryWidthInsteadOfRotatingTheWholeHead() PASSED
+
+LlamaConfigTest > FromMetadata > aFullRotaryModelReportsTheHeadWidthAndNoPartialRotary() PASSED
+
+LlamaConfigTest > FromMetadata > gemma3KeepsItsOwnWindowPatternAndHasNoAttentionSoftcap() PASSED
+
+LlamaConfigTest > FromMetadata > extractsHunyuanDenseSemantics() PASSED
+
+LlamaConfigTest > FromMetadata > missingEmbeddingLengthThrows() PASSED
+
+LlamaConfigTest > FromMetadata > readsThePinnedQwenYarnRopeScalingContract() PASSED
+
+LlamaConfigTest > FromMetadata > gemma3StillRequiresItsPostNormsAfterGemma1WasAdded() PASSED
+
+LlamaConfigTest > FromMetadata > extractsGemma2SemanticsIncludingTheAttentionSoftcapAndAlternatingWindow() PASSED
+
+LlamaConfigTest > FromMetadata > selectsSmolLm3LayersThatSkipRope() PASSED
+
+LlamaConfigTest > FromMetadata > readsLegacyLinearRopeScale() PASSED
+
+LlamaConfigTest > FromMetadata > derivesVocabSizeFromTokenizerTokensWhenArchitectureKeyIsMissing() PASSED
+
+LlamaConfigTest > FromMetadata > readsMapleFromItsRealHeaderKeys() PASSED
+
+LlamaConfigTest > FromMetadata > acceptsADenseModelThatDeclaresNoGatingFunction() PASSED
+
+LlamaConfigTest > LongRope > theTrainedContextAndAttentionFactorSurviveWithNoScalingTypeKey() PASSED
+
+LlamaConfigTest > LongRope > aModelPublishingNoDivisorsKeepsThePlainTable() PASSED
+
+LlamaConfigTest > LongRope > anAbsentAttentionFactorStaysNeutral() PASSED
+
+LlamaConfigTest > LongRope > theDivisorsChangeTheRotationRatherThanBeingCarriedAndIgnored() PASSED
+
+LlamaConfigTest > LongRope > aContextWithinTheTrainedOneTakesTheShortDivisors() PASSED
+
+LlamaConfigTest > LongRope > aContextAboveTheTrainedOneTakesTheLongDivisors() PASSED
+
+LlamaConfigTest > MapleSlidingWindowAndClamp > readsTheWindowAndFollowsTheDeclaredPattern() PASSED
+
+LlamaConfigTest > MapleSlidingWindowAndClamp > readsTheClampForEveryLayer() PASSED
+
+LlamaConfigTest > MapleSlidingWindowAndClamp > reportsNoClampWhereTheKeyIsAbsent() PASSED
+
+LlamaConfigTest > MapleSlidingWindowAndClamp > ropesExactlyTheLocalLayersAndLeavesTheGlobalOnesWithoutPositions() PASSED
+
+LlamaConfigTest > MapleSlidingWindowAndClamp > seedsTheSlidingWindowRopeBaseFromTheModelsOwnBase() PASSED
+
+LlamaConfigTest > MapleSlidingWindowAndClamp > doesNotShareTheCallersArrays() PASSED
+
+LlamaConfigTest > MapleSlidingWindowAndClamp > doesNotFallBackToTheGemmaStrideWhenThePatternIsAbsent() PASSED
+
+LlamaForwardPassTest > NanoModel > activatedForkRequiresItsExactInvocationAndLeavesBaseForkBitIdentical(Path) PASSED
+
+LlamaForwardPassPerformanceCliffTest > graniteKeepsTheFusedFallbackItWasQualifiedWithWithoutAskingForIt() PASSED
+
+LlamaForwardPassTest > NanoModel > q4PrefillUsesBatchedKernelAndPreservesAutoregressiveState() PASSED
+
+LlamaForwardPassPerformanceCliffTest > graniteStillTakesTheFusedPathAndThePureJavaBackendReportsNoNativeCliff() PASSED
+
+LlamaForwardPassPerformanceCliffTest > askingForTheFusedPathByNameTakesItAndReportsNoCliff() PASSED
+
+LlamaForwardPassPerformanceCliffTest > projectionTypeWithoutBatchedKernelReportsBatchedPrefillCliffOnce() PASSED
+
+LlamaForwardPassPerformanceCliffTest > graniteWithAnInjectedKernelLackingGroupedAttentionReportsOnce() PASSED
+
+LlamaForwardPassPerformanceCliffTest > graniteNativeAttentionOverTwoCacheSpansReportsNoSpanCliff() PASSED
+
+LlamaForwardPassPerformanceCliffTest > graniteNativeAttentionOverMoreThanTwoCacheSpansFallsBackAndReportsOnce() PASSED
+
+LlamaForwardPassPerformanceCliffTest > batchedProjectionTypesReportNoBatchedPrefillCliff() PASSED
+
+LlamaForwardPassPerformanceCliffTest > groupedQueryLlamaStaysHeadByHeadByDefaultAndReportsTheCliffOnce() PASSED
+
+LlamaForwardPassPerformanceCliffTest > aModelWithNothingToFuseReportsNoCliff() PASSED
+
+LlamaForwardPassPerformanceCliffTest > multiHeadLlamaHasNoGroupsAndReportsNoAttentionCliff() PASSED
+
+LlamaForwardPassTest > NanoModel > q5PrefillUsesBatchedKernelAndPreservesAutoregressiveState() PASSED
+
+LlamaHiddenStatePrefillTest > aPromptWithNothingToBatchLeavesTheCounterAlone() PASSED
+
+LlamaForwardPassTest > NanoModel > q8PrefillUsesBatchedKernelAndPreservesAutoregressiveState() PASSED
+
+LlamaForwardPassTest > NanoModel > sessionHiddenStateUsesItsOwnKvLineageAndRemainsUsableForGeneration() PASSED
+
+LlamaForwardPassTest > NanoModel > logitsPathIsUnchangedByTheEmbeddingPath() PASSED
+
+LlamaHiddenStatePrefillTest > generationContinuesFromTheBatchedPrefillExactlyAsItWouldHaveDone() PASSED
+
+LlamaHiddenStatePrefillTest > theBatchedPathIsTakenWhenThereIsSomethingToBatch() PASSED
+
+LlamaHiddenStatePrefillTest > invalidEmbeddingRowsDoNotAdvanceTheSequence() PASSED
+
+LlamaHiddenStatePrefillTest > theKeyValueCacheEndsInTheSameStateAsRunningOneTokenAtATime() PASSED
+
+LlamaHiddenStatePrefillTest > theSessionRouteMatchesOneTokenAtATimeAndTakesTheBatchedPathToo() PASSED
+
+LlamaHiddenStatePrefillTest > theHiddenStateMatchesRunningTheSamePromptOneTokenAtATime() PASSED
+
+LlamaForwardPassTest > NanoModel > stagedQuantizedSessionPrefillHandlesSingleRowTailAfterSharedPrefix() PASSED
+
+LlamaHiddenStatePrefillTest > injectedTokenRowsMatchTextLogitsAndSubsequentDecode() PASSED
+
+LlamaWeightsSafetensorsTest > requiresAnLmHeadWhenTheConfigDoesNotTieWordEmbeddings(Path) PASSED
+
+LlamaWeightsSafetensorsTest > loadsOfficialQwen2NamesAsMappedBfloat16Weights(Path) PASSED
+
+LlamaWeightsSafetensorsTest > rejectsAProjectionWhoseHuggingFaceShapeDoesNotMatchTheConfig(Path) PASSED
+
+MobileMoeForwardPassIntegrationTest > batchedPrefillMatchesSequentialExecutionAndLeavesEquivalentKvState() SKIPPED
+
+MobileMoeForwardPassIntegrationTest > executesTheRealQatGraphWithIsolatedRewindableSessions() SKIPPED
+
+MobileMoeForwardPassIntegrationTest > matchesTheOfficialPytorchOracleAtPositionZeroAndWithKvHistory() SKIPPED
+
+MobileMoeHuggingFaceConfigTest > parsesThePinnedSmallQatExecutionContract(Path) PASSED
+
+MobileMoeHuggingFaceConfigTest > rejectsAFormatThatWouldBeDecodedWithTheWrongNibbleContract(Path) PASSED
+
+MobileMoeHuggingFaceConfigTest > acceptsTheBf16SftContractWithoutQuantization(Path) PASSED
+
+MobileMoeHuggingFaceConfigTest > doesNotClaimAnotherHuggingFaceArchitecture(Path) PASSED
+
+MobileMoePackedInt4RightMatrixTest > batchesIndependentExpertActivationRowsWithoutChangingTheirResults() PASSED
+
+MobileMoePackedInt4RightMatrixTest > multipliesTheExpertInputByItsInputOutputTensorWithoutTransposingWeights() PASSED
+
+MobileMoePackedInt4RightMatrixTest > requantizesTheTransposedMatrixToQ8ForFastRuntimeMultiplication() PASSED
+
+LlamaForwardPassTest > NanoModel > raggedSessionPrefillPreservesFinalLogitsKvStateAndContinuation() PASSED
+
+LlamaForwardPassTest > NanoModel > differentPositionsProduceDifferentLogits() PASSED
+
+GroupedQueryAttentionKernelTest > swiGluMatchesTheScalarReferenceWithinLastBits() PASSED
+
+BertQ51ProjectionTest > bertScalarProjectionMatchesTheCausalNumericContractAcrossRepeatedBatches() PASSED
+
+ModernBertDecisionLayoutTest > refusesMarkersThatDoNotAscend() PASSED
+
+ModernBertDecisionLayoutTest > givesEveryOptionTheSameStartingPosition() PASSED
+
+GroupedQueryAttentionKernelTest > scoresMatchMatVecDotExactHeadByHead() PASSED
+
+GroupedQueryAttentionKernelTest > vectorExponentialMatchesItsScalarTwinAndMathExp() PASSED
+
+ModernBertDecisionLayoutTest > reproducesTheReferenceLayoutForEveryCase() PASSED
+
+ModernBertDecisionLayoutTest > laysOutASequenceWithNoOptionsSequentially() PASSED
+
+ModernBertDecisionLayoutTest > isolatesOptionsFromEachOtherButNotFromTheState() PASSED
+
+ModernBertDecisionLayoutTest > refusesAMarkerOutsideTheHead() PASSED
+
+SequenceGrowthTest > theFirstAllocationIsSmallWhateverTheCeiling() PASSED
+
+SequenceGrowthTest > advancingOnePositionAtATimeCopiesALinearAmount() PASSED
+
+SequenceGrowthTest > aCeilingBelowTheInitialCapacityIsNeverExceeded() PASSED
+
+SequenceGrowthTest > whatIsAlreadyHeldIsKeptWhenItSuffices() PASSED
+
+SequenceGrowthTest > growthDoublesAndThenClampsToTheCeiling() PASSED
+
+SequenceGrowthTest > askingForMoreThanTheCeilingIsRefusedRatherThanClamped() PASSED
+
+LlamaForwardPassTest > NanoModel > stagedQ4LayerPreservesPrefillCacheAndAutoregressiveStateExactly() PASSED
+
+LlamaForwardPassTest > NanoModel > gemma1LoadsWithoutTheGemma2NormsAndPrefillMatchesOneTokenAtATime() PASSED
+
+LlamaForwardPassTest > NanoModel > cacheGrowthAndResetPreserveSequenceResults() PASSED
+
+CactNeedle2LayoutTest > readsProbeHeadsFromTheSerializedManifest() PASSED
+
+CactNeedle2LayoutTest > rejectsProbeHeadsOutsideCanonicalManifestOrder() PASSED
+
+CactNeedle2LayoutTest > rejectsATypeOrShapeThatDoesNotMatchItsPosition() PASSED
+
+LlamaForwardPassTest > NanoModel > stableVerificationSnapshotSurvivesLaterTransientVerification() PASSED
+
+CactNeedle2LayoutTest > matchesPinnedOfficialNeedle2TensorLayoutWhenProvided() SKIPPED
+
+CactNeedle2LayoutTest > namesAndValidatesTheCanonicalTensorOrder() PASSED
+
+CactTokenizerTest > rejectsTruncatedInvalidAndMismatchedTokenizerBlobs() PASSED
+
+CactTokenizerTest > matchesPinnedNeedleReferenceForRobotToolPromptWhenProvided() SKIPPED
+
+CactTokenizerTest > exposesTheSerializedTokenizerContract() PASSED
+
+CactTokenizerTest > matchesTheReferenceSentencePieceMergesAndByteFallback() PASSED
+
+CactTokenizerTest > recognizesUserDefinedPiecesOnlyInTrustedControlText() PASSED
+
+CactTokenizerTest > matchesPinnedOfficialNeedle2ReferenceValuesWhenProvided() SKIPPED
+
+Needle2MathTest > hadamardMlpMatchesNeedleReference() PASSED
+
+Needle2MathTest > zeroCenteredRmsNormMatchesNeedleReference() PASSED
+
+Needle2MathTest > sinkhornAndRopeMatchNeedleReference() PASSED
+
+DebertaV2ForwardPassTest > matchesReferenceLogBucketsAtLinearAndLogarithmicBoundaries() PASSED
+
+MemoryAnchorsTest > breaksTiesByEarlierPosition() PASSED
+
+MemoryAnchorsTest > treatsANegativeReferenceAsAbsentWhateverItsScore() PASSED
+
+MemoryAnchorsTest > rejectsMismatchedInputsAndNonPositiveCapacity() PASSED
+
+MemoryAnchorsTest > truncatesToCapacityByScore() PASSED
+
+MemoryAnchorsTest > mergingAnEmptyBankIsTheIdentity() PASSED
+
+MemoryAnchorsTest > keepsTheHighestScoresAndPadsTheRest() PASSED
+
+MemoryAnchorsTest > mergeIsTheCommitStepAndKeepsTheBestOfBoth() PASSED
+
+MemoryAnchorsTest > mergeIsAssociativeSoPrefillAndDecodeAgree() PASSED
+
+LlamaForwardPassTest > NanoModel > independentSessionBatchPreservesLogitsKvStateAndAutoregressiveContinuation() PASSED
+
+GroupedQueryAttentionKernelTest > theFusedGroupAgreesWithTheHeadByHeadLoopToWithinAFewUlpsOfTheOutput() PASSED
+
+GroupedQueryAttentionKernelTest > valuesMatchAddWeightedRowsInPlaceHeadByHead() PASSED
+
+GroupedQueryAttentionKernelTest > softmaxMatchesTheScalarReferenceWithinLastBits() PASSED
+
+PinnedAttentionWidthContractTest > scoreTailsRetainEightLogicalFmaChainsAndPinnedFold() PASSED
+
+PinnedAttentionWidthContractTest > softmaxRetainsPolynomialOutputsAndEightLaneSumAcrossTails() PASSED
+
+RotaryTableTest > aPartialRotaryWidthRotatesTheSameWayAsAFullHeadOfThatWidth() PASSED
+
+RotaryTableTest > yarnMatchesPinnedFreeTokenGptOssFrequenciesAndMagnitude() PASSED
+
+RotaryTableTest > yarnAppliesItsAttentionMagnitudeAtPositionZero() PASSED
+
+RotaryTableTest > aPartialRotaryWidthLeavesTheRestOfTheHeadUntouched() PASSED
+
+RotaryTableTest > frequencyFactorsMustMatchTheRotaryPairCountAndRemainPositive() PASSED
+
+RotaryTableTest > reusesFactorsForEveryHeadAtTheSamePosition() PASSED
+
+RotaryTableTest > ggufFrequencyFactorsPreserveGemma4ProportionalRopeLayout() PASSED
+
+RotaryTableTest > batchFactorsArePreparedOnceAndAddressedByToken() PASSED
+
+RotaryTableTest > cachedFactorsMatchDirectStandardAndNeoxRope() PASSED
+
+SwiGluSplitTest > scalarSplitMatchesTheSerialLoop(int) > [1] size=1023 PASSED
+
+SwiGluSplitTest > scalarSplitMatchesTheSerialLoop(int) > [2] size=1024 PASSED
+
+SwiGluSplitTest > scalarSplitMatchesTheSerialLoop(int) > [3] size=2049 PASSED
+
+SwiGluSplitTest > scalarSplitMatchesTheSerialLoop(int) > [4] size=3109 PASSED
+
+SwiGluSplitTest > scalarSplitMatchesTheSerialLoop(int) > [5] size=896 PASSED
+
+MemoryRetentionTest > aHighScoringEarlyAnchorSurvivesTenThousandDullerTokens() PASSED
+
+MemoryRetentionTest > eachGroupKeepsItsOwnAnchorsBecauseTheyScoreThemDifferently() PASSED
+
+SwiGluSplitTest > scalarSplitMatchesTheSerialLoop(int) > [6] size=14336 PASSED
+
+MemoryRetentionTest > theNeedleIsFoundByItsOwnKeyAndNotByTheFloodsKey() PASSED
+
+SwiGluSplitTest > scalarSplitMatchesTheSerialLoop(int) > [7] size=18944 PASSED
+
+SwiGluSplitTest > scalarSplitMatchesTheSerialLoop(int) > [8] size=12301 PASSED
+
+Gemma4FixtureRegistrationTest > resolvesTheExactModelJarsArtifact() PASSED
+
+FlintRoutingTest > unnormalizedWeightsAndTiesRetainTheirDefinedMeaning() PASSED
+
+FlintRoutingTest > biasSelectsExpertsButDoesNotWeightTheirContributions() PASSED
+
+Gemma3nForwardPassTest > theLaurelResidualReachesTheOutput() PASSED
+
+SwiGluSplitTest > scalarSplitMatchesTheSerialLoop(int) > [9] size=100003 PASSED
+
+PlanPrecedenceTest > anOverrideBeatsADeploymentSettingWhichBeatsARecommendation() PASSED
+
+Gemma3nForwardPassTest > everyLogitIsFiniteAcrossTheWholeWindow() PASSED
+
+PlanPrecedenceTest > anOverrideIsValidatedLikeTheOtherTiers() PASSED
+
+PlanPrecedenceTest > theTwoTierFormStillMeansWhatItMeant() PASSED
+
+Gemma3nForwardPassTest > thePerLayerEmbeddingTableReachesTheOutput() PASSED
+
+Gemma3nForwardPassTest > theCompleteGraphMatchesAnIndependentScalarReference() PASSED
+
+Gemma3nForwardPassTest > theFixtureExercisesBothAttentionBranches() PASSED
+
+PtqQ8WidthContractTest > integerGroupsAndScaleFmaOrderMatchIndependentUnpacking() PASSED
+
+Gemma3nForwardPassTest > everyLogitIsBoundedByTheFinalSoftcap() PASSED
+
+TernaryDequantizerTest > dequantizeTq1_0MatchesTheReference() PASSED
+
+Gemma3nForwardPassTest > theFixtureExercisesBothFeedForwardBranches() PASSED
+
+Gemma3nForwardPassTest > theHalfPrecisionTensorsAreDecodedAsF16() PASSED
+
+TernaryDequantizerTest > packedPtqProductAgreesWithScalarUnpackingAcrossOffsetsAndScales() PASSED
+
+TernaryDequantizerTest > refusesACountThatIsNotAWholeNumberOfBlocks() PASSED
+
+TernaryDequantizerTest > dequantizeTq2_0MatchesTheReference() PASSED
+
+TernaryDequantizerTest > dequantizePq2_0MatchesTheReference() PASSED
+
+Gemma3nForwardPassTest > theHalfPrecisionRoundingIsObservable() PASSED
+
+TernaryDequantizerTest > theFourthTwoBitCodeIsPlusTwoNotClampedToOne() PASSED
+
+TernaryDequantizerTest > dequantizePtq1_0MatchesTheReference() PASSED
+
+Gemma3nForwardPassTest > resetReturnsTheGraphToItsStartingState() PASSED
+
+Gemma3nForwardPassTest > theStreamInitialisationProjectionReachesTheOutput() PASSED
+
+PrismHadamardTest > offsetTransformsKeepBatchRowsAndGuardValuesIndependent() PASSED
+
+PrismHadamardTest > metadataRequiresEveryDeclaredProjectionToUseTheTransform() PASSED
+
+Gemma3nForwardPassTest > theInactiveStreamsReachTheOutput() PASSED
+
+PrismHadamardTest > rejectsUnsupportedMetadataInsteadOfSilentlyIgnoringTheRotation() PASSED
+
+Gemma3nForwardPassTest > aNonSequentialPositionIsRefused() PASSED
+
+PrismHadamardTest > rejectsInvalidGeometryAndSigns() PASSED
+
+PrismHadamardTest > forwardMatchesDenseSylvesterMatrixAndInverseRestoresSignedInputs() PASSED
+
+PrismHadamardTest > recurrentProjectionGroupsTiledValueHeadsBeforeRotating() PASSED
+
+Qwen35FusedBetaAlphaTest > theFixtureGeometryActuallyGroups(Path) PASSED
+
+Qwen35FusedBetaAlphaTest > theNaivePackingIsNotEquivalent(Path) PASSED
+
+Qwen35FusedBetaAlphaTest > aFusedInterleavedTensorComputesWhatTwoSeparateTensorsDo(Path) PASSED
+
+Qwen35FusedBetaAlphaTest > theBackendLoadsAQwen3NextFileUnderItsOwnArchitecture(Path) PASSED
+
+Qwen35SlidingWindowSpanTest > theSpanCoversExactlyTheWindowOnceTheSequenceIsLonger() PASSED
+
+Qwen35SlidingWindowSpanTest > nonsenseArgumentsAreRefusedRatherThanProducingANegativeOffset() PASSED
+
+Qwen35SlidingWindowSpanTest > aSequenceShorterThanTheWindowIsNotTrimmed() PASSED
+
+Qwen35SlidingWindowSpanTest > aWindowOfOneSeesOnlyTheCurrentToken() PASSED
+
+Qwen35SlidingWindowSpanTest > anUnwindowedModelAlwaysSeesThePrefixFromZero() PASSED
+
+SafetensorsTensorSizeAssertionTest > shortDataRangeNamesTheTensorDtypeShapeExpectedAndAvailableBytes() PASSED
+
+SafetensorsTensorSizeAssertionTest > rangeRunningPastTheDataBufferNamesTheTensor() PASSED
+
+SafetensorsTensorSizeAssertionTest > overlappingRangesNameBothTensors() PASSED
+
+SafetensorsTensorSizeAssertionTest > validAdjacentTensorsStillParse() PASSED
+
+SopranoBackendContractTest > requiresConfigAndTokenizerToAgreeOnTheEndOfSpeechToken() PASSED
+
+SopranoConfigTest > refusesToSilentlyRunACompatibleLookingDifferentArchitecture() PASSED
+
+SopranoConfigTest > readsThePublishedSopranoArchitecture() PASSED
+
+SopranoVocoderMathTest > linearlyUpsamplesFramesWithAlignedCorners() PASSED
+
+SopranoVocoderMathTest > appliesAZeroPaddedDepthwiseConvolution() PASSED
+
+TensorSourceTest > ggufAndSafetensorsExposeTheSameLogicalF32Matrix(Path) PASSED
+
+TensorSourceTest > preservesFormatSpecificPackedBlockGeometry(Path) PASSED
+
+FlintTokenizerTest > speakerTransitionsStopOnlyFlintGeneration(Path) PASSED
+
+FlintTokenizerTest > splitsCjkSeparatelyFromLatinAndGroupsThreeDigits() PASSED
+
+UnigramTokenizerTest > viterbiSelectsTheHighestScoringCompleteSegmentation() PASSED
+
+UnigramTokenizerTest > preservesUserDefinedPiecesAndCoalescesUnknownRuns() PASSED
+
+UnigramTokenizerTest > rejectsMalformedPrecompiledCharacterMapsAtConstruction() PASSED
+
+LlamaForwardPassTest > NanoModel > mixedQ5KQ6KPrefillUsesBatchedKernelsAndPreservesAutoregressiveState() PASSED
+
+Gemma4DecoderSessionRetentionTest > releasesBorrowedSessionsOnSuccessValidationAndInferenceFailure(boolean) > [1] transientOutput=false PASSED
+
+LlamaForwardPassTest > NanoModel > sessionBatchRejectsInvalidOwnershipShapeAndAliasing() PASSED
+
+Gemma4DecoderSessionRetentionTest > releasesBorrowedSessionsOnSuccessValidationAndInferenceFailure(boolean) > [2] transientOutput=true PASSED
+
+Gemma4ExpertLoaderTest > reportsTheIncompleteRangeWhenTheSourceEndsEarly() PASSED
+
+Gemma4ExpertLoaderTest > closesTheOwnedReader() PASSED
+
+Gemma4ExpertLoaderTest > loadsBothExpertRangesIntoOneCallerOwnedSlot(Path) PASSED
+
+Gemma4ExpertLoaderTest > rejectsSlotsThatCannotHoldTheCompleteExpert() PASSED
+
+Gemma4ExpertLoaderTest > retriesShortReadsUntilBothRangesAreComplete() PASSED
+
+Gemma4TensorLayoutTest > rejectsUnsupportedRoutedExpertTensorTypes() PASSED
+
+LlamaForwardPassTest > NanoModel > independentlyActivatedSessionRetainsItsBoundaryAcrossRewindAndReset(Path) PASSED
+
+Gemma4TensorLayoutTest > resolvesTwoContiguousSourceRangesForEachExpert() PASSED
+
+Gemma4TensorLayoutTest > rejectsAnExpertTensorWhoseExpertAxisDoesNotMatchTheConfiguration() PASSED
+
+EmbeddingGemma2AttentionTest > fullAttentionSeesTheWholeSequenceAndGroupsQueryHeads() PASSED
+
+EmbeddingGemma2AttentionTest > symmetricWindowIncludesBothBoundariesAndFutureTokens() PASSED
+
+EmbeddingGemma2AttentionTest > learnedQueryScaleIsNotDividedByTheSquareRootOfHeadWidth() PASSED
+
+LlamaForwardPassTest > NanoModel > q4VerificationReturnsEverySequentialLogitRow() PASSED
+
+LlamaForwardPassTest > NanoModel > producesLogitsOfVocabSize() PASSED
+
+GgufEmbeddedFilesTest > rejectsUnsafePathsAndInvalidRanges() PASSED
+
+GgufEmbeddedFilesTest > readsBinarySidecarsFromAudioCppGgufMetadata() PASSED
+
+LlamaForwardPassTest > NanoModel > gemma2AttentionSoftcapChangesOutputAndIsAppliedOnBothAttentionRoutes() PASSED
+
+GgufParserTest > TensorNotFound > throwsForNonExistentTensor() PASSED
+
+GgufParserTest > FileParsing > nonExistentFileThrows(Path) PASSED
+
+LlamaForwardPassTest > NanoModel > sequentialFinalLayerPrefillPruningPreservesStateExactly() PASSED
+
+GgufParserTest > FileParsing > parsesFromDisk(Path) PASSED
+
+GgufParserTest > MalformedInput > rejectsTensorCountBeyondJavaCollectionLimits() PASSED
+
+LlamaForwardPassTest > NanoModel > deterministicForSameInput() PASSED
+
+GgufParserTest > MalformedInput > rejectsMetadataArrayBeyondJavaCollectionLimits() PASSED
+
+GgufParserTest > MalformedInput > rejectsTensorDataThatExtendsPastTheFile() PASSED
+
+GgufParserTest > MalformedInput > rejectsPartialQuantizationBlocks() PASSED
+
+GgufParserTest > MalformedInput > rejectsTruncatedHeaderWithAStableParserException() PASSED
+
+GgufParserTest > VocabularyOnlyFiles > parsesAFileWithNoTensorsWhoseMetadataEndsOffTheAlignmentBoundary() PASSED
+
+GgufParserTest > VocabularyOnlyFiles > stillRejectsAFileWithTensorsWhoseDataSectionStartsPastTheEnd() PASSED
+
+GgufParserTest > TensorOffsetAlignment > validatesAgainstTheDeclaredAlignmentNotTheDefault() PASSED
+
+GgufParserTest > TensorOffsetAlignment > rejectsTensorOffsetThatIsNotAMultipleOfTheDefaultAlignment() PASSED
+
+GgufParserTest > TensorOffsetAlignment > acceptsEveryTensorAtAnAlignmentBoundaryWithOddSizedData() PASSED
+
+GgufParserTest > Alignment > rejectsNonPowerOfTwoAlignmentAsMalformedGguf() PASSED
+
+GgufParserTest > Alignment > rejectsZeroAlignmentAsMalformedGguf() PASSED
+
+GgufParserTest > Alignment > tensorDataIsAlignedToDefaultAlignment() PASSED
+
+GgufParserTest > MultipleTensors > parsesTwoTensorsOfDifferentTypes() PASSED
+
+GgufParserTest > SingleTensor > parsesOneF32Tensor() PASSED
+
+LlamaForwardPassTest > NanoModel > q4KPrefillUsesBatchedKernelAndPreservesAutoregressiveState() PASSED
+
+GgufTensorSizeAssertionTest > validAdjacentTensorsStillParseAndSliceToTheirExactLength() PASSED
+
+LlamaForwardPassTest > NanoModel > hiddenStateRunsTheFinalLayerRatherThanTheKeyValueOnlyShortcut() PASSED
+
+GgufTensorSizeAssertionTest > twoTensorsSharingOneOffsetAreRejected() PASSED
+
+GgufTensorSizeAssertionTest > tensorOverlappingTheNextTensorIsRejectedEvenWhenBothEndInsideTheFile() PASSED
+
+GgufTensorSizeAssertionTest > overlapIsDetectedRegardlessOfTensorTableOrder() PASSED
+
+GgufTensorSizeAssertionTest > truncatedLastTensorNamesTheTensorExpectedAndAvailableBytes() PASSED
+
+GgufTensorSizeAssertionTest > tensorStartingPastTheEndOfTheFileIsRejected() PASSED
+
+GgufTensorSizeAssertionTest > quantizedTensorShorterThanItsBlockLayoutIsRejectedWithBlockArithmetic() PASSED
+
+GgufTensorTypeTest > FromId > throwsForUnknownId() PASSED
+
+GgufTensorTypeTest > FromId > roundTripsAllTypes() PASSED
+
+GgufTensorTypeTest > Properties > f32HasCorrectProperties() PASSED
+
+GgufTensorTypeTest > Properties > f16HasCorrectProperties() PASSED
+
+GgufTensorTypeTest > Properties > bf16MatchesTheOfficialGgmlWireType() PASSED
+
+GgufTensorTypeTest > Properties > q4_0HasCorrectProperties() PASSED
+
+GgufTensorTypeTest > Properties > q8_kHasCorrectProperties() PASSED
+
+GgufTensorTypeTest > Properties > q8_0HasCorrectProperties() PASSED
+
+GptOssConfigTest > parsesThePinnedOfficial20BExecutionShape() PASSED
+
+GptOssConfigTest > rejectsDuplicateConfigFields(Path) PASSED
+
+GptOssConfigTest > directConstructionCannotBypassTheExecutionContract() PASSED
+
+GptOssConfigTest > doesNotClaimAnotherHuggingFaceArchitecture(Path) PASSED
+
+GptOssConfigTest > rejectsUnsupportedQuantizationAndMalformedLayerSchedule(Path) PASSED
+
+LlamaForwardPassTest > NanoModel > fourSessionBatchExercisesRegisterTiledKQuantPathWithinFloatTolerance() PASSED
+
+GptOssMxfp4ExpertWeightsTest > mapsOfficialExpertTensorGeometryWithoutTransposingOrExpanding(Path) PASSED
+
+GptOssMxfp4ExpertWeightsTest > rejectsCheckpointGeometryThatDoesNotMatchTheConfiguration(Path) PASSED
+
+HuggingFaceEndOfGenerationTest > readsASingleIntegerEosFromGenerationConfig(Path) PASSED
+
+HuggingFaceEndOfGenerationTest > readsAListOfEosIdsFromGenerationConfig(Path) PASSED
+
+HuggingFaceEndOfGenerationTest > missingFilesAndMissingOrNullKeysContributeNothing(Path) PASSED
+
+HuggingFaceEndOfGenerationTest > rejectsMalformedEosDeclarations(Path) PASSED
+
+HuggingFaceEndOfGenerationTest > unionsConfigAndGenerationConfigInDeclarationOrderWithoutDuplicates(Path) PASSED
+
+Lfm2ForwardPassTest > theConvolutionKernelReachesTheOutput() PASSED
+
+Lfm2ForwardPassTest > theAttentionKeyProjectionReachesTheOutput() PASSED
+
+Lfm2ForwardPassTest > theRecurrentStateCarriesBetweenTokensAndResetClearsIt() PASSED
+
+Lfm2ForwardPassTest > runsBothMixersAndProducesFiniteLogits() PASSED
+
+Lfm2MoeRoutingTest > theSelectionBiasIsOptionalAndZeroIsItsIdentity() PASSED
+
+Lfm2MoeRoutingTest > theFeedForwardScratchIsSizedForTheWiderOfDenseAndExpertWidths() PASSED
+
+Lfm2MoeRoutingTest > routingUsesSigmoidGatingWithARenormalisedUnitScale() PASSED
+
+EncoderAttentionWindowTest > GemmaFamilyLayout > embeddingGemmaSharesGemma3BlockStructure() PASSED
+
+EncoderAttentionWindowTest > GemmaFamilyLayout > onlyEmbeddingGemmaAttendsBidirectionally() PASSED
+
+LlamaForwardPassTest > NanoModel > sharedPrefixForksMatchIndependentRecomputationAndReferenceTheSameKvStorage() PASSED
+
+EncoderAttentionWindowTest > GemmaFamilyLayout > slidingWindowLayersUseTheirOwnRotaryBase() PASSED
+
+EncoderAttentionWindowTest > CausalWindow > spansTheWindowEndingAtTheQuery() PASSED
+
+EncoderAttentionWindowTest > CausalWindow > isNotBidirectional() PASSED
+
+EncoderAttentionWindowTest > CausalWindow > neverLooksPastTheQuery() PASSED
+
+LlamaForwardPassTest > NanoModel > combinedPrefillReturnsTheFinalPromptLogitsAndHiddenState() PASSED
+
+LlamaForwardPassTest > NanoModel > combinedHeadReturnsLogitsAndHiddenStateFromOneDecodeStep() PASSED
+
+EncoderAttentionWindowTest > SymmetricWindow > reachesHalfTheWindowInEachDirection() PASSED
+
+EncoderAttentionWindowTest > SymmetricWindow > seesEverythingOnTheFullAttentionLayer() PASSED
+
+EncoderAttentionWindowTest > SymmetricWindow > isNotTheCausalWindowWidth() PASSED
+
+EncoderAttentionWindowTest > SymmetricWindow > clampsToTheSequenceRatherThanRunningOffEitherEnd() PASSED
+
+EncoderAttentionWindowTest > SymmetricWindow > slidesOnEveryLayerButTheLastOfEachPeriod() PASSED
+
+EncoderAttentionWindowTest > SymmetricWindow > windowIsInertBelowItsHalfWidth() PASSED
+
+LlamaWeightsHuggingFaceGgufTest > loadsQwenWeightsStoredUnderNativeHuggingFaceNames() PASSED
+
+LlamaWeightsHuggingFaceGgufTest > preparesHuggingFaceNamedBf16MatricesAsOwnedF32ExecutionWeights() PASSED
+
+LoraProjectionTest > rejectsShapeAndRangeMismatchesBeforeTouchingOutput() PASSED
+
+LoraProjectionTest > ownsAdapterWeightsInsteadOfRetainingMutableSourceSegments() PASSED
+
+LoraProjectionTest > supportsRowsInsideBatchMajorBuffersWithoutAllocatingCallerSlices() PASSED
+
+LoraProjectionTest > addsScaledLowRankDeltaWithoutReplacingBaseProjection() PASSED
+
+MobileMoeForwardPassTest > completeToyGraphOwnsSequentialAndBatchedState(Path) PASSED
+
+LlamaForwardPassTest > NanoModel > independentSessionBatchReusesQuantizedOutputWeightsExactly() PASSED
+
+LlamaForwardPassTest > NanoModel > hiddenStateHasEmbeddingWidthNotVocabularyWidth() PASSED
+
+LlamaForwardPassTest > NanoModel > transientForwardReusesLogitStorageWithoutChangingForwardSnapshots() PASSED
+
+MobileMoeForwardPassTest > compactPackedLayoutExecutesWithoutPreparedWeights(Path) PASSED
+
+MobileMoePackedInt4MatrixTest > decodesLowNibbleFirstAndAppliesOneFp16ScalePerGroup() PASSED
+
+MobileMoePackedInt4MatrixTest > batchesIndependentActivationRowsWithoutChangingTheirResults() PASSED
+
+MobileMoePackedInt4MatrixTest > requantizesRowsToQ8ForFastRuntimeMultiplication() PASSED
+
+MobileMoePackedInt4MatrixTest > rejectsMismatchedBuffersAndUnsupportedGroups() PASSED
+
+MobileMoeRoutingTest > expertBiasChangesSelectionButNotTheRoutingWeights() PASSED
+
+MobileMoeRoutingTest > stableSigmoidHandlesExtremeRouterLogits() PASSED
+
+MobileMoeRoutingTest > rejectsInvalidRoutingGeometry() PASSED
+
+ExpertRoutingTest > unnormalisedSigmoidWeightsAndTiesRetainTheirDefinedMeaning() PASSED
+
+ExpertRoutingTest > theTwoModesDisagreeOnTheWeightsWhileAgreeingOnTheExperts() PASSED
+
+ExpertRoutingTest > aTieKeepsTheLowerExpertIndexInBothModes() PASSED
+
+ExpertRoutingTest > theRenormalisedWeightsSumToOne() PASSED
+
+ExpertRoutingTest > sigmoidGatingDiffersFromSoftmaxGatingOnTheSameLogits() PASSED
+
+ExpertRoutingTest > theUnnormalisedWeightsAreAFullWidthSoftmaxAndSumToLessThanOne() PASSED
+
+ExpertRoutingTest > selectingEveryExpertSumsToOneEvenUnnormalised() PASSED
+
+ExpertRoutingTest > sigmoidGatingAppliesTheBiasToSelectionOnlyAndNeverToTheMixtureWeights() PASSED
+
+ExpertRoutingTest > turningTheBiasOffVisiblyChangesTheSelection() PASSED
+
+ExpertRoutingTest > bothModesReturnTheExpertsInDescendingOrder() PASSED
+
+LlamaForwardPassTest > NanoModel > stagedQ8LayerPreservesPrefillCacheAndAutoregressiveStateWithinSimdTolerance() PASSED
+
+LlamaForwardPassTest > NanoModel > mixedQ4KQ6KPrefillUsesBatchedKernelsAndPreservesAutoregressiveState() PASSED
+
+LlamaForwardPassTest > NanoModel > phi3FusedQkvAndGateUpSplitToExactlyTheSeparateTensors() PASSED
+
+LlamaForwardPassTest > NanoModel > stagedQ4FfnPreservesPrefillCacheAndAutoregressiveStateExactly() PASSED
+
+LlamaForwardPassTest > NanoModel > hiddenStateIsDeterministicAndInputDependent() PASSED
+
+LlamaForwardPassTest > NanoModel > injectedQ4KernelPreservesPrefillAndAutoregressiveState() PASSED
+
+LlamaForwardPassTest > NanoModel > rewindAndResetAffectOnlyTheirSession() PASSED
+
+LlamaForwardPassTest > NanoModel > prefillHiddenStateMatchesSteppingTokenAtATime() PASSED
+
+LlamaForwardPassTest > NanoModel > independentSessionBatchSizesScratchForQ4QuantizedOutput() PASSED
+
+LlamaForwardPassTest > NanoModel > raggedSessionPrefillChunksFlattenedRowsAcrossRetainedPrefixes() PASSED
+
+LlamaForwardPassTest > NanoModel > prefillMatchesTokenAtATimeForwardPass() PASSED
+
+LlamaForwardPassTest > NanoModel > extendedSharedPrefixChainMatchesIndependentFullContextRecomputation() PASSED
+
+LlamaForwardPassTest > NanoModel > rewindPreservesAcceptedPrefixAndReplacesRejectedTail() PASSED
+
+LlamaForwardPassTest > NanoModel > rejectsAnExecutionPlanForDifferentWeights() PASSED
+
+LlamaForwardPassTest > NanoModel > injectedAttentionKernelPreservesPrefillAndSelectedDecode(boolean) > [1] supportsDecode=false PASSED
+
+LlamaForwardPassTest > NanoModel > injectedAttentionKernelPreservesPrefillAndSelectedDecode(boolean) > [2] supportsDecode=true PASSED
+
+LlamaForwardPassTest > NanoModel > batchedAttentionValueAccumulationPreservesCompleteAutoregressiveState() PASSED
+
+LlamaForwardPassTest > NanoModel > finalLayerKvOnlyPrefillPreservesLogitsKvCacheAndAutoregressiveState() PASSED
+
+LlamaForwardPassTest > NanoModel > raggedSessionPrefillFlattensCompatiblePromptRowsIntoOneProjectionBatch() PASSED
+
+LlamaForwardPassTest > NanoModel > rejectsNonSequentialPositions() PASSED
+
+LlamaForwardPassTest > NanoModel > injectedKernelExecutesEligibleSingleTokenProjectionGroups() PASSED
+
+LlamaForwardPassTest > InjectedSwiGlu > unrelatedActivationContractsDoNotInvokeSwiGluProvider() PASSED
+
+LlamaForwardPassTest > InjectedSwiGlu > stagedQwenQuantizedFfnRetainsJavaActivationAndExactState() PASSED
+
+LlamaForwardPassTest > InjectedSwiGlu > qwenDecodeAndPrefillUseInjectedActivationAndRetainExactLogits() PASSED
+
+LlamaForwardPassTest > SessionScratchLifetime > failedLayerReleasesAllScratchSessionReferences() PASSED
+
+LlamaForwardPassTest > SessionScratchLifetime > knownPromptCapacityIsReservedBeforeTheFirstLayer() PASSED
+
+LlamaForwardPassTest > SessionScratchLifetime > completedRaggedPrefillReleasesScratchReferencesButPreservesOwnedSessions() PASSED
+
+LlamaMixtureOfExpertsTest > twoRoutedSessionsBatchedTogetherAgreeWithEachRunAlone() PASSED
+
+LlamaMixtureOfExpertsTest > tiedLogitsKeepTheLowerExpertIndex() PASSED
+
+LlamaMixtureOfExpertsTest > batchedPrefillAgreesWithTokenByTokenDecodeOnARoutedModel() PASSED
+
+LlamaMixtureOfExpertsTest > routingWeightsAreASoftmaxOverOnlyTheSelectedLogits() PASSED
+
+LlamaMixtureOfExpertsTest > identicalExpertsReproduceTheDenseFeedForward() PASSED
+
+LlamaMixtureOfExpertsTest > selectingEveryExpertIsAPlainSoftmax() PASSED
+
+LlamaMixtureOfExpertsTest > selectionTakesTheHighestLogitsInDescendingOrder() PASSED
+
+LlamaMixtureOfExpertsTest > planningTopologyReadsARoutedLayerWithoutTouchingItsAbsentDenseTensors() PASSED
+
+LlamaMixtureOfExpertsTest > aRoutedLayerCarriesExpertsInsteadOfADenseFeedForward() PASSED
+
+LlamaMixtureOfExpertsTest > expertSlicesFollowTheStackingOrderTheFileUses() PASSED
+
+ActivatedLoraAdapterTest > aSplitHalfArchitectureLeavesRowsAlone() PASSED
+
+ActivatedLoraAdapterTest > loadsAnUpstreamAdapterWithoutInventingTrainingData() PASSED
+
+ActivatedLoraAdapterTest > loadsAnExactPinnedAdapterAndAppliesEveryDeclaredProjection() PASSED
+
+ActivatedLoraAdapterTest > interleavesRotaryRowsPerHeadIntoTheLlamaCppLayout() PASSED
+
+ActivatedLoraAdapterTest > retainsTheLegacyToolSpecialistKindForExistingAdapters() PASSED
+
+ActivatedLoraAdapterTest > loadsAnActivatedAdapterThatDeclaresOnlyQkvProjections() PASSED
+
+ActivatedLoraAdapterTest > rejectsARequestedBaseArtifactThatDiffersFromPinnedMetadata() PASSED
+
+ActivatedLoraAdapterTest > readsSchemaThreeAdaptersWithoutInventingSubsetProvenance() PASSED
+
+ActivatedLoraAdapterTest > rejectsLegacyOrMalformedProvenanceMetadata() PASSED
+
+ActivatedLoraAdapterTest > rejectsAdapterContentWhoseHashOrTensorShapeDoesNotMatchTheManifest() PASSED
+
+MobileMoeMathTest > normalizesEachAttentionHeadWithoutLearnedWeights() PASSED
+
+ExactQ51ParallelTest > sharedParallelAndConfinedSerialKeepEveryFloatBitAcrossRepeatedBatches() PASSED
+
+ExactQ51ParallelTest > oversizedDecodedScratchRetainsItsUnusedTail() PASSED
+
+ExactQ51ParallelTest > publicSingleAndBatchRoutesKeepQ41AndQ51BitsWhenScratchGrowsAndShrinks() PASSED
+
+PinnedReductionTest > the eight-lane fold groups its lanes the way the original's width switch did PASSED
+
+PinnedReductionTest > sumOfSquares is exactly the self-dot rmsNorm asks for PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 1 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 7 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 8 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 16 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 17 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 31 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 32 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 33 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 64 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 127 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 128 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 2048 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 4096 elements PASSED
+
+PinnedReductionTest > offsets are honoured, so a row in the middle of a batch reduces like a row alone PASSED
+
+PinnedReductionWidthTest > physicalWidthsPreserveColdAndHotEightLaneResults(int) > [1] maximumVectorBytes=16 PASSED
+
+PinnedReductionWidthTest > physicalWidthsPreserveColdAndHotEightLaneResults(int) > [2] maximumVectorBytes=32 PASSED
+
+SwiGluClampTest > capsTheGateFromAbove() PASSED
+
+SwiGluClampTest > honoursOffsetsIntoLargerBuffers() PASSED
+
+SwiGluClampTest > boundsTheUpProjectionOnBothSides() PASSED
+
+SwiGluClampTest > agreesWithTheUnclampedKernelInsideTheLimit() PASSED
+
+SwiGluClampTest > leavesTheGateUnboundedBelow() PASSED
+
+TensorOpsPtqTest > sharedParallelAndConfinedSerialProductsAreBitIdentical() PASSED
+
+TensorOpsPtqTest > batchedPackedProductsKeepEachTokensQ8Contract() PASSED
+
+ExecutionPlannerPerformanceCliffTest > explicitlyWidenedQ4KernelIsAChoiceNotACliff() PASSED
+
+ExecutionPlannerPerformanceCliffTest > serialGgufRowsOnOneProcessorAreNotACliff() PASSED
+
+ExecutionPlannerPerformanceCliffTest > plannerLeavesBatchedPrefillCliffToTheForwardPassThatOwnsTheActualTopology() PASSED
+
+ExecutionPlannerPerformanceCliffTest > unsupportedPairwiseQ4KernelReportsFallbackOnce() PASSED
+
+ExecutionPlannerPerformanceCliffTest > nonPersistentExecutorReportsOnce() PASSED
+
+ExecutionPlannerPerformanceCliffTest > fastPlanReportsNoCliff() PASSED
+
+ExecutionPlannerPerformanceCliffTest > serialGgufRowsOnAMultiProcessorHostReportOnce() PASSED
+
+ExecutionPlannerPerformanceCliffTest > scalarVectorProviderReportsVectorApiUnavailableOnce() PASSED
+
+ExecutionPlannerPerformanceCliffTest > activeWidthBelowPreferredReportsVectorWidthCappedOnce() PASSED
+
+StagePublicationCapabilityTest > executorsWithoutItDoNot() PASSED
+
+StagePublicationCapabilityTest > anUnknownExecutorIsTreatedAsIncapableRatherThanAssumedCapable() PASSED
+
+StagePublicationCapabilityTest > theDefaultVectorsExecutorQualifies() PASSED
+
+StagePublicationCapabilityTest > executorsThatRetainAStagePublicationQualify() PASSED
+
+DequantizerTest > Q5_1 > readsTheFifthBitFromTheHighWordForBothHalves() PASSED
+
+DequantizerTest > Q5_1 > vectorExpansionMatchesScalarFormulaAcrossOffsetsAndFiniteHeaders() PASSED
+
+DequantizerTest > Q5_1 > appliesMinimumRatherThanCentringTheQuant() PASSED
+
+DequantizerTest > Q5_1 > reachesTheFullFiveBitRange() PASSED
+
+DequantizerTest > Q4_1 > appliesMinimumRatherThanCentringTheQuant() PASSED
+
+DequantizerTest > Q4_1 > splitsLowAndHighNibblesAcrossTheBlockHalves() PASSED
+
+DequantizerTest > Q4_1 > reachesTheFullFourBitRangeAndIsUnsigned() PASSED
+
+DequantizerTest > F16 > dequantizesKnownValues() PASSED
+
+DequantizerTest > Q8_0 > knownScaleAndQuants() PASSED
+
+DequantizerTest > Q8_0 > rejectsPartialBlocksInsteadOfSilentlyDroppingValues() PASSED
+
+DequantizerTest > Q8_0 > zeroScaleProducesZeros() PASSED
+
+DequantizerTest > Q4_0 > multiBlockDequantization() PASSED
+
+DequantizerTest > Q4_0 > rejectsPartialBlocksInsteadOfSilentlyDroppingValues() PASSED
+
+DequantizerTest > Q4_0 > knownNibblePatternWithScale() PASSED
+
+DequantizerTest > Q4_0 > allZeroBlockProducesNegativeEights() PASSED
+
+Float16Test > RoundTrip > roundTripsInfinity() PASSED
+
+Float16Test > RoundTrip > roundTripsCommonValues() PASSED
+
+Float16Test > ToFloat > onePointZero() PASSED
+
+Float16Test > ToFloat > decodesPositiveSubnormalBoundariesExactly() PASSED
+
+Float16Test > ToFloat > zeroIsZero() PASSED
+
+Float16Test > ToFloat > positiveInfinity() PASSED
+
+Float16Test > ToFloat > oneHalf() PASSED
+
+Float16Test > ToFloat > negativeOnePointZero() PASSED
+
+Float16Test > ToFloat > negativeInfinity() PASSED
+
+Float16Test > ToFloat > decodesNegativeSubnormalBoundaryExactly() PASSED
+
+Float16Test > ToFloat > nanBits() PASSED
+
+Float16Test > ToFloat > twoPointZero() PASSED
+
+Q51DequantizerWidthTest > physicalWidthsPreservePackedWeightsColdAndHot(int) > [1] maximumVectorBytes=16 PASSED
+
+NativeWidthAllocationTest > inferenceKernelsDoNotAllocateUnsupportedVectorObjects(int) > [1] maximumVectorBytes=16 PASSED
+
+Q51DequantizerWidthTest > physicalWidthsPreservePackedWeightsColdAndHot(int) > [2] maximumVectorBytes=32 PASSED
+
+EdgeRockScopeTest > theIntervalDerivedScheduleMatchesThePublishedRecurrentMask() PASSED
+
+EdgeRockScopeTest > edgeRockDeclaringItselfStillNeedsItsOwnPrefixedKeys() PASSED
+
+EdgeRockScopeTest > theBackboneKeysEdgeRockPublishesAreTheOnesQwen35Requires() PASSED
+
+Qwen35ConfigEdgeRockTest > aModelThatPublishesNoWindowAttendsToEverything() PASSED
+
+Qwen35ConfigEdgeRockTest > parsesThePublishedEdgeRockFourBillionShape() PASSED
+
+Qwen35ConfigEdgeRockTest > theEightMemoryLayersAreTheOnesTheFileCarriesMemoryTensorsFor() PASSED
+
+Qwen35ConfigEdgeRockTest > theThreeOlderArchitecturesDoNotGainMemoryAnchors() PASSED
+
+Qwen35ConfigEdgeRockTest > theVocabularyComesFromTheTokenizerBecauseTheFilePublishesNoSize() PASSED
+
+Qwen35ConfigEdgeRockTest > theWindowIsReadFromTheHeaderAndOnlyEdgeRockPublishesOne() PASSED
+
+Qwen35ConfigEdgeRockTest > aNegativeWindowIsRefused() PASSED
+
+Qwen35ForwardPassTest > injectedKernelWithoutGatedDeltaNetReportsTheCliffOncePerProcess(Path) PASSED
+
+Qwen35ForwardPassTest > toyHybridGraphPreservesStateAcrossPrefillRewindAndReset(Path) PASSED
+
+Qwen35ForwardPassTest > activationProviderAndUntouchedFallbackPreservePrefillDecodeAndGroupedState(Path) PASSED
+
+Qwen35ForwardPassTest > transposesChannelMajorConvolutionWeightsForVectorizedExecution() PASSED
+
+Qwen35ForwardPassTest > pureJavaBackendPlansF32QwenPrefillOneTokenAtATimeAndReportsItOnce(Path) PASSED
+
+Qwen35ForwardPassTest > groupedDecisionsMatchAskingEachQuestionAlone(Path) PASSED
+
+Qwen35ForwardPassTest > linearStateSnapshotRestoresContinuationWithoutReplayAndReportsBytes(Path) PASSED
+
+Qwen35ForwardPassTest > attentionHeadKernelMatchesScalarReference() PASSED
+
+Qwen35ForwardPassTest > bfloat16GatesUseIndividualProviderForPairedPrefillAndDecode(Path) PASSED
+
+Qwen35ForwardPassTest > aGroupedQuestionCannotReadAnotherQuestion(Path) PASSED
+
+Qwen35ForwardPassTest > linearStateSnapshotIsBoundToItsSessionAndRetainedPrefix(Path) PASSED
+
+Qwen35ForwardPassTest > directGraphWithBatchedPrefillRunsF32ProjectionsRowByRowAndReportsItOnce(Path) PASSED
+
+Qwen35ForwardPassTest > decodingTwiceReusesOneSetOfBuffersRatherThanAllocatingPerToken(Path) PASSED
+
+Qwen35ForwardPassTest > aProjectionGivesEachRowTheSameAnswerAtEveryBatchWidth(Path) PASSED
+
+Qwen35ForwardPassTest > batchedPrefillMatchesSequentialExecutionAcrossChunks(Path) PASSED
+
+Qwen35ForwardPassTest > sessionsEnforceOwnershipPositionAndCapacity(Path) PASSED
+
+Qwen35ForwardPassTest > injectedKernelExecutesEligibleQwen35Projections(Path) PASSED
+
+Qwen35ForwardPassTest > theDenseHybridOutputIsPinned(Path) PASSED
+
+Qwen35ForwardPassTest > directGraphWithoutBatchingDoesNotReportRowByRowProjection(Path) PASSED
+
+Qwen35ForwardPassTest > injectedKernelWithGatedDeltaNetAndBatchedProjectionsReportsNeitherCliff(Path) PASSED
+
+Qwen35QuantizedExpertsTest > anOutputHeadChangesTheLogitsOnAQuantizedModel(Path) PASSED
+
+Qwen35QuantizedExpertsTest > anF32ReferenceIsNotCloseEnoughToStandInForTheQuantizedOne(Path) PASSED
+
+Qwen35QuantizedExpertsTest > permutingQuantizedExpertsAndTheirRouterRowsLeavesTheOutputUnchanged(Path) PASSED
+
+Qwen35QuantizedExpertsTest > aQuantizedOutputHeadIsDecodedWithItsOwnType(Path) PASSED
+
+Qwen35QuantizedExpertsTest > clonedQuantizedExpertsReproduceTheDenseQuantizedEquivalent(Path) PASSED
+
+Qwen35QuantizedExpertsTest > theScratchCoversTheWidestRoutedProjection(Path) PASSED
+
+Qwen35QuantizedExpertsTest > anExpertWidthThatStraddlesABlockIsRefused(Path) PASSED
+
+SafetensorsBundleTest > resolvesEveryNvfp4PartThroughTheIndexAcrossShardBoundaries(Path) PASSED
+
+SafetensorsBundleTest > rejectsUnsafeShardPathsAndIndexShardDisagreement(Path) PASSED
+
+SafetensorsBundleTest > opensAStandardSingleFileBundle(Path) PASSED
+
+SopranoIstftTest > reconstructsAndCenterTrimsOverlappingFrames() PASSED
+
+SopranoIstftTest > validatesHeadAndWindowShapes() PASSED
+
+BpePreTokenizerTest > appliesSmolLmSingleDigitBoundaries() PASSED
+
+BpePreTokenizerTest > appliesDeepSeekCoderBoundaries() PASSED
+
+BpePreTokenizerTest > everyPieceConcatenatesBackToTheInput() PASSED
+
+BpePreTokenizerTest > appliesStarCoderSingleDigitBoundaries() PASSED
+
+BpePreTokenizerTest > tekkenIgnoresMergesAndIsNoLongerReportedUnrecognised() PASSED
+
+BpePreTokenizerTest > tekkenIsNotTheGptOssPatternDespiteTheSharedShape() PASSED
+
+BpePreTokenizerTest > namingAPreTokenizerDoesNotChangeHowItSplits() PASSED
+
+BpePreTokenizerTest > gpt4oSelectsTheSameO200kSplitAsGptOss() PASSED
+
+BpePreTokenizerTest > leavesUnknownPreTokenizerTextWhole() PASSED
+
+BpePreTokenizerTest > deepSeekCoderAppliesItsFiveExpressionsInOrder() PASSED
+
+BpePreTokenizerTest > appliesGpt2WordBoundaries() PASSED
+
+BpePreTokenizerTest > deepSeekLlmIsImplementedAndSplitsByItsSixExpressions() PASSED
+
+BpePreTokenizerTest > appliesQwen35CombiningMarkBoundaries() PASSED
+
+BpePreTokenizerTest > singleDigitSplitsAreTwoExpressionsAppliedInSequence() PASSED
+
+BpePreTokenizerTest > treatsNoBreakSpaceAsWhitespaceLikeTheRustRegex() PASSED
+
+BpePreTokenizerTest > hunyuanSplitsExactlyAsItsOwnTokenizerJsonSpecifies() PASSED
+
+BpePreTokenizerTest > anUnrecognisedPreTokenizerIsRecordedSoItIsNotInvisible() PASSED
+
+BpePreTokenizerTest > aPreTokenizerReportsTheNameThatSelectedItAndWhetherItIsImplemented() PASSED
+
+BpePreTokenizerTest > tekkenSplitsExactlyAsMistralsOwnTekkenJsonSpecifies() PASSED
+
+BpePreTokenizerTest > appliesDbrxLlama3BoundariesWithoutIgnoringMerges() PASSED
+
+BpePreTokenizerTest > deepSeekLlmExpressionsAreVerbatimFromTheReference() PASSED
+
+GgufTokenizerTest > byteLevelBpeTakesTheBosItsOwnChatTemplateDeclares() PASSED
+
+GgufTokenizerTest > theTemplateSignalIsASubstringTestAndSaysSoWhenItIsWrong() PASSED
+
+GgufTokenizerTest > llama3BpeUsesItsBosDefaultOnlyWhenMetadataDoesNotOverrideIt() PASSED
+
+GgufTokenizerTest > Errors > missingTokensThrows() PASSED
+
+GgufTokenizerTest > ChatTemplateEndOfTurn > reportsAnAbsentTemplate() PASSED
+
+GgufTokenizerTest > ChatTemplateEndOfTurn > addsTheTemplatesEndOfTurnMarkerWhenNoOtherRuleKnowsIt() PASSED
+
+GgufTokenizerTest > ChatTemplateEndOfTurn > neverOverridesTheHarmonyMessageBoundaryExclusion() PASSED
+
+GgufTokenizerTest > ChatTemplateEndOfTurn > ignoresUserDefinedTokensSuchAsReasoningDelimiters() PASSED
+
+GgufTokenizerTest > ChatTemplateEndOfTurn > recordsEveryRuleThatMarksAnAlreadyKnownTerminator() PASSED
+
+GgufTokenizerTest > ChatTemplateEndOfTurn > leavesTheSetUnchangedAndSaysWhyWhenTheTemplateHasNoGenerationPrompt() PASSED
+
+GgufTokenizerTest > ChatTemplateEndOfTurn > rejectsACandidateThatNeverClosesMessageContent() PASSED
+
+GgufTokenizerTest > ChatTemplateEndOfTurn > resolvesAnEosTokenReferenceToTheDeclaredEos() PASSED
+
+GgufTokenizerTest > VocabularyTerminatorTypes > untypedVocabularyKeepsTheTextHeuristic() PASSED
+
+GgufTokenizerTest > VocabularyTerminatorTypes > closingStrikethroughTagIsATerminatorOnlyWhenControlTypedOrDeclared() PASSED
+
+GgufTokenizerTest > VocabularyTerminatorTypes > textMatchOnATokenTypedNormalIsNotATerminator() PASSED
+
+GgufTokenizerTest > VocabularyTerminatorTypes > byteLevelBpeWithAddedTokensOnlyTreatsAddedTokensAsTextTerminators() PASSED
+
+GgufTokenizerTest > SpecialTokens > vocabSize() PASSED
+
+GgufTokenizerTest > SpecialTokens > bosTokenId() PASSED
+
+GgufTokenizerTest > SpecialTokens > exposesTheResolvedEndOfGenerationSetForDiagnostics() PASSED
+
+GgufTokenizerTest > SpecialTokens > honorsEndOfGenerationMetadataIdsWhoseTextIsNotARecognizedTerminator() PASSED
+
+GgufTokenizerTest > SpecialTokens > recognizesAllMetadataAndVocabularyEndOfGenerationTokens() PASSED
+
+GgufTokenizerTest > SpecialTokens > doesNotDecodeEndOfGenerationTokensAsAnswerText() PASSED
+
+GgufTokenizerTest > SpecialTokens > eosTokenId() PASSED
+
+GgufTokenizerTest > SentencePiece > addsBosForEmptyInput() PASSED
+
+GgufTokenizerTest > SentencePiece > appliesScoreOrderedMergesAndConfiguredBos() PASSED
+
+GgufTokenizerTest > SentencePiece > segmentedPromptPreservesTokenizerContextAcrossOrdinaryBoundaries() PASSED
+
+GgufTokenizerTest > SentencePiece > preservesWordBoundaryForSingleTokenStreamingButRemovesDummySequencePrefix() PASSED
+
+GgufTokenizerTest > SentencePiece > byteFallbackResolvesThroughTheTableExactlyAsTheVocabularyLookupDid() PASSED
+
+GgufTokenizerTest > SentencePiece > roundTripsDummyPrefixAndByteFallback() PASSED
+
+GgufTokenizerTest > Gemma4Bpe > preservesWholeNewlineRunsWhenTheVocabularyContainsThem() PASSED
+
+GgufTokenizerTest > Gemma4Bpe > appliesWhitespaceEscapingAndRankedRawUtf8Merges() PASSED
+
+GgufTokenizerTest > Gemma4Bpe > roundTripsRawUtf8AndByteFallback() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > fallsBackToExplicitByteToken() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > skipsInvalidIdsAndEncodesUnknownVocabularyCharacters() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > smaugPreTokenizerLimitsNumericPiecesToThreeDigits() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > appliesConfiguredBosAndEosTokens() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > rankedMergeQueueMatchesTheReferenceAlgorithm() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > smaugBpeStillRequiresDeclaredMergeRules() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > appliesRankedMergesAndRoundTripsSpace() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > qwen2PreTokenizerKeepsDigitsSeparate() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > parsesControlTokensOnlyInTrustedPromptSegments() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > chatTemplateCannotPromoteUserTextToControlTokens() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > encodesALongMergeablePieceWithinTheTokenizerBudget() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > llamaBpePreTokenizerLimitsNumericPiecesToThreeDigits() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > fallsBackToConfiguredUnknownToken() PASSED
+
+GgufTokenizerTest > ByteLevelBpe > llamaBpeUsesWholeVocabularyPieceWithoutMergeRules() PASSED
+
+GgufTokenizerTest > Decoding > decodeOutOfRangeReturnsEmpty() PASSED
+
+GgufTokenizerTest > Decoding > decodesByteToken() PASSED
+
+GgufTokenizerTest > Decoding > decodeArrayRoundTrips() PASSED
+
+GgufTokenizerTest > Decoding > decodesKnownToken() PASSED
+
+GgufTokenizerTest > BasicEncoding > encodesEmptyString() PASSED
+
+GgufTokenizerTest > BasicEncoding > encodesSingleKnownToken() PASSED
+
+GgufTokenizerTest > BasicEncoding > rejectsNullText() PASSED
+
+GgufTokenizerTest > WordPieceEncoding > usesTheLongestVocabularyPiecesWithinEachWord() PASSED
+
+GgufTokenizerTest > WordPieceEncoding > truncatesTheFirstSideWhenPairLengthsAreTied() PASSED
+
+GgufTokenizerTest > WordPieceEncoding > cleansControlsAndCollapsesLargeWhitespaceRuns() PASSED
+
+GgufTokenizerTest > WordPieceEncoding > encodesSentencePairsWithBertBoundariesAndTokenTypes() PASSED
+
+GgufTokenizerTest > WordPieceEncoding > truncatesTheLongerSideFirstToFitTheContextWindow() PASSED
+
+GgufTokenizerTest > WordPieceEncoding > emitsOneUnknownTokenWhenAWordCannotBeSegmented() PASSED
+
+GgufTokenizerTest > WordPieceEncoding > matchesTheBertNormalizationAndBoundaryContract() PASSED
+
+GgufTokenizerTest > WordPieceEncoding > rejectsPairEncodingForNonWordPieceModels() PASSED
+
+GgufTokenizerTest > TokenIdLookup > resolvesTokensByTheirExactVocabularyText() PASSED
+
+GgufTokenizerTest > TokenIdLookup > agreesWithControlEncodingForSingleTokens() PASSED
+
+GgufTokenizerTest > TokenIdLookup > returnsMinusOneRatherThanThrowingForAbsentText() PASSED
+
+ClipVisionEncoderCompileTest > configHasExpectedAccessors() PASSED
+
+LlavaVisionProjectorTest > bicubicResizeMatchesIndependentPillowRgbReference() PASSED
+
+LlavaVisionProjectorTest > rejectsInvalidDimensions() PASSED
+
+LlavaVisionProjectorTest > realTensorLayoutPreservesResidualsAndProjectsPatches(Path) PASSED
+
+LlavaVisionProjectorTest > rejectsDifferentArchitecturesAndClosedUse(Path) PASSED
+
+LlavaVisionProjectorTest > imageNormalizationUsesRgbChwAndSquarePadding() PASSED
+
+NativeWidthAllocationTest > inferenceKernelsDoNotAllocateUnsupportedVectorObjects(int) > [2] maximumVectorBytes=32 PASSED
+
+RotaryTableLlama3Test > interpolatesTheMiddleFrequencyBand() PASSED
+
+RotaryTableLlama3Test > matchesTheMobileMoeLlama3FrequencyRulesAndAdjacentPairLayout() PASSED
+
+SwiGluPoolRouteTest > aSizeBelowTheThresholdStaysOnTheCallingThread() PASSED
+
+SwiGluPoolRouteTest > swiGluFansOutOnThePoolTheFlagSelects() PASSED
+
+TensorOpsTest > aThreadedMxfp4ProjectionWritesEveryRowWhenChunksAreUneven() PASSED
+
+TensorOpsTest > ggufMatmulRefusesAnMxfp4RowThatIsNotAWholeNumberOfBlocks() PASSED
+
+TensorOpsTest > ggufMatmulMultipliesMxfp4WeightsInsteadOfRefusingThem() PASSED
+
+TensorOpsTest > aConfinedMxfp4SegmentIsProjectedOnTheCallingThread() PASSED
+
+TensorOpsTest > aThreadedMxfp4ProjectionIsBitIdenticalToTheSerialOne() PASSED
+
+TensorOpsTest > geluIsFiniteAndContinuousForValuesAtTheTanhTableBoundary() PASSED
+
+TensorOpsTest > GeluGlu > lookupApproximationStaysWithinFloatPrecisionAcrossTheActivationRange() PASSED
+
+TensorOpsTest > GeluGlu > operatesOnBatchBufferOffsets() PASSED
+
+TensorOpsTest > GeluGlu > matchesLlamaCppTanhApproximation() PASSED
+
+TensorOpsTest > Gelu > matchesTheErfExactBertActivation() PASSED
+
+TensorOpsTest > Gelu > matchesLlamaCppTanhApproximation() PASSED
+
+TensorOpsTest > SwiGlu > positiveGateScalesUp() PASSED
+
+TensorOpsTest > SwiGlu > knownValues() PASSED
+
+TensorOpsTest > SwiGlu > operatesOnBatchBufferOffsets() PASSED
+
+TensorOpsTest > Rope > offsetAwareSingleVectorRopeMatchesCopiedHeadSemantics() PASSED
+
+TensorOpsTest > Rope > appliesFrequencyScaleToNormalAndNeoxRope() PASSED
+
+TensorOpsTest > Rope > positionZeroIsIdentity() PASSED
+
+TensorOpsTest > Rope > offsetAwareRopeMatchesCopiedHeadSemantics() PASSED
+
+TensorOpsTest > Rope > preservesNorm() PASSED
+
+TensorOpsTest > Rope > neoxLayoutRotatesPairsSeparatedByHalfAHead() PASSED
+
+TensorOpsTest > Softmax > rejectsAnAllMaskedRow() PASSED
+
+TensorOpsTest > Softmax > rejectsEmptyAndNegativeSizes() PASSED
+
+TensorOpsTest > Softmax > uniformInputProducesUniform() PASSED
+
+TensorOpsTest > Softmax > zeroValueSinkMatchesFreeTokenOnlineSoftmaxInitialization() PASSED
+
+TensorOpsTest > Softmax > zeroValueSinkHandlesACompletelyMaskedKeyRange() PASSED
+
+TensorOpsTest > Softmax > numericallyStableWithLargeValues() PASSED
+
+TensorOpsTest > Softmax > preservesNegativeInfinityAsAZeroProbabilityMask() PASSED
+
+TensorOpsTest > Softmax > respectsOffset() PASSED
+
+TensorOpsTest > Softmax > sumsToOne() PASSED
+
+TensorOpsTest > Softmax > rejectsNaNAndPositiveInfinity() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_0DualMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_1SingleTokenAndBatchedPathsAgree() PASSED
+
+TensorOpsTest > QuantizedMatmul > mixedQ4_KQ6_KTripleMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q8_0BatchedMatmulMatchesIndependentQueries() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_KBatchedMatmulMatchesIndependentQueries() PASSED
+
+TensorOpsTest > QuantizedMatmul > q6_KBatchedMatmulMatchesIndependentQueries() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_KTripleMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_1SingleTokenAndBatchedPathsAgree() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_KDualMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q6_KMatchesVectorsGgmlQ8_KActivationSemantics() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_KDualBatchedMatmulMatchesSeparateBatchedProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_0MatchesVectorsGgmlQ8_0ActivationSemantics() PASSED
+
+TensorOpsTest > QuantizedMatmul > rejectsNonBlockAlignedQ8_0Dimensions() PASSED
+
+TensorOpsTest > QuantizedMatmul > groupedMatmulSupportIncludesKQuantProjectionTypes() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_0BatchedMatmulMatchesIndependentQueries() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_KTripleMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_KMatchesVectorsGgmlQ8_KActivationSemantics() PASSED
+
+TensorOpsTest > QuantizedMatmul > q8_0DualBatchedMatmulMatchesSeparateBatchedProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_KDualMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_0MatchesVectorsGgmlQ8_0ActivationSemantics() PASSED
+
+TensorOpsTest > QuantizedMatmul > rejectsNonBlockAlignedQ4_0Dimensions() PASSED
+
+TensorOpsTest > QuantizedMatmul > q5_KBatchedMatmulMatchesIndependentQueries() PASSED
+
+TensorOpsTest > QuantizedMatmul > q8_0MatchesVectorsGgmlQ8_0ActivationSemantics() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_0TripleMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > explicitQ4KernelPolicyReachesTheVectorKernel() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_KMatchesVectorsGgmlQ8_KActivationSemantics() PASSED
+
+TensorOpsTest > QuantizedMatmul > q4_0BatchedMatmulMatchesIndependentQueries() PASSED
+
+TensorOpsTest > QuantizedMatmul > q8_0DualMatmulMatchesSeparateProjectionsExactly() PASSED
+
+TensorOpsTest > QuantizedMatmul > groupedTriplePlanRetainsMatchingPairInMixedKQuantLayers() PASSED
+
+TensorOpsTest > QuantizedMatmul > mixedQ4_KQ6_KTripleBatchedMatmulMatchesSeparateBatchedProjectionsExactly() PASSED
+
+TensorOpsTest > Matmul > exactMappedProjectionRetainsF32Activations() PASSED
+
+TensorOpsTest > Matmul > bf16MatrixUsesMappedVectorsKernelForSingleAndBatchedActivations() PASSED
+
+TensorOpsTest > Matmul > f16MatrixSupportsBatchedActivationsWithoutExpandingWeights() PASSED
+
+TensorOpsTest > Matmul > ggufF32MatrixIsBitIdenticalToTheOrderDefinedRowDotProduct() PASSED
+
+TensorOpsTest > Matmul > delegatesToVectorsRowMajorGemvSemantics() PASSED
+
+TensorOpsTest > Matmul > ggufF32MatrixUsesMappedVectorsKernel() PASSED
+
+TensorOpsTest > Matmul > identityMatrix() PASSED
+
+TensorOpsTest > Matmul > known3x2Product() PASSED
+
+TensorOpsTest > LayerNorm > centersScalesAndBiasesTheRow() PASSED
+
+TensorOpsTest > LayerNorm > supportsOffsetsAndInPlaceNormalization() PASSED
+
+TensorOpsTest > RmsNorm > identityWeightNormalizesCorrectly() PASSED
+
+TensorOpsTest > RmsNorm > weightScalesOutput() PASSED
+
+ExecutionPlannerTest > enablesStagedQuantizedFfnOnlyForEligiblePersistentBatchedPlans() PASSED
+
+ExecutionPlannerTest > parsesTypedQ8BlockMajorKernelSelection() PASSED
+
+ExecutionPlannerTest > plansQ5_0GroupingFromInjectedKernelCapabilities() PASSED
+
+ExecutionPlannerTest > rejectsManuallyConstructedUnsignedPairwisePlanWithoutVectorCapability() PASSED
+
+ExecutionPlannerTest > plansQ8GroupingAndBatchedPrefillFromTopology() PASSED
+
+ExecutionPlannerTest > selectsUnsignedPairwiseForCapableGraalRuntime() PASSED
+
+ExecutionPlannerTest > invalidConfigurationIsRejectedWithoutAStartupProbe() PASSED
+
+ExecutionPlannerTest > explicitOverrideKeepsFinalFfnPruningWhileDisablingKvOnlyPrefill() PASSED
+
+ExecutionPlannerTest > parsesTypedQ6BatchedKernelSelection() PASSED
+
+ExecutionPlannerTest > equivalentInputsAlwaysProduceEqualPlans() PASSED
+
+ExecutionPlannerTest > enablesBlockMajorActivationsOnlyForRequestedStagedQ8Prefill() PASSED
+
+ExecutionPlannerTest > rejectsAPlanThatContradictsItsTensorTopology() PASSED
+
+ExecutionPlannerTest > rejectsLlamaOnlyLayerShortcutsForGemma3() PASSED
+
+ExecutionPlannerTest > selectsRowAccumulatedQ8KernelOnlyForRequestedGraalStagedBlockMajorPrefill() PASSED
+
+ExecutionPlannerTest > plansTheMixedKQuantProjectionKernelOnlyForEligibleLayers() PASSED
+
+ExecutionPlannerTest > plansFinalLayerPromptPruningForUniformQ4KTopology() PASSED
+
+ExecutionPlannerTest > kvOnlyPrefillRejectsAnUngatedFinalAttentionLayout() PASSED
+
+ExecutionPlannerTest > enablesParallelQ8FfnPreparationOnlyForRequestedAllQ8StagedBlockMajorLayers() PASSED
+
+ExecutionPlannerTest > rejectsKvOnlyPrefillWithoutFinalFfnPruning() PASSED
+
+ExecutionPlannerTest > explicitOverrideDisablesOnlyTheMixedKQuantProjectionKernel() PASSED
+
+ExecutionPlannerTest > modelRecommendationsConfigureThePlanAndDeploymentSettingsTakePrecedence() PASSED
+
+ExecutionPlannerTest > aTopologyReadFromTheModelStillReportsEveryProjectionDecision() PASSED
+
+ExecutionPlannerTest > selectsShortPairwiseOnlyForEligibleQ4ModelsAndRuntimes() PASSED
+
+ExecutionPlannerTest > enablesStagedQuantizedLayerOnlyForEligiblePersistentBatchedPlans() PASSED
+
+ExecutionPlannerTest > fallsBackToWidenedWhenTheRuntimeCannotExecuteShortPairwise() PASSED
+
+ExecutionPlannerTest > kvOnlyPrefillRequiresFinalFfnPruning() PASSED
+
+ExecutionPlannerTest > unsupportedTensorTopologyUsesConservativeFallbacks() PASSED
+
+ExecutionPlannerTest > explicitOverridesDisableOtherwiseEligibleOptimizations() PASSED
+
+ExecutionPlannerTest > selectsTwoQueryQ6KernelOnlyForTheMeasuredVectorEnvelope() PASSED
+
+ExecutionPlannerTest > aSyntheticTopologyMakesNoClaimsAboutTheModelsProjections() PASSED
+
+ExecutionPlannerTest > kvOnlyPrefillRejectsAnUngatedCrossFormatFinalLayer() PASSED
+
+ExecutionPlannerTest > plansQ5_0BatchedPrefillFromTopology() PASSED
+
+ExecutionPlannerTest > runtimeClassificationIsPropertyBasedAndDoesNotBenchmarkAtStartup() PASSED
+
+ExecutionPlannerTest > keepsGemma4OnOnlyTheExecutionPathsItsDecoderConsumes() PASSED
+
+ExecutionPlannerTest > selectsUnsignedPairwiseForAnyRuntimeWithTheRequiredVectorCapability() PASSED
+
+ExecutionPlannerTest > rejectsStagedQuantizedFfnWhenParallelExecutionOrWeightSharingIsUnavailable() PASSED
+
+ExecutionPlannerTest > selectsFloatLaneQ8KernelOnlyForAnExact256BitGraalRuntime() PASSED
+
+Mxfp4DequantizerTest > blockGeometryMatchesTheFormat() PASSED
+
+Mxfp4DequantizerTest > theDotProductAgreesWithDequantisingThenMultiplying() PASSED
+
+Mxfp4DequantizerTest > refusesACountThatIsNotAWholeNumberOfBlocks() PASSED
+
+Mxfp4DequantizerTest > aRunThatIsNotAWholeNumberOfBlocksIsRefused() PASSED
+
+Mxfp4DequantizerTest > theTwoNibblesOfAByteAreSixteenElementsApartNotAdjacent() PASSED
+
+Mxfp4DequantizerTest > everyCodeMapsToTheDoubledE2m1MagnitudeWithSignInTheHighBit() PASSED
+
+Mxfp4DequantizerTest > theScaleIsHalvedAndKeepsItsDenormalsAtTheBottomOfTheRange() PASSED
+
+Mxfp4DequantizerTest > theDotProductIsExactForASingleKnownBlock() PASSED
+
+GatedDeltaNetRecurrenceTest > inPlaceExecutionMatchesTheReferenceWithoutReplacingState() PASSED
+
+GatedDeltaNetRecurrenceTest > callerOwnedWorkspaceMatchesTheReferenceWithoutAllocatingAnOutput() PASSED
+
+GatedDeltaNetRecurrenceTest > continuationMatchesOneUninterruptedPass() PASSED
+
+GatedDeltaNetRecurrenceTest > matchesThePinnedFreeTokenFloat32Recurrence() PASSED
+
+GatedDeltaNetRecurrenceTest > usesTheTiledGgufHeadOrderForGroupedQueryAndKeyHeads() PASSED
+
+Qwen35ConfigTest > rejectsIncompatibleGdnHeadWidths() PASSED
+
+Qwen35ConfigTest > halfDeclaredExpertMetadataIsRefused() PASSED
+
+Qwen35ConfigTest > parsesThePinnedDense08BShape() PASSED
+
+Qwen35ConfigTest > aFullyRoutedModelMayPublishNoDenseFeedForwardWidth() PASSED
+
+Qwen35ConfigTest > anUnrelatedArchitectureIsStillRefused() PASSED
+
+Qwen35ConfigTest > theDenseVariantReportsNoExpertsAndIsUnchanged() PASSED
+
+Qwen35ConfigTest > parsesTheRoutedVariantUnderItsOwnPrefix() PASSED
+
+Qwen35ConfigTest > rejectsAnArchitectureThatOnlyLooksSimilar() PASSED
+
+Qwen35ConfigTest > acceptsTheGroupedGdnHeadLayoutUsedByDenseFourAndNineBillionParameterModels() PASSED
+
+Qwen35MixtureOfExpertsTest > anOutputHeadEqualToTheEmbeddingReproducesTheTiedModelExactly(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > anUntiedOutputHeadIsUsedInsteadOfTheTokenEmbedding(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > theSharedExpertContributesToEveryToken(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > aRoutedFixtureCarriesNoDenseFeedForwardLength(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > aRoutedModelDecodesOneTokenAtATimeWhateverBatchSizeIsAsked(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > theSharedExpertGateIsRead(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > theBackendLoadsARoutedFileUnderItsOwnArchitecture(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > aOneDimensionalSharedGateOfTheWrongWidthIsRefused(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > theUsedExpertCountIsHonoured(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > clonedExpertsReproduceTheDenseEquivalentExactly(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > prefillAgreesWithTokenByTokenDecoding(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > permutingExpertsAndTheirRouterRowsLeavesTheOutputUnchanged(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > groupedDecisionRefusesOnARoutedModel(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > theSharedExpertComputesAHalvedDenseFeedForward(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > theHalvingInThatEquivalenceIsLoadBearing(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > theTopologyNamesTheRoutedArchitectureAndItsExpertTensorTypes(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > aRoutedModelDecodesFiniteLogitsAtEveryPosition(Path) PASSED
+
+Qwen35MixtureOfExpertsTest > aOneDimensionalSharedGateRowLoadsAndMeansTheSameThing(Path) PASSED
+
+SafetensorsParserTest > acceptsEmptyTensorWithoutAllocatingData() PASSED
+
+SafetensorsParserTest > parsesMetadataDenseTypesScalarsAndMappedTensorViews(Path) PASSED
+
+SafetensorsParserTest > rejectsMalformedHeadersTensorLayoutsAndIncompleteBuffers() PASSED
+
+SafetensorsParserTest > parsesAnArtifactWrittenByTheOfficialPythonImplementationWhenProvided() SKIPPED
+
+SafetensorsParserTest > recognizesEveryDtypeInTheCurrentOfficialFormat() PASSED
+
+SopranoTokenizerTest > normalizesTextAppliesRankedMergesAndWrapsTheSpeechPrompt() PASSED
+
+SopranoTokenizerTest > mapsUnknownCharactersToTheUnknownToken() PASSED
+
+SopranoTokenizerTest > isolatesDigitsWordsPunctuationAndUnicodeCodePointsBeforeBpe() PASSED
+
+VectorSpeciesConstantStructuralTest > vectorsCoreKernelViolationsMatchTheRecordedAllowList() PASSED
+
+VectorSpeciesConstantStructuralTest > ruleFlagsSpeciesParameters() PASSED
+
+VectorSpeciesConstantStructuralTest > ruleFlagsSpeciesCapturedByALambdaParameter() PASSED
+
+VectorSpeciesConstantStructuralTest > backendJavaVectorKernelsHoldSpeciesOnlyInStaticFinalFields() PASSED
+
+VectorSpeciesConstantStructuralTest > ruleAcceptsAStaticFinalSpeciesConstant() PASSED
+
+VectorSpeciesConstantStructuralTest > ruleFlagsSpeciesFieldsThatAreNotStaticFinal() PASSED
+
+HuggingFaceTokenizerTest > buildsGptOssHarmonyTokenizerWithItsExactPretokenizer(Path) PASSED
+
+HuggingFaceTokenizerTest > matchesPinnedOfficialQwen25Tokenizer() SKIPPED
+
+HuggingFaceTokenizerTest > declaredEndOfGenerationIdsExtendTheResolvedSet(Path) PASSED
+
+HuggingFaceTokenizerTest > buildsQwen2ByteLevelBpeWithoutGivingOrdinaryTextControlPrivileges(Path) PASSED
+
+HuggingFaceTokenizerTest > matchesPinnedOfficialGptOss20BTokenizer() SKIPPED
+
+ClipVisionEncoderEndToEndTest > configLoadedFromGgufHasSensibleDefaults(Path) PASSED
+
+ClipVisionEncoderEndToEndTest > endToEndVisionEncoderProducesEmbeddingsForTextDecoder(Path) PASSED
+
+> Task :backend-java:narrowVectorTest
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: Using incubator modules: jdk.incubator.vector
+
+GroupedQueryAttentionKernelTest > swiGluMatchesTheScalarReferenceWithinLastBits() PASSED
+
+GroupedQueryAttentionKernelTest > scoresMatchMatVecDotExactHeadByHead() PASSED
+
+GroupedQueryAttentionKernelTest > vectorExponentialMatchesItsScalarTwinAndMathExp() PASSED
+
+PinnedReductionTest > the eight-lane fold groups its lanes the way the original's width switch did PASSED
+
+PinnedReductionTest > sumOfSquares is exactly the self-dot rmsNorm asks for PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 1 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 7 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 8 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 16 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 17 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 31 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 32 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 33 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 64 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 127 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 128 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 2048 elements PASSED
+
+PinnedReductionTest > the pinned dot matches its independent eight-lane contract on every host > 4096 elements PASSED
+
+PinnedReductionTest > offsets are honoured, so a row in the middle of a batch reduces like a row alone PASSED
+
+GroupedQueryAttentionKernelTest > theFusedGroupAgreesWithTheHeadByHeadLoopToWithinAFewUlpsOfTheOutput() PASSED
+
+GroupedQueryAttentionKernelTest > valuesMatchAddWeightedRowsInPlaceHeadByHead() PASSED
+
+GroupedQueryAttentionKernelTest > softmaxMatchesTheScalarReferenceWithinLastBits() PASSED
+
+PinnedAttentionWidthContractTest > scoreTailsRetainEightLogicalFmaChainsAndPinnedFold() PASSED
+
+PinnedAttentionWidthContractTest > softmaxRetainsPolynomialOutputsAndEightLaneSumAcrossTails() PASSED
+
+TernaryDequantizerTest > dequantizeTq1_0MatchesTheReference() PASSED
+
+TernaryDequantizerTest > packedPtqProductAgreesWithScalarUnpackingAcrossOffsetsAndScales() PASSED
+
+TernaryDequantizerTest > refusesACountThatIsNotAWholeNumberOfBlocks() PASSED
+
+TernaryDequantizerTest > dequantizeTq2_0MatchesTheReference() PASSED
+
+TernaryDequantizerTest > dequantizePq2_0MatchesTheReference() PASSED
+
+TernaryDequantizerTest > theFourthTwoBitCodeIsPlusTwoNotClampedToOne() PASSED
+
+TernaryDequantizerTest > dequantizePtq1_0MatchesTheReference() PASSED
+
+> Task :backend-java:spotbugsTest SKIPPED
+> Task :backend-java:spotlessJavaCheck UP-TO-DATE
+> Task :backend-java:spotlessCheck UP-TO-DATE
+> Task :backend-java:verifyDependencyPolicy
+
+> Task :backend-native:cargoClippy
+    Finished `release` profile [optimized] target(s) in 1.15s
+
+> Task :backend-java:jacocoTestCoverageVerification
+
+> Task :backend-native:cargoTest
+    Finished `release` profile [optimized] target(s) in 0.52s
+     Running unittests src/lib.rs (build/rust-target/release/deps/jmodels_kernels-d03214c13c608cc9)
+
+running 63 tests
+test bfloat16::tests::bf16_invalid_abi_arguments_do_not_write_output ... ok
+test onnx_kernels::activation_tests::nan_stays_nan ... ok
+test onnx_kernels::erf_tests::erf_matches_reference_values ... ok
+test onnx_kernels::tests::sgemm_accumulates_into_c ... ok
+test hf_tokenizer::tests::invalid_inputs_and_closed_handles_fail_without_unwinding ... ok
+test ptq::tests::packed_scalar_and_vector_q8_reductions_are_bit_identical ... ok
+test tests::avx2_k_quantized_rows_match_scalar_kernels ... ok
+test tests::a_published_job_partitions_across_the_active_pool_and_leaves_the_gate_alone ... ok
+test tests::avx2_q5_0_bit_plane_matches_scalar_kernel ... ok
+test tests::avx2_q5_0_row_reduces_simd_lanes_once ... ok
+test tests::avx2_q8_0_quantization_matches_scalar_exactly ... ok
+test tests::avx2_q8_0_row_matches_scalar_ordered_accumulation ... ok
+test tests::batch_scratch_uses_stack_capacity_and_heap_fallback ... ok
+test hf_tokenizer::tests::caller_buffers_and_handle_lifetime ... ok
+test tests::batched_k_quantized_rows_decode_each_weight_block_once ... ok
+test tests::completion_poll_observes_finished_workers_without_parking ... ok
+test tests::creates_and_joins_persistent_worker_context ... ok
+test tests::exports_stable_abi_and_capabilities ... ok
+test tests::active_count_changes_keep_every_generation_completing ... ok
+test onnx_kernels::activation_tests::exp_tanh_logistic_track_double_precision ... ok
+test hf_tokenizer::tests::insufficient_buffers_utf8_and_concurrent_calls ... ok
+test tests::gated_delta_net_matches_pinned_freetoken_recurrence ... ok
+test tests::grouped_attention_matches_a_naive_reference_across_two_spans_and_workers ... ok
+test tests::grouped_gated_delta_net_rejects_an_out_of_range_slot ... ok
+test onnx_kernels::activation_tests::vector_path_equals_scalar_path_bit_for_bit ... ok
+test tests::half_conversion_preserves_subnormal_boundaries ... ok
+test deberta_kernels::tests::uneven_rows_match_scalar_and_invalid_calls_preserve_output ... ok
+test tests::grouped_projection_uses_one_worker_generation ... ok
+test tests::matrix_dispatch_thread_scaling ... ignored
+test tests::claimed_chunks_cover_every_row_of_every_matrix_exactly_once ... ok
+test tests::half_round_trip_matches_known_values ... ok
+test tests::k_quantized_tiles_match_single_rows_bit_for_bit_across_tile_boundaries ... ok
+test tests::partition_count_bounds_the_rows_a_worker_takes ... ok
+test tests::persistent_context_reuses_activation_workspace ... ok
+test tests::packed_q4_preserves_both_reductions_rows_tails_and_sentinels ... ok
+test tests::independent_projections_use_one_worker_generation ... ok
+test tests::prefill_budget ... ignored
+test tests::q4_k_avx2_preserves_single_row_rounding_across_batch_sizes ... ok
+test tests::q4_k_ordered_avx2_matches_scalar_block_fold_bit_for_bit ... ok
+test tests::q5_1_grouping_is_refused_rather_than_given_empty_activations ... ok
+test tests::q5_1_unpack_matches_the_block_layout ... ok
+test tests::q5_1_scalar_and_avx2_rows_agree_exactly ... ok
+test tests::grouped_gated_delta_net_matches_each_row_stepped_alone ... ok
+test tests::multi_query_attention_partitions_across_query_heads ... ok
+test tests::grouped_query_attention_claims_every_head_at_any_thread_count ... ok
+test tests::gated_delta_net_prefix_matches_token_steps_exactly ... ok
+test tests::q8f32_avx2_row_matches_the_scalar_parity_oracle_exactly ... ok
+test tests::q8_k_simd_matches_scalar_bytes_scales_and_sums ... ok
+test tests::rejects_invalid_dimensions_without_dereferencing_buffers ... ok
+test tests::tq1_0_declares_q8_k_activations_and_its_own_block_geometry ... ok
+test tests::tq1_0_q8_k_avx2_is_bit_identical_to_the_scalar_kernel ... ok
+test tests::tq1_0_q8_k_capability_is_advertised ... ok
+test tests::tq1_0_q8_k_row_is_sensitive_to_activation_order ... ok
+test tests::tq1_0_q8_k_row_matches_the_reference_bit_for_bit ... ok
+test tests::worker_poll_observes_a_published_generation_without_parking ... ok
+test tests::worker_accounts_for_a_published_generation_without_a_job ... ok
+test tests::persistent_workers_complete_repeated_generations ... ok
+test onnx_kernels::tests::sine_matches_double_precision_sine_rounded_to_float ... ok
+test tests::q8f32_reuse_matches_scalar_through_real_worker_dispatch ... ok
+test tests::q5_1_reuse_matches_scalar_through_real_worker_dispatch ... ok
+test deberta_kernels::tests::destroying_pool_waits_for_worker_thread_local_cleanup ... ok
+test bfloat16::tests::exported_bf16_matches_selected_lane_and_fma_contract ... ok
+test onnx_kernels::sgemm_tests::sgemm_matches_naive_reference_on_ragged_shapes_and_leading_dimensions ... ok
+
+test result: ok. 61 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.97s
+
+
+> Task :backend-native:cargoBuildRelease UP-TO-DATE
+> Task :backend-native:compileTestJava
+> Task :backend-native:verifyNativeBuildPlatform
+> Task :backend-native:prepareNativePlatformResources UP-TO-DATE
+> Task :backend-native:nativePlatformJar UP-TO-DATE
+> Task :backend-native:processTestResources NO-SOURCE
+> Task :backend-native:testClasses
+
+> Task :backend-native:test
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: Using incubator modules: jdk.incubator.vector
+
+NativeHuggingFaceTokenizerTest > recognizesAddedTokensAndOwnsItsLifecycle() PASSED
+
+NativeKernelPollBudgetTest > an unset or blank budget keeps the shipped default rather than parking forever PASSED
+
+NativeKernelPollBudgetTest > a value inside the range is taken, surrounding whitespace and all PASSED
+
+NativeKernelPollBudgetTest > a budget outside the range is refused, naming the property and the value PASSED
+
+NativeKernelPollBudgetTest > a non-integer budget is refused rather than silently defaulted PASSED
+
+NativeOnnxKernelsTest > erfMatchesKnownValues() PASSED
+
+NativeOnnxKernelsTest > sineMatchesMathSinRoundedToFloatAcrossTheGraphsPhaseRange() PASSED
+
+NativeOnnxKernelsTest > activationExtentsAreChecked() PASSED
+
+NativeOnnxKernelsTest > gemmAccumulatesLikeTheJavaReferenceAtOffsetsAndLeadingDimensions() PASSED
+
+NativeDebertaKernelsTest > causalAttentionPreservesPrefixThroughChunksDecodeResetAndRewind() PASSED
+
+NativeDebertaKernelsTest > causalAttentionRejectsAliasingBeforeNativeDispatch() PASSED
+
+NativeDebertaKernelsTest > disentangledAttentionMatchesIndependentScalarCalculationAndRejectsBadIndices() PASSED
+
+NativeDebertaKernelsTest > retainedAttentionRejectsOversizedShapesAndAliasingWithoutAdvancing() PASSED
+
+NativeDebertaKernelsTest > denseAttentionMatchesScalarWithUnevenHeadsAndReusesScratch() PASSED
+
+NativeOnnxKernelsTest > activationsEqualTheJavaTranslationBitForBitAtOffsets() PASSED
+
+NativeDebertaKernelsTest > quickGeluMatchesDoublePrecisionOnRaggedAndParallelInputs() PASSED
+
+NativeDebertaKernelsTest > projectsUnevenBatchesAndReusesBuffersWithoutWritingPastOutput() PASSED
+
+NativeKernelLibraryTest > groupedKernelSharesInputAcrossTwoQ8ProjectionsWithinReductionTolerance() PASSED
+
+NativeKernelLibraryTest > aMixedQ4_0Q8_0GroupIsBitIdenticalToThePerMatrixRoute() PASSED
+
+NativeKernelLibraryTest > groupedKernelSharesOneQ8KActivationAcrossEightQ4KProjections() PASSED
+
+NativeKernelLibraryTest > reusableGgufKernelComputesQ5_1SingleTokenProjectionExactly() PASSED
+
+NativeKernelLibraryTest > reusableGgufKernelComputesQ5_0BatchedMatrixMultiplicationWithinReductionTolerance() PASSED
+
+NativeKernelLibraryTest > groupedRecurrenceRejectsDuplicateSlotsBeforeMutatingState() PASSED
+
+PreparedActivationViewTest > preparedViewsMatchArrayAbiWithOffsetsAliasesAndRejectedRanges() PASSED
+
+PreparedActivationViewTest > callerOwnedViewsWorkConcurrentlyAndRejectClosedProvider() PASSED
+
+NativeKernelLibraryTest > orderedQ4KMatchesJavaAcrossSingleGroupedAndIndependentDispatch() PASSED
+
+NativeKernelLibraryTest > groupedKernelStillRefusesFormatsThatDisagreeOnTheActivation() PASSED
+
+SwiGluNativeKernelTest > actualProviderMatchesJavaForOffsetsTailsAndInPlaceAliases() PASSED
+
+SwiGluNativeKernelTest > rejectedDomainsAndForwardAliasesLeaveEveryBufferUntouched() PASSED
+
+SwiGluNativeKernelTest > checksBoundsAndClosedLifetimeBeforeDowncall() PASSED
+
+SwiGluNativeKernelTest > backwardOverlapKeepsOriginalReadBeforeWriteBehavior() PASSED
+
+SwiGluNativeKernelTest > concurrentFirstUsePublishesAValidBindingAndKeepsCallerBuffersSeparate() PASSED
+
+NativeKernelLibraryTest > recurrentEligibilityReusesTheImmutableCapabilitySnapshot() PASSED
+
+NativeKernelLibraryTest > genericIndependentBlockFormatsReuseTheContextAcrossBatchGrowth() PASSED
+
+NativeKernelLibraryTest > theExactActivationQ8_0RouteIsCloserToAnF32ReferenceThanTheQuantizingRoute() PASSED
+
+NativeKernelLibraryTest > theQ8_0FixturesDoNotHoldTheFoldOrderAxisConstant() PASSED
+
+NativeKernelLibraryTest > profiledSettingsConfigureTheWorkerCount() PASSED
+
+NativeKernelLibraryTest > groupedKernelMatchesVectorSemanticsForMixedQ4_KQ5_KQ6_KProjections() PASSED
+
+NativeKernelLibraryTest > reusableGgufKernelComputesQ5_0SingleTokenProjectionWithinQuantizedTolerance() PASSED
+
+NativeKernelLibraryTest > genericProjectionRejectsAClosedContextAndClosingTwiceIsSafe() PASSED
+
+NativeKernelLibraryTest > sharingCanBeTurnedOffForMeasurement() PASSED
+
+NativeKernelLibraryTest > reusableGgufKernelComputesQ8_0BatchedMatrixMultiplicationWithinReductionTolerance() PASSED
+
+NativeKernelLibraryTest > independentKernelAcceptsQ5_0EvenThoughGroupingStillRefusesIt() PASSED
+
+NativeKernelLibraryTest > reusableGgufKernelComputesAcrossWorkspaceGrowth() PASSED
+
+NativeKernelLibraryTest > modelsWantingDifferentWorkerCountsDoNotShare() PASSED
+
+NativeKernelLibraryTest > groupedGatedDeltaNetTreatsANullSlotTableAsTheIdentity() PASSED
+
+NativeKernelLibraryTest > imagePrefillPolicyRequiresTheLoadedPackingCapability() PASSED
+
+NativeKernelLibraryTest > computesQ4_0BatchedMatrixMultiplication() PASSED
+
+NativeKernelLibraryTest > raggedIndependentKernelPreservesEachProjectionBatchSize() PASSED
+
+NativeKernelLibraryTest > theQ5_0IndependentDispatchIsBitIdenticalToThePerMatrixRoute() PASSED
+
+NativeKernelLibraryTest > groupedKernelSharesInputAcrossThreeExactQ4Projections() PASSED
+
+NativeKernelLibraryTest > modelsConfiguredAlikeShareOneLibraryAndOnePool() PASSED
+
+NativeKernelLibraryTest > singleTokenProjectionsAreAlwaysEligible() PASSED
+
+NativeKernelLibraryTest > groupedGatedDeltaNetMatchesEachRowAdvancedAlone() PASSED
+
+NativeKernelLibraryTest > decodeThreadCountLimitsSingleTokenWorkersWithoutChangingResults() PASSED
+
+NativeKernelLibraryTest > decodeThreadCountMustFitThePool() PASSED
+
+NativeKernelLibraryTest > reusableGgufKernelComputesQ5_1BatchedMatrixMultiplicationExactly() PASSED
+
+NativeKernelLibraryTest > groupedKernelSharesInputAcrossTwoExactQ4Projections() PASSED
+
+NativeKernelLibraryTest > q5_0ProjectionsAreNeverGrouped() PASSED
+
+NativeKernelLibraryTest > groupedKernelMixesQ4_0AndQ8_0BecauseBothQuantizeActivationsToQ8_0() PASSED
+
+NativeKernelLibraryTest > independentKernelExecutesEightQ4KProjectionsInOneDispatch() PASSED
+
+NativeKernelLibraryTest > q51EligibilitySelectsTheMeasuredHardwareAndBatchRoute() PASSED
+
+NativeKernelLibraryTest > gatedDeltaNetMatchesThePinnedFreeTokenRecurrence() PASSED
+
+NativeKernelLibraryTest > rejectsInvalidShapesBeforeCrossingTheNativeBoundary() PASSED
+
+NativeKernelLibraryTest > groupedAttentionMatchesTheJavaKernelAcrossTwoSpans() PASSED
+
+NativeKernelLibraryTest > theExactActivationQ8_0RouteMatchesTheShippedJavaPathBitForBit() PASSED
+
+NativeKernelLibraryTest > groupedGatedDeltaNetRejectsASlotOutsideTheState() PASSED
+
+NativeKernelLibraryTest > groupedGatedDeltaNetRejectsArgumentsItCannotServe() PASSED
+
+NativeKernelLibraryTest > reusableGgufKernelMatchesVectorSemanticsForKQuantizedBatchedMultiplication() PASSED
+
+NativeKernelLibraryTest > closingASharedLibraryTwiceReleasesItOnce() PASSED
+
+NativeKernelLibraryTest > exposesVersionedQuantizedKernelCapabilities() PASSED
+
+NativeKernelLibraryTest > recurrentWritesCannotAliasInputsOrEachOther() PASSED
+
+NativeKernelSettingsTest > thread count is the only native setting, and it follows the host when unset PASSED
+
+NativeKernelSettingsTest > a deployment property overrides a profile recommendation PASSED
+
+NativeKernelSettingsTest > a setting that never existed is still an error PASSED
+
+NativeKernelSettingsTest > a published profile naming a removed setting still loads, and says it was ignored PASSED
+
+NativeKernelSettingsTest > an out-of-range thread count is rejected PASSED
+
+NativeKernelSettingsTest > no removed setting means nothing is recorded PASSED
+
+NativePerformanceCliffTest > rustFfmDiagnosticsIncludeCliffsTakenAfterLoad() PASSED
+
+NativePerformanceCliffTest > libraryWithoutPollBudgetCapabilityReportsTheCliffOnce() PASSED
+
+NativePerformanceCliffTest > bundledLibraryAppliesThePollBudgetAndReportsNothing() PASSED
+
+PtqNativeKernelTest > packedProjectionMatchesJavaBitwiseAcrossBatchesAndWorkerTransitions() PASSED
+
+Tq1_0NativeKernelTest > refusesWeightsTooSmallForTheDeclaredShape() PASSED
+
+Tq1_0NativeKernelTest > anAllZeroActivationBlockProducesZero() PASSED
+
+Tq1_0NativeKernelTest > ternaryProjectionMatchesTheGgmlReferenceExactly() PASSED
+
+Tq1_0NativeKernelTest > tq1_0IsNotPtq1_0() PASSED
+
+Tq1_0NativeKernelTest > theHeapOverloadAgreesWithTheReferenceToo() PASSED
+
+BFloat16NativeKernelTest > actualProviderMatchesJavaAndPreservesCallerBuffers() PASSED
+
+BFloat16NativeKernelTest > rejectsUseAfterClose() PASSED
+
+BFloat16NativeKernelTest > rejectsInvalidBuffersAndClosedLibraryBeforeCallingNativeCode() PASSED
+
+> Task :backend-java:spotbugsMain
+
+> Task :backend-native:test
+
+BFloat16NativeKernelTest > scalarAndUnsupportedVectorWidthsStayOnJava() PASSED
+
+BundledNativeKernelLibraryTest > rejectsAnArtifactBuiltAgainstAnotherAbi() PASSED
+
+BundledNativeKernelLibraryTest > packagedHostArtifactCanBeExtractedAndOpened() PASSED
+
+BundledNativeKernelLibraryTest > rejectsADigestThatIsNotLowercaseHexOfTheRightLength() PASSED
+
+BundledNativeKernelLibraryTest > shippedResolutionNamesTheResourceItExpectedWhenNoKernelJarIsOnTheClasspath() PASSED
+
+BundledNativeKernelLibraryTest > rejectsMetadataMissingARequiredProperty() PASSED
+
+BundledNativeKernelLibraryTest > rejectsMetadataNamingAnotherLibraryFile() PASSED
+
+BundledNativeKernelLibraryTest > rejectsMetadataForAnotherPlatform() PASSED
+
+BundledNativeKernelLibraryTest > verifiesAndExtractsTheCurrentPlatformLibraryOnce() PASSED
+
+BundledNativeKernelLibraryTest > rejectsAnArtifactWhoseLibraryDoesNotMatchItsDigest() PASSED
+
+NativeKernelPlatformTest > normalizesEveryCiTarget() PASSED
+
+NativeKernelPlatformTest > rejectsUnsupportedOperatingSystemsAndArchitectures() PASSED
+
+NativeKernelThreadCountTest > aUsableRecommendationIsWhatThePoolSizesItselfTo() PASSED
+
+NativeKernelThreadCountTest > aNegativeRecommendationIsTreatedAsAbsentRatherThanPassedThrough() PASSED
+
+NativeKernelThreadCountTest > anAbsentRecommendationFallsBackToTheProcessorCount() PASSED
+
+NativeKernelThreadCountTest > anExplicitRecommendationStillWinsOverTheSharedDefault() PASSED
+
+PreparedActivationBoundaryTest > foreignPreparedViewsAreDeclinedWithoutWritesAndClosedProviderStillRejectsThem() PASSED
+
+PreparedActivationBoundaryTest > recurrentAndAttentionSpiForwardExactBuffersAndRespectClosedLifetime() PASSED
+
+PreparedActivationBoundaryTest > librarySegmentAndArrayRoutesShareBoundsAndUnsupportedNoWriteContract() PASSED
+
+RustFfmBackendTest > deploymentPropertiesOverrideModelProfileRecommendations() PASSED
+
+RustFfmBackendTest > resolvesTheWorkerCountFromModelProfileRecommendations() PASSED
+
+RustFfmBackendTest > exposesTheJavaTransformersIndependentSessionBatchingContract() PASSED
+
+RustFfmBackendTest > no optimization decision mentions a removed setting PASSED
+
+RustFfmBackendTest > routes not taken are reported with their reason, not as a missing capability PASSED
+
+RustFfmBackendTest > enrichesJavaDiagnosticsWithEnabledNativeKernelControls() PASSED
+
+RustFfmBackendTest > delegatesTheCompleteInferenceContractToTheJavaTransformer() PASSED
+
+RustFfmBackendTest > versionsAutomaticNativeProfileSelection() PASSED
+
+RustFfmBackendTest > rejectsMissingLoadInputsBeforeOpeningTheNativeLibrary() PASSED
+
+SleefActivationNativeKernelTest > validatedLibraryRejectsRangesBeforeWritesAndClosedCalls() PASSED
+
+SleefActivationNativeKernelTest > convolutionPreservesHistoryTailsAndAliasesAcrossSuccessiveTokens() PASSED
+
+SleefActivationNativeKernelTest > gatesPreserveOffsetsSpecialValuesAndAliasedOperationOrder() PASSED
+
+SleefActivationNativeKernelTest > preparedViewsMatchArrayRoutesWithoutExtendingProviderLifetime() PASSED
+
+> Task :backend-native:spotbugsTest SKIPPED
+> Task :backend-native:spotlessJavaCheck
+> Task :backend-native:spotlessCheck
+> Task :backend-native:verifyDependencyPolicy
+> Task :backend-native:jacocoTestCoverageVerification
+> Task :backend-native:verifyNativePlatformJar
+> Task :backend-cuda:compileJava UP-TO-DATE
+> Task :models-decisions:compileJava UP-TO-DATE
+> Task :models-router:compileJava UP-TO-DATE
+> Task :models-bench:compileJava
+> Task :models-bench:processResources UP-TO-DATE
+> Task :models-bench:classes
+> Task :models-bench:compileTestJava
+> Task :models-bench:processTestResources
+> Task :models-bench:testClasses
+> Task :models-bench:compileJmhJava
+> Task :models-bench:processJmhResources NO-SOURCE
+> Task :models-bench:jmhClasses
+> Task :models-bench:spotbugsTest SKIPPED
+> Task :models-bench:spotlessJavaCheck
+> Task :models-bench:spotlessCheck
+> Task :backend-cuda:verifyRustToolchain
+> Task :backend-cuda:compilePtx UP-TO-DATE
+> Task :backend-cuda:preparePtxResources UP-TO-DATE
+> Task :backend-cuda:processResources UP-TO-DATE
+> Task :backend-cuda:classes UP-TO-DATE
+> Task :backend-cuda:jar UP-TO-DATE
+> Task :models-decisions:processResources UP-TO-DATE
+> Task :models-decisions:classes UP-TO-DATE
+> Task :models-decisions:jar UP-TO-DATE
+> Task :models-router:processResources UP-TO-DATE
+> Task :models-router:classes UP-TO-DATE
+> Task :models-router:jar UP-TO-DATE
+
+> Task :models-bench:test
+WARNING: Using incubator modules: jdk.incubator.vector
+
+> Task :backend-native:spotbugsMain
+> Task :models-bench:spotbugsJmh
+> Task :backend-java:check
+> Task :backend-native:check
+> Task :models-bench:spotbugsMain
+> Task :models-bench:check
+
+BUILD SUCCESSFUL in 2m 41s
+75 actionable tasks: 37 executed, 38 up-to-date

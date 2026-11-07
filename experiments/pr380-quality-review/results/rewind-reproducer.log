@@ -1,0 +1,89 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/Users/briansam-bodden/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :models-api:compileJava
+> Task :backend-java:compileJava
+> Task :writeReleaseDependencyManifest
+> Task :backend-java:processResources
+> Task :backend-java:classes
+> Task :backend-java:jar
+> Task :models-backend-onnx:compileJava
+> Task :backend-native:compileJava
+> Task :models-runtime:compileJava
+> Task :models-test:compileJava
+> Task :backend-java:compileTestJava
+> Task :backend-java:processTestResources
+> Task :backend-java:testClasses
+> Task :backend-native:processResources
+> Task :backend-native:classes
+> Task :backend-native:jar
+> Task :models-api:processResources
+> Task :models-api:classes
+> Task :models-api:jar
+> Task :models-backend-onnx:processResources
+> Task :models-backend-onnx:classes
+> Task :models-backend-onnx:jar
+> Task :models-runtime:processResources
+> Task :models-runtime:classes
+> Task :models-runtime:jar
+> Task :models-test:processResources NO-SOURCE
+> Task :models-test:classes
+> Task :models-test:jar
+
+> Task :backend-java:test
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: Using incubator modules: jdk.incubator.vector
+
+Qwen35ForwardEmbeddingsParityTest > embeddingRewindPreservesPrefix(Path) FAILED
+    org.opentest4j.AssertionFailedError: 
+    Expecting actual:
+      [0.059918344f, 0.24336073f, -0.083735935f, -0.24594496f, 0.5709654f, 0.26916987f, 0.007496228f, 0.018179424f]
+    to contain exactly (and in same order):
+      [0.07387101f,
+        0.24523857f,
+        -0.07421563f,
+        -0.2267378f,
+        0.5725341f,
+        0.2887732f,
+        0.013275f,
+        0.019234262f]
+    but some elements were not found:
+      [0.07387101f,
+        0.24523857f,
+        -0.07421563f,
+        -0.2267378f,
+        0.5725341f,
+        0.2887732f,
+        0.013275f,
+        0.019234262f]
+    and others were not expected:
+      [0.059918344f,
+        0.24336073f,
+        -0.083735935f,
+        -0.24594496f,
+        0.5709654f,
+        0.26916987f,
+        0.007496228f,
+        0.018179424f]
+        at app//com.integrallis.models.backend.purejava.qwen35.Qwen35ForwardEmbeddingsParityTest.embeddingRewindPreservesPrefix(Qwen35ForwardEmbeddingsParityTest.java:116)
+
+1 test completed, 1 failed
+
+> Task :backend-java:test FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':backend-java:test'.
+> There were failing tests. See the report at: file:///Users/briansam-bodden/Code/java-ai/projects/models-pr380-quality-before/backend-java/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+
+BUILD FAILED in 42s
+21 actionable tasks: 21 executed

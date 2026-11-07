@@ -1,0 +1,10 @@
+gradle.projectsEvaluated {
+    allprojects {
+        def quality = extensions.findByName('mfcqi')
+        if (quality != null) {
+            quality.parallelism.set(1)
+            def scope = project.path == ':' ? 'release' : project.name
+            quality.jsonReport.set(new File(rootProject.property('quality.output'), scope + '.json'))
+        }
+    }
+}
