@@ -74,12 +74,12 @@ public final class ClipImagePreprocessor {
       double center = (x + 0.5) * scale;
       int first = Math.max(0, (int) (center - 2 * filterScale + 0.5));
       int last = Math.min(side, (int) (center + 2 * filterScale + 0.5));
-      double[] weights = weights(first, last, center, filterScale);
+      int[] weights = weights(first, last, center, filterScale);
       for (int y = 0; y < side; y++) {
         for (int c = 0; c < 3; c++) {
-          double sum = 0;
+          long sum = 1 << 21;
           for (int k = first; k < last; k++)
-            sum += weights[k - first] * rgb[(y * side + k) * 3 + c];
+            sum += (long) weights[k - first] * rgb[(y * side + k) * 3 + c];
           horizontal[(y * size + x) * 3 + c] = pixel(sum);
         }
       }
@@ -89,12 +89,12 @@ public final class ClipImagePreprocessor {
       double center = (y + 0.5) * scale;
       int first = Math.max(0, (int) (center - 2 * filterScale + 0.5));
       int last = Math.min(side, (int) (center + 2 * filterScale + 0.5));
-      double[] weights = weights(first, last, center, filterScale);
+      int[] weights = weights(first, last, center, filterScale);
       for (int x = 0; x < size; x++) {
         for (int c = 0; c < 3; c++) {
-          double sum = 0;
+          long sum = 1 << 21;
           for (int k = first; k < last; k++)
-            sum += weights[k - first] * horizontal[(k * size + x) * 3 + c];
+            sum += (long) weights[k - first] * horizontal[(k * size + x) * 3 + c];
           out[c * size * size + y * size + x] = (pixel(sum) / 255.0f - mean[c]) / std[c];
         }
       }
@@ -102,11 +102,11 @@ public final class ClipImagePreprocessor {
     return out;
   }
 
-  private static int pixel(double value) {
-    return Math.clamp((int) Math.floor(value + 0.5), 0, 255);
+  private static int pixel(long value) {
+    return Math.clamp((int) (value >> 22), 0, 255);
   }
 
-  private static double[] weights(int first, int last, double center, double scale) {
+  private static int[] weights(int first, int last, double center, double scale) {
     double[] result = new double[last - first];
     double sum = 0;
     for (int i = first; i < last; i++) {
@@ -116,7 +116,12 @@ public final class ClipImagePreprocessor {
       result[i - first] = w;
       sum += w;
     }
-    for (int i = 0; i < result.length; i++) result[i] /= sum;
-    return result;
+    // Pillow quantizes normalized bicubic coefficients to 22 fractional bits.
+    int[] fixed = new int[result.length];
+    for (int i = 0; i < result.length; i++) {
+      double coefficient = result[i] / sum * (1 << 22);
+      fixed[i] = (int) (coefficient + (coefficient < 0 ? -0.5 : 0.5));
+    }
+    return fixed;
   }
 }

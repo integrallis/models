@@ -108,6 +108,40 @@ class LlavaVisionProjectorTest {
   }
 
   @Test
+  void bicubicResizeMatchesIndependentPillowRgbReference() {
+    BufferedImage image = new BufferedImage(5, 3, BufferedImage.TYPE_INT_RGB);
+    for (int y = 0; y < 3; y++) {
+      for (int x = 0; x < 5; x++)
+        image.setRGB(x, y, ((x * 53 + y * 7) % 256 << 16) | (y * 83 << 8) | x * 41);
+    }
+    // Pillow 12.0.0: RGB pad to 5x5 with black, then BICUBIC resize to 4x4.
+    int[][] expected = {
+      {1, 0, 1},
+      {13, 0, 11},
+      {26, 0, 20},
+      {38, 0, 30},
+      {10, 27, 6},
+      {77, 27, 58},
+      {147, 27, 111},
+      {214, 27, 163},
+      {19, 144, 6},
+      {86, 144, 58},
+      {157, 144, 111},
+      {224, 144, 163},
+      {4, 36, 1},
+      {17, 36, 11},
+      {29, 36, 20},
+      {42, 36, 30}
+    };
+    float[] actual =
+        ClipImagePreprocessor.preprocess(image, 4, new float[] {0, 0, 0}, new float[] {1, 1, 1});
+    for (int pixel = 0; pixel < 16; pixel++) {
+      for (int channel = 0; channel < 3; channel++)
+        assertThat(actual[channel * 16 + pixel]).isEqualTo(expected[pixel][channel] / 255f);
+    }
+  }
+
+  @Test
   void rejectsInvalidDimensions() {
     assertThatThrownBy(() -> new ClipVisionConfig(8, 2, 3, 2, 4, 16, 5, 1e-5f))
         .isInstanceOf(IllegalArgumentException.class);
