@@ -260,6 +260,9 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
     int qn = Math.multiplyExact(batch, dimension), kn = Math.multiplyExact(positions, dimension);
     if (query.length < qn || output.length < qn || key.length < kn || value.length < kn)
       throw new IllegalArgumentException("Invalid causal attention buffer");
+    // The native ABI requires output storage disjoint from every input.
+    if (output == query || output == key || output == value)
+      throw new IllegalArgumentException("Causal attention output must not alias inputs");
     if (causalAttention == null)
       throw new UnsupportedOperationException("Native causal attention unavailable");
     try {

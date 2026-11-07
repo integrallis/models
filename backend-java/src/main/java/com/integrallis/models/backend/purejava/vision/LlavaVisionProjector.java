@@ -18,13 +18,15 @@ package com.integrallis.models.backend.purejava.vision;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufParser;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
-import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.lang.foreign.Arena;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 
-/** Owns a converted LLaVA 1.5 CLIP encoder and its trained two-layer MLP projector. */
+/**
+ * Owns a converted LLaVA 1.5 CLIP encoder and its trained two-layer MLP projector. Instances reuse
+ * image scratch buffers and must not be called concurrently.
+ */
 public final class LlavaVisionProjector implements AutoCloseable {
   private final com.integrallis.models.backend.purejava.spi.DenseProjectionKernels denseKernels;
   private final com.integrallis.models.backend.purejava.spi.DenseProjectionKernels.Projection
@@ -95,13 +97,10 @@ public final class LlavaVisionProjector implements AutoCloseable {
     upProjection = VisionProjection.prepare(up, denseKernels);
     downProjection = VisionProjection.prepare(down, denseKernels);
     encoder =
-        new ClipVisionEncoder(
-            config,
-            ClipVisionWeights.fromGgufFile(file, config),
-            GgufBatchedMatrixKernel.none(),
-            denseKernels);
+        new ClipVisionEncoder(config, ClipVisionWeights.fromGgufFile(file, config), denseKernels);
   }
 
+  /** Loads the supported converted LLaVA projector; the caller owns and closes the result. */
   public static LlavaVisionProjector load(Path path) {
     Arena arena = Arena.ofShared();
     com.integrallis.models.backend.purejava.spi.DenseProjectionKernels dense = null;
@@ -120,37 +119,46 @@ public final class LlavaVisionProjector implements AutoCloseable {
       }
       return new LlavaVisionProjector(arena, GgufParser.parse(path, arena), dense);
     } catch (Exception | Error e) {
-      if (dense != null) dense.close();
-      arena.close();
-      throw new IllegalArgumentException("Cannot load LLaVA projector: " + path, e);
+      // Close both resources even if provider cleanup fails; retain the load failure as primary.
+      var failedDense = dense;
+      try (arena;
+          failedDense) {
+        throw new IllegalArgumentException("Cannot load LLaVA projector: " + path, e);
+      }
     }
   }
 
+  /** Identifies the projection kernel selected for this loaded projector. */
   public String implementation() {
     checkOpen();
     return denseKernels == null ? "vector-api" : denseKernels.implementation();
   }
 
+  /** Number of projected patch rows, excluding the CLIP class token. */
   public int tokenCount() {
     checkOpen();
     return config.numTokens() - 1;
   }
 
+  /** Width of each projected row in the matched text decoder's input space. */
   public int embeddingDimension() {
     checkOpen();
     return down.rows();
   }
 
+  /** Target square image width and height, in pixels, before patch extraction. */
   public int imageSize() {
     checkOpen();
     return config.imageSize();
   }
 
+  /** Returns normalized RGB pixels in channel-first order, using this model's image metadata. */
   public float[] preprocess(byte[] image) {
     checkOpen();
     return ClipImagePreprocessor.preprocess(image, config.imageSize(), mean, std);
   }
 
+  /** Returns fresh row-major decoder embeddings for one encoded PNG/JPEG image. */
   public float[] encode(byte[] image) {
     return encodePreprocessed(preprocess(image));
   }

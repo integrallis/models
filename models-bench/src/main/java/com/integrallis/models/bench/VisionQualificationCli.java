@@ -59,6 +59,25 @@ public final class VisionQualificationCli {
     report.put("repetitions", repetitions);
     report.put(
         "candidateRevision", System.getProperty("models.qualification.revision", "unrecorded"));
+    var options =
+        new MeasurementOptions(
+            mmproj, output, warmups, repetitions, args.length == 6 ? Path.of(args[5]) : null);
+    measureVision(options, encoded, report);
+    if (options.textModel() != null) measureDecoder(options, encoded, report);
+    new ObjectMapper()
+        .writerWithDefaultPrettyPrinter()
+        .writeValue(output.resolve("report.json").toFile(), report);
+  }
+
+  private record MeasurementOptions(
+      Path mmproj, Path output, int warmups, int repetitions, Path textModel) {}
+
+  private static void measureVision(
+      MeasurementOptions options, byte[] encoded, Map<String, Object> report) throws Exception {
+    Path mmproj = options.mmproj();
+    Path output = options.output();
+    int warmups = options.warmups();
+    int repetitions = options.repetitions();
     long start = System.nanoTime();
     try (var vision = LlavaVisionProjector.load(mmproj)) {
       report.put("loadMs", elapsed(start));
@@ -81,81 +100,84 @@ public final class VisionQualificationCli {
       report.put("encoderProjectorMs", times);
       writeFloats(output.resolve("embeddings.f32"), embeddings);
     }
-    if (args.length == 6) {
-      Path textModel = Path.of(args[5]);
-      report.put("textSha256", sha256(textModel));
-      start = System.nanoTime();
-      try (var backend = LlavaBackend.load(textModel, mmproj)) {
-        report.put("twoFileLoadMs", elapsed(start));
-        report.put("decoderDiagnostics", backend.diagnostics());
-        report.put("context", backend.contextCapacity());
-        report.put("kvType", "f32");
-        report.put("maximumOutputTokens", 32);
-        var tokenizer = backend.tokenizer();
-        // Explicit LLaVA 1.5 Vicuna template; image is inserted where <image> belongs.
-        String prefix =
-            "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions. USER: ";
-        String suffix = "\nDescribe this image briefly. ASSISTANT:";
-        int[] prefixTokens = tokenizer.encode(prefix);
-        if (prefixTokens.length == 0 || prefixTokens[0] != tokenizer.bosToken()) {
-          int[] withBos = new int[prefixTokens.length + 1];
-          withBos[0] = tokenizer.bosToken();
-          System.arraycopy(prefixTokens, 0, withBos, 1, prefixTokens.length);
-          prefixTokens = withBos;
-        }
-        int[] suffixTokens = tokenizer.encode(suffix);
-        // Encoding a fragment must not add another BOS inside the sequence.
-        if (suffixTokens.length > 0 && suffixTokens[0] == tokenizer.bosToken())
-          suffixTokens = java.util.Arrays.copyOfRange(suffixTokens, 1, suffixTokens.length);
-        ArrayList<Double> prefillTimes = new ArrayList<>();
-        ArrayList<Double> decodeTimes = new ArrayList<>();
-        ArrayList<java.util.List<Integer>> generatedRuns = new ArrayList<>();
-        for (int run = -warmups; run < repetitions; run++) {
-          backend.reset();
-          start = System.nanoTime();
-          backend.prefill(prefixTokens, 0);
-          int position = prefixTokens.length;
-          backend.prefillImage(encoded, position);
-          position += backend.imageTokenCount();
-          float[] logits = backend.prefill(suffixTokens, position);
-          position += suffixTokens.length;
-          double prefillMs = elapsed(start);
-          if (run == 0) writeFloats(output.resolve("first-logits.f32"), logits);
-          ArrayList<Integer> generated = new ArrayList<>();
-          start = System.nanoTime();
-          for (int i = 0; i < 32; i++) {
-            int best = 0;
-            for (int j = 0; j < logits.length; j++) {
-              if (!Float.isFinite(logits[j])) throw new IllegalStateException("Nonfinite logits");
-              if (logits[j] > logits[best]) best = j;
-            }
-            if (tokenizer.isEndOfGeneration(best)) break;
-            generated.add(best);
-            if (i < 31) logits = backend.forward(best, position++);
-          }
-          double decodeMs = elapsed(start);
-          System.out.printf(
-              "decoder run=%d prefillMs=%.3f decodeMs=%.3f emittedTokens=%d%n",
-              run, prefillMs, decodeMs, generated.size());
-          if (run >= 0) {
-            prefillTimes.add(prefillMs);
-            decodeTimes.add(decodeMs);
-            generatedRuns.add(generated);
-          }
-          report.put("generatedTokens", generated);
-          report.put(
-              "answer", tokenizer.decode(generated.stream().mapToInt(Integer::intValue).toArray()));
-        }
-        report.put("imageTextPrefillMs", prefillTimes);
-        report.put("decodeMs", decodeTimes);
-        report.put("generatedTokenRuns", generatedRuns);
-        report.put("prefixTokens", prefixTokens);
-        report.put("suffixTokens", suffixTokens);
+  }
+
+  private static void measureDecoder(
+      MeasurementOptions options, byte[] encoded, Map<String, Object> report) throws Exception {
+    Path mmproj = options.mmproj();
+    Path output = options.output();
+    int warmups = options.warmups();
+    int repetitions = options.repetitions();
+    Path textModel = options.textModel();
+    report.put("textSha256", sha256(textModel));
+    long start = System.nanoTime();
+    try (var backend = LlavaBackend.load(textModel, mmproj)) {
+      report.put("twoFileLoadMs", elapsed(start));
+      report.put("decoderDiagnostics", backend.diagnostics());
+      report.put("context", backend.contextCapacity());
+      report.put("kvType", "f32");
+      report.put("maximumOutputTokens", 32);
+      var tokenizer = backend.tokenizer();
+      // Explicit LLaVA 1.5 Vicuna template; image is inserted where <image> belongs.
+      String prefix =
+          "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions. USER: ";
+      String suffix = "\nDescribe this image briefly. ASSISTANT:";
+      int[] prefixTokens = tokenizer.encode(prefix);
+      if (prefixTokens.length == 0 || prefixTokens[0] != tokenizer.bosToken()) {
+        int[] withBos = new int[prefixTokens.length + 1];
+        withBos[0] = tokenizer.bosToken();
+        System.arraycopy(prefixTokens, 0, withBos, 1, prefixTokens.length);
+        prefixTokens = withBos;
       }
+      int[] suffixTokens = tokenizer.encode(suffix);
+      // Encoding a fragment must not add another BOS inside the sequence.
+      if (suffixTokens.length > 0 && suffixTokens[0] == tokenizer.bosToken())
+        suffixTokens = java.util.Arrays.copyOfRange(suffixTokens, 1, suffixTokens.length);
+      ArrayList<Double> prefillTimes = new ArrayList<>();
+      ArrayList<Double> decodeTimes = new ArrayList<>();
+      ArrayList<java.util.List<Integer>> generatedRuns = new ArrayList<>();
+      for (int run = -warmups; run < repetitions; run++) {
+        backend.reset();
+        start = System.nanoTime();
+        backend.prefill(prefixTokens, 0);
+        int position = prefixTokens.length;
+        backend.prefillImage(encoded, position);
+        position += backend.imageTokenCount();
+        float[] logits = backend.prefill(suffixTokens, position);
+        position += suffixTokens.length;
+        double prefillMs = elapsed(start);
+        if (run == 0) writeFloats(output.resolve("first-logits.f32"), logits);
+        ArrayList<Integer> generated = new ArrayList<>();
+        start = System.nanoTime();
+        for (int i = 0; i < 32; i++) {
+          int best = 0;
+          for (int j = 0; j < logits.length; j++) {
+            if (!Float.isFinite(logits[j])) throw new IllegalStateException("Nonfinite logits");
+            if (logits[j] > logits[best]) best = j;
+          }
+          if (tokenizer.isEndOfGeneration(best)) break;
+          generated.add(best);
+          if (i < 31) logits = backend.forward(best, position++);
+        }
+        double decodeMs = elapsed(start);
+        System.out.printf(
+            "decoder run=%d prefillMs=%.3f decodeMs=%.3f emittedTokens=%d%n",
+            run, prefillMs, decodeMs, generated.size());
+        if (run >= 0) {
+          prefillTimes.add(prefillMs);
+          decodeTimes.add(decodeMs);
+          generatedRuns.add(generated);
+        }
+        report.put("generatedTokens", generated);
+        report.put(
+            "answer", tokenizer.decode(generated.stream().mapToInt(Integer::intValue).toArray()));
+      }
+      report.put("imageTextPrefillMs", prefillTimes);
+      report.put("decodeMs", decodeTimes);
+      report.put("generatedTokenRuns", generatedRuns);
+      report.put("prefixTokens", prefixTokens);
+      report.put("suffixTokens", suffixTokens);
     }
-    new ObjectMapper()
-        .writerWithDefaultPrettyPrinter()
-        .writeValue(output.resolve("report.json").toFile(), report);
   }
 
   private static double elapsed(long start) {

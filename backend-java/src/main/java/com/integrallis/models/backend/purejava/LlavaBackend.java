@@ -52,12 +52,11 @@ public final class LlavaBackend implements ImageInferenceBackend {
         throw new IllegalArgumentException("Context must fit image patches and text");
       return new LlavaBackend(text, vision);
     } catch (RuntimeException | Error e) {
-      try {
-        if (text != null) text.close();
-      } finally {
-        vision.close();
+      var failedText = text;
+      try (vision;
+          failedText) {
+        throw e;
       }
-      throw e;
     }
   }
 
@@ -71,8 +70,9 @@ public final class LlavaBackend implements ImageInferenceBackend {
         try {
           attention = provider.openAttention(threads, kernel);
         } catch (RuntimeException | Error failure) {
-          kernel.close();
-          throw failure;
+          try (kernel) {
+            throw failure;
+          }
         }
         return PureJavaBackend.load(model, kernel, attention);
       }

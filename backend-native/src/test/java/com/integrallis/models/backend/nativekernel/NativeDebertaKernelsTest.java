@@ -27,6 +27,56 @@ import org.junit.jupiter.api.Test;
 
 class NativeDebertaKernelsTest {
   @Test
+  void causalAttentionRejectsAliasingBeforeNativeDispatch() {
+    try (var kernels =
+        NativeDebertaKernels.load(
+            Path.of(System.getProperty("models.native.kernels.library")), 2)) {
+      float[] query = {1, 2, 3, 4};
+      float[] key = {4, 3, 2, 1};
+      float[] value = {5, 6, 7, 8};
+      for (float[] output : new float[][] {query, key, value}) {
+        float[] original = output.clone();
+        assertThatThrownBy(() -> kernels.causalAttention(output, query, key, value, 2, 2, 2, 1))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("alias");
+        assertThat(output).containsExactly(original);
+      }
+      float[] output = new float[4];
+      kernels.causalAttention(output, query, key, value, 2, 2, 2, 1);
+      assertThat(output[0]).isEqualTo(value[0]);
+      assertThat(output[1]).isEqualTo(value[1]);
+    }
+  }
+
+  @Test
+  void retainedAttentionRejectsOversizedShapesAndAliasingWithoutAdvancing() {
+    try (var matrix =
+            RustGgufBatchedMatrixKernel.open(
+                Path.of(System.getProperty("models.native.kernels.library")), 2);
+        var attention =
+            new NativeCausalAttention(
+                matrix,
+                NativeDebertaKernels.load(
+                    Path.of(System.getProperty("models.native.kernels.library")), 2))) {
+      assertThat(attention.isEligible(0, 0, 1, 65536, 65536, 65536, 65536, 2, 0)).isFalse();
+      assertThat(attention.isEligible(0, 0, 1, 1, 1, 65536, 65536, 65536, 0)).isFalse();
+      assertThat(attention.isEligible(0, 0, 1, 1, 1, 2, 2, Integer.MIN_VALUE, 0)).isFalse();
+      float[] query = {1, 2, 3, 4};
+      float[] key = {4, 3, 2, 1};
+      float[] value = {5, 6, 7, 8};
+      for (float[] output : new float[][] {query, key, value}) {
+        assertThatThrownBy(
+                () -> attention.attend(output, query, key, value, 0, 0, 2, 1, 1, 2, 2, 4, 0))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("alias");
+        assertThat(attention.isEligible(0, 0, 2, 1, 1, 2, 2, 4, 0)).isTrue();
+      }
+      attention.attend(new float[4], query, key, value, 0, 0, 2, 1, 1, 2, 2, 4, 0);
+      assertThat(attention.isEligible(0, 2, 1, 1, 1, 2, 2, 4, 0)).isTrue();
+    }
+  }
+
+  @Test
   void quickGeluMatchesDoublePrecisionOnRaggedAndParallelInputs() {
     try (var kernels =
         NativeDebertaKernels.load(

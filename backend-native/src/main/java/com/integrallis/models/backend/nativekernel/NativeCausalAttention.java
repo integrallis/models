@@ -67,13 +67,16 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
         || keyLength < 1
         || keyLength != valueLength
         || window != 0
+        || capacity < batch
         || start > capacity - batch) return false;
+    long dimension = (long) heads * keyLength;
+    if (dimension > Integer.MAX_VALUE || dimension * capacity > Integer.MAX_VALUE) return false;
     Layer state = layers.get(layer);
     return state == null
         ? start == 0
         : state.positions == start
-            && state.dimension == heads * keyLength
-            && state.keys.length == capacity * state.dimension;
+            && state.dimension == dimension
+            && state.keys.length == (long) capacity * state.dimension;
   }
 
   @Override
@@ -97,6 +100,8 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
     int count = Math.multiplyExact(batch, dimension);
     if (query.length < count || key.length < count || value.length < count || output.length < count)
       throw new IllegalArgumentException("Attention buffer too small");
+    if (output == query || output == key || output == value)
+      throw new IllegalArgumentException("Attention output must not alias inputs");
     Layer state = layers.computeIfAbsent(layer, ignored -> new Layer(dimension, capacity));
     System.arraycopy(key, 0, state.keys, start * dimension, count);
     System.arraycopy(value, 0, state.values, start * dimension, count);

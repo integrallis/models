@@ -221,6 +221,7 @@ public final class PureJavaBackend
     return LlavaBackend.load(modelPath, mmprojPath);
   }
 
+  /** Loads a GGUF model file and returns a ready-to-use backend. */
   public static PureJavaBackend load(Path modelPath) {
     return load(
         modelPath,
