@@ -182,6 +182,7 @@ const CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL: u64 = 1 << 24;
 const CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL: u64 = 1 << 29;
 /// Q4_K with Java-compatible sequential floating-point block accumulation.
 const CAPABILITY_Q4_K_ORDERED_REDUCTION: u64 = 1 << 30;
+const CAPABILITY_Q4_K_BATCH_PACKING: u64 = 1 << 31;
 mod ptq;
 const Q8_0_BLOCK_BYTES: usize = 34;
 const Q4_K_BLOCK_BYTES: usize = 144;
@@ -1699,6 +1700,20 @@ pub extern "C" fn jmodels_kernels_abi_version() -> u32 {
     ABI_VERSION
 }
 
+fn q4_batch_packing_capability() -> u64 {
+    #[cfg(target_arch = "x86_64")]
+    let supported = std::is_x86_feature_detected!("avx2")
+        && std::is_x86_feature_detected!("fma")
+        && std::is_x86_feature_detected!("f16c");
+    #[cfg(not(target_arch = "x86_64"))]
+    let supported = false;
+    if supported {
+        CAPABILITY_Q4_K_BATCH_PACKING
+    } else {
+        0
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
     CAPABILITY_Q4_0_F32_BATCHED_MATMUL
@@ -1722,6 +1737,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL
         | CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL
         | CAPABILITY_Q4_K_ORDERED_REDUCTION
+        | q4_batch_packing_capability()
         | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
         | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
         | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL
@@ -3499,6 +3515,15 @@ unsafe fn compute_batched_row_range(
         }
         #[cfg(target_arch = "x86_64")]
         DotKernel::Q4KOrderedAvx2 => {
+            if batch_size >= 16 && end_row - start_row >= 8 {
+                // The packed tile keeps the existing scalar block fold, with eight
+                // independent output rows in the SIMD lanes.
+                unsafe {
+                    compute_q4_k_packed_rows(weights, quantized, activation_scales,
+                        activation_sums, output, batch_size, rows, cols, start_row, end_row, true);
+                }
+                return;
+            }
             for batch in 0..batch_size {
                 for row in start_row..end_row {
                     // SAFETY: dispatch checked CPU features; this worker owns each output row.
@@ -3520,6 +3545,15 @@ unsafe fn compute_batched_row_range(
         }
         #[cfg(target_arch = "x86_64")]
         DotKernel::Q4KAvx2 => {
+            if batch_size >= 16 && end_row - start_row >= 8 {
+                // SAFETY: dispatch checked CPU features and the worker owns these rows.
+                // Packed rows preserve the original eight partial sums and reduction tree.
+                unsafe {
+                    compute_q4_k_packed_rows(weights, quantized, activation_scales,
+                        activation_sums, output, batch_size, rows, cols, start_row, end_row, false);
+                }
+                return;
+            }
             // SAFETY: runtime dispatch selected this variant only when AVX2 and FMA are available.
             unsafe {
                 compute_q4_k_batched_row_range_avx2(
@@ -4709,6 +4743,15 @@ unsafe fn compute_q6_k_batched_row_range_avx2(
             let batch_end = (batch_tile + 16).min(batch_size);
             for row in row_tile..(row_tile + 16).min(end_row) {
                 let mut batch = batch_tile;
+                while batch + 8 <= batch_end {
+                    unsafe {
+                        compute_q6_k_tile::<8>(
+                            weights, quantized, activation_scales, activation_sums,
+                            output, batch, row, rows, cols,
+                        );
+                    }
+                    batch += 8;
+                }
                 while batch + 4 <= batch_end {
                     unsafe {
                         compute_q6_k_tile::<4>(
@@ -7222,8 +7265,370 @@ fn f32_to_f16(value: f32) -> u16 {
     sign | (encoded_exponent << 10) | rounded as u16
 }
 
+#[cfg(target_arch = "x86_64")]
+#[derive(Clone, Copy)]
+/// Eight output rows, packed once per row tile and reused across query tiles.
+/// Scratch is bounded by eight rows, independent of the model or prompt length.
+struct PackedQ4Block {
+    quants: [[__m256i; 8]; 8],
+    scales: [[i32; 8]; 8],
+    scales16: [[i32; 8]; 8],
+    minima16: [[i32; 8]; 4],
+    minima: [[i32; 8]; 8],
+    d: [f32; 8],
+    dm: [f32; 8],
+}
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+fn transpose_q4_rows(a: [__m256i; 8]) -> [__m256i; 8] {
+    let mut halves = [_mm256_setzero_si256(); 8];
+    for h in 0..2 {
+        let b = h * 4;
+        let t0 = _mm256_unpacklo_epi32(a[b], a[b + 1]);
+        let t1 = _mm256_unpackhi_epi32(a[b], a[b + 1]);
+        let t2 = _mm256_unpacklo_epi32(a[b + 2], a[b + 3]);
+        let t3 = _mm256_unpackhi_epi32(a[b + 2], a[b + 3]);
+        halves[b] = _mm256_unpacklo_epi64(t0, t2);
+        halves[b + 1] = _mm256_unpackhi_epi64(t0, t2);
+        halves[b + 2] = _mm256_unpacklo_epi64(t1, t3);
+        halves[b + 3] = _mm256_unpackhi_epi64(t1, t3);
+    }
+    let mut out = [_mm256_setzero_si256(); 8];
+    for i in 0..4 {
+        out[i] = _mm256_permute2x128_si256(halves[i], halves[i + 4], 0x20);
+        out[i + 4] = _mm256_permute2x128_si256(halves[i], halves[i + 4], 0x31);
+    }
+    out
+}
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn compute_q4_k_packed_rows(
+    weights: &[u8],
+    q: &[i8],
+    scales: &[f32],
+    sums: &[i16],
+    out: *mut f32,
+    batch: usize,
+    rows: usize,
+    cols: usize,
+    start: usize,
+    end: usize,
+    ordered: bool,
+) {
+    let blocks = cols / 256;
+    let empty = PackedQ4Block {
+        quants: [[_mm256_setzero_si256(); 8]; 8],
+        scales: [[0; 8]; 8],
+        scales16: [[0; 8]; 8],
+        minima16: [[0; 8]; 4],
+        minima: [[0; 8]; 8],
+        d: [0.; 8],
+        dm: [0.; 8],
+    };
+    let mut packed = vec![empty; blocks];
+    let mask = _mm256_set1_epi8(15);
+    let mut row = start;
+    while row + 8 <= end {
+        for (block, p) in packed.iter_mut().enumerate() {
+            let mut decoded = [[_mm256_setzero_si256(); 8]; 8];
+            for r in 0..8 {
+                let off = ((row + r) * blocks + block) * 144;
+                p.d[r] = f16_to_f32_f16c(u16::from_le_bytes([weights[off], weights[off + 1]]));
+                p.dm[r] = f16_to_f32_f16c(u16::from_le_bytes([weights[off + 2], weights[off + 3]]));
+                for g in 0..8 {
+                    p.scales[g][r] = qk_scale(&weights[off + 4..off + 16], g);
+                    p.scales16[g][r] = p.scales[g][r] * 65537;
+                    p.minima[g][r] = qk_min(&weights[off + 4..off + 16], g);
+                }
+                for pair in 0..4 {
+                    p.minima16[pair][r] = p.minima[pair * 2][r] | (p.minima[pair * 2 + 1][r] << 16);
+                }
+                for g in 0..4 {
+                    let x = unsafe {
+                        _mm256_loadu_si256(weights.as_ptr().add(off + 16 + g * 32).cast())
+                    };
+                    decoded[g * 2][r] = _mm256_and_si256(x, mask);
+                    decoded[g * 2 + 1][r] = _mm256_and_si256(_mm256_srli_epi16(x, 4), mask);
+                }
+            }
+            for g in 0..8 {
+                p.quants[g] = transpose_q4_rows(decoded[g]);
+            }
+        }
+        let mut b = 0;
+        while b + 4 <= batch {
+            unsafe {
+                if ordered {
+                    compute_q4_packed_tile::<4>(&packed, q, scales, sums, out, b, row, rows, cols);
+                } else {
+                    compute_q4_packed_lane_tile::<4>(
+                        &packed, q, scales, sums, out, b, row, rows, cols,
+                    );
+                }
+            }
+            b += 4;
+        }
+        while b < batch {
+            unsafe {
+                if ordered {
+                    compute_q4_packed_tile::<1>(&packed, q, scales, sums, out, b, row, rows, cols);
+                } else {
+                    compute_q4_packed_lane_tile::<1>(
+                        &packed, q, scales, sums, out, b, row, rows, cols,
+                    );
+                }
+            }
+            b += 1;
+        }
+        row += 8;
+    }
+    for r in row..end {
+        for b in 0..batch {
+            unsafe {
+                out.add(b * rows + r).write(if ordered {
+                    dot_q4_k_q8_k_row_ordered_avx2(weights, q, scales, sums, b, r, cols)
+                } else {
+                    dot_q4_k_q8_k_row_avx2(weights, q, scales, sums, b, r, cols)
+                });
+            }
+        }
+    }
+}
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn compute_q4_packed_tile<const B: usize>(
+    packed: &[PackedQ4Block],
+    q: &[i8],
+    scales: &[f32],
+    sums: &[i16],
+    out: *mut f32,
+    batch: usize,
+    row: usize,
+    rows: usize,
+    cols: usize,
+) {
+    let mut result = [_mm256_setzero_ps(); B];
+    let ones = _mm256_set1_epi16(1);
+    for (block, p) in packed.iter().enumerate() {
+        let mut dot = [_mm256_setzero_si256(); B];
+        for g in 0..8 {
+            let mut group = [_mm256_setzero_si256(); B];
+            for k in 0..8 {
+                for b in 0..B {
+                    let a = unsafe {
+                        q.as_ptr()
+                            .add((batch + b) * cols + block * 256 + g * 32 + k * 4)
+                            .cast::<i32>()
+                            .read_unaligned()
+                    };
+                    let products = _mm256_maddubs_epi16(p.quants[g][k], _mm256_set1_epi32(a));
+                    group[b] = _mm256_add_epi32(group[b], _mm256_madd_epi16(products, ones));
+                }
+            }
+            let scale = unsafe { _mm256_loadu_si256(p.scales[g].as_ptr().cast()) };
+            for b in 0..B {
+                dot[b] = _mm256_add_epi32(dot[b], _mm256_mullo_epi32(group[b], scale));
+            }
+        }
+        let d = unsafe { _mm256_loadu_ps(p.d.as_ptr()) };
+        for b in 0..B {
+            let scale = _mm256_mul_ps(
+                d,
+                _mm256_set1_ps(scales[(batch + b) * packed.len() + block]),
+            );
+            result[b] = _mm256_fmadd_ps(scale, _mm256_cvtepi32_ps(dot[b]), result[b]);
+        }
+        let mut minimum = [_mm256_setzero_si256(); B];
+        for g in 0..8 {
+            let m = unsafe { _mm256_loadu_si256(p.minima[g].as_ptr().cast()) };
+            for b in 0..B {
+                let off = (batch + b) * cols / 16 + block * 16 + g * 2;
+                let sum = sums[off] as i32 + sums[off + 1] as i32;
+                minimum[b] =
+                    _mm256_add_epi32(minimum[b], _mm256_mullo_epi32(m, _mm256_set1_epi32(sum)));
+            }
+        }
+        let dm = unsafe { _mm256_loadu_ps(p.dm.as_ptr()) };
+        for b in 0..B {
+            let scale = _mm256_xor_ps(
+                _mm256_mul_ps(
+                    dm,
+                    _mm256_set1_ps(scales[(batch + b) * packed.len() + block]),
+                ),
+                _mm256_set1_ps(-0.),
+            );
+            result[b] = _mm256_fmadd_ps(scale, _mm256_cvtepi32_ps(minimum[b]), result[b]);
+        }
+    }
+    for b in 0..B {
+        unsafe {
+            _mm256_storeu_ps(out.add((batch + b) * rows + row), result[b]);
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn compute_q4_packed_lane_tile<const B: usize>(
+    packed: &[PackedQ4Block],
+    q: &[i8],
+    scales: &[f32],
+    sums: &[i16],
+    out: *mut f32,
+    batch: usize,
+    row: usize,
+    rows: usize,
+    cols: usize,
+) {
+    // Keep each original four-element partial sum in its own plane. Packing changes
+    // which output row occupies a SIMD lane, never the block fold or final tree.
+    let mut result = [[_mm256_setzero_ps(); B]; 8];
+    let mut minimum = [[_mm256_setzero_ps(); B]; 4];
+    for (block, p) in packed.iter().enumerate() {
+        let d = unsafe { _mm256_loadu_ps(p.d.as_ptr()) };
+        let dm = unsafe { _mm256_loadu_ps(p.dm.as_ptr()) };
+        let mut ds = [_mm256_setzero_ps(); B];
+        let mut dms = [_mm256_setzero_ps(); B];
+        for b in 0..B {
+            let s = _mm256_set1_ps(scales[(batch + b) * packed.len() + block]);
+            ds[b] = _mm256_mul_ps(d, s);
+            dms[b] = _mm256_xor_ps(_mm256_mul_ps(dm, s), _mm256_set1_ps(-0.));
+        }
+        for k in 0..8 {
+            let mut dot = [_mm256_setzero_si256(); B];
+            for g in 0..8 {
+                let scale = unsafe { _mm256_loadu_si256(p.scales16[g].as_ptr().cast()) };
+                for b in 0..B {
+                    let a = unsafe {
+                        q.as_ptr()
+                            .add((batch + b) * cols + block * 256 + g * 32 + k * 4)
+                            .cast::<i32>()
+                            .read_unaligned()
+                    };
+                    let products = _mm256_maddubs_epi16(p.quants[g][k], _mm256_set1_epi32(a));
+                    dot[b] = _mm256_add_epi32(dot[b], _mm256_madd_epi16(products, scale));
+                }
+            }
+            for b in 0..B {
+                result[k][b] = _mm256_fmadd_ps(ds[b], _mm256_cvtepi32_ps(dot[b]), result[k][b]);
+            }
+        }
+        for pair in 0..4 {
+            let m = unsafe { _mm256_loadu_si256(p.minima16[pair].as_ptr().cast()) };
+            for b in 0..B {
+                let off = (batch + b) * cols / 16 + block * 16 + pair * 4;
+                let a = sums[off] + sums[off + 1];
+                let c = sums[off + 2] + sums[off + 3];
+                let pair_sum =
+                    _mm256_set1_epi32(((a as u16 as u32) | ((c as u16 as u32) << 16)) as i32);
+                let product = _mm256_madd_epi16(m, pair_sum);
+                minimum[pair][b] =
+                    _mm256_fmadd_ps(dms[b], _mm256_cvtepi32_ps(product), minimum[pair][b]);
+            }
+        }
+    }
+    for b in 0..B {
+        let even = _mm256_add_ps(
+            _mm256_add_ps(result[4][b], result[0][b]),
+            _mm256_add_ps(result[6][b], result[2][b]),
+        );
+        let odd = _mm256_add_ps(
+            _mm256_add_ps(result[5][b], result[1][b]),
+            _mm256_add_ps(result[7][b], result[3][b]),
+        );
+        let correction = _mm256_add_ps(
+            _mm256_add_ps(minimum[0][b], minimum[2][b]),
+            _mm256_add_ps(minimum[1][b], minimum[3][b]),
+        );
+        let total = _mm256_add_ps(_mm256_add_ps(even, odd), correction);
+        unsafe {
+            _mm256_storeu_ps(out.add((batch + b) * rows + row), total);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn packed_q4_preserves_both_reductions_rows_tails_and_sentinels() {
+        if !(std::is_x86_feature_detected!("avx2")
+            && std::is_x86_feature_detected!("fma")
+            && std::is_x86_feature_detected!("f16c"))
+        {
+            return;
+        }
+        let rows = 19;
+        let cols = 768;
+        let blocks = cols / QK_K;
+        let mut weights: Vec<u8> = (0..rows * blocks * Q4_K_BLOCK_BYTES)
+            .map(|i| (i * 71 + i / 31 + 13) as u8)
+            .collect();
+        for (i, block) in weights.chunks_exact_mut(Q4_K_BLOCK_BYTES).enumerate() {
+            let sign = if i % 3 == 0 { -1.0 } else { 1.0 };
+            block[..2].copy_from_slice(&f32_to_f16(sign * (i % 7 + 1) as f32 * 0.03125).to_le_bytes());
+            block[2..4]
+                .copy_from_slice(&f32_to_f16(sign * (i % 5 + 1) as f32 * 0.015625).to_le_bytes());
+        }
+        for batch in [1, 3, 4, 5, 16, 17, 33, 128] {
+            let q: Vec<i8> = (0..batch * cols).map(|i| (i * 37 + i / 29) as i8).collect();
+            let scales: Vec<f32> = (0..batch * blocks)
+                .map(|i| ((i % 17) as f32 - 8.0) * 0.0009765625)
+                .collect();
+            let sums: Vec<i16> = q
+                .chunks_exact(16)
+                .map(|v| v.iter().map(|x| *x as i16).sum())
+                .collect();
+            for ordered in [false, true] {
+                for (start, end) in [(0, rows), (1, 18), (3, 12)] {
+                    let mut actual = vec![12345.0; batch * rows + 8];
+                    unsafe {
+                        compute_q4_k_packed_rows(
+                            &weights,
+                            &q,
+                            &scales,
+                            &sums,
+                            actual.as_mut_ptr(),
+                            batch,
+                            rows,
+                            cols,
+                            start,
+                            end,
+                            ordered,
+                        );
+                    }
+                    for b in 0..batch {
+                        for row in 0..rows {
+                            if (start..end).contains(&row) {
+                                let expected = unsafe {
+                                    if ordered {
+                                        dot_q4_k_q8_k_row_ordered_avx2(
+                                            &weights, &q, &scales, &sums, b, row, cols,
+                                        )
+                                    } else {
+                                        dot_q4_k_q8_k_row_avx2(
+                                            &weights, &q, &scales, &sums, b, row, cols,
+                                        )
+                                    }
+                                };
+                                assert_eq!(
+                                    actual[b * rows + row].to_bits(),
+                                    expected.to_bits(),
+                                    "batch={batch} row={row} b={b}"
+                                );
+                            } else {
+                                assert_eq!(actual[b * rows + row], 12345.0);
+                            }
+                        }
+                    }
+                    assert!(actual[batch * rows..].iter().all(|x| *x == 12345.0));
+                }
+            }
+        }
+    }
     #[cfg(target_arch = "x86_64")]
     #[test]
     fn k_quantized_tiles_match_single_rows_bit_for_bit_across_tile_boundaries() {
@@ -7694,6 +8099,7 @@ mod tests {
                 | CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL
                 | CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL
                 | CAPABILITY_Q4_K_ORDERED_REDUCTION
+        | q4_batch_packing_capability()
                 | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
                 | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
                 | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL

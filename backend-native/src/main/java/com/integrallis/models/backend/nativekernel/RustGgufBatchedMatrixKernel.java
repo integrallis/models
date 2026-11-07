@@ -54,6 +54,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private final boolean exactActivations;
 
   private volatile boolean sequentialQ4KReduction;
+  private volatile boolean imagePrefill;
 
   private final boolean gatedDeltaNetSupported;
   private final int bfloat16Lanes;
@@ -163,6 +164,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public String implementation() {
+    if (imagePrefill) return "rust-ffm-quantized-v16-packed-q4-k";
     if (sequentialQ4KReduction) return "rust-ffm-quantized-v15-ordered-q4-k";
     if (library.supports(NativeKernelCapability.PTQ1_0_Q8_0_BATCHED_MATMUL)) {
       return "rust-ffm-quantized-v14";
@@ -183,7 +185,18 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   @Override
   public Map<String, String> planRecommendations() {
-    return PLAN_RECOMMENDATIONS;
+    if (!imagePrefill) return PLAN_RECOMMENDATIONS;
+    var recommendations = new java.util.HashMap<>(PLAN_RECOMMENDATIONS);
+    recommendations.put(PureJavaPlanConfiguration.PREFILL_BATCH_SIZE_PROPERTY, "128");
+    return Map.copyOf(recommendations);
+  }
+
+  /** Selects the measured image-prefill policy only when the loaded library provides it. */
+  synchronized boolean configureImagePrefill() {
+    requireOpen();
+    if (!library.supports(NativeKernelCapability.Q4_K_BATCH_PACKING)) return false;
+    imagePrefill = true;
+    return true;
   }
 
   /** Whether the loaded recurrence preserves this Java runtime's fused arithmetic contract. */

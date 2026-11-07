@@ -33,6 +33,11 @@ if [[ -n ${VISION_NATIVE_LIBRARY:-} ]]; then
     sha256sum "$native_library" > "$output/native-library-sha256.txt"
 fi
 printf '%s\n' "$revision" > "$output/candidate-commit.txt"
+reference=${VISION_DECODER_REFERENCE_DIRECTORY:-$output/decoder-reference}
+if [[ ! -e $reference ]]; then
+    bash "$script_dir/build-decoder-reference.sh" "$reference" > "$output/reference-build.log" 2>&1
+fi
+[[ -x $reference/decoder-oracle && -d $reference/source ]] || { echo 'Missing external decoder reference' >&2; exit 2; }
 mmproj=$artifacts/llava-v1.5-7b-mmproj-model-f16.gguf
 text=$artifacts/llava-v1.5-7b-Q4_K_M.gguf
 for probe in cats wide-gradient tall-bands; do
@@ -40,11 +45,17 @@ for probe in cats wide-gradient tall-bands; do
     "$python" "$script_dir/oracle.py" "$mmproj" "$image" "$output/results/$probe/oracle" --threads "$threads" --warmups "$warmups" --repetitions "$repetitions"
     extra=()
     [[ $probe == cats ]] && extra=("$text")
-    "$java" "${native_args[@]}" --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx12g \
+    /usr/bin/time -v -o "$output/results/$probe/candidate-resource.txt" "$java" "${native_args[@]}" --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx12g \
         -Dvectors.gguf.threads="$threads" -Dmodels.purejava.maxContextLength=1024 \
         -Dmodels.qualification.revision="$revision" -cp "$distribution/lib/*" \
         com.integrallis.models.bench.VisionQualificationCli \
         "$mmproj" "$image" "$output/results/$probe/candidate" "$warmups" "$repetitions" "${extra[@]}"
     "$python" "$script_dir/compare.py" "$output/results/$probe/candidate" "$output/results/$probe/oracle" "$output/results/$probe/verdict.json" --max-latency-ratio 1.10
 done
-printf 'INTEGRATION_PASS\n' > "$output/STATUS"
+for kv in f32 f16; do
+    "$python" "$script_dir/decoder_reference.py" "$reference/decoder-oracle" "$reference/source" "$text" \
+        "$output/results/cats/candidate" "$output/results/cats/oracle" "$output/results/cats/reference-$kv" --kv "$kv"
+    "$python" "$script_dir/compare_decoder.py" "$output/results/cats/candidate" "$output/results/cats/oracle" \
+        "$output/results/cats/reference-$kv" "$output/results/cats/decoder-verdict-$kv.json" --max-latency-ratio 1.10
+done
+printf 'INTEGRATION_PERFORMANCE_PASS\n'  > "$output/STATUS"

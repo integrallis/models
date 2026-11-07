@@ -20,8 +20,6 @@ import static com.integrallis.models.backend.purejava.gguf.GgufTensorValues.toFl
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorData;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
-import com.integrallis.models.backend.purejava.quant.Q8_0Quantizer;
-import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 import java.util.Objects;
@@ -39,26 +37,17 @@ final class ClipVisionWeights {
       float[] ln1Weight,
       float[] ln1Bias,
       Matrix attnQkv,
-      float[] attnQkvF32,
-      MemorySegment attnQkvQ8_0,
       float[] attnQkvBias,
       Matrix attnOut,
-      float[] attnOutF32,
-      MemorySegment attnOutQ8_0,
       float[] attnOutBias,
       float[] ln2Weight,
       float[] ln2Bias,
       Matrix ffnUp,
-      float[] ffnUpF32,
-      MemorySegment ffnUpQ8_0,
       float[] ffnUpBias,
       Matrix ffnDown,
-      float[] ffnDownF32,
-      MemorySegment ffnDownQ8_0,
       float[] ffnDownBias) {}
 
   private final Matrix patchEmbed;
-  private final float[] patchEmbedF32;
   private final float[] patchEmbedBias;
   private final Matrix positionEmbed;
   private final float[] positionEmbedF32;
@@ -71,7 +60,6 @@ final class ClipVisionWeights {
 
   private ClipVisionWeights(
       Matrix patchEmbed,
-      float[] patchEmbedF32,
       float[] patchEmbedBias,
       Matrix positionEmbed,
       float[] positionEmbedF32,
@@ -82,7 +70,6 @@ final class ClipVisionWeights {
       float[] postLnBias,
       Layer[] layers) {
     this.patchEmbed = patchEmbed;
-    this.patchEmbedF32 = patchEmbedF32;
     this.patchEmbedBias = patchEmbedBias;
     this.positionEmbed = positionEmbed;
     this.positionEmbedF32 = positionEmbedF32;
@@ -96,10 +83,6 @@ final class ClipVisionWeights {
 
   Matrix patchEmbed() {
     return patchEmbed;
-  }
-
-  float[] patchEmbedF32() {
-    return patchEmbedF32;
   }
 
   float[] patchEmbedBias() {
@@ -138,55 +121,6 @@ final class ClipVisionWeights {
     return layers[index];
   }
 
-  /**
-   * Returns a new weights instance with Q8_0 quantized projection matrices. The Q8_0 segments are
-   * allocated in the provided arena and can be passed to native kernels via {@code
-   * GgufBatchedMatrixKernel}.
-   *
-   * @param arena arena for allocating native Q8_0 segments
-   * @return new weights with Q8_0 caches populated
-   */
-  ClipVisionWeights withQ8_0(Arena arena) {
-    Layer[] q8Layers = new Layer[layers.length];
-    for (int i = 0; i < layers.length; i++) {
-      Layer l = layers[i];
-      q8Layers[i] =
-          new Layer(
-              l.ln1Weight,
-              l.ln1Bias,
-              l.attnQkv,
-              l.attnQkvF32,
-              Q8_0Quantizer.quantize(l.attnQkvF32, l.attnQkv.rows(), l.attnQkv.columns(), arena),
-              l.attnQkvBias,
-              l.attnOut,
-              l.attnOutF32,
-              Q8_0Quantizer.quantize(l.attnOutF32, l.attnOut.rows(), l.attnOut.columns(), arena),
-              l.attnOutBias,
-              l.ln2Weight,
-              l.ln2Bias,
-              l.ffnUp,
-              l.ffnUpF32,
-              Q8_0Quantizer.quantize(l.ffnUpF32, l.ffnUp.rows(), l.ffnUp.columns(), arena),
-              l.ffnUpBias,
-              l.ffnDown,
-              l.ffnDownF32,
-              Q8_0Quantizer.quantize(l.ffnDownF32, l.ffnDown.rows(), l.ffnDown.columns(), arena),
-              l.ffnDownBias);
-    }
-    return new ClipVisionWeights(
-        patchEmbed,
-        patchEmbedF32,
-        patchEmbedBias,
-        positionEmbed,
-        positionEmbedF32,
-        preLnWeight,
-        preLnBias,
-        classEmb,
-        postLnWeight,
-        postLnBias,
-        q8Layers);
-  }
-
   static ClipVisionWeights fromGgufFile(GgufFile file, ClipVisionConfig config) {
     Objects.requireNonNull(file, "file");
     Objects.requireNonNull(config, "config");
@@ -205,7 +139,6 @@ final class ClipVisionWeights {
           "Invalid CLIP patch convolution shape: " + Arrays.toString(patchShape));
     }
     Matrix patchEmbed = new Matrix(patch.dataSegment(), patch.type(), dim, patchPixels);
-    float[] patchEmbedF32 = toFloatArray(file.getTensor("v.patch_embd.weight"));
     float[] patchEmbedBias = vectorOrZero(file, "v.patch_embd.bias", dim);
 
     Matrix positionEmbed = matrix(file, "v.position_embd.weight", numPositions, dim);
@@ -258,28 +191,19 @@ final class ClipVisionWeights {
               vector(file, p + "ln1.weight", dim),
               vector(file, p + "ln1.bias", dim),
               qkv,
-              qkvValues,
-              null, // Q8_0 populated later via withQ8_0()
               qkvBias,
               matrix(file, p + "attn_out.weight", dim, dim),
-              toFloatArray(file.getTensor(p + "attn_out.weight")),
-              null,
               vector(file, p + "attn_out.bias", dim),
               vector(file, p + "ln2.weight", dim),
               vector(file, p + "ln2.bias", dim),
               matrix(file, up + ".weight", intermediateSize, dim),
-              toFloatArray(file.getTensor(up + ".weight")),
-              null,
               vector(file, up + ".bias", intermediateSize),
               matrix(file, down + ".weight", dim, intermediateSize),
-              toFloatArray(file.getTensor(down + ".weight")),
-              null,
               vector(file, down + ".bias", dim));
     }
 
     return new ClipVisionWeights(
         patchEmbed,
-        patchEmbedF32,
         patchEmbedBias,
         positionEmbed,
         positionEmbedF32,

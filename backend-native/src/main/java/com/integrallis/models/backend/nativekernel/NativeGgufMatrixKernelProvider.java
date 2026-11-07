@@ -28,9 +28,10 @@ public final class NativeGgufMatrixKernelProvider implements GgufMatrixKernelPro
     if (configured == null || configured.isBlank())
       configured = System.getenv(RustFfmBackend.LIBRARY_PATH_ENV);
     if (configured != null && !configured.isBlank())
-      return Optional.of(RustGgufBatchedMatrixKernel.open(Path.of(configured), threads));
+      return Optional.of(
+          imageKernel(RustGgufBatchedMatrixKernel.open(Path.of(configured), threads)));
     try {
-      return Optional.of(RustGgufBatchedMatrixKernel.openBundled(threads));
+      return Optional.of(imageKernel(RustGgufBatchedMatrixKernel.openBundled(threads)));
     } catch (IllegalStateException unavailable) {
       System.getLogger(getClass().getName())
           .log(
@@ -39,6 +40,13 @@ public final class NativeGgufMatrixKernelProvider implements GgufMatrixKernelPro
               unavailable.getMessage());
       return Optional.empty();
     }
+  }
+
+  private static GgufBatchedMatrixKernel imageKernel(RustGgufBatchedMatrixKernel kernel) {
+    // Select the measured batch size only when the loaded library supports packing.
+    // The ordinary Q4_K reduction contract remains unchanged.
+    kernel.configureImagePrefill();
+    return kernel;
   }
 
   @Override
