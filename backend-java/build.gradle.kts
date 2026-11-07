@@ -240,6 +240,18 @@ dependencies {
     // Nano GGUF fixtures. models-test's main sources depend on nothing, so this is a test-only
     // edge in one direction: its own tests depend on backend-java's main sources, not the reverse.
     testImplementation(project(":models-test"))
+    // Native kernels for benchmarking the Q8_0 vision path.
+    testImplementation(project(":backend-native"))
+}
+
+// Allow tests that load the bundled native kernel to find the .so directly,
+// the same way backend-native's own tests do.
+tasks.withType<Test>().configureEach {
+    val nativeSo = rootProject.project(":backend-native").layout.buildDirectory
+        .file("rust-target/release/libjmodels_kernels.so")
+    if (nativeSo.isPresent && nativeSo.get().asFile.exists()) {
+        systemProperty("models.native.kernels.library", nativeSo.get().asFile.absolutePath)
+    }
 }
 
 val fixtureDirectory = providers.systemProperty("models.fixtures.directory")
