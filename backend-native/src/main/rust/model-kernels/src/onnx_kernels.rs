@@ -398,6 +398,44 @@ fn exp_one(x: f32) -> f32 {
     p * f32::from_bits(normal as u32)
 }
 
+/// Eight lanes of the existing MLAS polynomial, shared by dense attention softmax.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+pub(crate) unsafe fn exp8(x: std::arch::x86_64::__m256) -> std::arch::x86_64::__m256 {
+    use mlas::*;
+    use std::arch::x86_64::*;
+    let mut v = _mm256_min_ps(
+        _mm256_max_ps(x, _mm256_set1_ps(EXP_LOWER)),
+        _mm256_set1_ps(EXP_UPPER),
+    );
+    let biased = _mm256_fmadd_ps(
+        v,
+        _mm256_set1_ps(EXP_LOG2_RECIPROCAL),
+        _mm256_set1_ps(EXP_BIAS),
+    );
+    let m = _mm256_sub_ps(biased, _mm256_set1_ps(EXP_BIAS));
+    v = _mm256_fmadd_ps(m, _mm256_set1_ps(EXP_LOG2_HIGH), v);
+    v = _mm256_fmadd_ps(m, _mm256_set1_ps(EXP_LOG2_LOW), v);
+    let overflow = _mm256_slli_epi32::<23>(_mm256_castps_si256(biased));
+    let normal = _mm256_min_epi32(
+        _mm256_max_epi32(overflow, _mm256_set1_epi32(EXP_MIN_EXPONENT)),
+        _mm256_set1_epi32(EXP_MAX_EXPONENT),
+    );
+    let overflow = _mm256_add_epi32(
+        _mm256_sub_epi32(overflow, normal),
+        _mm256_set1_epi32(EXP_MAX_EXPONENT),
+    );
+    let normal = _mm256_add_epi32(normal, _mm256_set1_epi32(EXP_MAX_EXPONENT));
+    let mut p = _mm256_set1_ps(EXP_P0);
+    for coefficient in [EXP_P1, EXP_P2, EXP_P3, EXP_P4, EXP_P56] {
+        p = _mm256_fmadd_ps(p, v, _mm256_set1_ps(coefficient));
+    }
+    let scale = _mm256_castsi256_ps(overflow);
+    v = _mm256_mul_ps(v, scale);
+    p = _mm256_fmadd_ps(p, v, scale);
+    _mm256_mul_ps(p, _mm256_castsi256_ps(normal))
+}
+
 /// MLAS `MlasTanhKernel` on one lane.
 #[inline(always)]
 fn tanh_one(x: f32) -> f32 {

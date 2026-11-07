@@ -428,6 +428,273 @@ pub unsafe extern "C" fn jmodels_deberta_attend(
     .unwrap_or(-3)
 }
 
+fn dense_softmax(values: &mut [f32]) {
+    #[cfg(target_arch = "x86_64")]
+    if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+        // SAFETY: runtime checks both target features and all loads stay within the slice.
+        unsafe {
+            dense_softmax_avx2(values);
+        }
+        return;
+    }
+    let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let mut sum = 0.0;
+    for x in values.iter_mut() {
+        *x = (*x - max).exp();
+        sum += *x;
+    }
+    let inverse = 1.0 / sum;
+    for x in values {
+        *x *= inverse;
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn dense_softmax_avx2(values: &mut [f32]) {
+    use std::arch::x86_64::*;
+    let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let vm = _mm256_set1_ps(max);
+    let end = values.len() / 8 * 8;
+    let mut sums = _mm256_setzero_ps();
+    for offset in (0..end).step_by(8) {
+        unsafe {
+            let p = values.as_mut_ptr().add(offset);
+            let exp = super::onnx_kernels::exp8(_mm256_sub_ps(_mm256_loadu_ps(p), vm));
+            _mm256_storeu_ps(p, exp);
+            sums = _mm256_add_ps(sums, exp);
+        }
+    }
+    let halves = _mm_add_ps(_mm256_castps256_ps128(sums), _mm256_extractf128_ps(sums, 1));
+    let pairs = _mm_hadd_ps(halves, halves);
+    let mut sum = _mm_cvtss_f32(_mm_hadd_ps(pairs, pairs));
+    for x in &mut values[end..] {
+        *x = (*x - max).exp();
+        sum += *x;
+    }
+    let inverse = 1.0 / sum;
+    let vi = _mm256_set1_ps(inverse);
+    for offset in (0..end).step_by(8) {
+        unsafe {
+            let p = values.as_mut_ptr().add(offset);
+            _mm256_storeu_ps(p, _mm256_mul_ps(_mm256_loadu_ps(p), vi));
+        }
+    }
+    for x in &mut values[end..] {
+        *x *= inverse;
+    }
+}
+
+/// Ordinary multi-head attention over row-major Q, K, V packed consecutively.
+/// # Safety
+/// Buffers must be aligned, valid for their lengths and non-overlapping throughout the call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_dense_attention(
+    handle: u64,
+    qkv: *const f32,
+    qkv_len: usize,
+    out: *mut f32,
+    out_len: usize,
+    tokens: usize,
+    dim: usize,
+    heads: usize,
+) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        if tokens == 0
+            || dim == 0
+            || heads == 0
+            || !dim.is_multiple_of(heads)
+            || qkv.is_null()
+            || out.is_null()
+            || !(qkv as usize).is_multiple_of(4)
+            || !(out as usize).is_multiple_of(4)
+        {
+            return -1;
+        }
+        let Some(count) = tokens.checked_mul(dim) else {
+            return -1;
+        };
+        let Some(packed) = count.checked_mul(3) else {
+            return -1;
+        };
+        let Some(scores_len) = tokens.checked_mul(tokens) else {
+            return -1;
+        };
+        if packed > qkv_len
+            || count > out_len
+            || packed > isize::MAX as usize / 4
+            || scores_len > isize::MAX as usize / 4
+        {
+            return -1;
+        }
+        let Some(pool) = POOLS.lock().ok().and_then(|r| r.get(&handle).cloned()) else {
+            return -2;
+        };
+        let (src, dst) = (qkv as usize, out as usize);
+        let head_dim = dim / heads;
+        let scale = 1.0 / (head_dim as f32).sqrt();
+        pool.install(|| {
+            (0..heads).into_par_iter().for_each(|head| {
+                ATTENTION_SCRATCH.with(|cell| {
+                    let mut scratch = cell.borrow_mut();
+                    scratch.scores.resize(scores_len, 0.0);
+                    let scores = &mut scratch.scores;
+                    unsafe {
+                        let q = (src as *const f32).add(head * head_dim);
+                        let k = q.add(count);
+                        let v = k.add(count);
+                        matrixmultiply::sgemm(
+                            tokens,
+                            head_dim,
+                            tokens,
+                            scale,
+                            q,
+                            dim as isize,
+                            1,
+                            k,
+                            1,
+                            dim as isize,
+                            0.0,
+                            scores.as_mut_ptr(),
+                            tokens as isize,
+                            1,
+                        );
+                        for row in scores.chunks_exact_mut(tokens) {
+                            dense_softmax(row);
+                        }
+                        matrixmultiply::sgemm(
+                            tokens,
+                            tokens,
+                            head_dim,
+                            1.0,
+                            scores.as_ptr(),
+                            tokens as isize,
+                            1,
+                            v,
+                            dim as isize,
+                            1,
+                            0.0,
+                            (dst as *mut f32).add(head * head_dim),
+                            dim as isize,
+                            1,
+                        );
+                    }
+                });
+            })
+        });
+        0
+    }))
+    .unwrap_or(-3)
+}
+
+/// Batched causal attention with a retained row-major K/V prefix (ordinary MHA).
+/// # Safety
+/// Each aligned pointer must be valid for its advertised length; output cannot alias inputs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_dense_causal_attention(
+    handle: u64,
+    query: *const f32,
+    query_len: usize,
+    key: *const f32,
+    key_len: usize,
+    value: *const f32,
+    value_len: usize,
+    out: *mut f32,
+    out_len: usize,
+    batch: usize,
+    positions: usize,
+    dim: usize,
+    heads: usize,
+) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        if batch == 0
+            || positions < batch
+            || dim == 0
+            || heads == 0
+            || !dim.is_multiple_of(heads)
+            || [query, key, value, out.cast_const()]
+                .iter()
+                .any(|p| p.is_null() || !(*p as usize).is_multiple_of(4))
+        {
+            return -1;
+        }
+        let Some(qn) = batch.checked_mul(dim) else {
+            return -1;
+        };
+        let Some(kn) = positions.checked_mul(dim) else {
+            return -1;
+        };
+        let Some(sn) = batch.checked_mul(positions) else {
+            return -1;
+        };
+        if qn > query_len
+            || kn > key_len
+            || kn > value_len
+            || qn > out_len
+            || [qn, kn, sn].iter().any(|n| *n > isize::MAX as usize / 4)
+        {
+            return -1;
+        }
+        let Some(pool) = POOLS.lock().ok().and_then(|r| r.get(&handle).cloned()) else {
+            return -2;
+        };
+        let (qp, kp, vp, yp) = (query as usize, key as usize, value as usize, out as usize);
+        let width = dim / heads;
+        let scale = 1.0 / (width as f32).sqrt();
+        pool.install(|| {
+            (0..heads).into_par_iter().for_each(|head| {
+                ATTENTION_SCRATCH.with(|cell| {
+                    let mut scratch = cell.borrow_mut();
+                    scratch.scores.resize(sn, 0.0);
+                    let scores = &mut scratch.scores;
+                    unsafe {
+                        matrixmultiply::sgemm(
+                            batch,
+                            width,
+                            positions,
+                            scale,
+                            (qp as *const f32).add(head * width),
+                            dim as isize,
+                            1,
+                            (kp as *const f32).add(head * width),
+                            1,
+                            dim as isize,
+                            0.0,
+                            scores.as_mut_ptr(),
+                            positions as isize,
+                            1,
+                        );
+                        for (row, values) in scores.chunks_exact_mut(positions).enumerate() {
+                            let visible = positions - batch + row + 1;
+                            let (valid, masked) = values.split_at_mut(visible);
+                            dense_softmax(valid);
+                            masked.fill(0.0);
+                        }
+                        matrixmultiply::sgemm(
+                            batch,
+                            positions,
+                            width,
+                            1.0,
+                            scores.as_ptr(),
+                            positions as isize,
+                            1,
+                            (vp as *const f32).add(head * width),
+                            dim as isize,
+                            1,
+                            0.0,
+                            (yp as *mut f32).add(head * width),
+                            dim as isize,
+                            1,
+                        );
+                    }
+                });
+            })
+        });
+        0
+    }))
+    .unwrap_or(-3)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -539,165 +806,4 @@ mod tests {
             );
         }
     }
-}
-
-/// Ordinary multi-head attention over row-major Q, K, V packed consecutively.
-/// # Safety
-/// Buffers must be aligned, valid for their lengths and non-overlapping throughout the call.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn jmodels_dense_attention(
-    handle: u64,
-    qkv: *const f32,
-    qkv_len: usize,
-    out: *mut f32,
-    out_len: usize,
-    tokens: usize,
-    dim: usize,
-    heads: usize,
-) -> i32 {
-    catch_unwind(AssertUnwindSafe(|| {
-        if tokens == 0
-            || dim == 0
-            || heads == 0
-            || !dim.is_multiple_of(heads)
-            || qkv.is_null()
-            || out.is_null()
-            || !(qkv as usize).is_multiple_of(4)
-            || !(out as usize).is_multiple_of(4)
-        {
-            return -1;
-        }
-        let Some(count) = tokens.checked_mul(dim) else {
-            return -1;
-        };
-        let Some(packed) = count.checked_mul(3) else {
-            return -1;
-        };
-        let Some(scores_len) = tokens.checked_mul(tokens) else {
-            return -1;
-        };
-        if packed > qkv_len
-            || count > out_len
-            || packed > isize::MAX as usize / 4
-            || scores_len > isize::MAX as usize / 4
-        {
-            return -1;
-        }
-        let Some(pool) = POOLS.lock().ok().and_then(|r| r.get(&handle).cloned()) else {
-            return -2;
-        };
-        let (src, dst) = (qkv as usize, out as usize);
-        let head_dim = dim / heads;
-        let scale = 1.0 / (head_dim as f32).sqrt();
-        pool.install(|| {
-            (0..heads).into_par_iter().for_each(|head| {
-                ATTENTION_SCRATCH.with(|cell| {
-                    let mut scratch = cell.borrow_mut();
-                    scratch.scores.resize(scores_len, 0.0);
-                    let scores = &mut scratch.scores;
-                    unsafe {
-                        let q = (src as *const f32).add(head * head_dim);
-                        let k = q.add(count);
-                        let v = k.add(count);
-                        matrixmultiply::sgemm(
-                            tokens,
-                            head_dim,
-                            tokens,
-                            scale,
-                            q,
-                            dim as isize,
-                            1,
-                            k,
-                            1,
-                            dim as isize,
-                            0.0,
-                            scores.as_mut_ptr(),
-                            tokens as isize,
-                            1,
-                        );
-                        for row in scores.chunks_exact_mut(tokens) {
-                            let max = row.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-                            let mut sum = 0.0;
-                            for x in row.iter_mut() {
-                                *x = (*x - max).exp();
-                                sum += *x;
-                            }
-                            for x in row.iter_mut() {
-                                *x /= sum;
-                            }
-                        }
-                        matrixmultiply::sgemm(
-                            tokens,
-                            tokens,
-                            head_dim,
-                            1.0,
-                            scores.as_ptr(),
-                            tokens as isize,
-                            1,
-                            v,
-                            dim as isize,
-                            1,
-                            0.0,
-                            (dst as *mut f32).add(head * head_dim),
-                            dim as isize,
-                            1,
-                        );
-                    }
-                });
-            })
-        });
-        0
-    }))
-    .unwrap_or(-3)
-}
-
-/// Batched causal attention with a retained row-major K/V prefix (ordinary MHA).
-/// # Safety
-/// Each aligned pointer must be valid for its advertised length; output cannot alias inputs.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn jmodels_dense_causal_attention(
-    handle: u64, query: *const f32, query_len: usize, key: *const f32, key_len: usize,
-    value: *const f32, value_len: usize, out: *mut f32, out_len: usize,
-    batch: usize, positions: usize, dim: usize, heads: usize,
-) -> i32 {
-    catch_unwind(AssertUnwindSafe(|| {
-        if batch == 0 || positions < batch || dim == 0 || heads == 0 || !dim.is_multiple_of(heads)
-            || [query, key, value, out.cast_const()].iter().any(|p| p.is_null() || !(*p as usize).is_multiple_of(4)) { return -1; }
-        let Some(qn) = batch.checked_mul(dim) else { return -1; };
-        let Some(kn) = positions.checked_mul(dim) else { return -1; };
-        let Some(sn) = batch.checked_mul(positions) else { return -1; };
-        if qn > query_len || kn > key_len || kn > value_len || qn > out_len
-            || [qn, kn, sn].iter().any(|n| *n > isize::MAX as usize / 4) { return -1; }
-        let Some(pool) = POOLS.lock().ok().and_then(|r| r.get(&handle).cloned()) else { return -2; };
-        let (qp, kp, vp, yp) = (query as usize, key as usize, value as usize, out as usize);
-        let width = dim / heads;
-        let scale = 1.0 / (width as f32).sqrt();
-        pool.install(|| (0..heads).into_par_iter().for_each(|head| {
-            ATTENTION_SCRATCH.with(|cell| {
-                let mut scratch = cell.borrow_mut(); scratch.scores.resize(sn, 0.0);
-                let scores = &mut scratch.scores;
-                unsafe {
-                    matrixmultiply::sgemm(batch, width, positions, scale,
-                        (qp as *const f32).add(head * width), dim as isize, 1,
-                        (kp as *const f32).add(head * width), 1, dim as isize,
-                        0.0, scores.as_mut_ptr(), positions as isize, 1);
-                    for (row, values) in scores.chunks_exact_mut(positions).enumerate() {
-                        let visible = positions - batch + row + 1;
-                        let (valid, masked) = values.split_at_mut(visible);
-                        let max = valid.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-                        let mut sum = 0.0;
-                        for x in valid.iter_mut() { *x = (*x - max).exp(); sum += *x; }
-                        let inverse = 1.0 / sum;
-                        for x in valid.iter_mut() { *x *= inverse; }
-                        masked.fill(0.0);
-                    }
-                    matrixmultiply::sgemm(batch, positions, width, 1.0,
-                        scores.as_ptr(), positions as isize, 1,
-                        (vp as *const f32).add(head * width), dim as isize, 1,
-                        0.0, (yp as *mut f32).add(head * width), dim as isize, 1);
-                }
-            });
-        }));
-        0
-    })).unwrap_or(-3)
 }
