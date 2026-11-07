@@ -1,0 +1,9 @@
+gradle.projectsEvaluated {
+    def backend = rootProject.project(':backend-java')
+    backend.tasks.register('exportRefactorClasspath') {
+        doLast {
+            new File(rootProject.property('refactor.classpathOutput')).text =
+                backend.sourceSets.test.runtimeClasspath.asPath
+        }
+    }
+}
