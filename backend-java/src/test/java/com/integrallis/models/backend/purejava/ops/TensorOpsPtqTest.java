@@ -92,7 +92,10 @@ class TensorOpsPtqTest {
       MemorySegment.copy(packed, 0, parallel, ValueLayout.JAVA_BYTE, 0, packed.length);
       assertThat(TensorOps.packedProjectionThreads(rows, rowBytes, serial)).isEqualTo(1);
       assertThat(TensorOps.packedProjectionThreads(rows, rowBytes, parallel))
-          .isEqualTo(Math.min(rows, Runtime.getRuntime().availableProcessors()));
+          .isEqualTo(
+              Math.min(
+                  rows,
+                  com.integrallis.vectors.core.VectorUtil.runtimeCapabilities().ggufThreads()));
       float[] expected = new float[rows];
       float[] actual = new float[rows];
       TensorOps.ggufMatmul(expected, input, serial, GgufTensorType.PTQ1_0, rows, columns);

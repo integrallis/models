@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <vector>
 using clock_type = std::chrono::steady_clock;
 static double ms(clock_type::time_point start) { return std::chrono::duration<double, std::milli>(clock_type::now()-start).count(); }
@@ -18,18 +19,24 @@ template<class T> static std::vector<T> read(const char *path) {
     if (!f) throw std::runtime_error("short input"); return v;
 }
 int main(int argc, char **argv) {
-    if (argc != 9) { std::cerr << "model embeddings prefix suffix threads warmups repetitions batch\n"; return 2; }
+    if (argc != 10) { std::cerr << "model embeddings prefix suffix threads warmups repetitions batch f32|f16\n"; return 2; }
     auto embeddings=read<float>(argv[2]); auto prefix=read<llama_token>(argv[3]); auto suffix=read<llama_token>(argv[4]);
     int threads=std::stoi(argv[5]), warmups=std::stoi(argv[6]), repetitions=std::stoi(argv[7]), capacity=std::stoi(argv[8]);
     if (threads<1 || warmups<1 || repetitions<3 || capacity<1) return 2;
+    std::string kv=argv[9]; if (kv!="f32" && kv!="f16") return 2;
+    auto loaded=clock_type::now();
     llama_backend_init(); auto mp=llama_model_default_params(); mp.n_gpu_layers=0;
     auto model=llama_model_load_from_file(argv[1],mp); if (!model) return 3;
     auto cp=llama_context_default_params(); cp.n_ctx=1024; cp.n_batch=capacity; cp.n_ubatch=capacity;
     cp.n_threads=threads; cp.n_threads_batch=threads;
+    cp.type_k=kv=="f32" ? GGML_TYPE_F32 : GGML_TYPE_F16; cp.type_v=cp.type_k;
     auto ctx=llama_init_from_model(model,cp); if (!ctx) return 3;
     int dim=llama_model_n_embd(model); auto vocab=llama_model_get_vocab(model); int nv=llama_vocab_n_tokens(vocab);
     if (embeddings.size()%dim) return 2;
     auto tb=llama_batch_init(capacity,0,1); auto eb=llama_batch_init(capacity,dim,1);
+    std::cout << "{\"configuration\":{\"threads\":" << threads
+      << ",\"context\":1024,\"maximumOutputTokens\":32,\"batch\":" << capacity
+      << ",\"kvType\":\"" << kv << "\",\"loadMs\":" << ms(loaded) << "}}" << std::endl;
     for (int run=-warmups; run<repetitions; ++run) {
         llama_memory_clear(llama_get_memory(ctx),true); int pos=0;
         auto start=clock_type::now();

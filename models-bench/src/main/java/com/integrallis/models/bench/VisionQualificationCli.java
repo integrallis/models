@@ -88,6 +88,9 @@ public final class VisionQualificationCli {
       try (var backend = LlavaBackend.load(textModel, mmproj)) {
         report.put("twoFileLoadMs", elapsed(start));
         report.put("decoderDiagnostics", backend.diagnostics());
+        report.put("context", backend.contextCapacity());
+        report.put("kvType", "f32");
+        report.put("maximumOutputTokens", 32);
         var tokenizer = backend.tokenizer();
         // Explicit LLaVA 1.5 Vicuna template; image is inserted where <image> belongs.
         String prefix =
@@ -131,6 +134,9 @@ public final class VisionQualificationCli {
             if (i < 31) logits = backend.forward(best, position++);
           }
           double decodeMs = elapsed(start);
+          System.out.printf(
+              "decoder run=%d prefillMs=%.3f decodeMs=%.3f emittedTokens=%d%n",
+              run, prefillMs, decodeMs, generated.size());
           if (run >= 0) {
             prefillTimes.add(prefillMs);
             decodeTimes.add(decodeMs);
