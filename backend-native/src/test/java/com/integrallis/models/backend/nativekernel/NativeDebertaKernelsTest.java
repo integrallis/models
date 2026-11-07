@@ -27,12 +27,33 @@ import org.junit.jupiter.api.Test;
 
 class NativeDebertaKernelsTest {
   @Test
+  void quickGeluMatchesDoublePrecisionOnRaggedAndParallelInputs() {
+    try (var kernels =
+        NativeDebertaKernels.load(
+            Path.of(System.getProperty("models.native.kernels.library")), 3)) {
+      for (int count : new int[] {1, 7, 33, 8193}) {
+        float[] values = new float[count], expected = new float[count];
+        for (int i = 0; i < count; i++) {
+          values[i] = (i % 161 - 80) * .25f;
+          expected[i] = (float) (values[i] / (1.0 + Math.exp(-1.702 * values[i])));
+        }
+        assertThat(kernels.quickGelu(values)).isTrue();
+        assertThat(values).containsExactly(expected, within(2e-6f));
+      }
+    }
+  }
+
+  @Test
   void causalAttentionPreservesPrefixThroughChunksDecodeResetAndRewind() {
     var nativeKernels =
         RustGgufBatchedMatrixKernel.open(
             Path.of(System.getProperty("models.native.kernels.library")), 3);
     try (nativeKernels;
-        var attention = new NativeCausalAttention(nativeKernels)) {
+        var attention =
+            new NativeCausalAttention(
+                nativeKernels,
+                NativeDebertaKernels.load(
+                    Path.of(System.getProperty("models.native.kernels.library")), 3))) {
       int dim = 15, heads = 3, width = 5, capacity = 16;
       var random = new Random(6081);
       float[] fullQ = new float[capacity * dim], fullK = fullQ.clone(), fullV = fullQ.clone();

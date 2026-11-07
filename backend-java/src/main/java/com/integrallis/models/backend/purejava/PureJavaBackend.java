@@ -1214,6 +1214,11 @@ public final class PureJavaBackend
     return decoder.maxBatchSize();
   }
 
+  String attentionKernelImplementation() {
+    checkOpen();
+    return batchedAttentionKernel.getClass().getSimpleName();
+  }
+
   /** Whether this loaded graph accepts projected image rows. */
   public boolean supportsEmbeddingInput() {
     checkOpen();

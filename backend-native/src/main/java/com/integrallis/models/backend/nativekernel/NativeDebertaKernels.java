@@ -33,6 +33,7 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
   private final MethodHandle attention;
   private final MethodHandle denseAttention;
   private final MethodHandle causalAttention;
+  private final MethodHandle quickGelu;
   private final MethodHandle destroy;
   private MemorySegment x = MemorySegment.NULL;
   private MemorySegment w = MemorySegment.NULL;
@@ -131,6 +132,20 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
                               ValueLayout.JAVA_LONG),
                           Linker.Option.critical(true)))
               .orElse(null);
+      quickGelu =
+          symbols
+              .find("jmodels_dense_quick_gelu")
+              .map(
+                  symbol ->
+                      linker.downcallHandle(
+                          symbol,
+                          FunctionDescriptor.of(
+                              ValueLayout.JAVA_INT,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG),
+                          Linker.Option.critical(true)))
+              .orElse(null);
       destroy =
           linker.downcallHandle(
               symbols.find("jmodels_deberta_destroy").orElseThrow(),
@@ -209,6 +224,21 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
     }
     MemorySegment.copy(y, 0, MemorySegment.ofArray(output), 0, (long) yn * Float.BYTES);
     projectCalls++;
+  }
+
+  @Override
+  public synchronized boolean quickGelu(float[] values) {
+    if (handle == 0) throw new IllegalStateException("Dense kernels are closed");
+    if (quickGelu == null) return false;
+    if (values.length == 0) return true;
+    try {
+      int result =
+          (int) quickGelu.invokeExact(handle, MemorySegment.ofArray(values), (long) values.length);
+      if (result != 0) throw new IllegalStateException("QuickGELU failed: " + result);
+    } catch (Throwable failure) {
+      throw new IllegalStateException("QuickGELU call failed", failure);
+    }
+    return true;
   }
 
   boolean supportsCausalAttention() {

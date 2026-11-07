@@ -95,7 +95,12 @@ public final class LlavaBackend implements ImageInferenceBackend {
   @Override
   public BackendDiagnostics diagnostics() {
     checkOpen();
-    return text.diagnostics();
+    var decoder = text.diagnostics();
+    var environment = new java.util.LinkedHashMap<>(decoder.environment());
+    environment.put("vision-projections", vision.implementation());
+    environment.put("decoder-attention", text.attentionKernelImplementation());
+    return new BackendDiagnostics(
+        name(), "llava-v1/" + decoder.planVersion(), environment, decoder.optimizations());
   }
 
   @Override

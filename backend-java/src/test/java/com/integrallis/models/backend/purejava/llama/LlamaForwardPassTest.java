@@ -1356,8 +1356,9 @@ class LlamaForwardPassTest {
       assertThat(accelerated.forward(nextToken, tokens.length)).containsExactly(expectedNext);
     }
 
-    @Test
-    void injectedAttentionKernelPreservesPrefillAndFallsBackForDecode() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void injectedAttentionKernelPreservesPrefillAndSelectedDecode(boolean supportsDecode) {
       GgufFile file = buildQ4NanoModel(new Random(42));
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
@@ -1390,7 +1391,7 @@ class LlamaForwardPassTest {
                 int valueLength,
                 int maxSequenceLength,
                 int slidingWindow) {
-              return batchSize > 1;
+              return batchSize > 1 || supportsDecode;
             }
 
             @Override
@@ -1445,7 +1446,7 @@ class LlamaForwardPassTest {
       assertThat(invocations).hasValue(LAYERS);
       assertThat(actual).containsExactly(expected);
       assertThat(accelerated.forward(nextToken, tokens.length)).containsExactly(expectedNext);
-      assertThat(invocations).hasValue(LAYERS);
+      assertThat(invocations).hasValue(supportsDecode ? 2 * LAYERS : LAYERS);
       accelerated.reset();
       assertThat(resets).hasValue(1);
     }

@@ -612,9 +612,7 @@ impl WorkerPool {
             poll_nanos: CachePadded(AtomicU64::new(default_poll_nanos())),
             shutdown: CachePadded(AtomicBool::new(false)),
             failed: CachePadded(AtomicBool::new(false)),
-            state: Mutex::new(WorkerState {
-                job: None,
-            }),
+            state: Mutex::new(WorkerState { job: None }),
             work_available: Condvar::new(),
             work_complete: Condvar::new(),
             activation: Condvar::new(),
@@ -669,9 +667,7 @@ impl WorkerPool {
             self.shared.next_job_chunk.0.store(0, Ordering::Relaxed);
             return catch_unwind(AssertUnwindSafe(|| {
                 // SAFETY: the caller owns all matrix buffers for this synchronous execution.
-                unsafe {
-                    execute_matrix_job_partition(job, 0, 1, &self.shared.next_job_chunk.0)
-                }
+                unsafe { execute_matrix_job_partition(job, 0, 1, &self.shared.next_job_chunk.0) }
             }))
             .is_ok();
         }
@@ -776,9 +772,7 @@ impl WorkerPool {
             return catch_unwind(AssertUnwindSafe(|| {
                 self.shared.next_job_chunk.0.store(0, Ordering::Relaxed);
                 // SAFETY: the caller owns all recurrence buffers for this synchronous execution.
-                unsafe {
-                    execute_attention_partition(job, 0, 1, &self.shared.next_job_chunk.0)
-                }
+                unsafe { execute_attention_partition(job, 0, 1, &self.shared.next_job_chunk.0) }
             }))
             .is_ok();
         }
@@ -791,9 +785,7 @@ impl WorkerPool {
             return catch_unwind(AssertUnwindSafe(|| {
                 self.shared.next_job_chunk.0.store(0, Ordering::Relaxed);
                 // SAFETY: the caller owns all recurrence buffers for this synchronous execution.
-                unsafe {
-                    execute_attention_partition(job, 0, 1, &self.shared.next_job_chunk.0)
-                }
+                unsafe { execute_attention_partition(job, 0, 1, &self.shared.next_job_chunk.0) }
             }))
             .is_ok();
         }
@@ -4360,88 +4352,161 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
         return;
     }
 
+    for row in start_row..end_row {
+        let mut batch = 0;
+        while batch + 4 <= batch_size {
+            unsafe {
+                compute_q4_k_tile::<4>(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    output,
+                    batch,
+                    row,
+                    rows,
+                    cols,
+                );
+            }
+            batch += 4;
+        }
+        match batch_size - batch {
+            3 => unsafe {
+                compute_q4_k_tile::<3>(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    output,
+                    batch,
+                    row,
+                    rows,
+                    cols,
+                );
+            },
+            2 => unsafe {
+                compute_q4_k_tile::<2>(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    output,
+                    batch,
+                    row,
+                    rows,
+                    cols,
+                );
+            },
+            1 => unsafe {
+                compute_q4_k_tile::<1>(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    output,
+                    batch,
+                    row,
+                    rows,
+                    cols,
+                );
+            },
+            _ => {}
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments)]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn compute_q4_k_tile<const B: usize>(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    activation_sums: &[i16],
+    output: *mut f32,
+    batch_start: usize,
+    row: usize,
+    rows: usize,
+    cols: usize,
+) {
     let blocks_per_row = cols / QK_K;
     let sums_per_batch = cols / Q8_K_SUM_BLOCK;
     let nibble_mask = _mm256_set1_epi8(0x0f);
-    batch_scratch!(sums, batch_size, _mm256_setzero_ps(), __m256);
-    batch_scratch!(minimum_sums, batch_size, _mm_setzero_ps(), __m128);
+    let mut sums = [_mm256_setzero_ps(); B];
+    let mut minimum_sums = [_mm_setzero_ps(); B];
     let mut decoded = [_mm256_setzero_si256(); 8];
     let mut group_scales = [0_i32; 8];
-    for row in start_row..end_row {
-        sums.fill(_mm256_setzero_ps());
-        minimum_sums.fill(_mm_setzero_ps());
-        for block in 0..blocks_per_row {
-            record_k_quant_weight_block_decode();
-            let weight_offset = (row * blocks_per_row + block) * Q4_K_BLOCK_BYTES;
-            let weight_scale = f16_to_f32_f16c(u16::from_le_bytes([
-                weights[weight_offset],
-                weights[weight_offset + 1],
-            ]));
-            let weight_min_scale = f16_to_f32_f16c(u16::from_le_bytes([
-                weights[weight_offset + 2],
-                weights[weight_offset + 3],
-            ]));
-            let scales = &weights[weight_offset + 4..weight_offset + 16];
-            let quants = weights.as_ptr().wrapping_add(weight_offset + 16);
-            for pair in 0..4 {
-                // SAFETY: every Q4_K block contains four complete 32-byte packed groups.
-                let packed = unsafe { _mm256_loadu_si256(quants.add(pair * 32).cast()) };
-                decoded[pair * 2] = _mm256_and_si256(packed, nibble_mask);
-                decoded[pair * 2 + 1] = _mm256_and_si256(_mm256_srli_epi16(packed, 4), nibble_mask);
-            }
-            // One unpack per block, as the single-row kernel does. This replaced eight
-            // `qk_scale` and eight `qk_min` calls, each a branchy six-bit field extraction from
-            // memory -- the cost dcd8b172 removed from the row kernel and never removed from here.
-            let (scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
-            for group in 0..8 {
-                group_scales[group] = scale_values[group] as i32;
-            }
-            let group_minima = _mm256_extracti128_si256(mins_and_scales, 1);
-
-            for batch in 0..batch_size {
-                let activation_offset = batch * cols + block * QK_K;
-                let sum_offset = batch * sums_per_batch + block * QK_K / Q8_K_SUM_BLOCK;
-                // SAFETY: the activation row holds 256 signed bytes from this offset.
-                let quantized_lanes = unsafe {
-                    qk_batched_tile_lanes(
-                        &decoded,
-                        &group_scales,
-                        quantized.as_ptr().add(activation_offset),
-                    )
-                };
-                // The minimum correction goes through the same four-lane helper the single-row
-                // kernel uses, and accumulates the same way, so the two kernels agree bit-for-bit
-                // by construction rather than by two implementations happening to match.
-                // SAFETY: one Q8_K block contains sixteen complete i16 group sums.
-                let min_products = unsafe {
-                    qk_block_minimum_products(
-                        group_minima,
-                        activation_sums.as_ptr().add(sum_offset),
-                    )
-                };
-                let activation_scale = activation_scales[batch * blocks_per_row + block];
-                let d = weight_scale * activation_scale;
-                let d_min = weight_min_scale * activation_scale;
-                sums[batch] = _mm256_fmadd_ps(
-                    _mm256_set1_ps(d),
-                    _mm256_cvtepi32_ps(quantized_lanes),
-                    sums[batch],
-                );
-                minimum_sums[batch] = _mm_fmadd_ps(
-                    _mm_set1_ps(-d_min),
-                    _mm_cvtepi32_ps(min_products),
-                    minimum_sums[batch],
-                );
-            }
+    sums.fill(_mm256_setzero_ps());
+    minimum_sums.fill(_mm_setzero_ps());
+    for block in 0..blocks_per_row {
+        record_k_quant_weight_block_decode();
+        let weight_offset = (row * blocks_per_row + block) * Q4_K_BLOCK_BYTES;
+        let weight_scale = f16_to_f32_f16c(u16::from_le_bytes([
+            weights[weight_offset],
+            weights[weight_offset + 1],
+        ]));
+        let weight_min_scale = f16_to_f32_f16c(u16::from_le_bytes([
+            weights[weight_offset + 2],
+            weights[weight_offset + 3],
+        ]));
+        let scales = &weights[weight_offset + 4..weight_offset + 16];
+        let quants = weights.as_ptr().wrapping_add(weight_offset + 16);
+        for pair in 0..4 {
+            // SAFETY: every Q4_K block contains four complete 32-byte packed groups.
+            let packed = unsafe { _mm256_loadu_si256(quants.add(pair * 32).cast()) };
+            decoded[pair * 2] = _mm256_and_si256(packed, nibble_mask);
+            decoded[pair * 2 + 1] = _mm256_and_si256(_mm256_srli_epi16(packed, 4), nibble_mask);
         }
-        for (batch, &sum) in sums.iter().enumerate() {
-            record_q4_k_batch_horizontal_reduction();
-            // SAFETY: each worker owns this row across all batch-major output planes.
-            unsafe {
-                output.add(batch * rows + row).write(
-                    horizontal_sum_f32_avx2(sum) + horizontal_sum_f32_sse2(minimum_sums[batch]),
-                );
-            }
+        // One unpack per block, as the single-row kernel does. This replaced eight
+        // `qk_scale` and eight `qk_min` calls, each a branchy six-bit field extraction from
+        // memory -- the cost dcd8b172 removed from the row kernel and never removed from here.
+        let (scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
+        for group in 0..8 {
+            group_scales[group] = scale_values[group] as i32;
+        }
+        let group_minima = _mm256_extracti128_si256(mins_and_scales, 1);
+
+        for batch in 0..B {
+            let activation_offset = (batch_start + batch) * cols + block * QK_K;
+            let sum_offset = (batch_start + batch) * sums_per_batch + block * QK_K / Q8_K_SUM_BLOCK;
+            // SAFETY: the activation row holds 256 signed bytes from this offset.
+            let quantized_lanes = unsafe {
+                qk_batched_tile_lanes(
+                    &decoded,
+                    &group_scales,
+                    quantized.as_ptr().add(activation_offset),
+                )
+            };
+            // The minimum correction goes through the same four-lane helper the single-row
+            // kernel uses, and accumulates the same way, so the two kernels agree bit-for-bit
+            // by construction rather than by two implementations happening to match.
+            // SAFETY: one Q8_K block contains sixteen complete i16 group sums.
+            let min_products = unsafe {
+                qk_block_minimum_products(group_minima, activation_sums.as_ptr().add(sum_offset))
+            };
+            let activation_scale =
+                activation_scales[(batch_start + batch) * blocks_per_row + block];
+            let d = weight_scale * activation_scale;
+            let d_min = weight_min_scale * activation_scale;
+            sums[batch] = _mm256_fmadd_ps(
+                _mm256_set1_ps(d),
+                _mm256_cvtepi32_ps(quantized_lanes),
+                sums[batch],
+            );
+            minimum_sums[batch] = _mm_fmadd_ps(
+                _mm_set1_ps(-d_min),
+                _mm_cvtepi32_ps(min_products),
+                minimum_sums[batch],
+            );
+        }
+    }
+    for (batch, &sum) in sums.iter().enumerate() {
+        record_q4_k_batch_horizontal_reduction();
+        // SAFETY: each worker owns this row across all batch-major output planes.
+        unsafe {
+            output
+                .add((batch_start + batch) * rows + row)
+                .write(horizontal_sum_f32_avx2(sum) + horizontal_sum_f32_sse2(minimum_sums[batch]));
         }
     }
 }
@@ -4630,111 +4695,185 @@ unsafe fn compute_q6_k_batched_row_range_avx2(
         return;
     }
 
+    for row in start_row..end_row {
+        let mut batch = 0;
+        while batch + 4 <= batch_size {
+            unsafe {
+                compute_q6_k_tile::<4>(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    output,
+                    batch,
+                    row,
+                    rows,
+                    cols,
+                );
+            }
+            batch += 4;
+        }
+        match batch_size - batch {
+            3 => unsafe {
+                compute_q6_k_tile::<3>(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    output,
+                    batch,
+                    row,
+                    rows,
+                    cols,
+                );
+            },
+            2 => unsafe {
+                compute_q6_k_tile::<2>(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    output,
+                    batch,
+                    row,
+                    rows,
+                    cols,
+                );
+            },
+            1 => unsafe {
+                compute_q6_k_tile::<1>(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    output,
+                    batch,
+                    row,
+                    rows,
+                    cols,
+                );
+            },
+            _ => {}
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments)]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn compute_q6_k_tile<const B: usize>(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    activation_sums: &[i16],
+    output: *mut f32,
+    batch_start: usize,
+    row: usize,
+    rows: usize,
+    cols: usize,
+) {
     let blocks_per_row = cols / QK_K;
     let low_mask = _mm256_set1_epi8(0x0f);
     let high_two_mask = _mm256_set1_epi8(0x03);
-    batch_scratch!(sums, batch_size, _mm256_setzero_ps(), __m256);
+    let mut sums = [_mm256_setzero_ps(); B];
     let mut decoded = [_mm256_setzero_si256(); 8];
-    for row in start_row..end_row {
-        sums.fill(_mm256_setzero_ps());
-        for block in 0..blocks_per_row {
-            record_k_quant_weight_block_decode();
-            let weight_offset = (row * blocks_per_row + block) * Q6_K_BLOCK_BYTES;
-            let weight_scale = f16_to_f32_f16c(u16::from_le_bytes([
-                weights[weight_offset + 208],
-                weights[weight_offset + 209],
-            ]));
-            let ql = weights.as_ptr().wrapping_add(weight_offset);
-            let qh = ql.wrapping_add(128);
-            let scales = &weights[weight_offset + 192..weight_offset + 208];
-            let scale_values = unsafe { _mm_loadu_si128(scales.as_ptr().cast()) };
-            let scale_lanes = _mm256_cvtepi8_epi16(scale_values);
-            for super_block in 0..2 {
-                // SAFETY: every Q6_K super-block contains two 32-byte low-bit groups and one
-                // 32-byte high-bit group.
-                let low_first = unsafe { _mm256_loadu_si256(ql.add(super_block * 64).cast()) };
-                let low_second =
-                    unsafe { _mm256_loadu_si256(ql.add(super_block * 64 + 32).cast()) };
-                let high = unsafe { _mm256_loadu_si256(qh.add(super_block * 32).cast()) };
-                let decoded_offset = super_block * 4;
-                decoded[decoded_offset] = _mm256_or_si256(
-                    _mm256_and_si256(low_first, low_mask),
-                    _mm256_slli_epi16(_mm256_and_si256(high, high_two_mask), 4),
-                );
-                decoded[decoded_offset + 1] = _mm256_or_si256(
-                    _mm256_and_si256(low_second, low_mask),
-                    _mm256_slli_epi16(
-                        _mm256_and_si256(_mm256_srli_epi16(high, 2), high_two_mask),
-                        4,
-                    ),
-                );
-                decoded[decoded_offset + 2] = _mm256_or_si256(
-                    _mm256_and_si256(_mm256_srli_epi16(low_first, 4), low_mask),
-                    _mm256_slli_epi16(
-                        _mm256_and_si256(_mm256_srli_epi16(high, 4), high_two_mask),
-                        4,
-                    ),
-                );
-                decoded[decoded_offset + 3] = _mm256_or_si256(
-                    _mm256_and_si256(_mm256_srli_epi16(low_second, 4), low_mask),
-                    _mm256_slli_epi16(
-                        _mm256_and_si256(_mm256_srli_epi16(high, 6), high_two_mask),
-                        4,
-                    ),
-                );
-            }
-
-            for batch in 0..batch_size {
-                let activation_offset = batch * cols + block * QK_K;
-                let activation_sum_offset =
-                    batch * cols / Q8_K_SUM_BLOCK + block * QK_K / Q8_K_SUM_BLOCK;
-                let activation_sum_values = unsafe {
-                    _mm256_loadu_si256(activation_sums.as_ptr().add(activation_sum_offset).cast())
-                };
-                let offset_lanes =
-                    _mm256_slli_epi32(_mm256_madd_epi16(activation_sum_values, scale_lanes), 5);
-                let mut integer_lanes = _mm256_setzero_si256();
-                for super_block in 0..2 {
-                    let activation = quantized
-                        .as_ptr()
-                        .wrapping_add(activation_offset + super_block * 128);
-                    let decoded_offset = super_block * 4;
-                    let scale_base = super_block * 8;
-                    for group in 0..4 {
-                        let activations =
-                            unsafe { _mm256_loadu_si256(activation.add(group * 32).cast()) };
-                        let products =
-                            _mm256_maddubs_epi16(decoded[decoded_offset + group], activations);
-                        let first_scale =
-                            _mm_set1_epi16(scales[scale_base + group * 2] as i8 as i16);
-                        let second_scale =
-                            _mm_set1_epi16(scales[scale_base + group * 2 + 1] as i8 as i16);
-                        let scale = _mm256_inserti128_si256(
-                            _mm256_castsi128_si256(first_scale),
-                            second_scale,
-                            1,
-                        );
-                        integer_lanes =
-                            _mm256_add_epi32(integer_lanes, _mm256_madd_epi16(products, scale));
-                    }
-                }
-                integer_lanes = _mm256_sub_epi32(integer_lanes, offset_lanes);
-                let d = weight_scale * activation_scales[batch * blocks_per_row + block];
-                sums[batch] = _mm256_fmadd_ps(
-                    _mm256_set1_ps(d),
-                    _mm256_cvtepi32_ps(integer_lanes),
-                    sums[batch],
-                );
-            }
+    sums.fill(_mm256_setzero_ps());
+    for block in 0..blocks_per_row {
+        record_k_quant_weight_block_decode();
+        let weight_offset = (row * blocks_per_row + block) * Q6_K_BLOCK_BYTES;
+        let weight_scale = f16_to_f32_f16c(u16::from_le_bytes([
+            weights[weight_offset + 208],
+            weights[weight_offset + 209],
+        ]));
+        let ql = weights.as_ptr().wrapping_add(weight_offset);
+        let qh = ql.wrapping_add(128);
+        let scales = &weights[weight_offset + 192..weight_offset + 208];
+        let scale_values = unsafe { _mm_loadu_si128(scales.as_ptr().cast()) };
+        let scale_lanes = _mm256_cvtepi8_epi16(scale_values);
+        for super_block in 0..2 {
+            // SAFETY: every Q6_K super-block contains two 32-byte low-bit groups and one
+            // 32-byte high-bit group.
+            let low_first = unsafe { _mm256_loadu_si256(ql.add(super_block * 64).cast()) };
+            let low_second = unsafe { _mm256_loadu_si256(ql.add(super_block * 64 + 32).cast()) };
+            let high = unsafe { _mm256_loadu_si256(qh.add(super_block * 32).cast()) };
+            let decoded_offset = super_block * 4;
+            decoded[decoded_offset] = _mm256_or_si256(
+                _mm256_and_si256(low_first, low_mask),
+                _mm256_slli_epi16(_mm256_and_si256(high, high_two_mask), 4),
+            );
+            decoded[decoded_offset + 1] = _mm256_or_si256(
+                _mm256_and_si256(low_second, low_mask),
+                _mm256_slli_epi16(
+                    _mm256_and_si256(_mm256_srli_epi16(high, 2), high_two_mask),
+                    4,
+                ),
+            );
+            decoded[decoded_offset + 2] = _mm256_or_si256(
+                _mm256_and_si256(_mm256_srli_epi16(low_first, 4), low_mask),
+                _mm256_slli_epi16(
+                    _mm256_and_si256(_mm256_srli_epi16(high, 4), high_two_mask),
+                    4,
+                ),
+            );
+            decoded[decoded_offset + 3] = _mm256_or_si256(
+                _mm256_and_si256(_mm256_srli_epi16(low_second, 4), low_mask),
+                _mm256_slli_epi16(
+                    _mm256_and_si256(_mm256_srli_epi16(high, 6), high_two_mask),
+                    4,
+                ),
+            );
         }
-        for (batch, &sum) in sums.iter().enumerate() {
-            record_q6_k_single_horizontal_reduction();
-            // SAFETY: each worker owns this row across all batch-major output planes.
-            unsafe {
-                output
-                    .add(batch * rows + row)
-                    .write(horizontal_sum_f32_avx2(sum));
+
+        for batch in 0..B {
+            let activation_offset = (batch_start + batch) * cols + block * QK_K;
+            let activation_sum_offset =
+                (batch_start + batch) * cols / Q8_K_SUM_BLOCK + block * QK_K / Q8_K_SUM_BLOCK;
+            let activation_sum_values = unsafe {
+                _mm256_loadu_si256(activation_sums.as_ptr().add(activation_sum_offset).cast())
+            };
+            let offset_lanes =
+                _mm256_slli_epi32(_mm256_madd_epi16(activation_sum_values, scale_lanes), 5);
+            let mut integer_lanes = _mm256_setzero_si256();
+            for super_block in 0..2 {
+                let activation = quantized
+                    .as_ptr()
+                    .wrapping_add(activation_offset + super_block * 128);
+                let decoded_offset = super_block * 4;
+                let scale_base = super_block * 8;
+                for group in 0..4 {
+                    let activations =
+                        unsafe { _mm256_loadu_si256(activation.add(group * 32).cast()) };
+                    let products =
+                        _mm256_maddubs_epi16(decoded[decoded_offset + group], activations);
+                    let first_scale = _mm_set1_epi16(scales[scale_base + group * 2] as i8 as i16);
+                    let second_scale =
+                        _mm_set1_epi16(scales[scale_base + group * 2 + 1] as i8 as i16);
+                    let scale = _mm256_inserti128_si256(
+                        _mm256_castsi128_si256(first_scale),
+                        second_scale,
+                        1,
+                    );
+                    integer_lanes =
+                        _mm256_add_epi32(integer_lanes, _mm256_madd_epi16(products, scale));
+                }
             }
+            integer_lanes = _mm256_sub_epi32(integer_lanes, offset_lanes);
+            let d =
+                weight_scale * activation_scales[(batch_start + batch) * blocks_per_row + block];
+            sums[batch] = _mm256_fmadd_ps(
+                _mm256_set1_ps(d),
+                _mm256_cvtepi32_ps(integer_lanes),
+                sums[batch],
+            );
+        }
+    }
+    for (batch, &sum) in sums.iter().enumerate() {
+        record_q6_k_single_horizontal_reduction();
+        // SAFETY: each worker owns this row across all batch-major output planes.
+        unsafe {
+            output
+                .add((batch_start + batch) * rows + row)
+                .write(horizontal_sum_f32_avx2(sum));
         }
     }
 }
@@ -6708,15 +6847,21 @@ fn quantize_q8_k_batch(
     #[cfg(target_arch = "x86_64")]
     if std::is_x86_feature_detected!("avx2") {
         // SAFETY: dispatch checks AVX2; callers provide complete validated Q8_K blocks.
-        unsafe { quantize_q8_k_batch_avx2(input, batch_size, cols, quantized, scales, sums); }
+        unsafe {
+            quantize_q8_k_batch_avx2(input, batch_size, cols, quantized, scales, sums);
+        }
         return;
     }
     quantize_q8_k_batch_scalar(input, batch_size, cols, quantized, scales, sums);
 }
 
 fn quantize_q8_k_batch_scalar(
-    input: &[f32], batch_size: usize, cols: usize, quantized: &mut [i8],
-    scales: &mut [f32], sums: &mut [i16],
+    input: &[f32],
+    batch_size: usize,
+    cols: usize,
+    quantized: &mut [i8],
+    scales: &mut [f32],
+    sums: &mut [i16],
 ) {
     let blocks_per_row = cols / QK_K;
     let sums_per_row = cols / Q8_K_SUM_BLOCK;
@@ -6762,8 +6907,12 @@ fn quantize_q8_k_batch_scalar(
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 unsafe fn quantize_q8_k_batch_avx2(
-    input: &[f32], batch_size: usize, cols: usize, quantized: &mut [i8],
-    scales: &mut [f32], sums: &mut [i16],
+    input: &[f32],
+    batch_size: usize,
+    cols: usize,
+    quantized: &mut [i8],
+    scales: &mut [f32],
+    sums: &mut [i16],
 ) {
     let sign = _mm256_set1_ps(-0.0);
     let pack_permutation = _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7);
@@ -6778,10 +6927,20 @@ unsafe fn quantize_q8_k_batch_avx2(
         let mut nonfinite = _mm256_setzero_ps();
         for lane in (0..QK_K).step_by(8) {
             let absolute = _mm256_andnot_ps(sign, unsafe { _mm256_loadu_ps(values.add(lane)) });
-            nonfinite = _mm256_or_ps(nonfinite, _mm256_cmp_ps::<_CMP_NLE_UQ>(absolute, _mm256_set1_ps(f32::MAX)));
-            maxima = _mm256_blendv_ps(maxima, absolute, _mm256_cmp_ps::<_CMP_GT_OQ>(absolute, maxima));
+            nonfinite = _mm256_or_ps(
+                nonfinite,
+                _mm256_cmp_ps::<_CMP_NLE_UQ>(absolute, _mm256_set1_ps(f32::MAX)),
+            );
+            maxima = _mm256_blendv_ps(
+                maxima,
+                absolute,
+                _mm256_cmp_ps::<_CMP_GT_OQ>(absolute, maxima),
+            );
         }
-        let m128 = _mm_max_ps(_mm256_castps256_ps128(maxima), _mm256_extractf128_ps(maxima, 1));
+        let m128 = _mm_max_ps(
+            _mm256_castps256_ps128(maxima),
+            _mm256_extractf128_ps(maxima, 1),
+        );
         let m64 = _mm_max_ps(m128, _mm_movehl_ps(m128, m128));
         let absolute_max = _mm_cvtss_f32(_mm_max_ss(m64, _mm_movehdup_ps(m64)));
         if absolute_max == 0.0 {
@@ -6791,9 +6950,14 @@ unsafe fn quantize_q8_k_batch_avx2(
             continue;
         }
         if _mm256_movemask_ps(nonfinite) != 0 || !(127.0 / absolute_max).is_finite() {
-            quantize_q8_k_batch_scalar(&input[offset..offset + QK_K], 1, QK_K,
-                &mut quantized[offset..offset + QK_K], &mut scales[block..block + 1],
-                &mut sums[block * 16..block * 16 + 16]);
+            quantize_q8_k_batch_scalar(
+                &input[offset..offset + QK_K],
+                1,
+                QK_K,
+                &mut quantized[offset..offset + QK_K],
+                &mut scales[block..block + 1],
+                &mut sums[block * 16..block * 16 + 16],
+            );
             continue;
         }
         let maximum = _mm256_set1_ps(absolute_max);
@@ -6802,7 +6966,10 @@ unsafe fn quantize_q8_k_batch_avx2(
         for lane in (0..QK_K).step_by(8) {
             let absolute = _mm256_andnot_ps(sign, unsafe { _mm256_loadu_ps(values.add(lane)) });
             let mask = _mm256_movemask_ps(_mm256_cmp_ps::<_CMP_EQ_OQ>(absolute, maximum));
-            if mask != 0 { signed_max = input[offset + lane + mask.trailing_zeros() as usize]; break; }
+            if mask != 0 {
+                signed_max = input[offset + lane + mask.trailing_zeros() as usize];
+                break;
+            }
         }
         let inverse = -127.0 / signed_max;
         scales[block] = 1.0 / inverse;
@@ -6812,20 +6979,38 @@ unsafe fn quantize_q8_k_batch_avx2(
             for (i, quant) in quants.iter_mut().enumerate() {
                 let value = unsafe { _mm256_loadu_ps(values.add(group * 32 + i * 8)) };
                 // Same magic-number rounding and clamp as ggml_nearest_int, with no FMA.
-                let bits = _mm256_castps_si256(_mm256_add_ps(_mm256_mul_ps(value, multiplier), magic));
-                *quant = _mm256_min_epi32(_mm256_sub_epi32(_mm256_and_si256(bits, mantissa), bias), upper);
+                let bits =
+                    _mm256_castps_si256(_mm256_add_ps(_mm256_mul_ps(value, multiplier), magic));
+                *quant = _mm256_min_epi32(
+                    _mm256_sub_epi32(_mm256_and_si256(bits, mantissa), bias),
+                    upper,
+                );
             }
-            let packed = _mm256_permutevar8x32_epi32(_mm256_packs_epi16(
-                _mm256_packs_epi32(quants[0], quants[1]), _mm256_packs_epi32(quants[2], quants[3])), pack_permutation);
-            unsafe { _mm256_storeu_si256(quantized.as_mut_ptr().add(offset + group * 32).cast(), packed); }
+            let packed = _mm256_permutevar8x32_epi32(
+                _mm256_packs_epi16(
+                    _mm256_packs_epi32(quants[0], quants[1]),
+                    _mm256_packs_epi32(quants[2], quants[3]),
+                ),
+                pack_permutation,
+            );
+            unsafe {
+                _mm256_storeu_si256(
+                    quantized.as_mut_ptr().add(offset + group * 32).cast(),
+                    packed,
+                );
+            }
             let lo = _mm256_cvtepi8_epi16(_mm256_castsi256_si128(packed));
             let hi = _mm256_cvtepi8_epi16(_mm256_extracti128_si256(packed, 1));
             let ones = _mm256_set1_epi16(1);
             for (i, v) in [lo, hi].into_iter().enumerate() {
                 let pairs = _mm256_madd_epi16(v, ones);
-                let halves = _mm_add_epi32(_mm256_castsi256_si128(pairs), _mm256_extracti128_si256(pairs, 1));
+                let halves = _mm_add_epi32(
+                    _mm256_castsi256_si128(pairs),
+                    _mm256_extracti128_si256(pairs, 1),
+                );
                 let reduced = _mm_hadd_epi32(halves, halves);
-                sums[block * 16 + group * 2 + i] = _mm_cvtsi128_si32(_mm_hadd_epi32(reduced, reduced)) as i16;
+                sums[block * 16 + group * 2 + i] =
+                    _mm_cvtsi128_si32(_mm_hadd_epi32(reduced, reduced)) as i16;
             }
         }
     }
@@ -7028,28 +7213,147 @@ fn f32_to_f16(value: f32) -> u16 {
 mod tests {
     #[cfg(target_arch = "x86_64")]
     #[test]
+    fn k_quantized_tiles_match_single_rows_bit_for_bit_across_tile_boundaries() {
+        if !(std::is_x86_feature_detected!("avx2")
+            && std::is_x86_feature_detected!("fma")
+            && std::is_x86_feature_detected!("f16c"))
+        {
+            return;
+        }
+        let rows = 3;
+        let cols = 1024;
+        let blocks = cols / QK_K;
+        for batch in [1, 2, 3, 4, 5, 8, 17, 33, 128] {
+            let q: Vec<i8> = (0..batch * cols)
+                .map(|i| ((i * 31 + 7) % 255) as i16 - 127)
+                .map(|x| x as i8)
+                .collect();
+            let scales: Vec<f32> = (0..batch * blocks)
+                .map(|i| (i % 19 + 1) as f32 * 0.015625)
+                .collect();
+            let sums: Vec<i16> = q
+                .chunks_exact(16)
+                .map(|x| x.iter().map(|v| *v as i16).sum())
+                .collect();
+            for kind in [4, 6] {
+                let size = if kind == 4 {
+                    Q4_K_BLOCK_BYTES
+                } else {
+                    Q6_K_BLOCK_BYTES
+                };
+                let mut weights: Vec<u8> = (0..rows * blocks * size)
+                    .map(|i| (i * 19 + 3) as u8)
+                    .collect();
+                for block in weights.chunks_exact_mut(size) {
+                    if kind == 4 {
+                        block[..2].copy_from_slice(&f32_to_f16(0.125).to_le_bytes());
+                        block[2..4].copy_from_slice(&f32_to_f16(0.0625).to_le_bytes());
+                    } else {
+                        block[208..210].copy_from_slice(&f32_to_f16(0.125).to_le_bytes());
+                    }
+                }
+                let mut actual = vec![99.0; batch * rows + 3];
+                unsafe {
+                    if kind == 4 {
+                        compute_q4_k_batched_row_range_avx2(
+                            &weights,
+                            &q,
+                            &scales,
+                            &sums,
+                            actual.as_mut_ptr(),
+                            batch,
+                            rows,
+                            cols,
+                            0,
+                            rows,
+                        );
+                    } else {
+                        compute_q6_k_batched_row_range_avx2(
+                            &weights,
+                            &q,
+                            &scales,
+                            &sums,
+                            actual.as_mut_ptr(),
+                            batch,
+                            rows,
+                            cols,
+                            0,
+                            rows,
+                        );
+                    }
+                    for b in 0..batch {
+                        for row in 0..rows {
+                            let expected = if kind == 4 {
+                                dot_q4_k_q8_k_row_avx2(&weights, &q, &scales, &sums, b, row, cols)
+                            } else {
+                                dot_q6_k_q8_k_row_avx2(&weights, &q, &scales, &sums, b, row, cols)
+                            };
+                            assert_eq!(
+                                actual[b * rows + row].to_bits(),
+                                expected.to_bits(),
+                                "Q{kind}, batch {batch}, row {row}, query {b}"
+                            );
+                        }
+                    }
+                }
+                assert_eq!(&actual[batch * rows..], &[99.0; 3]);
+            }
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
     fn q8_k_simd_matches_scalar_bytes_scales_and_sums() {
-        if !std::is_x86_feature_detected!("avx2") { return; }
+        if !std::is_x86_feature_detected!("avx2") {
+            return;
+        }
         for batch in [1, 3, 8, 33] {
             let cols = 3 * QK_K;
             let mut input: Vec<f32> = (0..batch * cols)
-                .map(|i| (((i * 73 + 17) % 8191) as f32 - 4095.0) / 31.0).collect();
+                .map(|i| (((i * 73 + 17) % 8191) as f32 - 4095.0) / 31.0)
+                .collect();
             input[..256].fill(0.0);
             input[256..512].fill(0.5);
-            input[270] = -127.0; input[271] = 127.0;
-            input[520] = 127.0; input[521] = -127.0;
-            for index in 0..16 { input[530 + index] = index as f32 + 0.5; }
-            for special in [None, Some(f32::MIN_POSITIVE / 1024.0), Some(f32::NAN), Some(f32::INFINITY)] {
+            input[270] = -127.0;
+            input[271] = 127.0;
+            input[520] = 127.0;
+            input[521] = -127.0;
+            for index in 0..16 {
+                input[530 + index] = index as f32 + 0.5;
+            }
+            for special in [
+                None,
+                Some(f32::MIN_POSITIVE / 1024.0),
+                Some(f32::NAN),
+                Some(f32::INFINITY),
+            ] {
                 let mut values = input.clone();
-                if let Some(value) = special { values[256..512].fill(value); }
-                let mut expected = vec![0; values.len()]; let mut actual = expected.clone();
-                let mut es = vec![0.0; values.len() / 256]; let mut a_s = es.clone();
-                let mut sums = vec![0; values.len() / 16]; let mut a_sums = sums.clone();
+                if let Some(value) = special {
+                    values[256..512].fill(value);
+                }
+                let mut expected = vec![0; values.len()];
+                let mut actual = expected.clone();
+                let mut es = vec![0.0; values.len() / 256];
+                let mut a_s = es.clone();
+                let mut sums = vec![0; values.len() / 16];
+                let mut a_sums = sums.clone();
                 quantize_q8_k_batch_scalar(&values, batch, cols, &mut expected, &mut es, &mut sums);
-                unsafe { quantize_q8_k_batch_avx2(&values, batch, cols, &mut actual, &mut a_s, &mut a_sums); }
+                unsafe {
+                    quantize_q8_k_batch_avx2(
+                        &values,
+                        batch,
+                        cols,
+                        &mut actual,
+                        &mut a_s,
+                        &mut a_sums,
+                    );
+                }
                 assert_eq!(actual, expected);
                 assert_eq!(a_sums, sums);
-                assert_eq!(a_s.iter().map(|x| x.to_bits()).collect::<Vec<_>>(), es.iter().map(|x| x.to_bits()).collect::<Vec<_>>());
+                assert_eq!(
+                    a_s.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+                    es.iter().map(|x| x.to_bits()).collect::<Vec<_>>()
+                );
             }
         }
     }
@@ -7557,18 +7861,34 @@ mod tests {
             let status = unsafe {
                 jmodels_grouped_attention_f32_with_context(
                     context,
-                    query.as_ptr(), 0, query.len() as u64,
-                    keys_a.as_ptr(), 0, keys_a.len() as u64,
-                    values_a.as_ptr(), 0, values_a.len() as u64,
+                    query.as_ptr(),
+                    0,
+                    query.len() as u64,
+                    keys_a.as_ptr(),
+                    0,
+                    keys_a.len() as u64,
+                    values_a.as_ptr(),
+                    0,
+                    values_a.len() as u64,
                     positions[0] as u32,
-                    keys_b.as_ptr(), 0, keys_b.len() as u64,
-                    values_b.as_ptr(), 0, values_b.len() as u64,
+                    keys_b.as_ptr(),
+                    0,
+                    keys_b.len() as u64,
+                    values_b.as_ptr(),
+                    0,
+                    values_b.len() as u64,
                     positions[1] as u32,
-                    output.as_mut_ptr(), 0, output.len() as u64,
-                    scores.as_mut_ptr(), scores.len() as u64,
-                    key_dim as u32, value_dim as u32,
-                    key_length as u32, value_length as u32,
-                    num_heads as u32, num_kv as u32,
+                    output.as_mut_ptr(),
+                    0,
+                    output.len() as u64,
+                    scores.as_mut_ptr(),
+                    scores.len() as u64,
+                    key_dim as u32,
+                    value_dim as u32,
+                    key_length as u32,
+                    value_length as u32,
+                    num_heads as u32,
+                    num_kv as u32,
                     scale,
                 )
             };
@@ -7872,7 +8192,10 @@ mod tests {
             "\nmatrix dispatch scaling: rows={rows} cols={cols} Q4_0 \
 chunks_per_partition={chunks} available_parallelism={processors}"
         );
-        println!("{:>8}  {:>12}  {:>10}  {:>9}", "threads", "mean us/op", "speedup", "efficiency");
+        println!(
+            "{:>8}  {:>12}  {:>10}  {:>9}",
+            "threads", "mean us/op", "speedup", "efficiency"
+        );
 
         let mut baseline = f64::NAN;
         let mut counts: Vec<usize> = vec![1, 2, 4, 6, 8, 12, 16, 24, 32]
@@ -7984,7 +8307,10 @@ chunks_per_partition={chunks} available_parallelism={processors}"
         // rather than as a plausible zero.
         const UNCLAIMED: f32 = -12345.0;
         let fresh = || -> Vec<Vec<f32>> {
-            row_counts.iter().map(|rows| vec![UNCLAIMED; *rows]).collect()
+            row_counts
+                .iter()
+                .map(|rows| vec![UNCLAIMED; *rows])
+                .collect()
         };
 
         let pool = WorkerPool::new(4).expect("pool");

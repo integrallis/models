@@ -254,16 +254,18 @@ public final class ClipVisionEncoder {
 
     // 8. GELU activation
     if (config.quickGelu()) {
-      GgufStagePlan.of(
-              GgufStagePlan.stage(
-                  tokens,
-                  (from, to) -> {
-                    for (int i = from * hiddenDim; i < to * hiddenDim; i++) {
-                      feedForward[i] =
-                          (float) (feedForward[i] / (1.0 + Math.exp(-1.702 * feedForward[i])));
-                    }
-                  }))
-          .execute();
+      if (denseKernels == null || !denseKernels.quickGelu(feedForward)) {
+        GgufStagePlan.of(
+                GgufStagePlan.stage(
+                    tokens,
+                    (from, to) -> {
+                      for (int i = from * hiddenDim; i < to * hiddenDim; i++) {
+                        feedForward[i] =
+                            (float) (feedForward[i] / (1.0 + Math.exp(-1.702 * feedForward[i])));
+                      }
+                    }))
+            .execute();
+      }
     } else {
       TensorOps.gelu(feedForward, 0, feedForward, 0, tokens * hiddenDim);
     }
