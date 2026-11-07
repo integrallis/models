@@ -31,12 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * End-to-end test: synthetic CLIP mmproj → encode image → verify output shape and that the output
- * dimension matches what a text decoder would need.
- *
- * <p>This is the reviewable checkpoint for multimodal PR: it demonstrates the vision encoder is
- * complete, loads from GGUF, and produces correctly-shaped embeddings for downstream text decoder
- * consumption.
+ * Synthetic encoder shape checks; real image-to-answer evidence is recorded by the vision harness.
  */
 @Tag("unit")
 class ClipVisionEncoderEndToEndTest {
@@ -72,17 +67,6 @@ class ClipVisionEncoderEndToEndTest {
       int expectedDim = HIDDEN_SIZE;
       assertThat(embeddings).hasSize(expectedTokens * expectedDim);
       assertThat(allFinite(embeddings)).isTrue();
-
-      // Verify each token embedding has the expected dimension
-      for (int t = 0; t < expectedTokens; t++) {
-        // Token-specific assertion: the embedding at each position is not all zeros
-        float[] tokenEmb = new float[expectedDim];
-        System.arraycopy(embeddings, t * expectedDim, tokenEmb, 0, expectedDim);
-        float sum = 0;
-        for (float v : tokenEmb) sum += v;
-        // With small random weights and non-zero input, embeddings should not all be zero
-        // This is a weak sanity check; with real weights and image, values would be much larger
-      }
     }
   }
 

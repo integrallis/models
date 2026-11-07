@@ -26,7 +26,7 @@ import java.util.Arrays;
  * Pure-Java CLIP vision encoder.
  *
  * <p>Loads weights from a CLIP mmproj GGUF and runs a full ViT forward pass, producing vision
- * feature tokens suitable for injection into a text decoder.
+ * feature tokens. A trained projector is required before decoder injection.
  *
  * <p>The forward pass reuses existing kernels:
  *
@@ -62,8 +62,6 @@ public final class ClipVisionEncoder {
   private final float[] feedForwardProjected;
   private final float[] scores;
 
-  private final float[] exactWeightRow;
-
   public ClipVisionEncoder(
       ClipVisionConfig config, ClipVisionWeights weights, GgufBatchedMatrixKernel matrixKernel) {
     this.config = config;
@@ -92,8 +90,6 @@ public final class ClipVisionEncoder {
     this.feedForward = new float[Math.multiplyExact(tokens, hiddenDim)];
     this.feedForwardProjected = new float[batchElements];
     this.scores = new float[Math.multiplyExact(tokens, tokens)];
-
-    this.exactWeightRow = new float[Math.max(dim, hiddenDim)];
   }
 
   /**
@@ -108,7 +104,7 @@ public final class ClipVisionEncoder {
     int patchSize = config.patchSize();
     int imageSize = config.imageSize();
     int channels = 3;
-    int expectedPixels = channels * imageSize * imageSize;
+    int expectedPixels = Math.multiplyExact(channels, Math.multiplyExact(imageSize, imageSize));
     if (chw.length != expectedPixels) {
       throw new IllegalArgumentException(
           "Expected "
@@ -121,6 +117,11 @@ public final class ClipVisionEncoder {
               + chw.length);
     }
 
+    for (float value : chw) {
+      if (!Float.isFinite(value))
+        throw new IllegalArgumentException("Image contains nonfinite values");
+    }
+    Arrays.fill(hidden, 0);
     // Patch embedding: writes patches to hidden[dim..], leaving hidden[0..dim] for CLS
     patchEmbed(chw, imageSize, patchSize, channels, dim);
 
@@ -144,7 +145,9 @@ public final class ClipVisionEncoder {
     }
 
     // Post-transformer layer norm
-    normalizeRows(hidden, hidden, tokens, weights.postLnWeight(), weights.postLnBias());
+    if (weights.postLnWeight() != null) {
+      normalizeRows(hidden, hidden, tokens, weights.postLnWeight(), weights.postLnBias());
+    }
 
     // Return a copy so callers can't mutate internal state
     return Arrays.copyOf(hidden, tokens * dim);
@@ -192,7 +195,7 @@ public final class ClipVisionEncoder {
   private void addPositionEmbeddings(int tokens, int dim) {
     float[] posEmbed = weights.positionEmbedF32();
     for (int t = 0; t < tokens; t++) {
-      int pos = Math.min(t, config.numPositions() - 1);
+      int pos = t;
       int offset = pos * dim;
       for (int h = 0; h < dim; h++) {
         hidden[t * dim + h] += posEmbed[offset + h];
@@ -235,7 +238,13 @@ public final class ClipVisionEncoder {
     addBias(feedForward, tokens, hiddenDim, layer.ffnUpBias());
 
     // 8. GELU activation
-    TensorOps.geluErf(feedForward, 0, feedForward, 0, tokens * hiddenDim);
+    if (config.quickGelu()) {
+      for (int i = 0; i < tokens * hiddenDim; i++) {
+        feedForward[i] = (float) (feedForward[i] / (1.0 + Math.exp(-1.702 * feedForward[i])));
+      }
+    } else {
+      TensorOps.gelu(feedForward, 0, feedForward, 0, tokens * hiddenDim);
+    }
 
     // 9. FFN down projection + residual
     projectQ8_0(
@@ -336,44 +345,17 @@ public final class ClipVisionEncoder {
 
   private void project(
       float[] output, float[] input, int sequenceLength, ClipVisionWeights.Matrix matrix) {
-    if (matrix.type() == GgufTensorType.F32
-        || matrix.type() == GgufTensorType.F16
-        || matrix.type() == GgufTensorType.BF16) {
-      TensorOps.ggufExactBatchedMatmul(
+    if (matrixKernel.isEligible(matrix.type(), sequenceLength, matrix.rows(), matrix.columns())) {
+      matrixKernel.multiply(
           output,
           input,
           matrix.data(),
           matrix.type(),
           sequenceLength,
           matrix.rows(),
-          matrix.columns(),
-          exactWeightRow);
+          matrix.columns());
     } else {
-      if (matrixKernel.isEligible(matrix.type(), sequenceLength, matrix.rows(), matrix.columns())) {
-        matrixKernel.multiply(
-            output,
-            input,
-            matrix.data(),
-            matrix.type(),
-            sequenceLength,
-            matrix.rows(),
-            matrix.columns());
-        return;
-      }
-      TensorOps.ggufBatchedMatmul(
-          output,
-          input,
-          matrix.data(),
-          matrix.type(),
-          sequenceLength,
-          matrix.rows(),
-          matrix.columns(),
-          new byte[0],
-          new float[0],
-          new int[0],
-          new short[0],
-          new float[0],
-          com.integrallis.vectors.core.GgufQ4Kernel.WIDENED);
+      VisionProjection.multiply(output, input, sequenceLength, matrix);
     }
   }
 

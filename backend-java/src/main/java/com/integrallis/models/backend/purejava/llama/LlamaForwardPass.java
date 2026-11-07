@@ -732,6 +732,40 @@ public final class LlamaForwardPass {
   }
 
   /**
+   * Consumes projected image rows in the default sequence; returns stable final logits. Rows are
+   * already in decoder input space and are not token-embedding scaled.
+   */
+  public float[] prefillEmbeddings(float[] embeddings, int startPosition) {
+    Objects.requireNonNull(embeddings, "embeddings");
+    int dim = config.embeddingDim();
+    if (embeddings.length == 0 || embeddings.length % dim != 0) {
+      throw new IllegalArgumentException("embeddings must contain complete nonempty rows");
+    }
+    int rows = embeddings.length / dim;
+    if (startPosition != nextPosition || rows > cache.maxSeqLen() - startPosition) {
+      throw new IllegalArgumentException("image positions must be contiguous and fit the context");
+    }
+    for (float value : embeddings) {
+      if (!Float.isFinite(value)) throw new IllegalArgumentException("nonfinite embedding");
+    }
+    float[] result = null;
+    for (int row = 0; row < rows; row++) {
+      result =
+          forwardSequenceInternal(
+              0,
+              startPosition + row,
+              row == rows - 1 ? Head.LOGITS : Head.NONE,
+              cache,
+              nextPosition,
+              false,
+              embeddings,
+              row * dim);
+      nextPosition++;
+    }
+    return result.clone();
+  }
+
+  /**
    * Runs one decode step and returns stable copies of both its logits and normalized hidden state.
    *
    * <p>This avoids executing the transformer twice for consumers, such as acoustic language models,
@@ -1887,6 +1921,19 @@ public final class LlamaForwardPass {
       KvCache sequenceCache,
       int expectedPosition,
       boolean adapterActive) {
+    return forwardSequenceInternal(
+        token, position, head, sequenceCache, expectedPosition, adapterActive, null, 0);
+  }
+
+  private float[] forwardSequenceInternal(
+      int token,
+      int position,
+      Head head,
+      KvCache sequenceCache,
+      int expectedPosition,
+      boolean adapterActive,
+      float[] embeddings,
+      int embeddingOffset) {
     if (position != expectedPosition) {
       throw new IllegalArgumentException(
           "position must be sequential: expected " + expectedPosition + ", got " + position);
@@ -1901,9 +1948,12 @@ public final class LlamaForwardPass {
     int numKvHeads = config.numKvHeads();
     prepareRope(position);
 
-    // Token embedding (dequantizes only the single row for this token)
-    weights.embedToken(token, x);
-    scaleActive(x, 0, dim, config.embeddingScale());
+    if (embeddings == null) {
+      weights.embedToken(token, x);
+      scaleActive(x, 0, dim, config.embeddingScale());
+    } else {
+      System.arraycopy(embeddings, embeddingOffset, x, 0, dim);
+    }
 
     // Process each transformer layer
     for (int layer = 0; layer < config.numLayers(); layer++) {

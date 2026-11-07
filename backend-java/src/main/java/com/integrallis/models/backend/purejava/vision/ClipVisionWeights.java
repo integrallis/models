@@ -196,44 +196,85 @@ final class ClipVisionWeights {
     int numPositions = config.numPositions();
 
     int patchPixels = 3 * config.patchSize() * config.patchSize();
-    Matrix patchEmbed = matrix(file, "v.patch_embd.weight", dim, patchPixels);
+    GgufTensorData patch = file.getTensor("v.patch_embd.weight");
+    long[] patchShape = patch.shape();
+    if (!Arrays.equals(patchShape, new long[] {patchPixels, dim})
+        && !Arrays.equals(
+            patchShape, new long[] {config.patchSize(), config.patchSize(), 3, dim})) {
+      throw new IllegalArgumentException(
+          "Invalid CLIP patch convolution shape: " + Arrays.toString(patchShape));
+    }
+    Matrix patchEmbed = new Matrix(patch.dataSegment(), patch.type(), dim, patchPixels);
     float[] patchEmbedF32 = toFloatArray(file.getTensor("v.patch_embd.weight"));
-    float[] patchEmbedBias = vector(file, "v.patch_embd.bias", dim);
+    float[] patchEmbedBias = vectorOrZero(file, "v.patch_embd.bias", dim);
 
     Matrix positionEmbed = matrix(file, "v.position_embd.weight", numPositions, dim);
     float[] positionEmbedF32 = toFloatArray(file.getTensor("v.position_embd.weight"));
 
     float[] preLnWeight = optionalVector(file, "v.pre_ln.weight", dim);
     float[] preLnBias = optionalVector(file, "v.pre_ln.bias", dim);
-    float[] classEmb = optionalVector(file, "v.class_embd.weight", dim);
-    float[] postLnWeight = vector(file, "v.post_ln.weight", dim);
-    float[] postLnBias = vector(file, "v.post_ln.bias", dim);
+    float[] classEmb =
+        vector(file, file.hasTensor("v.class_embd") ? "v.class_embd" : "v.class_embd.weight", dim);
+    float[] postLnWeight = optionalVector(file, "v.post_ln.weight", dim);
+    float[] postLnBias = vectorOrZero(file, "v.post_ln.bias", dim);
 
     Layer[] layers = new Layer[config.numLayers()];
     for (int layer = 0; layer < layers.length; layer++) {
       String p = "v.blk." + layer + ".";
+      Matrix qkv;
+      float[] qkvValues;
+      float[] qkvBias;
+      if (file.hasTensor(p + "attn_qkv.weight")) {
+        qkv = matrix(file, p + "attn_qkv.weight", dim * 3, dim);
+        qkvValues = toFloatArray(file.getTensor(p + "attn_qkv.weight"));
+        qkvBias = vectorOrZero(file, p + "attn_qkv.bias", dim * 3);
+      } else {
+        qkvValues = new float[Math.multiplyExact(3, Math.multiplyExact(dim, dim))];
+        qkvBias = new float[3 * dim];
+        String[] names = {"attn_q", "attn_k", "attn_v"};
+        for (int i = 0; i < names.length; i++) {
+          matrix(file, p + names[i] + ".weight", dim, dim);
+          System.arraycopy(
+              toFloatArray(file.getTensor(p + names[i] + ".weight")),
+              0,
+              qkvValues,
+              i * dim * dim,
+              dim * dim);
+          System.arraycopy(
+              vectorOrZero(file, p + names[i] + ".bias", dim), 0, qkvBias, i * dim, dim);
+        }
+        qkv = new Matrix(MemorySegment.ofArray(qkvValues), GgufTensorType.F32, 3 * dim, dim);
+      }
+      // Early LLaVA converters reversed the FFN tensor names. Shapes identify that layout.
+      boolean swapped =
+          dim != intermediateSize
+              && Arrays.equals(
+                  file.getTensor(p + "ffn_down.weight").shape(),
+                  new long[] {dim, intermediateSize});
+      String up = p + (swapped ? "ffn_down" : "ffn_up");
+      String down = p + (swapped ? "ffn_up" : "ffn_down");
       layers[layer] =
           new Layer(
               vector(file, p + "ln1.weight", dim),
               vector(file, p + "ln1.bias", dim),
-              matrix(file, p + "attn_qkv.weight", dim * 3, dim),
-              toFloatArray(file.getTensor(p + "attn_qkv.weight")),
+              qkv,
+              qkvValues,
               null, // Q8_0 populated later via withQ8_0()
-              vector(file, p + "attn_qkv.bias", dim * 3),
+              qkvBias,
               matrix(file, p + "attn_out.weight", dim, dim),
               toFloatArray(file.getTensor(p + "attn_out.weight")),
               null,
               vector(file, p + "attn_out.bias", dim),
               vector(file, p + "ln2.weight", dim),
               vector(file, p + "ln2.bias", dim),
-              matrix(file, p + "ffn_up.weight", intermediateSize, dim),
-              toFloatArray(file.getTensor(p + "ffn_up.weight")),
+              matrix(file, up + ".weight", intermediateSize, dim),
+              toFloatArray(file.getTensor(up + ".weight")),
               null,
-              vector(file, p + "ffn_up.bias", intermediateSize),
-              matrix(file, p + "ffn_down.weight", dim, intermediateSize),
-              toFloatArray(file.getTensor(p + "ffn_down.weight")),
+              vector(file, up + ".bias", intermediateSize),
+              matrix(file, down + ".weight", dim, intermediateSize),
+              toFloatArray(file.getTensor(down + ".weight")),
               null,
-              vector(file, p + "ffn_down.bias", dim));
+              vector(file, down + ".bias", dim));
     }
 
     return new ClipVisionWeights(
@@ -250,7 +291,7 @@ final class ClipVisionWeights {
         layers);
   }
 
-  private static Matrix matrix(GgufFile file, String name, int rows, int columns) {
+  static Matrix matrix(GgufFile file, String name, int rows, int columns) {
     GgufTensorData tensor = file.getTensor(name);
     long[] expected = {columns, rows};
     if (!Arrays.equals(tensor.shape(), expected)) {
@@ -264,11 +305,14 @@ final class ClipVisionWeights {
     return new Matrix(tensor.dataSegment(), tensor.type(), rows, columns);
   }
 
+  private static float[] vectorOrZero(GgufFile file, String name, int size) {
+    float[] values = optionalVector(file, name, size);
+    return values == null ? new float[size] : values;
+  }
+
   private static float[] optionalVector(GgufFile file, String name, int size) {
+    if (!file.hasTensor(name)) return null;
     GgufTensorData tensor = file.getTensor(name);
-    if (tensor == null) {
-      return null;
-    }
     long[] expected = {size};
     if (!Arrays.equals(tensor.shape(), expected)) {
       throw new IllegalArgumentException(
@@ -281,7 +325,7 @@ final class ClipVisionWeights {
     return toFloatArray(tensor);
   }
 
-  private static float[] vector(GgufFile file, String name, int size) {
+  static float[] vector(GgufFile file, String name, int size) {
     GgufTensorData tensor = file.getTensor(name);
     long[] expected = {size};
     if (!Arrays.equals(tensor.shape(), expected)) {
