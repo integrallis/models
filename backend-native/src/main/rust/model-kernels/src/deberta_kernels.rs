@@ -540,3 +540,52 @@ mod tests {
         }
     }
 }
+
+/// Ordinary multi-head attention over row-major Q, K, V packed consecutively.
+/// # Safety
+/// Buffers must be aligned, valid for their lengths and non-overlapping throughout the call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_dense_attention(
+    handle: u64, qkv: *const f32, qkv_len: usize, out: *mut f32, out_len: usize,
+    tokens: usize, dim: usize, heads: usize,
+) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        if tokens == 0 || dim == 0 || heads == 0 || !dim.is_multiple_of(heads)
+            || qkv.is_null() || out.is_null() || !(qkv as usize).is_multiple_of(4)
+            || !(out as usize).is_multiple_of(4) { return -1; }
+        let Some(count) = tokens.checked_mul(dim) else { return -1; };
+        let Some(packed) = count.checked_mul(3) else { return -1; };
+        let Some(scores_len) = tokens.checked_mul(tokens) else { return -1; };
+        if packed > qkv_len || count > out_len || packed > isize::MAX as usize / 4
+            || scores_len > isize::MAX as usize / 4 { return -1; }
+        let Some(pool) = POOLS.lock().ok().and_then(|r| r.get(&handle).cloned()) else { return -2; };
+        let (src, dst) = (qkv as usize, out as usize);
+        let head_dim = dim / heads;
+        let scale = 1.0 / (head_dim as f32).sqrt();
+        pool.install(|| (0..heads).into_par_iter().for_each(|head| {
+            ATTENTION_SCRATCH.with(|cell| {
+                let mut scratch = cell.borrow_mut();
+                scratch.scores.resize(scores_len, 0.0);
+                let scores = &mut scratch.scores;
+                unsafe {
+                    let q = (src as *const f32).add(head * head_dim);
+                    let k = q.add(count);
+                    let v = k.add(count);
+                    matrixmultiply::sgemm(tokens, head_dim, tokens, scale,
+                        q, dim as isize, 1, k, 1, dim as isize,
+                        0.0, scores.as_mut_ptr(), tokens as isize, 1);
+                    for row in scores.chunks_exact_mut(tokens) {
+                        let max = row.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+                        let mut sum = 0.0;
+                        for x in row.iter_mut() { *x = (*x - max).exp(); sum += *x; }
+                        for x in row.iter_mut() { *x /= sum; }
+                    }
+                    matrixmultiply::sgemm(tokens, tokens, head_dim, 1.0,
+                        scores.as_ptr(), tokens as isize, 1, v, dim as isize, 1,
+                        0.0, (dst as *mut f32).add(head * head_dim), dim as isize, 1);
+                }
+            });
+        }));
+        0
+    })).unwrap_or(-3)
+}

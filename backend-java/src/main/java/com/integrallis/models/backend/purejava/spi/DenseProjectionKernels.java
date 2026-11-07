@@ -26,6 +26,18 @@ public interface DenseProjectionKernels extends AutoCloseable {
   /** Copies immutable weights into provider-owned storage once. */
   Projection prepare(float[] weights, int outputs, int inputs);
 
+  /** Performs ordinary multi-head attention when supported; false leaves output untouched. */
+  default boolean attention(
+      float[] output,
+      float[] query,
+      float[] key,
+      float[] value,
+      int tokens,
+      int dimension,
+      int heads) {
+    return false;
+  }
+
   default String implementation() {
     return "java";
   }

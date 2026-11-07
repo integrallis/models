@@ -31,6 +31,7 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
   private final Arena arena = Arena.ofShared();
   private final MethodHandle project;
   private final MethodHandle attention;
+  private final MethodHandle denseAttention;
   private final MethodHandle destroy;
   private MemorySegment x = MemorySegment.NULL;
   private MemorySegment w = MemorySegment.NULL;
@@ -87,6 +88,24 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
                   ValueLayout.JAVA_LONG,
                   ValueLayout.JAVA_LONG,
                   ValueLayout.JAVA_LONG));
+      denseAttention =
+          symbols
+              .find("jmodels_dense_attention")
+              .map(
+                  symbol ->
+                      linker.downcallHandle(
+                          symbol,
+                          FunctionDescriptor.of(
+                              ValueLayout.JAVA_INT,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG)))
+              .orElse(null);
       destroy =
           linker.downcallHandle(
               symbols.find("jmodels_deberta_destroy").orElseThrow(),
@@ -165,6 +184,49 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
     }
     MemorySegment.copy(y, 0, MemorySegment.ofArray(output), 0, (long) yn * Float.BYTES);
     projectCalls++;
+  }
+
+  @Override
+  public synchronized boolean attention(
+      float[] output,
+      float[] query,
+      float[] key,
+      float[] value,
+      int tokens,
+      int dimension,
+      int heads) {
+    if (handle == 0) throw new IllegalStateException("Dense kernels are closed");
+    if (tokens < 1 || dimension < 1 || heads < 1 || dimension % heads != 0)
+      throw new IllegalArgumentException("Invalid attention shape");
+    int count = Math.multiplyExact(tokens, dimension);
+    if (output.length < count || query.length < count || key.length < count || value.length < count)
+      throw new IllegalArgumentException("Invalid attention buffer");
+    if (denseAttention == null) return false;
+    int packed = Math.multiplyExact(count, 3);
+    x = reserve(x, packed);
+    y = reserve(y, count);
+    long bytes = (long) count * Float.BYTES;
+    MemorySegment.copy(MemorySegment.ofArray(query), 0, x, 0, bytes);
+    MemorySegment.copy(MemorySegment.ofArray(key), 0, x, bytes, bytes);
+    MemorySegment.copy(MemorySegment.ofArray(value), 0, x, 2 * bytes, bytes);
+    try {
+      int result =
+          (int)
+              denseAttention.invokeExact(
+                  handle,
+                  x,
+                  (long) packed,
+                  y,
+                  (long) count,
+                  (long) tokens,
+                  (long) dimension,
+                  (long) heads);
+      if (result != 0) throw new IllegalStateException("Dense attention failed: " + result);
+    } catch (Throwable failure) {
+      throw new IllegalStateException("Dense attention call failed", failure);
+    }
+    MemorySegment.copy(y, 0, MemorySegment.ofArray(output), 0, bytes);
+    return true;
   }
 
   @Override
