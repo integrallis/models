@@ -40,6 +40,15 @@ public final class ClipImagePreprocessor {
   /** Pads and resizes an RGB view without changing the source image or normalization arrays. */
   public static float[] preprocess(BufferedImage image, int size, float[] mean, float[] std) {
     Objects.requireNonNull(image, "image");
+    validateNormalization(size, mean, std);
+    int side = Math.max(image.getWidth(), image.getHeight());
+    int[] rgb = padSquare(image, side, mean);
+    // Pillow rounds/clamps after each separable pass; keep the integer intermediate.
+    int[] horizontal = resizeHorizontal(rgb, side, size);
+    return resizeVerticalAndNormalize(horizontal, side, size, mean, std);
+  }
+
+  private static void validateNormalization(int size, float[] mean, float[] std) {
     if (size <= 0 || mean.length != 3 || std.length != 3) {
       throw new IllegalArgumentException(
           "Expected positive image size and three normalization channels");
@@ -53,7 +62,9 @@ public final class ClipImagePreprocessor {
         throw new IllegalArgumentException("Invalid image normalization");
       }
     }
-    int side = Math.max(image.getWidth(), image.getHeight());
+  }
+
+  private static int[] padSquare(BufferedImage image, int side, float[] mean) {
     int left = (side - image.getWidth()) / 2;
     int top = (side - image.getHeight()) / 2;
     int[] rgb = new int[Math.multiplyExact(Math.multiplyExact(side, side), 3)];
@@ -68,7 +79,10 @@ public final class ClipImagePreprocessor {
         }
       }
     }
-    // Pillow's RGB bicubic resampling rounds/clamps after each separable pass.
+    return rgb;
+  }
+
+  private static int[] resizeHorizontal(int[] rgb, int side, int size) {
     int[] horizontal = new int[Math.multiplyExact(Math.multiplyExact(side, size), 3)];
     double scale = (double) side / size;
     double filterScale = Math.max(1.0, scale);
@@ -86,6 +100,13 @@ public final class ClipImagePreprocessor {
         }
       }
     }
+    return horizontal;
+  }
+
+  private static float[] resizeVerticalAndNormalize(
+      int[] horizontal, int side, int size, float[] mean, float[] std) {
+    double scale = (double) side / size;
+    double filterScale = Math.max(1.0, scale);
     float[] out = new float[Math.multiplyExact(Math.multiplyExact(size, size), 3)];
     for (int y = 0; y < size; y++) {
       double center = (y + 0.5) * scale;

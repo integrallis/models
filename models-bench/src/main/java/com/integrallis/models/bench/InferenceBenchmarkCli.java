@@ -71,159 +71,78 @@ public final class InferenceBenchmarkCli {
   private InferenceBenchmarkCli() {}
 
   public static void main(String[] args) throws Exception {
-    if (args.length > 0 && "profile-prefill".equals(args[0])) {
-      PrefillProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
-      return;
-    }
-    if (args.length > 0 && "profile-decode".equals(args[0])) {
-      DecodeProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
-      return;
-    }
-    if (args.length > 0 && "profile-sessions".equals(args[0])) {
-      SessionBatchProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
-      return;
-    }
-    if (args.length > 0 && "profile-runtime-sessions".equals(args[0])) {
-      RuntimeBatchProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
-      return;
-    }
-    if (args.length > 0 && "profile-ragged-prefill".equals(args[0])) {
-      RaggedPrefillProfileCli.run(Arrays.copyOfRange(args, 1, args.length));
-      return;
-    }
-    if (args.length > 0 && "profile-hotspots".equals(args[0])) {
-      ProfileHotspotCli.run(Arrays.copyOfRange(args, 1, args.length));
-      return;
-    }
-    if (args.length > 0 && "triage-decisions".equals(args[0])) {
-      TriageDecisionBenchCli.run(Arrays.copyOfRange(args, 1, args.length));
-      return;
-    }
-    if (args.length > 0 && "compare".equals(args[0])) {
-      BenchmarkComparisonCli.run(Arrays.copyOfRange(args, 1, args.length));
-      return;
-    }
-    if (args.length > 0 && "determinism".equals(args[0])) {
-      DeterminismAuditCli.run(Arrays.copyOfRange(args, 1, args.length));
-      return;
-    }
-    if (args.length > 0 && "router-evaluate".equals(args[0])) {
-      RouterSelectionEvaluationCli.run(Arrays.copyOfRange(args, 1, args.length));
-      return;
-    }
-    if (args.length > 0 && "task-index".equals(args[0])) {
-      // Its evaluate subcommand is a gate, so the verdict travels in the exit status.
-      System.exit(TaskIndexCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "vision-qualification".equals(args[0])) {
-      VisionQualificationCli.main(java.util.Arrays.copyOfRange(args, 1, args.length));
-      return;
-    }
-    if (args.length > 0 && "embedding-equivalence".equals(args[0])) {
-      // A gate rather than a benchmark, so its verdict travels in the exit status.
-      System.exit(EmbeddingEquivalenceCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "needle2-tool-qualification".equals(args[0])) {
-      // A conformance gate rather than a throughput benchmark.
-      System.exit(Needle2ToolQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "tool-qualification".equals(args[0])) {
-      System.exit(ToolCallingQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "cuda-kernel-gate".equals(args[0])) {
-      System.exit(CudaKernelGateCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "logit-fusion".equals(args[0])) {
-      System.exit(
-          com.integrallis.models.bench.fusion.FusionCli.run(
-              Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "activated-prefix-sharing".equals(args[0])) {
-      System.exit(ActivatedPrefixSharingBenchmarkCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "activated-answerability-long-context".equals(args[0])) {
-      System.exit(
-          ActivatedAnswerabilityLongContextCli.run(Arrays.copyOfRange(args, 1, args.length)));
-    }
-    if (args.length > 0 && "activated-answerability".equals(args[0])) {
-      System.exit(
-          ActivatedAnswerabilityQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
-    }
-    if (args.length > 0 && "activated-query-rewrite".equals(args[0])) {
-      System.exit(
-          ActivatedQueryRewriteQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "activated-decision-profile".equals(args[0])) {
-      System.exit(ActivatedDecisionProfileCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "activated-hidden-decision-profile".equals(args[0])) {
-      System.exit(ActivatedHiddenDecisionProfileCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "activated-hidden-calibrate".equals(args[0])) {
-      System.exit(
-          ActivatedQ4CalibrationCli.runCalibration(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "activated-hidden-screen".equals(args[0])) {
-      System.exit(ActivatedQ4CalibrationCli.runScreen(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "activated-transfer-calibrate".equals(args[0])) {
-      System.exit(ActivatedQ4TransferCli.runCalibration(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "activated-transfer-screen".equals(args[0])) {
-      System.exit(ActivatedQ4TransferCli.runScreen(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "semantic-applicability-diagnostic".equals(args[0])) {
-      System.exit(SemanticApplicabilityDiagnosticCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "activated-dual-decision-diagnostic".equals(args[0])) {
-      System.exit(ActivatedDualDecisionDiagnosticCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "activated-hybrid-development".equals(args[0])) {
-      System.exit(ActivatedHybridDevelopmentCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "activated-hybrid-live-decision".equals(args[0])) {
-      System.exit(ActivatedHybridLiveDecisionCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "activated-long-context".equals(args[0])) {
-      System.exit(
-          ActivatedLongContextQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "virtual-model-qualification".equals(args[0])) {
-      System.exit(VirtualModelQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "virtual-model-qualification-compare".equals(args[0])) {
-      System.exit(
-          VirtualModelQualificationComparisonCli.run(Arrays.copyOfRange(args, 1, args.length)));
-      return;
-    }
-    if (args.length > 0 && "needle-smollm-hybrid-qualification".equals(args[0])) {
-      System.exit(NeedleSmolHybridQualificationCli.run(Arrays.copyOfRange(args, 1, args.length)));
+    if (args.length > 0 && dispatchCommand(args[0], Arrays.copyOfRange(args, 1, args.length))) {
       return;
     }
     BenchmarkConfiguration configuration = parse(args);
     BenchmarkReport report = run(configuration);
     write(configuration.output(), report);
     printSummary(report, configuration.output());
+  }
+
+  private static boolean dispatchCommand(String command, String[] commandArgs) throws Exception {
+    // Gate commands retain their process exit status; benchmark commands return normally.
+    switch (command) {
+      case "profile-prefill" -> PrefillProfileCli.run(commandArgs);
+      case "profile-decode" -> DecodeProfileCli.run(commandArgs);
+      case "profile-sessions" -> SessionBatchProfileCli.run(commandArgs);
+      case "profile-runtime-sessions" -> RuntimeBatchProfileCli.run(commandArgs);
+      case "profile-ragged-prefill" -> RaggedPrefillProfileCli.run(commandArgs);
+      case "profile-hotspots" -> ProfileHotspotCli.run(commandArgs);
+      case "triage-decisions" -> TriageDecisionBenchCli.run(commandArgs);
+      case "compare" -> BenchmarkComparisonCli.run(commandArgs);
+      case "determinism" -> DeterminismAuditCli.run(commandArgs);
+      case "router-evaluate" -> RouterSelectionEvaluationCli.run(commandArgs);
+      case "task-index" -> System.exit(TaskIndexCli.run(commandArgs));
+      case "vision-qualification" -> VisionQualificationCli.main(commandArgs);
+      case "embedding-equivalence" -> System.exit(EmbeddingEquivalenceCli.run(commandArgs));
+      case "needle2-tool-qualification" ->
+          System.exit(Needle2ToolQualificationCli.run(commandArgs));
+      case "tool-qualification" -> System.exit(ToolCallingQualificationCli.run(commandArgs));
+      case "cuda-kernel-gate" -> System.exit(CudaKernelGateCli.run(commandArgs));
+      case "logit-fusion" ->
+          System.exit(com.integrallis.models.bench.fusion.FusionCli.run(commandArgs));
+      case "activated-prefix-sharing" ->
+          System.exit(ActivatedPrefixSharingBenchmarkCli.run(commandArgs));
+      case "activated-answerability-long-context" ->
+          System.exit(ActivatedAnswerabilityLongContextCli.run(commandArgs));
+      case "activated-answerability" ->
+          System.exit(ActivatedAnswerabilityQualificationCli.run(commandArgs));
+      case "activated-query-rewrite" ->
+          System.exit(ActivatedQueryRewriteQualificationCli.run(commandArgs));
+      case "activated-decision-profile" ->
+          System.exit(ActivatedDecisionProfileCli.run(commandArgs));
+      case "activated-hidden-decision-profile" ->
+          System.exit(ActivatedHiddenDecisionProfileCli.run(commandArgs));
+      case "activated-hidden-calibrate" ->
+          System.exit(ActivatedQ4CalibrationCli.runCalibration(commandArgs));
+      case "activated-hidden-screen" ->
+          System.exit(ActivatedQ4CalibrationCli.runScreen(commandArgs));
+      case "activated-transfer-calibrate" ->
+          System.exit(ActivatedQ4TransferCli.runCalibration(commandArgs));
+      case "activated-transfer-screen" ->
+          System.exit(ActivatedQ4TransferCli.runScreen(commandArgs));
+      case "semantic-applicability-diagnostic" ->
+          System.exit(SemanticApplicabilityDiagnosticCli.run(commandArgs));
+      case "activated-dual-decision-diagnostic" ->
+          System.exit(ActivatedDualDecisionDiagnosticCli.run(commandArgs));
+      case "activated-hybrid-development" ->
+          System.exit(ActivatedHybridDevelopmentCli.run(commandArgs));
+      case "activated-hybrid-live-decision" ->
+          System.exit(ActivatedHybridLiveDecisionCli.run(commandArgs));
+      case "activated-long-context" ->
+          System.exit(ActivatedLongContextQualificationCli.run(commandArgs));
+      case "virtual-model-qualification" ->
+          System.exit(VirtualModelQualificationCli.run(commandArgs));
+      case "virtual-model-qualification-compare" ->
+          System.exit(VirtualModelQualificationComparisonCli.run(commandArgs));
+      case "needle-smollm-hybrid-qualification" ->
+          System.exit(NeedleSmolHybridQualificationCli.run(commandArgs));
+      default -> {
+        return false;
+      }
+    }
+    return true;
   }
 
   static BenchmarkConfiguration parse(String[] args) throws IOException {
