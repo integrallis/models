@@ -1,0 +1,77 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 25.0.3, OpenJDK 64-Bit Server VM, 25.0.3+9-LTS
+# VM invoker: /Users/briansam-bodden/.sdkman/candidates/java/25.0.3-tem/bin/java
+# VM options: --add-modules=jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx512m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.integrallis.models.experiments.RefactorBenchmark.imagePreprocess
+
+# Run progress: 0.00% complete, ETA 00:00:20
+# Fork: 1 of 2
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1668.061 us/op
+# Warmup Iteration   2: 1399.362 us/op
+# Warmup Iteration   3: 928.701 us/op
+# Warmup Iteration   4: 904.399 us/op
+# Warmup Iteration   5: 1069.214 us/op
+Iteration   1: 938.620 us/op
+Iteration   2: 882.509 us/op
+Iteration   3: 904.728 us/op
+Iteration   4: 1018.517 us/op
+Iteration   5: 920.043 us/op
+
+# Run progress: 50.00% complete, ETA 00:00:10
+# Fork: 2 of 2
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1155.881 us/op
+# Warmup Iteration   2: 1034.089 us/op
+# Warmup Iteration   3: 902.603 us/op
+# Warmup Iteration   4: 934.006 us/op
+# Warmup Iteration   5: 1009.905 us/op
+Iteration   1: 955.729 us/op
+Iteration   2: 980.304 us/op
+Iteration   3: 948.361 us/op
+Iteration   4: 915.604 us/op
+Iteration   5: 986.050 us/op
+
+
+Result "com.integrallis.models.experiments.RefactorBenchmark.imagePreprocess":
+  945.047 ±(99.9%) 62.777 us/op [Average]
+  (min, avg, max) = (882.509, 945.047, 1018.517), stdev = 41.523
+  CI (99.9%): [882.270, 1007.823] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:21
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                          Mode  Cnt    Score    Error  Units
+RefactorBenchmark.imagePreprocess  avgt   10  945.047 ± 62.777  us/op
+
+Benchmark result is saved to /tmp/pr380-hotspot-fixes/paired/longer-warmup/after-imagePreprocess.json

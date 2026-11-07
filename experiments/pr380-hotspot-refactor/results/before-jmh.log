@@ -1,0 +1,317 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 25.0.3, OpenJDK 64-Bit Server VM, 25.0.3+9-LTS
+# VM invoker: /Users/briansam-bodden/.sdkman/candidates/java/25.0.3-tem/bin/java
+# VM options: --add-modules=jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx512m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 500 ms each
+# Measurement: 5 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.integrallis.models.experiments.RefactorBenchmark.embeddingPrefillAndDecode
+# Parameters: (fixture = buildNanoModel)
+
+# Run progress: 0.00% complete, ETA 00:00:40
+# Fork: 1 of 2
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Nov 07, 2026 4:39:17 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 07, 2026 4:39:17 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=countdown ggufThreads=6 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+329.788 us/op
+# Warmup Iteration   2: 225.297 us/op
+# Warmup Iteration   3: 192.435 us/op
+Iteration   1: 189.239 us/op
+Iteration   2: 186.928 us/op
+Iteration   3: 165.707 us/op
+Iteration   4: 175.994 us/op
+Iteration   5: 274.994 us/op
+
+# Run progress: 10.00% complete, ETA 00:00:45
+# Fork: 2 of 2
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Nov 07, 2026 4:39:22 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 07, 2026 4:39:22 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=countdown ggufThreads=6 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+265.498 us/op
+# Warmup Iteration   2: 159.525 us/op
+# Warmup Iteration   3: 150.601 us/op
+Iteration   1: 131.362 us/op
+Iteration   2: 142.446 us/op
+Iteration   3: 153.433 us/op
+Iteration   4: 134.468 us/op
+Iteration   5: 145.940 us/op
+
+
+Result "com.integrallis.models.experiments.RefactorBenchmark.embeddingPrefillAndDecode":
+  170.051 ±(99.9%) 63.950 us/op [Average]
+  (min, avg, max) = (131.362, 170.051, 274.994), stdev = 42.299
+  CI (99.9%): [106.101, 234.001] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, OpenJDK 64-Bit Server VM, 25.0.3+9-LTS
+# VM invoker: /Users/briansam-bodden/.sdkman/candidates/java/25.0.3-tem/bin/java
+# VM options: --add-modules=jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx512m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 500 ms each
+# Measurement: 5 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.integrallis.models.experiments.RefactorBenchmark.embeddingPrefillAndDecode
+# Parameters: (fixture = buildQ4KNanoModel)
+
+# Run progress: 20.00% complete, ETA 00:00:40
+# Fork: 1 of 2
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Nov 07, 2026 4:39:27 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 07, 2026 4:39:27 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=countdown ggufThreads=6 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+732170.239 us/op
+# Warmup Iteration   2: 51106.418 us/op
+# Warmup Iteration   3: 14169.757 us/op
+Iteration   1: 10876.141 us/op
+Iteration   2: 8963.183 us/op
+Iteration   3: 9440.949 us/op
+Iteration   4: 9851.464 us/op
+Iteration   5: 9368.379 us/op
+
+# Run progress: 30.00% complete, ETA 00:00:35
+# Fork: 2 of 2
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Nov 07, 2026 4:39:32 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 07, 2026 4:39:32 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=countdown ggufThreads=6 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+660426.378 us/op
+# Warmup Iteration   2: 31726.829 us/op
+# Warmup Iteration   3: 14809.396 us/op
+Iteration   1: 9818.818 us/op
+Iteration   2: 8409.908 us/op
+Iteration   3: 8466.089 us/op
+Iteration   4: 8777.949 us/op
+Iteration   5: 7972.843 us/op
+
+
+Result "com.integrallis.models.experiments.RefactorBenchmark.embeddingPrefillAndDecode":
+  9194.572 ±(99.9%) 1295.255 us/op [Average]
+  (min, avg, max) = (7972.843, 9194.572, 10876.141), stdev = 856.731
+  CI (99.9%): [7899.317, 10489.828] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, OpenJDK 64-Bit Server VM, 25.0.3+9-LTS
+# VM invoker: /Users/briansam-bodden/.sdkman/candidates/java/25.0.3-tem/bin/java
+# VM options: --add-modules=jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx512m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 500 ms each
+# Measurement: 5 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.integrallis.models.experiments.RefactorBenchmark.imagePreprocess
+
+# Run progress: 40.00% complete, ETA 00:00:30
+# Fork: 1 of 2
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2086.483 us/op
+# Warmup Iteration   2: 1311.258 us/op
+# Warmup Iteration   3: 1083.727 us/op
+Iteration   1: 1108.046 us/op
+Iteration   2: 978.592 us/op
+Iteration   3: 990.831 us/op
+Iteration   4: 1011.983 us/op
+Iteration   5: 939.761 us/op
+
+# Run progress: 50.00% complete, ETA 00:00:25
+# Fork: 2 of 2
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1625.893 us/op
+# Warmup Iteration   2: 1244.110 us/op
+# Warmup Iteration   3: 1142.065 us/op
+Iteration   1: 989.816 us/op
+Iteration   2: 1274.493 us/op
+Iteration   3: 1010.314 us/op
+Iteration   4: 967.165 us/op
+Iteration   5: 1067.195 us/op
+
+
+Result "com.integrallis.models.experiments.RefactorBenchmark.imagePreprocess":
+  1033.820 ±(99.9%) 147.531 us/op [Average]
+  (min, avg, max) = (939.761, 1033.820, 1274.493), stdev = 97.582
+  CI (99.9%): [886.289, 1181.350] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, OpenJDK 64-Bit Server VM, 25.0.3+9-LTS
+# VM invoker: /Users/briansam-bodden/.sdkman/candidates/java/25.0.3-tem/bin/java
+# VM options: --add-modules=jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx512m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 500 ms each
+# Measurement: 5 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.integrallis.models.experiments.RefactorBenchmark.tokenPrefillAndDecode
+# Parameters: (fixture = buildNanoModel)
+
+# Run progress: 60.00% complete, ETA 00:00:19
+# Fork: 1 of 2
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Nov 07, 2026 4:39:46 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 07, 2026 4:39:47 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=countdown ggufThreads=6 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+278.310 us/op
+# Warmup Iteration   2: 158.198 us/op
+# Warmup Iteration   3: 150.619 us/op
+Iteration   1: 139.077 us/op
+Iteration   2: 144.677 us/op
+Iteration   3: 148.392 us/op
+Iteration   4: 132.324 us/op
+Iteration   5: 133.204 us/op
+
+# Run progress: 70.00% complete, ETA 00:00:14
+# Fork: 2 of 2
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Nov 07, 2026 4:39:52 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 07, 2026 4:39:52 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=countdown ggufThreads=6 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+255.295 us/op
+# Warmup Iteration   2: 174.779 us/op
+# Warmup Iteration   3: 148.498 us/op
+Iteration   1: 130.730 us/op
+Iteration   2: 131.414 us/op
+Iteration   3: 142.077 us/op
+Iteration   4: 140.694 us/op
+Iteration   5: 133.114 us/op
+
+
+Result "com.integrallis.models.experiments.RefactorBenchmark.tokenPrefillAndDecode":
+  137.570 ±(99.9%) 9.443 us/op [Average]
+  (min, avg, max) = (130.730, 137.570, 148.392), stdev = 6.246
+  CI (99.9%): [128.127, 147.013] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.3, OpenJDK 64-Bit Server VM, 25.0.3+9-LTS
+# VM invoker: /Users/briansam-bodden/.sdkman/candidates/java/25.0.3-tem/bin/java
+# VM options: --add-modules=jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx512m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 500 ms each
+# Measurement: 5 iterations, 500 ms each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.integrallis.models.experiments.RefactorBenchmark.tokenPrefillAndDecode
+# Parameters: (fixture = buildQ4KNanoModel)
+
+# Run progress: 80.00% complete, ETA 00:00:09
+# Fork: 1 of 2
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Nov 07, 2026 4:39:56 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 07, 2026 4:39:57 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=countdown ggufThreads=6 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+622451.120 us/op
+# Warmup Iteration   2: 34175.048 us/op
+# Warmup Iteration   3: 12248.969 us/op
+Iteration   1: 9203.202 us/op
+Iteration   2: 11185.847 us/op
+Iteration   3: 7966.658 us/op
+Iteration   4: 8552.308 us/op
+Iteration   5: 8258.965 us/op
+
+# Run progress: 90.00% complete, ETA 00:00:04
+# Fork: 2 of 2
+WARNING: Using incubator modules: jdk.incubator.vector
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/briansam-bodden/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.37/896f27e49105b35ea1964319c83d12082e7a79ef/jmh-core-1.37.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: Nov 07, 2026 4:40:02 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 07, 2026 4:40:02 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=countdown ggufThreads=6 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+626055.823 us/op
+# Warmup Iteration   2: 32075.727 us/op
+# Warmup Iteration   3: 12067.741 us/op
+Iteration   1: 8904.057 us/op
+Iteration   2: 9093.116 us/op
+Iteration   3: 8201.574 us/op
+Iteration   4: 8765.484 us/op
+Iteration   5: 8989.131 us/op
+
+
+Result "com.integrallis.models.experiments.RefactorBenchmark.tokenPrefillAndDecode":
+  8912.034 ±(99.9%) 1358.773 us/op [Average]
+  (min, avg, max) = (7966.658, 8912.034, 11185.847), stdev = 898.744
+  CI (99.9%): [7553.261, 10270.807] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:49
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                            (fixture)  Mode  Cnt     Score      Error  Units
+RefactorBenchmark.embeddingPrefillAndDecode     buildNanoModel  avgt   10   170.051 ±   63.950  us/op
+RefactorBenchmark.embeddingPrefillAndDecode  buildQ4KNanoModel  avgt   10  9194.572 ± 1295.255  us/op
+RefactorBenchmark.imagePreprocess                          N/A  avgt   10  1033.820 ±  147.531  us/op
+RefactorBenchmark.tokenPrefillAndDecode         buildNanoModel  avgt   10   137.570 ±    9.443  us/op
+RefactorBenchmark.tokenPrefillAndDecode      buildQ4KNanoModel  avgt   10  8912.034 ± 1358.773  us/op
+
+Benchmark result is saved to /private/tmp/pr380-hotspot-fixes/paired/before-jmh.json
