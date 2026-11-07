@@ -1436,20 +1436,19 @@ public final class LlamaForwardPass {
             batchedMatmulDispatch(
                 batchFfnUp, batchXNorm, batchSize, lw.ffnUp(), lw.ffnUpType(), hiddenDim, dim);
           }
-          for (int batch = 0; batch < batchSize; batch++) {
-            int hiddenOffset = batch * hiddenDim;
-            activateFfn(
-                batchFfnOut,
-                hiddenOffset,
-                batchFfnGate,
-                hiddenOffset,
-                batchFfnUp,
-                hiddenOffset,
-                hiddenDim,
-                batchFfnOutView,
-                batchFfnGateView,
-                batchFfnUpView);
-          }
+          // Activation is elementwise: one dispatch over the batch preserves each lane's
+          // arithmetic and avoids a worker-pool round trip for every image patch.
+          activateFfn(
+              batchFfnOut,
+              0,
+              batchFfnGate,
+              0,
+              batchFfnUp,
+              0,
+              Math.multiplyExact(batchSize, hiddenDim),
+              batchFfnOutView,
+              batchFfnGateView,
+              batchFfnUpView);
           batchedMatmulDispatch(
               batchFfnProjected,
               batchFfnOut,
@@ -1718,20 +1717,19 @@ public final class LlamaForwardPass {
         sessions, batchSize, layer, Projection.FFN_GATE, batchFfnGate, hiddenDim, batchXNorm, dim);
     addActivatedAdapters(
         sessions, batchSize, layer, Projection.FFN_UP, batchFfnUp, hiddenDim, batchXNorm, dim);
-    for (int batch = 0; batch < batchSize; batch++) {
-      int hiddenOffset = batch * hiddenDim;
-      activateFfn(
-          batchFfnOut,
-          hiddenOffset,
-          batchFfnGate,
-          hiddenOffset,
-          batchFfnUp,
-          hiddenOffset,
-          hiddenDim,
-          batchFfnOutView,
-          batchFfnGateView,
-          batchFfnUpView);
-    }
+    // Activation is elementwise: one dispatch over the batch preserves each lane's
+    // arithmetic and avoids a worker-pool round trip for every image patch.
+    activateFfn(
+        batchFfnOut,
+        0,
+        batchFfnGate,
+        0,
+        batchFfnUp,
+        0,
+        Math.multiplyExact(batchSize, hiddenDim),
+        batchFfnOutView,
+        batchFfnGateView,
+        batchFfnUpView);
   }
 
   private void observeIndependentSessionLayer(
