@@ -32,6 +32,7 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
   private final MethodHandle project;
   private final MethodHandle attention;
   private final MethodHandle denseAttention;
+  private final MethodHandle causalAttention;
   private final MethodHandle destroy;
   private MemorySegment x = MemorySegment.NULL;
   private MemorySegment w = MemorySegment.NULL;
@@ -105,6 +106,30 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
                               ValueLayout.JAVA_LONG,
                               ValueLayout.JAVA_LONG,
                               ValueLayout.JAVA_LONG)))
+              .orElse(null);
+      causalAttention =
+          symbols
+              .find("jmodels_dense_causal_attention")
+              .map(
+                  symbol ->
+                      linker.downcallHandle(
+                          symbol,
+                          FunctionDescriptor.of(
+                              ValueLayout.JAVA_INT,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG),
+                          Linker.Option.critical(true)))
               .orElse(null);
       destroy =
           linker.downcallHandle(
@@ -184,6 +209,50 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
     }
     MemorySegment.copy(y, 0, MemorySegment.ofArray(output), 0, (long) yn * Float.BYTES);
     projectCalls++;
+  }
+
+  boolean supportsCausalAttention() {
+    return causalAttention != null;
+  }
+
+  synchronized void causalAttention(
+      float[] output,
+      float[] query,
+      float[] key,
+      float[] value,
+      int batch,
+      int positions,
+      int dimension,
+      int heads) {
+    if (handle == 0) throw new IllegalStateException("Dense kernels are closed");
+    if (batch < 1 || positions < batch || dimension < 1 || heads < 1 || dimension % heads != 0)
+      throw new IllegalArgumentException("Invalid causal attention shape");
+    int qn = Math.multiplyExact(batch, dimension), kn = Math.multiplyExact(positions, dimension);
+    if (query.length < qn || output.length < qn || key.length < kn || value.length < kn)
+      throw new IllegalArgumentException("Invalid causal attention buffer");
+    if (causalAttention == null)
+      throw new UnsupportedOperationException("Native causal attention unavailable");
+    try {
+      int result =
+          (int)
+              causalAttention.invokeExact(
+                  handle,
+                  MemorySegment.ofArray(query),
+                  (long) query.length,
+                  MemorySegment.ofArray(key),
+                  (long) key.length,
+                  MemorySegment.ofArray(value),
+                  (long) value.length,
+                  MemorySegment.ofArray(output),
+                  (long) output.length,
+                  (long) batch,
+                  (long) positions,
+                  (long) dimension,
+                  (long) heads);
+      if (result != 0) throw new IllegalStateException("Causal attention failed: " + result);
+    } catch (Throwable failure) {
+      throw new IllegalStateException("Causal attention call failed", failure);
+    }
   }
 
   @Override

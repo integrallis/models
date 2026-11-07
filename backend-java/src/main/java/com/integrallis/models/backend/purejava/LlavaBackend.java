@@ -20,7 +20,6 @@ import com.integrallis.models.api.ImageInferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
-import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.models.backend.purejava.spi.GgufMatrixKernelProvider;
 import com.integrallis.models.backend.purejava.vision.LlavaVisionProjector;
 import java.nio.file.Path;
@@ -43,7 +42,7 @@ public final class LlavaBackend implements ImageInferenceBackend {
     LlavaVisionProjector vision = LlavaVisionProjector.load(mmproj);
     PureJavaBackend text = null;
     try {
-      text = PureJavaBackend.load(textModel, decoderKernel());
+      text = decoder(textModel);
       if (!text.supportsEmbeddingInput()
           || text.embeddingInputDimension() != vision.embeddingDimension()) {
         throw new IllegalArgumentException(
@@ -62,13 +61,23 @@ public final class LlavaBackend implements ImageInferenceBackend {
     }
   }
 
-  private static GgufBatchedMatrixKernel decoderKernel() {
+  private static PureJavaBackend decoder(Path model) {
     int threads = RuntimeFingerprint.capture().ggufThreads();
     for (GgufMatrixKernelProvider provider : ServiceLoader.load(GgufMatrixKernelProvider.class)) {
-      var kernel = provider.open(threads);
-      if (kernel.isPresent()) return kernel.orElseThrow();
+      var available = provider.open(threads);
+      if (available.isPresent()) {
+        var kernel = available.orElseThrow();
+        com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel attention;
+        try {
+          attention = provider.openAttention(threads);
+        } catch (RuntimeException | Error failure) {
+          kernel.close();
+          throw failure;
+        }
+        return PureJavaBackend.load(model, kernel, attention);
+      }
     }
-    return GgufBatchedMatrixKernel.none();
+    return PureJavaBackend.load(model);
   }
 
   @Override

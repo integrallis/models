@@ -2041,7 +2041,25 @@ public final class LlamaForwardPass {
       // Store K,V in cache
       sequenceCache.store(layer, position, k, v);
       // Grouped-query attention, partitioned over heads
-      attendHeads(q, 0, attnOut, 0, layer, position, sequenceCache);
+      if (sequenceCache == cache && batchedAttentionKernelEligible(layer, position, 1)) {
+        int window = config.usesSlidingWindow(layer) ? config.slidingWindow() : 0;
+        batchedAttentionKernel.attend(
+            attnOut,
+            q,
+            k,
+            v,
+            layer,
+            position,
+            1,
+            config.numHeads(),
+            config.numKvHeads(),
+            config.keyLength(),
+            config.valueLength(),
+            cache.maxSeqLen(),
+            window);
+      } else {
+        attendHeads(q, 0, attnOut, 0, layer, position, sequenceCache);
+      }
 
       // Output projection
       matmulDispatch(

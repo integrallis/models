@@ -40,4 +40,23 @@ public final class NativeGgufMatrixKernelProvider implements GgufMatrixKernelPro
       return Optional.empty();
     }
   }
+
+  @Override
+  public com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel openAttention(
+      int threads) {
+    String configured = System.getProperty(RustFfmBackend.LIBRARY_PATH_PROPERTY);
+    if (configured == null || configured.isBlank())
+      configured = System.getenv(RustFfmBackend.LIBRARY_PATH_ENV);
+    try {
+      NativeDebertaKernels kernels =
+          configured == null || configured.isBlank()
+              ? NativeDebertaKernels.load(threads)
+              : NativeDebertaKernels.load(Path.of(configured), threads);
+      if (kernels.supportsCausalAttention()) return new NativeCausalAttention(kernels);
+      kernels.close();
+      return com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel.none();
+    } catch (java.io.IOException failure) {
+      throw new IllegalStateException("Cannot load causal attention kernels", failure);
+    }
+  }
 }
