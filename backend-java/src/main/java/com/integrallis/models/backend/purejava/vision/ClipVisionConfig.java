@@ -57,7 +57,9 @@ public final class ClipVisionConfig {
     if (numPositions != Math.addExact(patches, 1)) {
       throw new IllegalArgumentException("CLIP position count must equal patch count plus CLS");
     }
-    Math.multiplyExact(Math.multiplyExact(imageSize, imageSize), 3);
+    if ((long) imageSize * imageSize > Integer.MAX_VALUE / 3) {
+      throw new IllegalArgumentException("Image is too large for a CHW array");
+    }
     this.hiddenSize = hiddenSize;
     this.numLayers = numLayers;
     this.numHeads = numHeads;

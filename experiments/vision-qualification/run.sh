@@ -15,6 +15,7 @@ java=${VISION_JAVA:-java}
 threads=${VISION_THREADS:-8}
 artifacts=${VISION_ARTIFACT_DIRECTORY:-$output/artifacts}
 mkdir -p "$output/results"
+"$python" -m unittest discover -s "$script_dir" -p 'test_*.py'
 "$python" "$script_dir/fetch.py" "$artifacts"
 "$python" "$script_dir/images.py" "$output/images"
 "$python" -m pip freeze > "$output/python-environment.txt"

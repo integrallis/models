@@ -32,7 +32,8 @@ checkpoints were trained together; use the pinned matched pair.
 `ImageInferenceBackend` has the same single-threaded, reset/close lifecycle as `InferenceBackend`.
 Returned image logits are stable caller-owned arrays. Invalid image/position/context inputs are
 rejected before consuming decoder state. Close releases both mapped models. The Llama embedding
-input uses the existing transformer graph and KV cache, without a duplicate decoder implementation.
+input uses the existing transformer graph and KV cache, without a duplicate decoder implementation. Image rows use the existing batched prefill engine,
+including chunk boundaries and the final single-row tail.
 
 ## Supported profile
 
