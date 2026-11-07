@@ -87,6 +87,7 @@ public final class VisionQualificationCli {
       start = System.nanoTime();
       try (var backend = LlavaBackend.load(textModel, mmproj)) {
         report.put("twoFileLoadMs", elapsed(start));
+        report.put("decoderDiagnostics", backend.diagnostics());
         var tokenizer = backend.tokenizer();
         // Explicit LLaVA 1.5 Vicuna template; image is inserted where <image> belongs.
         String prefix =

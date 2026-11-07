@@ -19,8 +19,12 @@ import com.integrallis.models.api.BackendDiagnostics;
 import com.integrallis.models.api.ImageInferenceBackend;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.Tokenizer;
+import com.integrallis.models.backend.purejava.plan.RuntimeFingerprint;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import com.integrallis.models.backend.purejava.spi.GgufMatrixKernelProvider;
 import com.integrallis.models.backend.purejava.vision.LlavaVisionProjector;
 import java.nio.file.Path;
+import java.util.ServiceLoader;
 
 /** Two-file LLaVA 1.5 inference, sharing the shipping Llama decoder and its KV cache. */
 public final class LlavaBackend implements ImageInferenceBackend {
@@ -39,7 +43,7 @@ public final class LlavaBackend implements ImageInferenceBackend {
     LlavaVisionProjector vision = LlavaVisionProjector.load(mmproj);
     PureJavaBackend text = null;
     try {
-      text = PureJavaBackend.load(textModel);
+      text = PureJavaBackend.load(textModel, decoderKernel());
       if (!text.supportsEmbeddingInput()
           || text.embeddingInputDimension() != vision.embeddingDimension()) {
         throw new IllegalArgumentException(
@@ -56,6 +60,15 @@ public final class LlavaBackend implements ImageInferenceBackend {
       }
       throw e;
     }
+  }
+
+  private static GgufBatchedMatrixKernel decoderKernel() {
+    int threads = RuntimeFingerprint.capture().ggufThreads();
+    for (GgufMatrixKernelProvider provider : ServiceLoader.load(GgufMatrixKernelProvider.class)) {
+      var kernel = provider.open(threads);
+      if (kernel.isPresent()) return kernel.orElseThrow();
+    }
+    return GgufBatchedMatrixKernel.none();
   }
 
   @Override
