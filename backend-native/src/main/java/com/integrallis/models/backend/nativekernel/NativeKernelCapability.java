@@ -93,6 +93,8 @@ public enum NativeKernelCapability {
   TQ1_0_Q8_K_BATCHED_MATMUL(1L << 29),
   /** Q4_K with Java-compatible sequential floating-point block accumulation. */
   Q4_K_ORDERED_REDUCTION(1L << 30),
+  /** Packed Q4_K prefill, available only on the supported SIMD host. */
+  Q4_K_BATCH_PACKING(1L << 31),
   /** Fixed-tree BF16 projections for the supported shape and vector configuration. */
   BF16_F32_BATCHED_MATMUL(1L << 25),
   /** Deterministic float SwiGLU with checked finite gates. */

@@ -15,13 +15,11 @@
  */
 package com.integrallis.models.backend.purejava.vision;
 
-import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
 import com.integrallis.models.backend.purejava.spi.DenseProjectionKernels;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufStagePlan;
 import com.integrallis.vectors.core.VectorUtil;
-import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 
 /**
@@ -226,8 +224,7 @@ public final class ClipVisionEncoder {
     normalizeRows(normalized, hidden, tokens, layer.ln1Weight(), layer.ln1Bias());
 
     // 2. QKV projection (fused)
-    projectQ8_0(
-        queryKeyValues, normalized, tokens, layer.attnQkvQ8_0(), dim * 3, dim, layer.attnQkv());
+    project(queryKeyValues, normalized, tokens, layer.attnQkv());
     addBias(queryKeyValues, tokens, dim * 3, layer.attnQkvBias());
 
     // 3. Split into Q, K, V
@@ -237,8 +234,7 @@ public final class ClipVisionEncoder {
     attend(tokens, dim);
 
     // 5. Output projection + residual
-    projectQ8_0(
-        attentionProjected, attention, tokens, layer.attnOutQ8_0(), dim, dim, layer.attnOut());
+    project(attentionProjected, attention, tokens, layer.attnOut());
     addBias(attentionProjected, tokens, dim, layer.attnOutBias());
     for (int i = 0; i < batchElements; i++) {
       attentionProjected[i] += hidden[i];
@@ -249,7 +245,7 @@ public final class ClipVisionEncoder {
 
     // 7. FFN: up projection
     int hiddenDim = config.intermediateSize();
-    projectQ8_0(feedForward, normalized, tokens, layer.ffnUpQ8_0(), hiddenDim, dim, layer.ffnUp());
+    project(feedForward, normalized, tokens, layer.ffnUp());
     addBias(feedForward, tokens, hiddenDim, layer.ffnUpBias());
 
     // 8. GELU activation
@@ -271,14 +267,7 @@ public final class ClipVisionEncoder {
     }
 
     // 9. FFN down projection + residual
-    projectQ8_0(
-        feedForwardProjected,
-        feedForward,
-        tokens,
-        layer.ffnDownQ8_0(),
-        dim,
-        hiddenDim,
-        layer.ffnDown());
+    project(feedForwardProjected, feedForward, tokens, layer.ffnDown());
     addBias(feedForwardProjected, tokens, dim, layer.ffnDownBias());
     for (int i = 0; i < batchElements; i++) {
       feedForwardProjected[i] += attentionProjected[i];
@@ -359,28 +348,6 @@ public final class ClipVisionEncoder {
                   }
                 }))
         .execute();
-  }
-
-  /**
-   * Projects using Q8_0 quantized weights through the native kernel when available, otherwise falls
-   * back to the original weight matrix.
-   */
-  private void projectQ8_0(
-      float[] output,
-      float[] input,
-      int sequenceLength,
-      MemorySegment q8_0Weights,
-      int rows,
-      int columns,
-      ClipVisionWeights.Matrix fallbackMatrix) {
-    if (q8_0Weights != null
-        && matrixKernel.isEligible(GgufTensorType.Q8_0, sequenceLength, rows, columns)) {
-      matrixKernel.multiply(
-          output, input, q8_0Weights, GgufTensorType.Q8_0, sequenceLength, rows, columns);
-      return;
-    }
-    // Fallback: use original matrix (F32/BF16/F16 path)
-    project(output, input, sequenceLength, fallbackMatrix);
   }
 
   private void project(

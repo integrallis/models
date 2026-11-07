@@ -33,7 +33,8 @@
     "Q4_K_ORDERED_REDUCTION": 1073741824,
     "MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL": 2147483648,
     "TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL": 4294967296,
-    "Q5_0_INDEPENDENT_BATCHED_MATMUL": 8589934592
+    "Q5_0_INDEPENDENT_BATCHED_MATMUL": 8589934592,
+    "Q4_K_BATCH_PACKING": 2147483648
   },
   "exports": {
     "cpu": [
@@ -223,7 +224,8 @@
         "Q4_K_F32_GROUPED_BATCHED_MATMUL",
         "Q4_K_BATCH_VECTOR_ACCUMULATION",
         "K_QUANT_BATCH_WEIGHT_REUSE",
-        "Q4_K_ORDERED_REDUCTION"
+        "Q4_K_ORDERED_REDUCTION",
+        "Q4_K_BATCH_PACKING"
       ],
       "exports": {
         "cpu": [
@@ -265,7 +267,8 @@
       "remaining": [
         "Verify the ordered Q4_K variant with all pinned Flint continuations and bounded full-logit tolerances, then rerun unchanged held-out quality and whole-model performance gates; short ablations and synthetic parity do not qualify a model.",
         "Reproduce the best exact Java alternative and native route with matched scheduling and actual model calls.",
-        "Identify a controlled JVM cause, qualify whole-model cost and resources on every retained profile, then adopt or remove."
+        "Identify a controlled JVM cause, qualify whole-model cost and resources on every retained profile, then adopt or remove.",
+        "Retain packed prefill parity and matched LLaVA performance evidence; hardware capability gates the image policy. Existing ordered callers preserve their floating-point block fold."
       ],
       "sourceScope": "cpu"
     },

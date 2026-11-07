@@ -37,6 +37,24 @@ import org.junit.jupiter.api.Test;
 
 class NativeKernelLibraryTest {
 
+  @Test
+  void imagePrefillPolicyRequiresTheLoadedPackingCapability() {
+    try (var library = NativeKernelLibrary.open(libraryPath(), 2);
+        var kernel = RustGgufBatchedMatrixKernel.open(libraryPath(), 2)) {
+      var before = kernel.planRecommendations();
+      boolean supported = library.supports(NativeKernelCapability.Q4_K_BATCH_PACKING);
+      assertThat(kernel.configureImagePrefill()).isEqualTo(supported);
+      if (supported) {
+        assertThat(kernel.planRecommendations())
+            .containsEntry(PureJavaPlanConfiguration.PREFILL_BATCH_SIZE_PROPERTY, "128");
+        assertThat(kernel.implementation()).contains("packed");
+      } else {
+        assertThat(kernel.planRecommendations()).isEqualTo(before);
+        assertThat(kernel.implementation()).doesNotContain("ordered");
+      }
+    }
+  }
+
   @AfterEach
   void restoreTheLibrarySharingDefault() {
     System.clearProperty(NativeKernelLibrary.SHARED_LIBRARY_PROPERTY);
