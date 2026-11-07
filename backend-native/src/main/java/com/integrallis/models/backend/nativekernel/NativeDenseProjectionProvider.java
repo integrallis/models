@@ -28,10 +28,10 @@ public final class NativeDenseProjectionProvider implements DenseProjectionProvi
     if (configured == null || configured.isBlank())
       configured = System.getenv("MODELS_NATIVE_KERNELS_LIBRARY");
     if (configured != null && !configured.isBlank()) {
-      return Optional.of(NativeDebertaKernels.load(Path.of(configured), threads));
+      return Optional.of(coordinate(NativeDebertaKernels.load(Path.of(configured), threads)));
     }
     try {
-      return Optional.of(NativeDebertaKernels.load(threads));
+      return Optional.of(coordinate(NativeDebertaKernels.load(threads)));
     } catch (java.io.IOException | IllegalStateException unavailable) {
       System.getLogger(getClass().getName())
           .log(
@@ -40,5 +40,11 @@ public final class NativeDenseProjectionProvider implements DenseProjectionProvi
               unavailable.getMessage());
       return Optional.empty();
     }
+  }
+
+  private static DenseProjectionKernels coordinate(DenseProjectionKernels kernels) {
+    // Match RustGgufBatchedMatrixKernel: idle Java workers must not compete with native GEMM.
+    RustGgufBatchedMatrixKernel.parkJavaExecutor();
+    return kernels;
   }
 }
