@@ -162,7 +162,17 @@ public final class LlavaVisionProjector implements AutoCloseable {
     // LLaVA uses patch features, excluding CLS, with no post-layer normalization.
     float[] patches = Arrays.copyOfRange(features, config.hiddenSize(), features.length);
     float[] intermediate = project(patches, up, upBias, upProjection);
-    TensorOps.geluErf(intermediate, 0, intermediate, 0, intermediate.length);
+    com.integrallis.vectors.core.GgufStagePlan.of(
+            com.integrallis.vectors.core.GgufStagePlan.stage(
+                tokenCount(),
+                (from, to) ->
+                    TensorOps.geluErf(
+                        intermediate,
+                        from * up.rows(),
+                        intermediate,
+                        from * up.rows(),
+                        (to - from) * up.rows())))
+        .execute();
     return project(intermediate, down, downBias, downProjection);
   }
 
