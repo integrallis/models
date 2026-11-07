@@ -738,16 +738,7 @@ public final class LlamaForwardPass {
   public float[] prefillEmbeddings(float[] embeddings, int startPosition) {
     Objects.requireNonNull(embeddings, "embeddings");
     int dim = config.embeddingDim();
-    if (embeddings.length == 0 || embeddings.length % dim != 0) {
-      throw new IllegalArgumentException("embeddings must contain complete nonempty rows");
-    }
-    int rows = embeddings.length / dim;
-    if (startPosition != nextPosition || rows > cache.maxSeqLen() - startPosition) {
-      throw new IllegalArgumentException("image positions must be contiguous and fit the context");
-    }
-    for (float value : embeddings) {
-      if (!Float.isFinite(value)) throw new IllegalArgumentException("nonfinite embedding");
-    }
+    int rows = validateEmbeddingRows(embeddings, startPosition, dim);
     float[] result = null;
     int row = 0;
     while (row < rows) {
@@ -773,6 +764,20 @@ public final class LlamaForwardPass {
       row += count;
     }
     return result.clone();
+  }
+
+  private int validateEmbeddingRows(float[] embeddings, int startPosition, int dim) {
+    if (embeddings.length == 0 || embeddings.length % dim != 0) {
+      throw new IllegalArgumentException("embeddings must contain complete nonempty rows");
+    }
+    int rows = embeddings.length / dim;
+    if (startPosition != nextPosition || rows > cache.maxSeqLen() - startPosition) {
+      throw new IllegalArgumentException("image positions must be contiguous and fit the context");
+    }
+    for (float value : embeddings) {
+      if (!Float.isFinite(value)) throw new IllegalArgumentException("nonfinite embedding");
+    }
+    return rows;
   }
 
   /**
@@ -1314,181 +1319,194 @@ public final class LlamaForwardPass {
       boolean computeFinalLogits,
       float[] batchLogits,
       int batchLogitsOffset) {
+    prepareRopeBatch(startPosition, batchSize);
+    for (int layer = 0; layer < config.numLayers(); layer++) {
+      if (advancePrefillLayer(
+          layer, batchSize, startPosition, computeFinalLogits, batchLogits != null)) {
+        break;
+      }
+    }
+    projectPrefillOutput(batchSize, computeFinalLogits, batchLogits, batchLogitsOffset);
+  }
+
+  /** Returns true when a final-layer shortcut has completed the batch. */
+  private boolean advancePrefillLayer(
+      int layer, int batchSize, int startPosition, boolean computeFinalLogits, boolean allLogits) {
+    int dim = config.embeddingDim();
+    LlamaWeights.LayerWeights lw = weights.layer(layer);
+    for (int batch = 0; batch < batchSize; batch++) {
+      int xOffset = batch * dim;
+      TensorOps.rmsNorm(
+          batchXNorm, xOffset, batchX, xOffset, lw.attentionNorm(), dim, config.rmsNormEps());
+    }
+    boolean canPrune = canDiscardFinalLayer(layer, allLogits);
+    if (finalLayerKvOnlyPrefill && canPrune) {
+      finishFinalLayerKvOnlyBatch(lw, layer, batchSize, startPosition, computeFinalLogits);
+      return true;
+    }
+    projectPrefillQkv(lw, batchSize);
+    boolean pruneFinalLayer = finalLayerPrefillPruning && canPrune;
+    boolean useStagedQuantizedLayer =
+        !pruneFinalLayer
+            && stagedQuantizedLayer
+            && stagedQuantizedPlan != null
+            && stagedQuantizedPlan.supportsLayer(lw);
+    if (useStagedQuantizedLayer) {
+      cache.reserveSequenceCapacity(startPosition + batchSize);
+      stagedQuantizedPlan.executeLayer(lw, layer, startPosition, batchSize);
+    } else {
+      executePrefillAttention(lw, layer, batchSize, startPosition);
+      if (pruneFinalLayer) {
+        if (computeFinalLogits) {
+          finishFinalLayerFfnRow(lw, (batchSize - 1) * dim, dim, config.hiddenDim());
+        }
+        return true;
+      }
+      executePrefillFfn(lw, layer, batchSize);
+    }
+    normalizeProjectionBatch(batchFfnProjected, batchSize, dim, lw.ffnPostNorm());
+    addScaledActiveInPlace(batchX, batchFfnProjected, batchSize * dim, config.residualScale());
+    notifyPrefillLayer(layer, startPosition, batchSize);
+    return false;
+  }
+
+  private void notifyPrefillLayer(int layer, int startPosition, int batchSize) {
+    int dim = config.embeddingDim();
+    if (layerObserver != null) {
+      for (int batch = 0; batch < batchSize; batch++) {
+        layerObserver.onLayerComplete(layer, startPosition + batch, batchX, batch * dim, dim);
+      }
+    }
+  }
+
+  private boolean canDiscardFinalLayer(int layer, boolean outputNeeded) {
+    return !outputNeeded && layerObserver == null && layer == config.numLayers() - 1;
+  }
+
+  private void projectPrefillQkv(LlamaWeights.LayerWeights lw, int batchSize) {
     int dim = config.embeddingDim();
     int queryDim = config.queryDim();
     int keyDim = config.keyDim();
     int valueDim = config.valueDim();
-    int attentionOutputDim = config.attentionOutputDim();
-    int hiddenDim = config.hiddenDim();
-    prepareRopeBatch(startPosition, batchSize);
-
-    for (int layer = 0; layer < config.numLayers(); layer++) {
-      LlamaWeights.LayerWeights lw = weights.layer(layer);
-      for (int batch = 0; batch < batchSize; batch++) {
-        int xOffset = batch * dim;
-        TensorOps.rmsNorm(
-            batchXNorm, xOffset, batchX, xOffset, lw.attentionNorm(), dim, config.rmsNormEps());
-      }
-
-      boolean useFinalLayerKvOnlyPrefill =
-          finalLayerKvOnlyPrefill
-              && batchLogits == null
-              && layerObserver == null
-              && layer == config.numLayers() - 1;
-      if (useFinalLayerKvOnlyPrefill) {
-        finishFinalLayerKvOnlyBatch(lw, layer, batchSize, startPosition, computeFinalLogits);
-        break;
-      }
-
-      if (groupedBatchedPrefill) {
-        tripleBatchedMatmulDispatch(
-            batchQ,
-            lw.wq(),
-            lw.wqType(),
-            queryDim,
-            batchK,
-            lw.wk(),
-            lw.wkType(),
-            keyDim,
-            batchV,
-            lw.wv(),
-            lw.wvType(),
-            valueDim,
-            batchXNorm,
-            batchSize,
-            dim);
-      } else {
-        batchedMatmulDispatch(batchQ, batchXNorm, batchSize, lw.wq(), lw.wqType(), queryDim, dim);
-        batchedMatmulDispatch(batchK, batchXNorm, batchSize, lw.wk(), lw.wkType(), keyDim, dim);
-        batchedMatmulDispatch(batchV, batchXNorm, batchSize, lw.wv(), lw.wvType(), valueDim, dim);
-      }
-
-      boolean pruneFinalLayer =
-          finalLayerPrefillPruning
-              && batchLogits == null
-              && layerObserver == null
-              && layer == config.numLayers() - 1;
-      boolean useStagedQuantizedLayer =
-          !pruneFinalLayer
-              && stagedQuantizedLayer
-              && stagedQuantizedPlan != null
-              && stagedQuantizedPlan.supportsLayer(lw);
-      if (useStagedQuantizedLayer) {
-        cache.reserveSequenceCapacity(startPosition + batchSize);
-        stagedQuantizedPlan.executeLayer(lw, layer, startPosition, batchSize);
-      } else {
-        prepareBatchedAttention(lw, layer, startPosition, 0, batchSize);
-        computeBatchedAttentionRows(lw, layer, startPosition, batchSize);
-        batchedMatmulDispatch(
-            batchAttnProjected,
-            batchAttnOut,
-            batchSize,
-            lw.wo(),
-            lw.woType(),
-            dim,
-            attentionOutputDim);
-        normalizeProjectionBatch(batchAttnProjected, batchSize, dim, lw.attentionPostNorm());
-        addScaledActiveInPlace(batchX, batchAttnProjected, batchSize * dim, config.residualScale());
-
-        if (pruneFinalLayer) {
-          if (computeFinalLogits) {
-            finishFinalLayerFfnRow(lw, (batchSize - 1) * dim, dim, hiddenDim);
-          }
-          break;
-        }
-
-        for (int batch = 0; batch < batchSize; batch++) {
-          int xOffset = batch * dim;
-          TensorOps.rmsNorm(
-              batchXNorm, xOffset, batchX, xOffset, lw.ffnNorm(), dim, config.rmsNormEps());
-        }
-        if (lw.moe() != null) {
-          for (int batch = 0; batch < batchSize; batch++) {
-            routedFfn(batchFfnProjected, batch * dim, batchXNorm, batch * dim, lw.moe(), layer);
-          }
-        } else if (stagedQuantizedFfn
-            && stagedQuantizedPlan != null
-            && stagedQuantizedPlan.supportsFfn(lw)) {
-          stagedQuantizedPlan.executeFfn(lw, batchSize);
-        } else {
-          if (groupedBatchedPrefill) {
-            dualBatchedMatmulDispatch(
-                batchFfnGate,
-                lw.ffnGate(),
-                lw.ffnGateType(),
-                hiddenDim,
-                batchFfnUp,
-                lw.ffnUp(),
-                lw.ffnUpType(),
-                hiddenDim,
-                batchXNorm,
-                batchSize,
-                dim);
-          } else {
-            batchedMatmulDispatch(
-                batchFfnGate,
-                batchXNorm,
-                batchSize,
-                lw.ffnGate(),
-                lw.ffnGateType(),
-                hiddenDim,
-                dim);
-            batchedMatmulDispatch(
-                batchFfnUp, batchXNorm, batchSize, lw.ffnUp(), lw.ffnUpType(), hiddenDim, dim);
-          }
-          // Activation is elementwise: one dispatch over the batch preserves each lane's
-          // arithmetic and avoids a worker-pool round trip for every image patch.
-          activateFfn(
-              batchFfnOut,
-              0,
-              batchFfnGate,
-              0,
-              batchFfnUp,
-              0,
-              Math.multiplyExact(batchSize, hiddenDim),
-              batchFfnOutView,
-              batchFfnGateView,
-              batchFfnUpView);
-          batchedMatmulDispatch(
-              batchFfnProjected,
-              batchFfnOut,
-              batchSize,
-              lw.ffnDown(),
-              lw.ffnDownType(),
-              dim,
-              hiddenDim);
-        }
-      }
-      normalizeProjectionBatch(batchFfnProjected, batchSize, dim, lw.ffnPostNorm());
-      addScaledActiveInPlace(batchX, batchFfnProjected, batchSize * dim, config.residualScale());
-      if (layerObserver != null) {
-        for (int batch = 0; batch < batchSize; batch++) {
-          layerObserver.onLayerComplete(layer, startPosition + batch, batchX, batch * dim, dim);
-        }
-      }
+    if (groupedBatchedPrefill) {
+      tripleBatchedMatmulDispatch(
+          batchQ,
+          lw.wq(),
+          lw.wqType(),
+          queryDim,
+          batchK,
+          lw.wk(),
+          lw.wkType(),
+          keyDim,
+          batchV,
+          lw.wv(),
+          lw.wvType(),
+          valueDim,
+          batchXNorm,
+          batchSize,
+          dim);
+    } else {
+      batchedMatmulDispatch(batchQ, batchXNorm, batchSize, lw.wq(), lw.wqType(), queryDim, dim);
+      batchedMatmulDispatch(batchK, batchXNorm, batchSize, lw.wk(), lw.wkType(), keyDim, dim);
+      batchedMatmulDispatch(batchV, batchXNorm, batchSize, lw.wv(), lw.wvType(), valueDim, dim);
     }
+  }
 
+  private void executePrefillAttention(
+      LlamaWeights.LayerWeights lw, int layer, int batchSize, int startPosition) {
+    int dim = config.embeddingDim();
+    int attentionOutputDim = config.attentionOutputDim();
+    prepareBatchedAttention(lw, layer, startPosition, 0, batchSize);
+    computeBatchedAttentionRows(lw, layer, startPosition, batchSize);
+    batchedMatmulDispatch(
+        batchAttnProjected, batchAttnOut, batchSize, lw.wo(), lw.woType(), dim, attentionOutputDim);
+    normalizeProjectionBatch(batchAttnProjected, batchSize, dim, lw.attentionPostNorm());
+    addScaledActiveInPlace(batchX, batchAttnProjected, batchSize * dim, config.residualScale());
+  }
+
+  private void executePrefillFfn(LlamaWeights.LayerWeights lw, int layer, int batchSize) {
+    int dim = config.embeddingDim();
+    for (int batch = 0; batch < batchSize; batch++) {
+      int xOffset = batch * dim;
+      TensorOps.rmsNorm(
+          batchXNorm, xOffset, batchX, xOffset, lw.ffnNorm(), dim, config.rmsNormEps());
+    }
+    if (lw.moe() != null) {
+      for (int batch = 0; batch < batchSize; batch++) {
+        routedFfn(batchFfnProjected, batch * dim, batchXNorm, batch * dim, lw.moe(), layer);
+      }
+    } else if (stagedQuantizedFfn
+        && stagedQuantizedPlan != null
+        && stagedQuantizedPlan.supportsFfn(lw)) {
+      stagedQuantizedPlan.executeFfn(lw, batchSize);
+    } else {
+      executeDensePrefillFfn(lw, batchSize);
+    }
+  }
+
+  private void executeDensePrefillFfn(LlamaWeights.LayerWeights lw, int batchSize) {
+    int dim = config.embeddingDim();
+    int hiddenDim = config.hiddenDim();
+    if (groupedBatchedPrefill) {
+      dualBatchedMatmulDispatch(
+          batchFfnGate,
+          lw.ffnGate(),
+          lw.ffnGateType(),
+          hiddenDim,
+          batchFfnUp,
+          lw.ffnUp(),
+          lw.ffnUpType(),
+          hiddenDim,
+          batchXNorm,
+          batchSize,
+          dim);
+    } else {
+      batchedMatmulDispatch(
+          batchFfnGate, batchXNorm, batchSize, lw.ffnGate(), lw.ffnGateType(), hiddenDim, dim);
+      batchedMatmulDispatch(
+          batchFfnUp, batchXNorm, batchSize, lw.ffnUp(), lw.ffnUpType(), hiddenDim, dim);
+    }
+    // Activation is elementwise: one dispatch over the batch preserves each lane's
+    // arithmetic and avoids a worker-pool round trip for every image patch.
+    activateFfn(
+        batchFfnOut,
+        0,
+        batchFfnGate,
+        0,
+        batchFfnUp,
+        0,
+        Math.multiplyExact(batchSize, hiddenDim),
+        batchFfnOutView,
+        batchFfnGateView,
+        batchFfnUpView);
+    batchedMatmulDispatch(
+        batchFfnProjected, batchFfnOut, batchSize, lw.ffnDown(), lw.ffnDownType(), dim, hiddenDim);
+  }
+
+  private void projectPrefillOutput(
+      int batchSize, boolean computeFinalLogits, float[] batchLogits, int batchLogitsOffset) {
+    int dim = config.embeddingDim();
     if (batchLogits != null) {
       int vocabSize = config.vocabSize();
       for (int batch = 0; batch < batchSize; batch++) {
         int stateOffset = batch * dim;
-        TensorOps.rmsNorm(
-            xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
-        matmulDispatch(
-            logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
-        scaleLogits(logits, 0, vocabSize);
-        softcapLogits(logits);
+        projectPrefillLogits(stateOffset);
         System.arraycopy(logits, 0, batchLogits, batchLogitsOffset + batch * vocabSize, vocabSize);
       }
     } else if (computeFinalLogits) {
       int finalOffset = (batchSize - 1) * dim;
-      TensorOps.rmsNorm(
-          xNorm, 0, batchX, finalOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
-      matmulDispatch(
-          logits, xNorm, weights.outputSegment(), weights.outputType(), config.vocabSize(), dim);
-      scaleLogits(logits, 0, config.vocabSize());
-      softcapLogits(logits);
+      projectPrefillLogits(finalOffset);
     }
+  }
+
+  private void projectPrefillLogits(int stateOffset) {
+    int dim = config.embeddingDim();
+    int vocabSize = config.vocabSize();
+    TensorOps.rmsNorm(
+        xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
+    matmulDispatch(logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
+    scaleLogits(logits, 0, vocabSize);
+    softcapLogits(logits);
   }
 
   private LogitBatch forwardIndependentSessionBatch(Session[] sessions, int[] tokens) {
@@ -1962,7 +1980,6 @@ public final class LlamaForwardPass {
 
     int dim = config.embeddingDim();
     int keyLength = config.keyLength();
-    int numHeads = config.numHeads();
     int numKvHeads = config.numKvHeads();
     prepareRope(position);
 
@@ -1981,84 +1998,14 @@ public final class LlamaForwardPass {
       TensorOps.rmsNorm(xNorm, x, lw.attentionNorm(), dim, config.rmsNormEps());
 
       // Only safe when the activation is genuinely discarded; HIDDEN needs the full final layer.
-      if (finalLayerKvOnlyPrefill
-          && head == Head.NONE
-          && layerObserver == null
-          && layer == config.numLayers() - 1) {
+      if (finalLayerKvOnlyPrefill && canDiscardFinalLayer(layer, head != Head.NONE)) {
         finishFinalLayerKvOnlyToken(
             lw, layer, position, keyLength, numKvHeads, sequenceCache, adapterActive);
         return null;
       }
 
-      // QKV projections
-      if (groupedProjections) {
-        tripleMatmulDispatch(
-            q,
-            lw.wq(),
-            lw.wqType(),
-            config.queryDim(),
-            k,
-            lw.wk(),
-            lw.wkType(),
-            config.keyDim(),
-            v,
-            lw.wv(),
-            lw.wvType(),
-            config.valueDim(),
-            xNorm,
-            dim);
-      } else {
-        matmulDispatch(q, xNorm, lw.wq(), lw.wqType(), config.queryDim(), dim);
-        matmulDispatch(k, xNorm, lw.wk(), lw.wkType(), config.keyDim(), dim);
-        matmulDispatch(v, xNorm, lw.wv(), lw.wvType(), config.valueDim(), dim);
-      }
-      addActivatedAdapter(layer, Projection.QUERY, q, xNorm, adapterActive);
-      addActivatedAdapter(layer, Projection.KEY, k, xNorm, adapterActive);
-      addActivatedAdapter(layer, Projection.VALUE, v, xNorm, adapterActive);
-      addOptionalBias(q, lw.qBias());
-      addOptionalBias(k, lw.kBias());
-      addOptionalBias(v, lw.vBias());
-
-      // RoPE for each head
-      for (int h = 0; h < numHeads; h++) {
-        int offset = h * keyLength;
-        normalizeHead(q, offset, lw.qNorm(), keyLength);
-        if (config.usesRope(layer)) {
-          applyRope(q, offset, layer);
-        }
-      }
-      scaleQueryTemperature(q, 0, position);
-      for (int h = 0; h < numKvHeads; h++) {
-        int offset = h * keyLength;
-        normalizeHead(k, offset, lw.kNorm(), keyLength);
-        if (config.usesRope(layer)) {
-          applyRope(k, offset, layer);
-        }
-      }
-
-      // Store K,V in cache
-      sequenceCache.store(layer, position, k, v);
-      // Grouped-query attention, partitioned over heads
-      if (sequenceCache == cache && batchedAttentionKernelEligible(layer, position, 1)) {
-        int window = config.usesSlidingWindow(layer) ? config.slidingWindow() : 0;
-        batchedAttentionKernel.attend(
-            attnOut,
-            q,
-            k,
-            v,
-            layer,
-            position,
-            1,
-            config.numHeads(),
-            config.numKvHeads(),
-            config.keyLength(),
-            config.valueLength(),
-            cache.maxSeqLen(),
-            window);
-      } else {
-        attendHeads(q, 0, attnOut, 0, layer, position, sequenceCache);
-      }
-
+      projectTokenQkv(lw, layer, adapterActive);
+      executeTokenAttention(lw, layer, position, sequenceCache);
       // Output projection
       matmulDispatch(
           attnProjected, attnOut, lw.wo(), lw.woType(), dim, config.attentionOutputDim());
@@ -2071,56 +2018,11 @@ public final class LlamaForwardPass {
 
       // Second pruning shortcut: the last layer's FFN cannot change a discarded activation.
       // HIDDEN consumes that activation, so it must run the FFN.
-      if (finalLayerPrefillPruning
-          && head == Head.NONE
-          && layerObserver == null
-          && layer == config.numLayers() - 1) {
+      if (finalLayerPrefillPruning && canDiscardFinalLayer(layer, head != Head.NONE)) {
         return null;
       }
 
-      // FFN norm
-      TensorOps.rmsNorm(xNorm, x, lw.ffnNorm(), dim, config.rmsNormEps());
-
-      // FFN: routed for a mixture-of-experts layer, dense SwiGLU otherwise
-      if (lw.moe() != null) {
-        refuseFfnAdapter(layer, adapterActive);
-        routedFfn(ffnProjected, 0, xNorm, 0, lw.moe(), layer);
-      } else {
-        if (groupedProjections) {
-          dualMatmulDispatch(
-              ffnGate,
-              lw.ffnGate(),
-              lw.ffnGateType(),
-              config.hiddenDim(),
-              ffnUp,
-              lw.ffnUp(),
-              lw.ffnUpType(),
-              config.hiddenDim(),
-              xNorm,
-              dim);
-        } else {
-          matmulDispatch(ffnGate, xNorm, lw.ffnGate(), lw.ffnGateType(), config.hiddenDim(), dim);
-          matmulDispatch(ffnUp, xNorm, lw.ffnUp(), lw.ffnUpType(), config.hiddenDim(), dim);
-        }
-        addActivatedAdapter(layer, Projection.FFN_GATE, ffnGate, xNorm, adapterActive);
-        addActivatedAdapter(layer, Projection.FFN_UP, ffnUp, xNorm, adapterActive);
-        activateFfn(
-            ffnOut,
-            0,
-            ffnGate,
-            0,
-            ffnUp,
-            0,
-            config.hiddenDim(),
-            ffnOutView,
-            ffnGateView,
-            ffnUpView);
-
-        // Down projection
-        matmulDispatch(
-            ffnProjected, ffnOut, lw.ffnDown(), lw.ffnDownType(), dim, config.hiddenDim());
-        addActivatedAdapter(layer, Projection.FFN_DOWN, ffnProjected, ffnOut, adapterActive);
-      }
+      executeTokenFfn(lw, layer, adapterActive);
       normalizeProjection(ffnProjected, lw.ffnPostNorm(), dim);
 
       // Residual connection
@@ -2130,6 +2032,132 @@ public final class LlamaForwardPass {
       }
     }
 
+    return projectTokenOutput(head);
+  }
+
+  private void projectTokenQkv(LlamaWeights.LayerWeights lw, int layer, boolean adapterActive) {
+    int dim = config.embeddingDim();
+    // QKV projections
+    if (groupedProjections) {
+      tripleMatmulDispatch(
+          q,
+          lw.wq(),
+          lw.wqType(),
+          config.queryDim(),
+          k,
+          lw.wk(),
+          lw.wkType(),
+          config.keyDim(),
+          v,
+          lw.wv(),
+          lw.wvType(),
+          config.valueDim(),
+          xNorm,
+          dim);
+    } else {
+      matmulDispatch(q, xNorm, lw.wq(), lw.wqType(), config.queryDim(), dim);
+      matmulDispatch(k, xNorm, lw.wk(), lw.wkType(), config.keyDim(), dim);
+      matmulDispatch(v, xNorm, lw.wv(), lw.wvType(), config.valueDim(), dim);
+    }
+    addActivatedAdapter(layer, Projection.QUERY, q, xNorm, adapterActive);
+    addActivatedAdapter(layer, Projection.KEY, k, xNorm, adapterActive);
+    addActivatedAdapter(layer, Projection.VALUE, v, xNorm, adapterActive);
+    addOptionalBias(q, lw.qBias());
+    addOptionalBias(k, lw.kBias());
+    addOptionalBias(v, lw.vBias());
+  }
+
+  private void executeTokenAttention(
+      LlamaWeights.LayerWeights lw, int layer, int position, KvCache sequenceCache) {
+    int keyLength = config.keyLength();
+    int numHeads = config.numHeads();
+    int numKvHeads = config.numKvHeads();
+    // RoPE for each head
+    for (int h = 0; h < numHeads; h++) {
+      int offset = h * keyLength;
+      normalizeHead(q, offset, lw.qNorm(), keyLength);
+      if (config.usesRope(layer)) {
+        applyRope(q, offset, layer);
+      }
+    }
+    scaleQueryTemperature(q, 0, position);
+    for (int h = 0; h < numKvHeads; h++) {
+      int offset = h * keyLength;
+      normalizeHead(k, offset, lw.kNorm(), keyLength);
+      if (config.usesRope(layer)) {
+        applyRope(k, offset, layer);
+      }
+    }
+
+    // Store K,V in cache
+    sequenceCache.store(layer, position, k, v);
+    // Grouped-query attention, partitioned over heads
+    if (sequenceCache == cache && batchedAttentionKernelEligible(layer, position, 1)) {
+      int window = config.usesSlidingWindow(layer) ? config.slidingWindow() : 0;
+      batchedAttentionKernel.attend(
+          attnOut,
+          q,
+          k,
+          v,
+          layer,
+          position,
+          1,
+          config.numHeads(),
+          config.numKvHeads(),
+          config.keyLength(),
+          config.valueLength(),
+          cache.maxSeqLen(),
+          window);
+    } else {
+      attendHeads(q, 0, attnOut, 0, layer, position, sequenceCache);
+    }
+  }
+
+  private void executeTokenFfn(LlamaWeights.LayerWeights lw, int layer, boolean adapterActive) {
+    int dim = config.embeddingDim();
+    // FFN norm
+    TensorOps.rmsNorm(xNorm, x, lw.ffnNorm(), dim, config.rmsNormEps());
+
+    // FFN: routed for a mixture-of-experts layer, dense SwiGLU otherwise
+    if (lw.moe() != null) {
+      refuseFfnAdapter(layer, adapterActive);
+      routedFfn(ffnProjected, 0, xNorm, 0, lw.moe(), layer);
+    } else {
+      executeDenseTokenFfn(lw, layer, adapterActive);
+    }
+  }
+
+  private void executeDenseTokenFfn(
+      LlamaWeights.LayerWeights lw, int layer, boolean adapterActive) {
+    int dim = config.embeddingDim();
+    if (groupedProjections) {
+      dualMatmulDispatch(
+          ffnGate,
+          lw.ffnGate(),
+          lw.ffnGateType(),
+          config.hiddenDim(),
+          ffnUp,
+          lw.ffnUp(),
+          lw.ffnUpType(),
+          config.hiddenDim(),
+          xNorm,
+          dim);
+    } else {
+      matmulDispatch(ffnGate, xNorm, lw.ffnGate(), lw.ffnGateType(), config.hiddenDim(), dim);
+      matmulDispatch(ffnUp, xNorm, lw.ffnUp(), lw.ffnUpType(), config.hiddenDim(), dim);
+    }
+    addActivatedAdapter(layer, Projection.FFN_GATE, ffnGate, xNorm, adapterActive);
+    addActivatedAdapter(layer, Projection.FFN_UP, ffnUp, xNorm, adapterActive);
+    activateFfn(
+        ffnOut, 0, ffnGate, 0, ffnUp, 0, config.hiddenDim(), ffnOutView, ffnGateView, ffnUpView);
+
+    // Down projection
+    matmulDispatch(ffnProjected, ffnOut, lw.ffnDown(), lw.ffnDownType(), dim, config.hiddenDim());
+    addActivatedAdapter(layer, Projection.FFN_DOWN, ffnProjected, ffnOut, adapterActive);
+  }
+
+  private float[] projectTokenOutput(Head head) {
+    int dim = config.embeddingDim();
     if (head == Head.NONE) {
       return null;
     }
