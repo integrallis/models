@@ -2,6 +2,8 @@
 
 This review compares the pinned PR base, the original PR head, and the reviewed source commit. See [generated score tables](COMPARISON.md), [exact revisions and tool settings](results/provenance.json), and the unmodified reports under `results/{main,before,after}`. MFCQI measures production Java; it does not score Rust, tests, or model accuracy.
 
+**Coverage caveat discovered in the subsequent CLI pass:** MFCQI 0.7.0's default AST parser skips files using modern Java syntax. The scores below are reproducible but incomplete as a full-source quality assessment. See the [CLI hotspot review](cli-hotspots/README.md) for measured parser coverage and method findings with modern syntax enabled. A corrected main/PR score comparison requires rerunning both arms after fixing analyzer language configuration.
+
 The aggregate is slightly down from main: **67.1447 → 67.1400 (−0.0047 score points)**, effectively flat at two decimal places. The original PR was 67.0386; the review improves it by 0.1014 points. Java backend, native backend and API scores exceed main. Benchmark tooling remains below main by 0.4145 points, although the review recovered 0.1480 points there. Eighteen other scopes are unchanged. Added validation slightly lowers the native module score relative to the original PR; its correctness benefit takes precedence over that metric movement.
 
 The remaining release decreases are concentrated in complexity, coupling and smell components; documentation, duplication and cohesion improve relative to main. No further changes were made merely to force the aggregate across main's score.
