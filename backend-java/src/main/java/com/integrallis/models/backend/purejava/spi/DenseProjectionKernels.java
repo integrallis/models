@@ -38,6 +38,11 @@ public interface DenseProjectionKernels extends AutoCloseable {
     return false;
   }
 
+  /** Applies QuickGELU in place, or leaves the array untouched when unavailable. */
+  default boolean quickGelu(float[] values) {
+    return false;
+  }
+
   default String implementation() {
     return "java";
   }

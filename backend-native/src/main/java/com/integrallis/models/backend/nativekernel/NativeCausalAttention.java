@@ -22,6 +22,7 @@ import java.util.Map;
 /** Owned continuous MHA prefix for the LLaVA decoder, sharing the dense GEMM implementation. */
 final class NativeCausalAttention implements BatchedCausalAttentionKernel {
   private final com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel kernels;
+  private final NativeDebertaKernels dense;
   private float[] scores = new float[0];
   private final Map<Integer, Layer> layers = new HashMap<>();
   private boolean closed;
@@ -40,8 +41,10 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
   }
 
   NativeCausalAttention(
-      com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel kernels) {
+      com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel kernels,
+      NativeDebertaKernels dense) {
     this.kernels = kernels;
+    this.dense = dense;
   }
 
   @Override
@@ -97,25 +100,27 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
     Layer state = layers.computeIfAbsent(layer, ignored -> new Layer(dimension, capacity));
     System.arraycopy(key, 0, state.keys, start * dimension, count);
     System.arraycopy(value, 0, state.values, start * dimension, count);
-    int needed = Math.multiplyExact(heads, start + batch);
-    if (scores.length < needed) scores = new float[needed];
-    float scale = (float) (1.0 / Math.sqrt(keyLength));
-    for (int row = 0; row < batch; row++) {
+    if (batch > 1) {
+      dense.causalAttention(
+          output, query, state.keys, state.values, batch, start + batch, dimension, heads);
+    } else {
+      int needed = Math.multiplyExact(heads, start + 1);
+      if (scores.length < needed) scores = new float[needed];
       kernels.groupedAttention(
           query,
-          row * dimension,
+          0,
           state.keys,
           0,
           state.values,
           0,
-          start + row + 1,
+          start + 1,
           null,
           0,
           null,
           0,
           0,
           output,
-          row * dimension,
+          0,
           scores,
           dimension,
           dimension,
@@ -123,7 +128,7 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
           valueLength,
           heads,
           kvHeads,
-          scale);
+          (float) (1.0 / Math.sqrt(keyLength)));
     }
     state.positions = start + batch;
   }
@@ -145,6 +150,7 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
       closed = true;
       layers.clear();
       scores = new float[0];
+      dense.close();
     }
   }
 }

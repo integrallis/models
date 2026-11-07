@@ -695,6 +695,71 @@ pub unsafe extern "C" fn jmodels_dense_causal_attention(
     .unwrap_or(-3)
 }
 
+/// In-place QuickGELU, using the same owned dense pool as adjacent projections.
+/// # Safety
+/// `values` must address `length` aligned writable floats, with no concurrent accesses.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_dense_quick_gelu(
+    handle: u64,
+    values: *mut f32,
+    length: usize,
+) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        if values.is_null()
+            || !(values as usize).is_multiple_of(4)
+            || length > isize::MAX as usize / 4
+        {
+            return -1;
+        }
+        let Some(pool) = POOLS.lock().ok().and_then(|r| r.get(&handle).cloned()) else {
+            return -2;
+        };
+        let ptr = values as usize;
+        let chunks = length.div_ceil(4096);
+        pool.install(|| {
+            (0..chunks).into_par_iter().for_each(|chunk| {
+                let start = chunk * 4096;
+                let count = (length - start).min(4096);
+                let values =
+                    unsafe { std::slice::from_raw_parts_mut((ptr as *mut f32).add(start), count) };
+                #[cfg(target_arch = "x86_64")]
+                if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
+                    unsafe {
+                        quick_gelu_avx2(values);
+                    }
+                    return;
+                }
+                for x in values {
+                    *x = (*x as f64 / (1.0 + (-1.702 * *x as f64).exp())) as f32;
+                }
+            })
+        });
+        0
+    }))
+    .unwrap_or(-3)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn quick_gelu_avx2(values: &mut [f32]) {
+    use std::arch::x86_64::*;
+    let scale = _mm256_set1_ps(-1.702);
+    let one = _mm256_set1_ps(1.0);
+    let end = values.len() / 8 * 8;
+    for offset in (0..end).step_by(8) {
+        unsafe {
+            let ptr = values.as_mut_ptr().add(offset);
+            let x = _mm256_loadu_ps(ptr);
+            let denominator =
+                _mm256_add_ps(one, super::onnx_kernels::exp8(_mm256_mul_ps(scale, x)));
+            _mm256_storeu_ps(ptr, _mm256_div_ps(x, denominator));
+        }
+    }
+    for x in &mut values[end..] {
+        *x = (*x as f64 / (1.0 + (-1.702 * *x as f64).exp())) as f32;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
