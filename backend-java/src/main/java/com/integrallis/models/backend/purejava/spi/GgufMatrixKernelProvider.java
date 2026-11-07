@@ -21,4 +21,9 @@ import java.util.Optional;
 public interface GgufMatrixKernelProvider {
   /** Opens a kernel; the receiving backend owns and closes it. */
   Optional<GgufBatchedMatrixKernel> open(int threads);
+
+  /** Opens the matching retained attention kernel, when supported. */
+  default BatchedCausalAttentionKernel openAttention(int threads) {
+    return BatchedCausalAttentionKernel.none();
+  }
 }

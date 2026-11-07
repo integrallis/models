@@ -650,3 +650,54 @@ pub unsafe extern "C" fn jmodels_dense_attention(
     }))
     .unwrap_or(-3)
 }
+
+/// Batched causal attention with a retained row-major K/V prefix (ordinary MHA).
+/// # Safety
+/// Each aligned pointer must be valid for its advertised length; output cannot alias inputs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_dense_causal_attention(
+    handle: u64, query: *const f32, query_len: usize, key: *const f32, key_len: usize,
+    value: *const f32, value_len: usize, out: *mut f32, out_len: usize,
+    batch: usize, positions: usize, dim: usize, heads: usize,
+) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        if batch == 0 || positions < batch || dim == 0 || heads == 0 || !dim.is_multiple_of(heads)
+            || [query, key, value, out.cast_const()].iter().any(|p| p.is_null() || !(*p as usize).is_multiple_of(4)) { return -1; }
+        let Some(qn) = batch.checked_mul(dim) else { return -1; };
+        let Some(kn) = positions.checked_mul(dim) else { return -1; };
+        let Some(sn) = batch.checked_mul(positions) else { return -1; };
+        if qn > query_len || kn > key_len || kn > value_len || qn > out_len
+            || [qn, kn, sn].iter().any(|n| *n > isize::MAX as usize / 4) { return -1; }
+        let Some(pool) = POOLS.lock().ok().and_then(|r| r.get(&handle).cloned()) else { return -2; };
+        let (qp, kp, vp, yp) = (query as usize, key as usize, value as usize, out as usize);
+        let width = dim / heads;
+        let scale = 1.0 / (width as f32).sqrt();
+        pool.install(|| (0..heads).into_par_iter().for_each(|head| {
+            ATTENTION_SCRATCH.with(|cell| {
+                let mut scratch = cell.borrow_mut(); scratch.scores.resize(sn, 0.0);
+                let scores = &mut scratch.scores;
+                unsafe {
+                    matrixmultiply::sgemm(batch, width, positions, scale,
+                        (qp as *const f32).add(head * width), dim as isize, 1,
+                        (kp as *const f32).add(head * width), 1, dim as isize,
+                        0.0, scores.as_mut_ptr(), positions as isize, 1);
+                    for (row, values) in scores.chunks_exact_mut(positions).enumerate() {
+                        let visible = positions - batch + row + 1;
+                        let (valid, masked) = values.split_at_mut(visible);
+                        let max = valid.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+                        let mut sum = 0.0;
+                        for x in valid.iter_mut() { *x = (*x - max).exp(); sum += *x; }
+                        let inverse = 1.0 / sum;
+                        for x in valid.iter_mut() { *x *= inverse; }
+                        masked.fill(0.0);
+                    }
+                    matrixmultiply::sgemm(batch, positions, width, 1.0,
+                        scores.as_ptr(), positions as isize, 1,
+                        (vp as *const f32).add(head * width), dim as isize, 1,
+                        0.0, (yp as *mut f32).add(head * width), dim as isize, 1);
+                }
+            });
+        }));
+        0
+    })).unwrap_or(-3)
+}
