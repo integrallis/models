@@ -1,0 +1,247 @@
+{
+  "schema" : "vision-integration-v1",
+  "arm" : "models-java",
+  "java" : "25.0.5+8-LTS",
+  "os" : "Linux amd64",
+  "host" : "ip-172-31-11-163",
+  "threads" : 8,
+  "mmprojSha256" : "50da4e5b0a011615f77686f9b02613571e65d23083c225e107c08c3b1775d9b1",
+  "imageSha256" : "cf6f3c4befa148732c7453e0de5afab00f682427435fead2d88b07a9615cdac2",
+  "warmups" : 1,
+  "repetitions" : 3,
+  "candidateRevision" : "148b-packed-prototype",
+  "loadMs" : 2977.141458,
+  "visionKernel" : "rust-matrixmultiply",
+  "preprocessMs" : 123.369758,
+  "imageSize" : 336,
+  "tokens" : 576,
+  "dimension" : 4096,
+  "encoderProjectorMs" : [ 979.140017, 918.155557, 869.546219 ],
+  "textSha256" : "2687b20ac8b7a23f6c70296d5b1e7f908fef2ce4769ecdebd1bb9503528a75bf",
+  "twoFileLoadMs" : 2137.855349,
+  "decoderDiagnostics" : {
+    "backend" : "pure-java-llava",
+    "planVersion" : "llava-v1/pure-java-v20",
+    "environment" : {
+      "gguf-executor" : "countdown",
+      "java-version" : "25.0.5",
+      "fast-scalar-fma" : "true",
+      "vision-projections" : "rust-matrixmultiply",
+      "vm-name" : "OpenJDK 64-Bit Server VM",
+      "tokenizer.pre.implemented" : "true",
+      "gguf-chunks-per-thread" : "2",
+      "os" : "Linux",
+      "gguf-parallel" : "true",
+      "sve" : "false",
+      "processors" : "16",
+      "end-of-generation.2" : "tokenizer.ggml.eos_token_id,vocabulary-text",
+      "compiler" : "hotspot-c2",
+      "vm-vendor" : "Eclipse Adoptium",
+      "decoder-attention" : "NativeCausalAttention",
+      "architecture" : "amd64",
+      "vector-api" : "true",
+      "q4-unsigned-pairwise-supported" : "true",
+      "gguf-threads" : "8",
+      "tokenizer.pre" : "",
+      "java-feature" : "25",
+      "active-vector-bits" : "256",
+      "cpu-model" : "AMD EPYC 7R13 Processor",
+      "preferred-vector-bits" : "256",
+      "vm-version" : "25.0.5+8-LTS",
+      "fast-vector-fma" : "true",
+      "projection-layers" : "32",
+      "end-of-generation.chat-template" : "absent",
+      "vector-provider" : "PanamaVectorUtilSupport",
+      "q4-short-pairwise-supported" : "true",
+      "model-architecture" : "llama",
+      "end-of-generation-token-ids" : "2"
+    },
+    "optimizations" : [ {
+      "id" : "grouped-projections",
+      "status" : "ENABLED",
+      "reason" : "loaded tensor topology has a retained grouped projection kernel",
+      "settings" : {
+        "gate-up" : "grouped",
+        "qkv" : "grouped",
+        "implementation" : "rust-ffm-quantized-v15-ordered-q4-k"
+      }
+    }, {
+      "id" : "mixed-k-projections",
+      "status" : "ENABLED",
+      "reason" : "eligible projections share one Q8_K quantization and row dispatch",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K",
+        "eligible-layers" : "16"
+      }
+    }, {
+      "id" : "q4-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "the loaded model has no Q4_0 projection tensors",
+      "settings" : {
+        "java-feature" : "25",
+        "active-vector-bits" : "256",
+        "unsigned-supported" : "true",
+        "os" : "Linux",
+        "architecture" : "amd64",
+        "compiler" : "hotspot-c2",
+        "requested" : "widened",
+        "short-supported" : "true"
+      }
+    }, {
+      "id" : "batched-prefill",
+      "status" : "ENABLED",
+      "reason" : "all loaded projection tensors have retained batched kernels",
+      "settings" : {
+        "batch-size" : "128"
+      }
+    }, {
+      "id" : "q6-batched-kernel",
+      "status" : "DISABLED",
+      "reason" : "models.purejava.q6BatchedKernel selects one-query blocks",
+      "settings" : {
+        "kernel" : "one-query-block",
+        "architecture" : "amd64",
+        "batch-size" : "128",
+        "active-vector-bits" : "256",
+        "requested-kernel" : "one-query-block"
+      }
+    }, {
+      "id" : "final-layer-prefill-pruning",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer FFN layout has no controlled exactness and performance gate",
+      "settings" : {
+        "output-rows" : "all",
+        "formats" : "Q4_K,Q4_K,Q6_K"
+      }
+    }, {
+      "id" : "final-layer-kv-only-prefill",
+      "status" : "UNSUPPORTED",
+      "reason" : "the final-layer attention layout has no controlled exactness and performance gate",
+      "settings" : {
+        "formats" : "Q4_K,Q4_K,Q6_K,Q4_K",
+        "unused-rows" : "full-attention"
+      }
+    }, {
+      "id" : "batched-attention-scores",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected exact two-row key scoring",
+      "settings" : {
+        "rows-per-group" : "2"
+      }
+    }, {
+      "id" : "batched-attention-values",
+      "status" : "ENABLED",
+      "reason" : "the model profile selected four-row value accumulation",
+      "settings" : {
+        "rows-per-group" : "4"
+      }
+    }, {
+      "id" : "fused-grouped-attention",
+      "status" : "DISABLED",
+      "reason" : "disabled by models.purejava.fusedGroupedAttention",
+      "settings" : {
+        "cache-passes-per-group" : "group-size",
+        "architecture-default" : "false"
+      }
+    }, {
+      "id" : "staged-quantized-ffn",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 FFN layer",
+      "settings" : {
+        "stages" : "2",
+        "executor" : "countdown",
+        "eligible-layers" : "0",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "staged-quantized-layer",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded tensor topology has no supported Q4_0/Q8_0 output-and-FFN layer",
+      "settings" : {
+        "stages" : "7",
+        "executor" : "countdown",
+        "eligible-layers" : "0",
+        "parallel" : "true"
+      }
+    }, {
+      "id" : "block-major-q8-activations",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "layout" : "block-major-bytes",
+        "prefill-batch-size" : "128"
+      }
+    }, {
+      "id" : "q8-block-major-kernel",
+      "status" : "UNSUPPORTED",
+      "reason" : "loaded staged projection topology has no Q8_0 consumer",
+      "settings" : {
+        "requested-kernel" : "scattered",
+        "kernel" : "scattered",
+        "floating-point-order" : "scalar-block-order",
+        "compiler" : "hotspot-c2",
+        "active-vector-bits" : "256"
+      }
+    }, {
+      "id" : "parallel-q8-ffn-preparation",
+      "status" : "UNSUPPORTED",
+      "reason" : "every staged layer requires Q8_0 gate and up projections",
+      "settings" : {
+        "staged-layers" : "0",
+        "partition" : "batch-rows",
+        "partitions" : "8",
+        "eligible-layers" : "0"
+      }
+    }, {
+      "id" : "mapped-model-weights",
+      "status" : "ENABLED",
+      "reason" : "model tensors remain mapped for model-scale streaming locality",
+      "settings" : {
+        "artifact-format" : "gguf",
+        "storage" : "memory-segment"
+      }
+    }, {
+      "id" : "vector-fma",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected deterministic vector FMA for this platform",
+      "settings" : {
+        "fast-scalar-fma" : "true"
+      }
+    }, {
+      "id" : "persistent-row-executor",
+      "status" : "ENABLED",
+      "reason" : "vectors-core selected reusable GGUF row workers",
+      "settings" : {
+        "executor" : "countdown",
+        "threads" : "8",
+        "chunks-per-thread" : "2"
+      }
+    }, {
+      "id" : "sliding-window-attention",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no sliding window, so every layer attends to the full context",
+      "settings" : {
+        "pattern-source" : "none",
+        "declared-window" : "0",
+        "local-layers" : "0/32"
+      }
+    }, {
+      "id" : "expert-swiglu-clamp",
+      "status" : "DISABLED",
+      "reason" : "the checkpoint declares no expert SwiGLU clamp",
+      "settings" : {
+        "clamped-layers" : "0/32"
+      }
+    } ]
+  },
+  "context" : 1024,
+  "kvType" : "f32",
+  "maximumOutputTokens" : 32,
+  "generatedTokens" : [ 450, 1967, 5680, 263, 274, 3222, 411, 1023, 274, 1446, 19214, 373, 372, 29889, 3118, 6635, 338, 2602, 287, 373, 278, 2175, 2625, 310, 278, 274, 3222, 29892, 1550, 278, 916, 6635 ],
+  "answer" : "The image features a couch with two cats lying on it. One cat is positioned on the left side of the couch, while the other cat",
+  "imageTextPrefillMs" : [ 11509.520605, 11389.615518, 11472.419793 ],
+  "decodeMs" : [ 4023.919917, 3982.406873, 3993.146075 ],
+  "generatedTokenRuns" : [ [ 450, 1967, 5680, 263, 274, 3222, 411, 1023, 274, 1446, 19214, 373, 372, 29889, 3118, 6635, 338, 2602, 287, 373, 278, 2175, 2625, 310, 278, 274, 3222, 29892, 1550, 278, 916, 6635 ], [ 450, 1967, 5680, 263, 274, 3222, 411, 1023, 274, 1446, 19214, 373, 372, 29889, 3118, 6635, 338, 2602, 287, 373, 278, 2175, 2625, 310, 278, 274, 3222, 29892, 1550, 278, 916, 6635 ], [ 450, 1967, 5680, 263, 274, 3222, 411, 1023, 274, 1446, 19214, 373, 372, 29889, 3118, 6635, 338, 2602, 287, 373, 278, 2175, 2625, 310, 278, 274, 3222, 29892, 1550, 278, 916, 6635 ] ],
+  "prefixTokens" : [ 1, 319, 13563, 1546, 263, 12758, 5199, 322, 385, 23116, 21082, 20255, 29889, 450, 20255, 4076, 8444, 29892, 13173, 29892, 322, 1248, 568, 6089, 304, 278, 5199, 29915, 29879, 5155, 29889, 3148, 1001, 29901, 29871 ],
+  "suffixTokens" : [ 29871, 13, 4002, 29581, 445, 1967, 23359, 29889, 319, 1799, 9047, 13566, 29901 ]
+}

@@ -6,10 +6,11 @@ MLP projector, consumes the projected patches in the existing Llama KV sequence,
 generation. The first concrete candidate is LLaVA 1.5 7B Q4_K_M with its F16 projector. The pinned
 files and SHA-256 values are in `experiments/vision-qualification/artifacts.json`.
 
-The [recorded remote run](../experiments/vision-qualification/results/2026-11-07/README.md) passes
-all three numerical probes and generates the correct photographic subjects through the two-file
-API. It also measures a 7.2–7.9× encoder latency gap and a 174-second image/text prefill. Those
-performance gaps and the published-task campaign remain before catalog admission.
+The [final paired remote run](../experiments/vision-qualification/results/2026-11-07-performance/README.md)
+passes all three encoder probes, exact caption-token agreement, and the frozen latency gates against
+both F32 and stock F16 reference caches. It closes the integration performance gaps exposed by the
+[original run](../experiments/vision-qualification/results/2026-11-07/README.md). Published-task accuracy
+and complete workload qualification remain before catalog admission.
 
 ## Public API
 
@@ -50,9 +51,16 @@ apply a post-layer norm. CLIP uses QuickGELU when declared; the MLP uses exact G
 dimension comes from `mm.2.weight`, not the misleading original CLIP `projection_dim` metadata.
 Preprocessing is RGB, mean-colored square padding, antialiased bicubic resize, CLIP mean/std and CHW.
 
-Exact matrix reductions share the configured `vectors.gguf.threads` worker pool. Original weights
-are preserved. The earlier experimental load-time Q8 conversion is not selected by this public
-path, and its synthetic measurements are not evidence for this model.
+The optimized path reuses Models' owned Rust dense GEMM and quantized GGUF kernels. Dense CLIP
+attention and causal prefill use the existing native pool; single-token decode uses the quantized
+attention kernel. Q4 row packing preserves the original accumulation tree, and Q6 uses eight-query
+tiles. The provider selects a 128-row image-prefill batch when the loaded library advertises the
+packing capability. `vectors.gguf.threads` bounds both native and Java work; idle Java workers park
+during native work. Diagnostics report the selected implementation and batch size.
+
+Original checkpoint weights are preserved. The experimental load-time Q8 conversion and its unused
+weight copies were removed after a real-model ablation failed both speed and numerical gates. The
+portable Java implementation remains available when native kernels are absent.
 
 **Qwen3-VL, Qwen3.5 vision, SigLIP, any-resolution tiling, video, OCR specialists, and cross-modal
 retrieval are not supported by this loader.** In particular, Qwen3-VL still requires its vision
@@ -65,17 +73,26 @@ at loading rather than producing plausible-looking incorrect embeddings.
 Build locally (no real-model inference or weight download on the development Mac):
 
 ```sh
-./gradlew :models-bench:installDist
+./gradlew :models-bench:installDist :backend-native:jar
 ```
 
-Copy that distribution and `experiments/vision-qualification/` to an ephemeral worker. Install Java
+Copy that distribution, `backend-native/build/libs/backend-native-*.jar`,
+`backend-native/src/main/rust/model-kernels/` (excluding build outputs), and
+`experiments/vision-qualification/` to an ephemeral worker. Place the native Java bridge JAR in the
+distribution's `lib/` directory and compile the owned Rust library on the worker with
+`cargo build --release --locked`. Do not copy a macOS native library to Linux. Install Java
 25+, CPU PyTorch 2.9.0, Transformers 4.57.1, gguf 0.17.1, NumPy 2.3.4 and Pillow 12.0.0. The committed
 `run.sh` downloads and verifies the pinned artifacts, creates two deterministic non-square probes,
 downloads the pinned photographic probe, runs both arms sequentially, and compares the results.
-Pass the immutable candidate commit and distribution path explicitly. The worker must have at least
+Pass the immutable candidate commit and distribution path explicitly. The runner also builds a
+pinned external llama.cpp decoder comparator (requires Git, CMake and a C++ compiler), unless
+`VISION_DECODER_REFERENCE_DIRECTORY` points to an existing clean build from
+`build-decoder-reference.sh`. That comparator is never linked or packaged with Models. The worker must have at least
 16 GiB available memory, sufficient context capacity, and about 8 GiB of disk for artifacts/tools.
 
 ```sh
+VISION_NATIVE_LIBRARY=/path/to/model-kernels/target/release/libjmodels_kernels.so \
+VISION_THREADS=8 VISION_WARMUPS=3 VISION_REPETITIONS=7 \
 bash experiments/vision-qualification/run.sh /path/to/models-bench COMMIT_SHA /path/to/evidence
 ```
 
@@ -90,17 +107,27 @@ Per probe it records normalized pixels, all projected patch vectors, runtime ver
 individual timings. Numerical limits: pixel max absolute error <= 0.02, embedding cosine >= 0.999,
 and embedding normalized RMSE <= 0.01. These are integration gates, not an invented catalog accuracy
 policy. The photograph also exercises full two-file image-to-answer generation; its text output and
-first logits are retained for inspection. This smoke is not a paired decoder-accuracy benchmark.
+first logits are retained for inspection. The reference decoder consumes independently generated
+PyTorch patch embeddings, the exact same prefix/suffix tokens, the same text GGUF and context, and
+32 greedy output tokens. Both F32 KV (matched precision) and stock F16 KV are checked. Every generated
+token must match in every repetition. Encoder, complete image/text prefill, decode, and total median
+latency ratios must each be at most 1.10. The reference full prefill composes separately measured
+PyTorch encoding/preprocessing and llama.cpp prefill; it is not a single-process multimodal timing.
+
+Reports retain individual timings, source/artifact/payload hashes, settings, peak RSS and load times.
+Load times use a warm filesystem and are not cold-load measurements. `INTEGRATION_PERFORMANCE_PASS`
+is written only after all three probes and both decoder comparisons pass. The result still does not
+establish accuracy on published VQA/OCR workloads.
 
 ## Proceeding to catalog qualification
 
-1. Retain the three-probe numerical evidence and two-file smoke from this PR.
+1. Retain the three-probe numerical evidence and paired decoder performance/fidelity results from this PR.
 2. Freeze representative published VQA and OCR datasets, prompts, scoring, output limits and an
    admission policy; run both runtimes on the same examples. Shape tests and a plausible caption do
    not establish task accuracy. Do not apply text-only RAG scores to a vision capability.
-3. Run matched end-to-end TTFT, image encoding, prefill, decode, memory and cold-load measurements
-   on the qualification hardware. The harness provides measured encoder/projector distributions;
-   full task throughput needs the complete paired workloads.
+3. Extend the paired performance protocol to those full workloads and qualification hardware,
+   including TTFT, image encoding, prefill, decode, memory and cold-load measurements. The current
+   bounded-caption campaign does not substitute for complete task throughput.
 4. Validate Java and any proposed Rust execution policies against the same vectors before admitting
    either. Converting weights to Q8 is a separate numerical change, not a free speed comparison.
 5. Add the two-artifact catalog record and public image demo only after these gates pass. Existing

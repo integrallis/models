@@ -32,4 +32,16 @@ for kv, v in decoders.items():
 lines += ['', 'The F32 comparison matches cache precision; F16 also tests the faster stock reference default. Encoder vectors are checked independently against Transformers/PyTorch on the same converted weights. llama.cpp is an external comparator, never linked or bundled with Models.', '',
           'The historical pre-optimization run and its distinct worker/protocol remain in `../2026-11-07/`; no historical timing is used as the denominator of the paired closure gate.', '',
           'Qualification still requires frozen published VQA/OCR workloads, accuracy scoring, full-workload memory/cold-load measurements, and two-artifact catalog packaging. The three probes and one bounded caption establish integration fidelity and performance only.', '']
+checks = read(root / 'engineering-checks.json')
+lines += ['## Evidence and verification', '',
+          'The full raw archive is retained at `java-ai/audit-artifacts/pr380-vision-performance/pr380-performance-evidence.tar.gz` in the shared workspace. `archive-sha256.txt` verifies the archive; `raw-vector-sha256.json` identifies the exact vectors. The archive contains final and rejected-trial sources, payloads, vectors, logs, profiles and reference binaries, without model weights or credentials. All verdicts were recomputed successfully from the downloaded archive before terminating the worker.', '',
+          '[Rejected experiments](EXPERIMENTS.md) · [Worker lifecycle](../../PERFORMANCE-CONTROL.md) · [Reproduction guide](../../../../docs/VISION-QUALIFICATION.md)', '',
+          'Local `models-api:check`, `backend-java:check` and `backend-native:check` passed, including formatting, static analysis, coverage and dependency policy. Cached real-model fixtures were excluded on the development Mac. The retained test reports count:', '',
+          '| Module | Passed | Skipped | Failures/errors |', '| --- | ---: | ---: | ---: |']
+for module, report in checks.items():
+    t = report['totals']
+    lines.append(f"| {module} | {t['tests'] - t['skipped'] - t['failures'] - t['errors']} | {t['skipped']} | {t['failures'] + t['errors']} |")
+lines += ['', 'Regenerate both tables/notes from committed reports:', '', '```sh',
+          'python3 experiments/vision-qualification/summarize_performance.py experiments/vision-qualification/results/2026-11-07-performance',
+          'python3 experiments/vision-qualification/summarize_exploration.py experiments/vision-qualification/results/2026-11-07-performance', '```', '']
 (root / 'README.md').write_text('\n'.join(lines))
