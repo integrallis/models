@@ -171,7 +171,7 @@ public final class VisionQualificationCli {
       if (run == 0) writeFloats(output.resolve("first-logits.f32"), logits);
       ArrayList<Integer> generated = new ArrayList<>();
       start = System.nanoTime();
-      decodeGreedy(backend, logits, position, generated);
+      decodeGreedy(backend, tokenizer, logits, position, generated);
       double decodeMs = elapsed(start);
       System.out.printf(
           "decoder run=%d prefillMs=%.3f decodeMs=%.3f emittedTokens=%d%n",
@@ -193,8 +193,11 @@ public final class VisionQualificationCli {
   }
 
   private static void decodeGreedy(
-      LlavaBackend backend, float[] logits, int position, ArrayList<Integer> generated) {
-    var tokenizer = backend.tokenizer();
+      LlavaBackend backend,
+      Tokenizer tokenizer,
+      float[] logits,
+      int position,
+      ArrayList<Integer> generated) {
     for (int i = 0; i < 32; i++) {
       int best = bestToken(logits);
       if (tokenizer.isEndOfGeneration(best)) break;
