@@ -104,31 +104,45 @@ public final class VisionQualificationCli {
         // Encoding a fragment must not add another BOS inside the sequence.
         if (suffixTokens.length > 0 && suffixTokens[0] == tokenizer.bosToken())
           suffixTokens = java.util.Arrays.copyOfRange(suffixTokens, 1, suffixTokens.length);
-        start = System.nanoTime();
-        backend.prefill(prefixTokens, 0);
-        int position = prefixTokens.length;
-        backend.prefillImage(encoded, position);
-        position += backend.imageTokenCount();
-        float[] logits = backend.prefill(suffixTokens, position);
-        position += suffixTokens.length;
-        report.put("imageTextPrefillMs", elapsed(start));
-        writeFloats(output.resolve("first-logits.f32"), logits);
-        ArrayList<Integer> generated = new ArrayList<>();
-        start = System.nanoTime();
-        for (int i = 0; i < 32; i++) {
-          int best = 0;
-          for (int j = 0; j < logits.length; j++) {
-            if (!Float.isFinite(logits[j])) throw new IllegalStateException("Nonfinite logits");
-            if (logits[j] > logits[best]) best = j;
+        ArrayList<Double> prefillTimes = new ArrayList<>();
+        ArrayList<Double> decodeTimes = new ArrayList<>();
+        ArrayList<java.util.List<Integer>> generatedRuns = new ArrayList<>();
+        for (int run = -warmups; run < repetitions; run++) {
+          backend.reset();
+          start = System.nanoTime();
+          backend.prefill(prefixTokens, 0);
+          int position = prefixTokens.length;
+          backend.prefillImage(encoded, position);
+          position += backend.imageTokenCount();
+          float[] logits = backend.prefill(suffixTokens, position);
+          position += suffixTokens.length;
+          double prefillMs = elapsed(start);
+          if (run == 0) writeFloats(output.resolve("first-logits.f32"), logits);
+          ArrayList<Integer> generated = new ArrayList<>();
+          start = System.nanoTime();
+          for (int i = 0; i < 32; i++) {
+            int best = 0;
+            for (int j = 0; j < logits.length; j++) {
+              if (!Float.isFinite(logits[j])) throw new IllegalStateException("Nonfinite logits");
+              if (logits[j] > logits[best]) best = j;
+            }
+            if (tokenizer.isEndOfGeneration(best)) break;
+            generated.add(best);
+            if (i < 31) logits = backend.forward(best, position++);
           }
-          if (tokenizer.isEndOfGeneration(best)) break;
-          generated.add(best);
-          if (i < 31) logits = backend.forward(best, position++);
+          double decodeMs = elapsed(start);
+          if (run >= 0) {
+            prefillTimes.add(prefillMs);
+            decodeTimes.add(decodeMs);
+            generatedRuns.add(generated);
+          }
+          report.put("generatedTokens", generated);
+          report.put(
+              "answer", tokenizer.decode(generated.stream().mapToInt(Integer::intValue).toArray()));
         }
-        report.put("decodeMs", elapsed(start));
-        report.put("generatedTokens", generated);
-        report.put(
-            "answer", tokenizer.decode(generated.stream().mapToInt(Integer::intValue).toArray()));
+        report.put("imageTextPrefillMs", prefillTimes);
+        report.put("decodeMs", decodeTimes);
+        report.put("generatedTokenRuns", generatedRuns);
         report.put("prefixTokens", prefixTokens);
         report.put("suffixTokens", suffixTokens);
       }
