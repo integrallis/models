@@ -16,10 +16,12 @@
 package com.integrallis.models.backend.purejava.deberta;
 
 /** Synchronous dense projection and disentangled attention over caller-owned row-major buffers. */
-public interface DebertaV2Kernels {
+public interface DebertaV2Kernels
+    extends com.integrallis.models.backend.purejava.spi.DenseProjectionKernels {
   /** A prepared immutable matrix whose storage is owned by the enclosing kernel provider. */
   @FunctionalInterface
-  interface Projection {
+  interface Projection
+      extends com.integrallis.models.backend.purejava.spi.DenseProjectionKernels.Projection {
     /** Computes output[batch, outputs] = input[batch, inputs] * transpose(prepared weights). */
     void project(float[] output, float[] input, int batch);
   }

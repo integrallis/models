@@ -25,6 +25,19 @@ final class VisionProjection {
 
   private VisionProjection() {}
 
+  static com.integrallis.models.backend.purejava.spi.DenseProjectionKernels.Projection prepare(
+      ClipVisionWeights.Matrix matrix,
+      com.integrallis.models.backend.purejava.spi.DenseProjectionKernels kernels) {
+    if (kernels == null) return (output, input, tokens) -> multiply(output, input, tokens, matrix);
+    float[] weights = new float[Math.multiplyExact(matrix.rows(), matrix.columns())];
+    float[] row = new float[matrix.columns()];
+    for (int r = 0; r < matrix.rows(); r++) {
+      GgufTensorValues.dequantizeRow(matrix.data(), matrix.type(), r, matrix.columns(), row);
+      System.arraycopy(row, 0, weights, r * matrix.columns(), row.length);
+    }
+    return kernels.prepare(weights, matrix.rows(), matrix.columns());
+  }
+
   static void multiply(float[] output, float[] input, int tokens, ClipVisionWeights.Matrix matrix) {
     GgufStagePlan.RangeOperation rows =
         (from, to) -> {

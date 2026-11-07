@@ -62,6 +62,7 @@ public final class VisionQualificationCli {
     long start = System.nanoTime();
     try (var vision = LlavaVisionProjector.load(mmproj)) {
       report.put("loadMs", elapsed(start));
+      report.put("visionKernel", vision.implementation());
       start = System.nanoTime();
       float[] pixels = vision.preprocess(encoded);
       report.put("preprocessMs", elapsed(start));

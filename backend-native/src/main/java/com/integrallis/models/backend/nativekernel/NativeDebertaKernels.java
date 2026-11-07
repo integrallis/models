@@ -114,6 +114,11 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
   }
 
   @Override
+  public String implementation() {
+    return "rust-matrixmultiply";
+  }
+
+  @Override
   public synchronized Projection prepare(float[] weights, int outputs, int inputs) {
     if (handle == 0) throw new IllegalStateException("DeBERTa kernels are closed");
     Objects.requireNonNull(weights, "weights");
