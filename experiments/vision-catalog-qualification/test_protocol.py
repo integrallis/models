@@ -17,6 +17,14 @@ class Evaluator:
 
 
 class ProtocolTest(unittest.TestCase):
+    def test_shard_selection_cannot_drop_every_model_or_name_an_unknown_variant(self):
+        manifest = {"variants": ["Q4_K_S", "Q4_K_M"]}
+        self.assertEqual(manifest["variants"], compare.selected_variants(manifest))
+        self.assertEqual(["Q4_K_M"], compare.selected_variants(manifest, ["Q4_K_M"]))
+        for selection in [[], ["unknown"], ["Q4_K_M", "Q4_K_M"], "Q4_K_M"]:
+            with self.subTest(selection=selection), self.assertRaises(ValueError):
+                compare.selected_variants(manifest, selection)
+
     def test_selection_is_order_independent_and_ignores_answers(self):
         shards = [[dict(question_id=i, answers=["yes"]) for i in range(start, start + 20)] for start in [0, 20]]
         first = select(shards, "seed", 12)

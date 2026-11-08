@@ -25,6 +25,14 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def selected_variants(manifest, requested=None):
+    variants = manifest["variants"] if requested is None else requested
+    require(isinstance(variants, list) and bool(variants), "Empty or invalid variant selection")
+    require(all(isinstance(v, str) and v in manifest["variants"] for v in variants), "Unknown variant selection")
+    require(len(set(variants)) == len(variants), "Duplicate variant selection")
+    return list(variants)
+
+
 def measured(rows, case):
     expected = list(range(-case["warmups"], case["repetitions"]))
     require([row["run"] for row in rows] == expected, "Missing, reordered or duplicate runs: " + case["id"])
@@ -137,7 +145,7 @@ def main():
     require(receipt["corpusSha256"] == sha(root / "cases.json"), "Corpus mismatch")
     for case in corpus["cases"]:
         require(sha(root / case["image"]) == case["imageSha256"], "Image mismatch")
-    results = [evaluate(corpus, manifest, root / "results", variant, evaluator) for variant in manifest["variants"]]
+    results = [evaluate(corpus, manifest, root / "results", variant, evaluator) for variant in selected_variants(manifest, receipt.get("variants"))]
     report = dict(schema="llava-task-admission-v1", receipt=receipt, variants=results,
                   scope="branch task gate; integration and ModelJars runtime evidence also required")
     (root / "results/task-verdict.json").write_text(json.dumps(report, indent=2) + "\n")
