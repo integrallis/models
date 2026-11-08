@@ -248,7 +248,8 @@ final class ClipVisionEncoder {
                     (from, to) -> {
                       for (int i = from * hiddenDim; i < to * hiddenDim; i++) {
                         feedForward[i] =
-                            (float) (feedForward[i] / (1.0 + Math.exp(-1.702 * feedForward[i])));
+                            feedForward[i]
+                                * (1.0f / (1.0f + (float) Math.exp(-1.702f * feedForward[i])));
                       }
                     }))
             .execute();

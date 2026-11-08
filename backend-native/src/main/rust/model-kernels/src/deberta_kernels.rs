@@ -805,7 +805,7 @@ pub unsafe extern "C" fn jmodels_dense_quick_gelu(
                     return;
                 }
                 for x in values {
-                    *x = (*x as f64 / (1.0 + (-1.702 * *x as f64).exp())) as f32;
+                    *x *= 1.0 / (1.0 + (-1.702_f32 * *x).exp());
                 }
             })
         });
@@ -827,11 +827,11 @@ unsafe fn quick_gelu_avx2(values: &mut [f32]) {
             let x = _mm256_loadu_ps(ptr);
             let denominator =
                 _mm256_add_ps(one, super::onnx_kernels::exp8(_mm256_mul_ps(scale, x)));
-            _mm256_storeu_ps(ptr, _mm256_div_ps(x, denominator));
+            _mm256_storeu_ps(ptr, _mm256_mul_ps(x, _mm256_div_ps(one, denominator)));
         }
     }
     for x in &mut values[end..] {
-        *x = (*x as f64 / (1.0 + (-1.702 * *x as f64).exp())) as f32;
+        *x *= 1.0 / (1.0 + (-1.702_f32 * *x).exp());
     }
 }
 
