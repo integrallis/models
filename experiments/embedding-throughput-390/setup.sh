@@ -23,7 +23,8 @@ tar -xzf java.tar.gz -C java --strip-components=1
 java/bin/java -version > results/java-version.txt 2>&1
 curl --retry 3 --retry-max-time 180 --connect-timeout 20 -fsSL 'https://github.com/async-profiler/async-profiler/releases/download/v4.6/async-profiler-4.6-linux-x64.tar.gz' -o profiler.tar.gz
 tar -xzf profiler.tar.gz -C profiler --strip-components=1
-sha256sum java.tar.gz profiler.tar.gz > results/tooling-sha256.txt
+curl --retry 3 --retry-max-time 120 --connect-timeout 20 -fsSL 'https://github.com/async-profiler/async-profiler/releases/download/v4.6/async-profiler.jar' -o profiler/lib/async-profiler.jar
+sha256sum java.tar.gz profiler.tar.gz profiler/lib/async-profiler.jar > results/tooling-sha256.txt
 python3 - <<'PY'
 import hashlib,json,pathlib,subprocess
 models=json.load(open('models.json'))
