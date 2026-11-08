@@ -518,8 +518,12 @@ public final class LlamaForwardPass {
       throw new IllegalArgumentException(
           "execution plan selected Llama-only layer shortcuts for " + config.architecture());
     }
-    this.globalRopeTable =
+    RotaryTable configuredRope =
         config.globalRotaryTable(weights.ropeFactorsLong(), weights.ropeFactorsShort());
+    this.globalRopeTable =
+        batchedAttentionKernel.usesFloatRotaryRecurrence()
+            ? configuredRope.withFloatRecurrence()
+            : configuredRope;
     this.slidingWindowRopeTable =
         config.slidingWindow() > 0 ? config.slidingWindowRotaryTable() : globalRopeTable;
 
@@ -2386,14 +2390,14 @@ public final class LlamaForwardPass {
         && batchedAttentionKernelEligible(layerIndex, startPosition + finalBatch, 1)) {
       System.arraycopy(batchK, finalBatch * keyDim, k, 0, keyDim);
       System.arraycopy(batchV, finalBatch * valueDim, v, 0, valueDim);
-      batchedAttentionKernel.attend(
+      batchedAttentionKernel.attendFinalPrefill(
           attnOut,
           q,
           k,
           v,
           layerIndex,
           startPosition + finalBatch,
-          1,
+          batchSize,
           numHeads,
           numKvHeads,
           keyLength,

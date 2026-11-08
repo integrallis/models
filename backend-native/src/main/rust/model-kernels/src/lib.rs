@@ -1,3 +1,5 @@
+mod clip_math;
+mod vision_attention;
 mod deberta_kernels;
 mod hf_tokenizer;
 mod onnx_kernels;

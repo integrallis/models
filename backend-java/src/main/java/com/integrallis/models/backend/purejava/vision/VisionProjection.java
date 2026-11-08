@@ -38,6 +38,58 @@ final class VisionProjection {
     return kernels.prepare(weights, matrix.rows(), matrix.columns());
   }
 
+  static com.integrallis.models.backend.purejava.spi.DenseProjectionKernels.Projection
+      prepareAffine(
+          ClipVisionWeights.Matrix matrix,
+          float[] bias,
+          com.integrallis.models.backend.purejava.spi.DenseProjectionKernels kernels) {
+    if (kernels == null) {
+      var projection = prepare(matrix, null);
+      return (output, input, batch) -> {
+        projection.project(output, input, batch);
+        for (int i = 0; i < batch * matrix.rows(); i++) output[i] += bias[i % bias.length];
+      };
+    }
+    float[] weights = new float[Math.multiplyExact(matrix.rows(), matrix.columns())];
+    float[] row = new float[matrix.columns()];
+    for (int r = 0; r < matrix.rows(); r++) {
+      GgufTensorValues.dequantizeRow(matrix.data(), matrix.type(), r, matrix.columns(), row);
+      System.arraycopy(row, 0, weights, r * matrix.columns(), row.length);
+    }
+    return kernels.prepareAffine(weights, bias, matrix.rows(), matrix.columns());
+  }
+
+  static com.integrallis.models.backend.purejava.spi.DenseProjectionKernels.Projection preparePatch(
+      ClipVisionWeights.Matrix matrix,
+      com.integrallis.models.backend.purejava.spi.DenseProjectionKernels kernels,
+      int channels) {
+    if (kernels == null) return prepare(matrix, null);
+    if (channels < 1 || matrix.columns() % channels != 0)
+      throw new IllegalArgumentException("Invalid patch channel shape");
+    int pixels = matrix.columns() / channels;
+    float[] ordered = new float[Math.multiplyExact(matrix.rows(), matrix.columns())];
+    float[] row = new float[matrix.columns()];
+    for (int output = 0; output < matrix.rows(); output++) {
+      GgufTensorValues.dequantizeRow(matrix.data(), matrix.type(), output, matrix.columns(), row);
+      for (int pixel = 0; pixel < pixels; pixel++)
+        for (int channel = 0; channel < channels; channel++)
+          ordered[output * matrix.columns() + pixel * channels + channel] =
+              row[channel * pixels + pixel];
+    }
+    var prepared = kernels.prepareOrdered(ordered, matrix.rows(), matrix.columns());
+    return (output, input, batch) -> {
+      int count = Math.multiplyExact(batch, matrix.columns());
+      if (input.length < count) throw new IllegalArgumentException("Patch input buffer too small");
+      float[] packed = new float[count];
+      for (int token = 0; token < batch; token++)
+        for (int pixel = 0; pixel < pixels; pixel++)
+          for (int channel = 0; channel < channels; channel++)
+            packed[token * matrix.columns() + pixel * channels + channel] =
+                input[token * matrix.columns() + channel * pixels + pixel];
+      prepared.project(output, packed, batch);
+    };
+  }
+
   static void multiply(float[] output, float[] input, int tokens, ClipVisionWeights.Matrix matrix) {
     GgufStagePlan.RangeOperation rows =
         (from, to) -> {

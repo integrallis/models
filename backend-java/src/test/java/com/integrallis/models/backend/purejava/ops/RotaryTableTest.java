@@ -26,6 +26,34 @@ import org.junit.jupiter.api.Test;
 class RotaryTableTest {
 
   @Test
+  void floatRecurrenceMatchesIndependentGgmlAcrossHeadsAndPositions() throws Exception {
+    int[] positions = {0, 1, 31, 639, 4095};
+    for (int mode : new int[] {0, 2}) {
+      float[] expected;
+      try (var input = getClass().getResourceAsStream("/vision-rotary/rope-" + mode + ".f32")) {
+        assertThat(input).isNotNull();
+        var bytes =
+            java.nio.ByteBuffer.wrap(input.readAllBytes())
+                .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                .asFloatBuffer();
+        expected = new float[bytes.remaining()];
+        bytes.get(expected);
+      }
+      var table = new RotaryTable(128, 10000f, 0.25f).withFloatRecurrence();
+      float[] actual = new float[128 * 2 * positions.length];
+      for (int i = 0; i < actual.length; i++) actual[i] = (i % 19 - 9) * .125f;
+      for (int row = 0; row < positions.length; row++) {
+        table.prepare(positions[row]);
+        for (int head = 0; head < 2; head++) table.apply(actual, (row * 2 + head) * 128, mode == 2);
+      }
+      assertThat(actual).containsExactly(expected, offset(3e-7f));
+    }
+    assertThatThrownBy(
+            () -> RotaryTable.yarn(64, 150000f, 32f, 32f, 1f, 4096, false).withFloatRecurrence())
+        .isInstanceOf(UnsupportedOperationException.class);
+  }
+
+  @Test
   void reusesFactorsForEveryHeadAtTheSamePosition() {
     RotaryTable table = new RotaryTable(4, 10_000.0f, 0.25f);
     float[] first = {1.0f, 2.0f, 3.0f, 4.0f};

@@ -118,6 +118,110 @@ pub unsafe extern "C" fn jmodels_deberta_project(
     inputs: usize,
     outputs: usize,
 ) -> i32 {
+    unsafe {
+        dense_project_impl(
+            handle,
+            x,
+            x_len,
+            w,
+            w_len,
+            y,
+            y_len,
+            batch,
+            inputs,
+            outputs,
+            ProjectionOrder::General,
+        )
+    }
+}
+
+/// Ordered projection; weights are stored input-major by the prepared Java owner.
+/// # Safety
+/// Aligned buffers must cover the advertised lengths and writable output must not alias inputs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_dense_project_ordered(
+    handle: u64,
+    x: *const f32,
+    x_len: usize,
+    w: *const f32,
+    w_len: usize,
+    y: *mut f32,
+    y_len: usize,
+    batch: usize,
+    inputs: usize,
+    outputs: usize,
+) -> i32 {
+    unsafe {
+        dense_project_impl(
+            handle,
+            x,
+            x_len,
+            w,
+            w_len,
+            y,
+            y_len,
+            batch,
+            inputs,
+            outputs,
+            ProjectionOrder::InputMajor,
+        )
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum ProjectionOrder {
+    General,
+    InputMajor,
+    VisionAffine,
+}
+
+/// Affine vision projection: row-major weights followed by one bias per output.
+/// # Safety
+/// Aligned buffers must cover the advertised lengths; writable output must not alias inputs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_vision_project_affine(
+    handle: u64,
+    x: *const f32,
+    x_len: usize,
+    w: *const f32,
+    w_len: usize,
+    y: *mut f32,
+    y_len: usize,
+    batch: usize,
+    inputs: usize,
+    outputs: usize,
+) -> i32 {
+    unsafe {
+        dense_project_impl(
+            handle,
+            x,
+            x_len,
+            w,
+            w_len,
+            y,
+            y_len,
+            batch,
+            inputs,
+            outputs,
+            ProjectionOrder::VisionAffine,
+        )
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+unsafe fn dense_project_impl(
+    handle: u64,
+    x: *const f32,
+    x_len: usize,
+    w: *const f32,
+    w_len: usize,
+    y: *mut f32,
+    y_len: usize,
+    batch: usize,
+    inputs: usize,
+    outputs: usize,
+    order: ProjectionOrder,
+) -> i32 {
     catch_unwind(AssertUnwindSafe(|| {
         if batch == 0
             || inputs == 0
@@ -134,7 +238,10 @@ pub unsafe extern "C" fn jmodels_deberta_project(
         let Some(x_need) = batch.checked_mul(inputs) else {
             return -1;
         };
-        let Some(w_need) = outputs.checked_mul(inputs) else {
+        let Some(w_need) = inputs
+            .checked_add(usize::from(order == ProjectionOrder::VisionAffine))
+            .and_then(|n| outputs.checked_mul(n))
+        else {
             return -1;
         };
         let Some(y_need) = batch.checked_mul(outputs) else {
@@ -156,6 +263,29 @@ pub unsafe extern "C" fn jmodels_deberta_project(
         let Some(pool) = pool else {
             return -2;
         };
+        if order == ProjectionOrder::InputMajor {
+            let input = unsafe { std::slice::from_raw_parts(x, x_need) };
+            let weights = unsafe { std::slice::from_raw_parts(w, w_need) };
+            let output = unsafe { std::slice::from_raw_parts_mut(y, y_need) };
+            output.fill(0.);
+            pool.install(|| {
+                output
+                    .par_chunks_mut(outputs * 6)
+                    .enumerate()
+                    .for_each(|(row, out)| unsafe {
+                        super::vision_attention::gemm(
+                            out,
+                            &input
+                                [row * 6 * inputs..row * 6 * inputs + out.len() / outputs * inputs],
+                            weights,
+                            out.len() / outputs,
+                            inputs,
+                            outputs,
+                        );
+                    })
+            });
+            return 0;
+        }
         let count = pool.current_num_threads().min(outputs);
         let (xp, wp, yp) = (x as usize, w as usize, y as usize);
         pool.install(|| {
@@ -166,22 +296,49 @@ pub unsafe extern "C" fn jmodels_deberta_project(
                 let end = begin + width + usize::from(worker < remainder);
                 // Each worker owns disjoint output columns. Shared inputs/weights are read-only.
                 unsafe {
-                    matrixmultiply::sgemm(
-                        batch,
-                        inputs,
-                        end - begin,
-                        1.0,
-                        xp as *const f32,
-                        inputs as isize,
-                        1,
-                        (wp as *const f32).add(begin * inputs),
-                        1,
-                        inputs as isize,
-                        0.0,
-                        (yp as *mut f32).add(begin),
-                        outputs as isize,
-                        1,
-                    );
+                    if order == ProjectionOrder::VisionAffine {
+                        for row in 0..batch {
+                            for col in begin..end {
+                                *(yp as *mut f32).add(row * outputs + col) =
+                                    *(wp as *const f32).add(inputs * outputs + col);
+                            }
+                        }
+                        for start in (0..inputs).step_by(192) {
+                            matrixmultiply::sgemm(
+                                batch,
+                                (inputs - start).min(192),
+                                end - begin,
+                                1.,
+                                (xp as *const f32).add(start),
+                                inputs as isize,
+                                1,
+                                (wp as *const f32).add(begin * inputs + start),
+                                1,
+                                inputs as isize,
+                                1.,
+                                (yp as *mut f32).add(begin),
+                                outputs as isize,
+                                1,
+                            );
+                        }
+                    } else {
+                        matrixmultiply::sgemm(
+                            batch,
+                            inputs,
+                            end - begin,
+                            1.0,
+                            xp as *const f32,
+                            inputs as isize,
+                            1,
+                            (wp as *const f32).add(begin * inputs),
+                            1,
+                            inputs as isize,
+                            0.0,
+                            (yp as *mut f32).add(begin),
+                            outputs as isize,
+                            1,
+                        );
+                    }
                 }
             })
         });
@@ -560,24 +717,26 @@ pub unsafe extern "C" fn jmodels_dense_attention(
                             1,
                         );
                         for row in scores.chunks_exact_mut(tokens) {
-                            dense_softmax(row);
+                            super::clip_math::softmax(row);
                         }
-                        matrixmultiply::sgemm(
-                            tokens,
-                            tokens,
-                            head_dim,
-                            1.0,
-                            scores.as_ptr(),
-                            tokens as isize,
-                            1,
-                            v,
-                            dim as isize,
-                            1,
-                            0.0,
-                            (dst as *mut f32).add(head * head_dim),
-                            dim as isize,
-                            1,
-                        );
+                        for start in (0..tokens).step_by(192) {
+                            matrixmultiply::sgemm(
+                                tokens,
+                                (tokens - start).min(192),
+                                head_dim,
+                                1.,
+                                scores.as_ptr().add(start),
+                                tokens as isize,
+                                1,
+                                v.add(start * dim),
+                                dim as isize,
+                                1,
+                                if start == 0 { 0. } else { 1. },
+                                (dst as *mut f32).add(head * head_dim),
+                                dim as isize,
+                                1,
+                            );
+                        }
                     }
                 });
             })
@@ -609,7 +768,7 @@ pub unsafe extern "C" fn jmodels_dense_causal_attention(
     unsafe {
         dense_causal_attention_impl(
             handle, query, query_len, key, key_len, value, value_len, out, out_len, batch,
-            positions, dim, heads, None,
+            positions, dim, heads, None, None,
         )
     }
 }
@@ -650,6 +809,49 @@ pub unsafe extern "C" fn jmodels_dense_causal_attention_head_major(
             dim,
             heads,
             Some(capacity),
+            None,
+        )
+    }
+}
+
+/// LLaVA attention with F16 operands, online accumulation and retained head-major cache.
+/// # Safety
+/// Pointers must cover their advertised lengths and output cannot alias inputs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_vision_causal_attention(
+    handle: u64,
+    query: *const f32,
+    query_len: usize,
+    key: *const f32,
+    key_len: usize,
+    value: *const f32,
+    value_len: usize,
+    out: *mut f32,
+    out_len: usize,
+    batch: usize,
+    positions: usize,
+    dim: usize,
+    heads: usize,
+    capacity: usize,
+    original_batch: usize,
+) -> i32 {
+    unsafe {
+        dense_causal_attention_impl(
+            handle,
+            query,
+            query_len,
+            key,
+            key_len,
+            value,
+            value_len,
+            out,
+            out_len,
+            batch,
+            positions,
+            dim,
+            heads,
+            Some(capacity),
+            Some(original_batch),
         )
     }
 }
@@ -670,6 +872,7 @@ unsafe fn dense_causal_attention_impl(
     dim: usize,
     heads: usize,
     capacity: Option<usize>,
+    vision_arithmetic: Option<usize>,
 ) -> i32 {
     catch_unwind(AssertUnwindSafe(|| {
         if batch == 0
@@ -707,6 +910,41 @@ unsafe fn dense_causal_attention_impl(
         let Some(pool) = POOLS.lock().ok().and_then(|r| r.get(&handle).cloned()) else {
             return -2;
         };
+        if let Some(original_batch) = vision_arithmetic {
+            if original_batch < batch || original_batch > positions {
+                return -1;
+            }
+            // Disjoint writable output is necessary before constructing shared input slices.
+            let out_start = out as usize;
+            let Some(out_end) = out_start.checked_add(qn * 4) else {
+                return -1;
+            };
+            for (pointer, count) in [(query, qn), (key, kn), (value, kn)] {
+                let input_start = pointer as usize;
+                let Some(input_end) = input_start.checked_add(count * 4) else {
+                    return -1;
+                };
+                if out_start < input_end && input_start < out_end {
+                    return -1;
+                }
+            }
+            unsafe {
+                super::vision_attention::run(
+                    &pool,
+                    query,
+                    key,
+                    value,
+                    out,
+                    batch,
+                    positions,
+                    heads,
+                    dim / heads,
+                    cache_positions,
+                    original_batch,
+                );
+            }
+            return 0;
+        }
         let (qp, kp, vp, yp) = (query as usize, key as usize, value as usize, out as usize);
         let width = dim / heads;
         let scale = 1.0 / (width as f32).sqrt();
@@ -779,6 +1017,22 @@ pub unsafe extern "C" fn jmodels_dense_quick_gelu(
     values: *mut f32,
     length: usize,
 ) -> i32 {
+    unsafe { dense_activation(handle, values, length, false) }
+}
+
+/// In-place ERF GELU for the vision projector, using the owned dense worker pool.
+/// # Safety
+/// `values` must address `length` aligned writable floats, with no concurrent accesses.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_dense_gelu_erf(
+    handle: u64,
+    values: *mut f32,
+    length: usize,
+) -> i32 {
+    unsafe { dense_activation(handle, values, length, true) }
+}
+
+unsafe fn dense_activation(handle: u64, values: *mut f32, length: usize, erf: bool) -> i32 {
     catch_unwind(AssertUnwindSafe(|| {
         if values.is_null()
             || !(values as usize).is_multiple_of(4)
@@ -797,6 +1051,10 @@ pub unsafe extern "C" fn jmodels_dense_quick_gelu(
                 let count = (length - start).min(4096);
                 let values =
                     unsafe { std::slice::from_raw_parts_mut((ptr as *mut f32).add(start), count) };
+                if erf {
+                    super::clip_math::gelu_rows(values);
+                    return;
+                }
                 #[cfg(target_arch = "x86_64")]
                 if std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma") {
                     unsafe {
@@ -805,7 +1063,7 @@ pub unsafe extern "C" fn jmodels_dense_quick_gelu(
                     return;
                 }
                 for x in values {
-                    *x *= 1.0 / (1.0 + (-1.702_f32 * *x).exp());
+                    *x = super::clip_math::quick_gelu(*x);
                 }
             })
         });
@@ -825,13 +1083,12 @@ unsafe fn quick_gelu_avx2(values: &mut [f32]) {
         unsafe {
             let ptr = values.as_mut_ptr().add(offset);
             let x = _mm256_loadu_ps(ptr);
-            let denominator =
-                _mm256_add_ps(one, super::onnx_kernels::exp8(_mm256_mul_ps(scale, x)));
+            let denominator = _mm256_add_ps(one, super::clip_math::exp8(_mm256_mul_ps(scale, x)));
             _mm256_storeu_ps(ptr, _mm256_mul_ps(x, _mm256_div_ps(one, denominator)));
         }
     }
     for x in &mut values[end..] {
-        *x *= 1.0 / (1.0 + (-1.702_f32 * *x).exp());
+        *x = super::clip_math::quick_gelu(*x);
     }
 }
 

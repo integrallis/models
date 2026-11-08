@@ -22,6 +22,10 @@ import java.util.Objects;
 public final class RotaryTable {
 
   private final int rotaryDim;
+  private final float theta;
+  private final boolean blendedFrequencies;
+  private boolean floatRecurrence;
+  private final float recurrenceStep;
   private final float frequencyScale;
   private final float attentionFactor;
   private final float[] frequencyFactors;
@@ -78,6 +82,9 @@ public final class RotaryTable {
       this.frequencyFactors = null;
     }
     this.rotaryDim = rotaryDim;
+    this.theta = theta;
+    this.blendedFrequencies = preparedFrequencies != null;
+    this.recurrenceStep = (float) Math.pow(theta, -2.0f / rotaryDim);
     this.frequencyScale = frequencyScale;
     this.attentionFactor = attentionFactor;
     if (preparedFrequencies == null) {
@@ -94,6 +101,17 @@ public final class RotaryTable {
     }
     this.cosine = new float[pairCount];
     this.sine = new float[pairCount];
+  }
+
+  /** Returns an independent ordinary-frequency table using the native float recurrence. */
+  public RotaryTable withFloatRecurrence() {
+    if (blendedFrequencies)
+      throw new UnsupportedOperationException(
+          "Float recurrence requires ordinary RoPE frequencies");
+    RotaryTable result =
+        new RotaryTable(rotaryDim, theta, frequencyScale, frequencyFactors, attentionFactor, null);
+    result.floatRecurrence = true;
+    return result;
   }
 
   /**
@@ -346,6 +364,17 @@ public final class RotaryTable {
 
   private void fillFactors(
       int position, float[] cosineDestination, float[] sineDestination, int destinationOffset) {
+    if (floatRecurrence) {
+      float angle = position;
+      for (int pair = 0; pair < cosine.length; pair++) {
+        float divisor = frequencyFactors == null ? 1.0f : frequencyFactors[pair];
+        float scaled = angle * frequencyScale / divisor;
+        cosineDestination[destinationOffset + pair] = attentionFactor * (float) Math.cos(scaled);
+        sineDestination[destinationOffset + pair] = attentionFactor * (float) Math.sin(scaled);
+        angle *= recurrenceStep;
+      }
+      return;
+    }
     float scaledPosition = position * frequencyScale;
     for (int pair = 0; pair < cosine.length; pair++) {
       float divisor = frequencyFactors == null ? 1.0f : frequencyFactors[pair];

@@ -41,3 +41,23 @@ The exp, tanh, logistic and erf are translations of onnxruntime's MLAS approxima
   compiler under AVX2/FMA; clamps by comparison so NaN propagates.
 The matrix product is matrixmultiply 0.3.11 (MIT OR Apache-2.0).
 
+
+Vision attention arithmetic (vision_attention.rs)
+Derived from ggml CPU operations at 2cbca389f515df455412dafa07e2b1359cc72a6d:
+ops.cpp, vec.cpp, vec.h, simd-mappings.h and simd-gemm.h.
+MIT copyright and license text: META-INF/licenses/ggml-vision.txt.
+Rust port retains F16 casts, explicit FMA/reduction order, tiled online softmax,
+and split-KV accumulation. Java owns the graph and retained state.
+
+CLIP exponential and softmax (clip_math.rs)
+SLEEF EXP u10, pinned by PyTorch 2.9.0 at
+5a1d179df9cf652951b59010a2d2075372d67f68, src/libm/sleefsimdsp.c.
+Copyright (c) 2010-2021 Naoki Shibata and contributors.
+Boost Software License 1.0; see META-INF/LICENSE-BOOST-SLEEF.txt.
+Rust AVX2 and scalar ports preserve fused polynomial and exponent scaling order.
+
+The vision projector GELU/EXP arithmetic is adapted from oneDNN 3.7.1
+(8d263e693366ef8db40acc569cc7d8edf644556d),
+src/cpu/x64/injectors/jit_uni_eltwise_injector.cpp.
+Copyright 2019-2025 Intel Corporation, Apache License 2.0.
+No oneDNN library or model graph is linked into the runtime.

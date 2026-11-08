@@ -21,9 +21,7 @@ import java.util.Map;
 
 /** Owned continuous MHA prefix for the LLaVA decoder, sharing the dense GEMM implementation. */
 final class NativeCausalAttention implements BatchedCausalAttentionKernel {
-  private final RustGgufBatchedMatrixKernel kernels;
   private final NativeDebertaKernels dense;
-  private float[] scores = new float[0];
   private final Map<Integer, Layer> layers = new HashMap<>();
   private boolean closed;
 
@@ -42,9 +40,13 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
     }
   }
 
-  NativeCausalAttention(RustGgufBatchedMatrixKernel kernels, NativeDebertaKernels dense) {
-    this.kernels = kernels;
+  NativeCausalAttention(NativeDebertaKernels dense) {
     this.dense = dense;
+  }
+
+  @Override
+  public boolean usesFloatRotaryRecurrence() {
+    return true;
   }
 
   @Override
@@ -95,6 +97,72 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
       int valueLength,
       int capacity,
       int window) {
+    attendWithBatch(
+        output,
+        query,
+        key,
+        value,
+        layer,
+        start,
+        batch,
+        heads,
+        kvHeads,
+        keyLength,
+        valueLength,
+        capacity,
+        window,
+        batch);
+  }
+
+  @Override
+  public void attendFinalPrefill(
+      float[] output,
+      float[] query,
+      float[] key,
+      float[] value,
+      int layer,
+      int position,
+      int originalBatchSize,
+      int heads,
+      int kvHeads,
+      int keyLength,
+      int valueLength,
+      int capacity,
+      int window) {
+    attendWithBatch(
+        output,
+        query,
+        key,
+        value,
+        layer,
+        position,
+        1,
+        heads,
+        kvHeads,
+        keyLength,
+        valueLength,
+        capacity,
+        window,
+        originalBatchSize);
+  }
+
+  private void attendWithBatch(
+      float[] output,
+      float[] query,
+      float[] key,
+      float[] value,
+      int layer,
+      int start,
+      int batch,
+      int heads,
+      int kvHeads,
+      int keyLength,
+      int valueLength,
+      int capacity,
+      int window,
+      int originalBatchSize) {
+    if (originalBatchSize < batch || originalBatchSize > start + batch)
+      throw new IllegalArgumentException("Invalid original attention batch size");
     if (!isEligible(layer, start, batch, heads, kvHeads, keyLength, valueLength, capacity, window))
       throw new IllegalArgumentException("Discontinuous or unsupported native attention");
     int dimension = Math.multiplyExact(heads, keyLength);
@@ -104,32 +172,17 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
     if (output == query || output == key || output == value)
       throw new IllegalArgumentException("Attention output must not alias inputs");
     Layer state = storeRows(key, value, layer, start, batch, heads, keyLength, capacity);
-    if (batch > 1) {
-      dense.causalAttention(
-          output,
-          query,
-          state.keys,
-          state.values,
-          batch,
-          start + batch,
-          dimension,
-          heads,
-          capacity);
-    } else {
-      int needed = Math.multiplyExact(heads, start + 1);
-      if (scores.length < needed) scores = new float[needed];
-      kernels.headMajorAttention(
-          query,
-          state.keys,
-          state.values,
-          output,
-          scores,
-          heads,
-          keyLength,
-          capacity,
-          start + 1,
-          (float) (1.0 / Math.sqrt(keyLength)));
-    }
+    dense.visionAttention(
+        output,
+        query,
+        state.keys,
+        state.values,
+        batch,
+        start + batch,
+        dimension,
+        heads,
+        capacity,
+        originalBatchSize);
     state.positions = start + batch;
   }
 
@@ -193,7 +246,6 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
     if (!closed) {
       closed = true;
       layers.clear();
-      scores = new float[0];
       dense.close();
     }
   }
