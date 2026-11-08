@@ -128,8 +128,9 @@ class NativeDebertaKernelsTest {
     }
   }
 
-  @Test
-  void causalAttentionPreservesPrefixThroughChunksDecodeResetAndRewind() {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void causalAttentionPreservesPrefixThroughChunksDecodeResetAndRewind(boolean appendPrefix) {
     var nativeKernels =
         RustGgufBatchedMatrixKernel.open(
             Path.of(System.getProperty("models.native.kernels.library")), 3);
@@ -155,6 +156,19 @@ class NativeDebertaKernelsTest {
           float[] q = Arrays.copyOfRange(fullQ, start * dim, (start + count) * dim);
           float[] k = Arrays.copyOfRange(fullK, start * dim, (start + count) * dim);
           float[] v = Arrays.copyOfRange(fullV, start * dim, (start + count) * dim);
+          if (appendPrefix && start == 0) {
+            assertThat(attention.append(k, v, 0, 1, count, heads, heads, width, width, capacity, 0))
+                .isFalse();
+            assertThatThrownBy(
+                    () ->
+                        attention.append(
+                            new float[0], v, 0, 0, count, heads, heads, width, width, capacity, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+            assertThat(attention.append(k, v, 0, 0, count, heads, heads, width, width, capacity, 0))
+                .isTrue();
+            start += count;
+            continue;
+          }
           float[] output = new float[count * dim + 2];
           Arrays.fill(output, 99);
           attention.attend(
