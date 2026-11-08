@@ -215,3 +215,37 @@ f328332ae339018d1466490db6a2e6708969fe9094b0a7de68dd27482dcf37f8.
 It retains executable payloads, source, inputs, timings, answer traces and failure
 records; excludes model weights, credentials and build caches. Verify the local
 copy before terminating i-091c95dd56f03732a and deleting its key/security group.
+
+## Fresh full-repeat worker — declared before provisioning
+
+The current worker's four-hour deadline leaves too little time for another full
+candidate/reference collection and safe evidence transfer. Keep every frozen
+case and performance arm; use a fresh isolated worker instead of shortening the
+campaign or reusing old timings. The completed normalization-only task scores
+are Q4_K_S VQA 0.675 versus 0.6875 reference (accuracy-loss gate fails), TextVQA
+0.415625 versus 0.415625; Q4_K_M VQA 0.675 versus 0.675, TextVQA 0.403125 versus
+0.384375. Both match 62/64 complete nonblank token sequences. These are complete
+task results, with integration and faster-reference performance still collecting.
+
+- Experiment: full retained-candidate admission repeat after the queued arithmetic
+  diagnostic; each payload identifies its immutable source and binary digests.
+- Branch: `fix/llava-catalog-fidelity`; current prepared payload is c4d1c348.
+  Arithmetic variants remain separate experiments unless independently justified.
+- Provider: AWS us-east-1, one m6a.4xlarge (16 vCPU, 64 GiB), Ubuntu 24.04
+  ami-0d6dd9e8265d48906, 80 GiB disposable gp3 root, delete on termination.
+- Expected duration: 90 minutes; maximum two hours from creation, automatic shutdown
+  with instance shutdown behavior terminate. Create by 2026-11-08 06:15 UTC;
+  delete by 08:15 UTC and no later than two hours after creation.
+- Spend: retain the USD 6 combined fidelity-experiment ceiling. The original
+  primary's maximum four hours, deleted auxiliary's actual <1 hour, and this
+  worker's maximum two hours total <7 instance-hours, leaving storage allowance.
+  Terminate the original primary after collecting its outstanding evidence.
+- Correctness: unchanged exact artifacts, public corpus, scoring, 99% sequence
+  agreement, <=0.5 percentage-point score loss, absolute floors and integration.
+- Performance: unchanged same-host sequential arms, 8 threads, all F32/AUTO and
+  faster F16 reference comparisons, original warmups/repetitions and <=1.10 ratios.
+- Stop on corrupt artifacts, nonfinite output, budget or deadline. Retain failures.
+- Secrets: ephemeral SSH public key only; no service credentials on the worker.
+- Local evidence: `audit-artifacts/pr380-vision-repeat-2026-11-08/`.
+- Re-read live quota and active fleet. Do not modify any unrelated resource or the
+  ongoing primary measurement. This worker has a distinct key and security group.
