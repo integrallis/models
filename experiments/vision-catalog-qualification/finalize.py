@@ -7,6 +7,25 @@ from pathlib import Path
 from compare import measured, median, read, require, sha
 
 
+def resources(root, variant):
+    directory = root / "results" / variant
+    def peak(path):
+        rows = [line for line in path.read_text().splitlines()
+                if line.lstrip().startswith("Maximum resident set size (kbytes):")]
+        require(len(rows) == 1, "Missing peak RSS: " + str(path))
+        value = int(rows[0].split(":", 1)[1].strip())
+        require(value > 0, "Invalid peak RSS")
+        return value
+    reference = json.loads((directory / "reference.jsonl").read_text().splitlines()[0])["configuration"]
+    candidate = read(directory / "candidate/configuration.json")
+    encoder = read(root / "results/encoder/configuration.json")
+    return dict(candidatePeakRssKiB=peak(directory / "candidate-resources.txt"),
+                referenceDecoderPeakRssKiB=peak(directory / "reference-resources.txt"),
+                candidateLoadMs=median([candidate], "loadMs"),
+                referenceDecoderLoadMs=median([reference], "loadMs"),
+                referenceEncoderLoadMs=median([encoder], "loadMs"))
+
+
 def stronger_performance(root, corpus, variant, task):
     directory = root / "results" / variant
     receipt = read(directory / "reference-performance-f16-receipt.json")
@@ -86,7 +105,8 @@ def main():
                      integrationConfirmation=repeated["passed"])
         result["candidates"].append(dict(variant=task["variant"], backendQualified=all(gates.values()),
                                          gates=gates, datasets=task["datasets"], tokenAgreement=task["tokenAgreement"],
-                                         disagreements=task["disagreements"], performance=performance))
+                                         disagreements=task["disagreements"], performance=performance,
+                                         resources=resources(root, task["variant"])))
     (root / "results/admission-attempt.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))
     return 0 if all(c["backendQualified"] for c in result["candidates"]) else 1
