@@ -54,11 +54,28 @@ class LayerTrace {
     var observerField = pass.getClass().getDeclaredField("layerObserver");
     observerField.setAccessible(true);
     Class<?> observerType = observerField.getType();
+    Object observedPass = pass;
     observerField.set(pass, Proxy.newProxyInstance(observerType.getClassLoader(), new Class<?>[] {observerType},
         (proxy, method, values) -> {
-          if (method.getName().equals("onLayerComplete") && (int) values[1] == target)
+          if (method.getName().equals("onLayerComplete") && (int) values[1] == target) {
             floats(output.resolve("layer-" + values[0] + ".f32"), (float[]) values[2],
                 (int) values[3], (int) values[4]);
+            if ((int) values[0] == 0) {
+              var capacityField = observedPass.getClass().getDeclaredField("prefillBatchCapacity");
+              capacityField.setAccessible(true);
+              int capacity = capacityField.getInt(observedPass);
+              int row = (int) values[3] / (int) values[4];
+              for (String name : new String[] {"batchQ", "batchK", "batchV", "batchXNorm",
+                  "batchAttnOut", "batchAttnProjected", "batchFfnGate", "batchFfnUp",
+                  "batchFfnOut", "batchFfnProjected"}) {
+                var field = observedPass.getClass().getDeclaredField(name);
+                field.setAccessible(true);
+                float[] buffer = (float[]) field.get(observedPass);
+                int width = buffer.length / capacity;
+                floats(output.resolve(name + ".f32"), buffer, row * width, width);
+              }
+            }
+          }
           return method.getName().equals("toString") ? "LayerTrace" : null;
         }));
   }

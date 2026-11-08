@@ -30,14 +30,21 @@ struct Trace { std::filesystem::path output; bool active = false; };
 static bool observe(ggml_tensor *tensor, bool ask, void *data) {
     auto &trace = *static_cast<Trace *>(data);
     std::string name = tensor->name;
-    bool selected = trace.active && name.rfind("l_out-", 0) == 0;
+    bool selected = trace.active && (name.rfind("l_out-", 0) == 0 ||
+        (name.size()>2 && name.substr(name.size()-2)=="-0"));
     if (ask) return selected;
     if (!selected) return true;
-    if (tensor->type != GGML_TYPE_F32 || tensor->ne[2] != 1 || tensor->ne[3] != 1
-        || tensor->nb[0] != sizeof(float)) throw std::runtime_error("unexpected layer output layout");
-    std::vector<float> values(tensor->ne[0]);
-    ggml_backend_tensor_get(tensor, values.data(), (tensor->ne[1] - 1) * tensor->nb[1], values.size() * sizeof(float));
-    write(trace.output / ("layer-" + name.substr(6) + ".f32"), values.data(), values.size());
+    if (tensor->type != GGML_TYPE_F32 || tensor->nb[0] != sizeof(float)) return true;
+    std::vector<float> values(ggml_nbytes(tensor)/sizeof(float));
+    ggml_backend_tensor_get(tensor, values.data(), 0, values.size()*sizeof(float));
+    write(trace.output / (name + ".f32"), values.data(), values.size());
+    std::ofstream shape(trace.output / (name + ".shape.json"));
+    shape << "[" << tensor->ne[0] << "," << tensor->ne[1] << "," << tensor->ne[2] << "," << tensor->ne[3] << "]";
+    if (name.rfind("l_out-", 0)==0) {
+        std::vector<float> last(tensor->ne[0]);
+        ggml_backend_tensor_get(tensor, last.data(), (tensor->ne[1]-1)*tensor->nb[1], last.size()*sizeof(float));
+        write(trace.output / ("layer-"+name.substr(6)+".f32"), last.data(), last.size());
+    }
     return true;
 }
 
