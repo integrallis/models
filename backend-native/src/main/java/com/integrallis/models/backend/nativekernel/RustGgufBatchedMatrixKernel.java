@@ -184,7 +184,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   }
 
   @Override
-  public boolean usesDoubleRmsAccumulation() {
+  public boolean usesReferenceDecoderArithmetic() {
     return imagePrefill;
   }
 

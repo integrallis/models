@@ -204,7 +204,7 @@ public final class LlamaForwardPass {
   }
 
   private final boolean nativeGroupedAttention;
-  private final boolean doubleRmsAccumulation;
+  private final boolean referenceDecoderArithmetic;
 
   private final boolean attentionTemperatureScaling;
 
@@ -509,7 +509,7 @@ public final class LlamaForwardPass {
     this.q8BlockMajorKernel = executionPlan.q8BlockMajorKernel();
     this.parallelQ8FfnPreparation = executionPlan.parallelQ8FfnPreparation();
     this.batchedMatrixKernel = loadedMatrixKernel;
-    this.doubleRmsAccumulation = loadedMatrixKernel.usesDoubleRmsAccumulation();
+    this.referenceDecoderArithmetic = loadedMatrixKernel.usesReferenceDecoderArithmetic();
     this.batchedAttentionKernel =
         Objects.requireNonNull(batchedAttentionKernel, "batchedAttentionKernel");
     if (!config.usesStandardLlamaLayerSemantics()
@@ -721,7 +721,7 @@ public final class LlamaForwardPass {
                 batchQ4LaneScratch,
                 this::prepareBatchedAttention,
                 this::computeBatchedAttention,
-                doubleRmsAccumulation)
+                referenceDecoderArithmetic)
             : null;
   }
 
@@ -3277,7 +3277,7 @@ public final class LlamaForwardPass {
       int size,
       float epsilon) {
     TensorOps.rmsNorm(
-        out, outOffset, input, inputOffset, weight, size, epsilon, doubleRmsAccumulation);
+        out, outOffset, input, inputOffset, weight, size, epsilon, referenceDecoderArithmetic);
   }
 
   private void normalizeHead(float[] vector, int offset, float[] weight, int headDim) {
@@ -3373,6 +3373,8 @@ public final class LlamaForwardPass {
       // Granite retains its distinct sigmoid arithmetic; it does not use the Qwen activation.
       // Routing this branch through the optional Qwen kernel would change that contract.
       GroupedQueryAttentionKernel.swiGlu(out, outOffset, gate, gateOffset, up, upOffset, size);
+    } else if (referenceDecoderArithmetic) {
+      TensorOps.swiGluReference(out, outOffset, gate, gateOffset, up, upOffset, size);
     } else if (usesVectorizedSwiGlu()) {
       boolean accepted =
           outView != null && gateView != null && upView != null

@@ -1994,6 +1994,18 @@ public final class TensorOps {
     }
   }
 
+  /** Vision decoder SwiGLU with the reference float32 exponential arithmetic. */
+  public static void swiGluReference(
+      float[] out,
+      int outOffset,
+      float[] gate,
+      int gateOffset,
+      float[] up,
+      int upOffset,
+      int size) {
+    GgmlSwiGlu.apply(out, outOffset, gate, gateOffset, up, upOffset, size);
+  }
+
   /** SwiGLU activation: out[i] = silu(gate[i]) * up[i]. */
   public static void swiGlu(float[] out, float[] gate, float[] up, int size) {
     swiGlu(out, 0, gate, 0, up, 0, size);

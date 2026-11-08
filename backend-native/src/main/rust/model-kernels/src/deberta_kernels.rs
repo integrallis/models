@@ -814,11 +814,12 @@ pub unsafe extern "C" fn jmodels_dense_causal_attention_head_major(
     }
 }
 
-/// LLaVA attention with F16 operands, online accumulation and retained head-major cache.
+/// LLaVA attention borrowing a retained head-major cache of F16-rounded values widened to F32.
 /// # Safety
-/// Pointers must cover their advertised lengths and output cannot alias inputs.
+/// Pointers must cover their advertised lengths and output cannot alias inputs. K/V values must
+/// already be rounded to F16 (ties to even) then widened to F32, as the Java cache owner guarantees.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn jmodels_vision_causal_attention(
+pub unsafe extern "C" fn jmodels_vision_causal_attention_f16_cache(
     handle: u64,
     query: *const f32,
     query_len: usize,

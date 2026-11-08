@@ -506,20 +506,16 @@ pub(super) unsafe fn run(
     let output = out as usize;
     pool.install(|| {
         (0..heads).into_par_iter().for_each(|head| {
-            let mut keys =
-                k[head * capacity * width..head * capacity * width + positions * width].to_vec();
-            let mut values =
-                v[head * capacity * width..head * capacity * width + positions * width].to_vec();
-            unsafe {
-                round_slice(&mut keys);
-                round_slice(&mut values);
-            }
+            // The Java-owned cache rounds newly appended rows to F16 exactly once. Borrow that
+            // immutable prefix for this synchronous call; never retain pointers after returning.
+            let keys = &k[head * capacity * width..head * capacity * width + positions * width];
+            let values = &v[head * capacity * width..head * capacity * width + positions * width];
             if original_batch < 64 {
                 for row in 0..batch {
                     let r = small(
                         &q[row * dim + head * width..row * dim + (head + 1) * width],
-                        &keys,
-                        &values,
+                        keys,
+                        values,
                         start + row + 1,
                         padded,
                         width,
@@ -536,7 +532,7 @@ pub(super) unsafe fn run(
                 }
                 return;
             }
-            let result = tiled(q, &keys, &values, batch, start, dim, head, width);
+            let result = tiled(q, keys, values, batch, start, dim, head, width);
             for row in 0..batch {
                 unsafe {
                     std::ptr::copy_nonoverlapping(
@@ -553,7 +549,7 @@ pub(super) unsafe fn run(
 #[cfg(test)]
 mod tests {
     use crate::deberta_kernels::{
-        jmodels_deberta_create, jmodels_deberta_destroy, jmodels_vision_causal_attention,
+        jmodels_deberta_create, jmodels_deberta_destroy, jmodels_vision_causal_attention_f16_cache,
     };
     fn data(count: usize, state: &mut u32) -> Vec<f32> {
         (0..count)
@@ -626,8 +622,13 @@ mod tests {
         for (bytes, batch, start, pruned) in cases {
             let mut state = 0x12345678;
             let q = data(batch * 256, &mut state);
-            let k = data(1024 * 256, &mut state);
-            let v = data(k.len(), &mut state);
+            let mut k = data(1024 * 256, &mut state);
+            let mut v = data(k.len(), &mut state);
+            // This ABI receives the F16-rounded, Java-owned retained cache.
+            unsafe {
+                super::round_slice(&mut k);
+                super::round_slice(&mut v);
+            }
             let physical = if pruned { 1 } else { batch };
             let query = if pruned {
                 &q[(batch - 1) * 256..]
@@ -636,7 +637,7 @@ mod tests {
             };
             let mut output = vec![0f32; physical * 256];
             let rc = unsafe {
-                jmodels_vision_causal_attention(
+                jmodels_vision_causal_attention_f16_cache(
                     handle,
                     query.as_ptr(),
                     query.len(),
@@ -678,7 +679,7 @@ mod tests {
         let mut output = [99f32; 8];
         for original in [0, 3] {
             let rc = unsafe {
-                jmodels_vision_causal_attention(
+                jmodels_vision_causal_attention_f16_cache(
                     handle,
                     q.as_ptr(),
                     8,
@@ -700,7 +701,7 @@ mod tests {
             assert_eq!(output, [99.; 8]);
         }
         let rc = unsafe {
-            jmodels_vision_causal_attention(
+            jmodels_vision_causal_attention_f16_cache(
                 handle,
                 output.as_ptr(),
                 8,

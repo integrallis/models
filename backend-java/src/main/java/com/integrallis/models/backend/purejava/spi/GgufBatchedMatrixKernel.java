@@ -28,11 +28,11 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
   }
 
   /**
-   * Whether this decoder route requires float64 accumulation of float32 squared values in RMS
-   * normalization. The vision route matches its reference this way; existing text routes retain
-   * their pinned float32 reduction contract.
+   * Whether this decoder route requires the reference RMS and SwiGLU float32 arithmetic. The vision
+   * route uses float64 accumulation of float32 squared values and a fixed exponential polynomial;
+   * existing text routes retain their pinned reduction and activation contracts.
    */
-  default boolean usesDoubleRmsAccumulation() {
+  default boolean usesReferenceDecoderArithmetic() {
     return false;
   }
 

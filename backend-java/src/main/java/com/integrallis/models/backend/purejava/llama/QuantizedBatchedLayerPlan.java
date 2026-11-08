@@ -48,7 +48,7 @@ final class QuantizedBatchedLayerPlan {
   private final int attentionOutputDim;
   private final int hiddenDim;
   private final float rmsNormEps;
-  private final boolean doubleRmsAccumulation;
+  private final boolean referenceDecoderArithmetic;
   private final boolean vectorizedSwiGlu;
   private final GgufQ4Kernel q4Kernel;
   private final boolean blockMajorQ8Activations;
@@ -101,7 +101,7 @@ final class QuantizedBatchedLayerPlan {
       float[] laneScratch,
       AttentionStage attentionPreparation,
       AttentionStage attentionComputation,
-      boolean doubleRmsAccumulation) {
+      boolean referenceDecoderArithmetic) {
     if (batchCapacity < 2) {
       throw new IllegalArgumentException("batchCapacity must be at least two");
     }
@@ -115,7 +115,7 @@ final class QuantizedBatchedLayerPlan {
     this.attentionOutputDim = attentionOutputDim;
     this.hiddenDim = hiddenDim;
     this.rmsNormEps = rmsNormEps;
-    this.doubleRmsAccumulation = doubleRmsAccumulation;
+    this.referenceDecoderArithmetic = referenceDecoderArithmetic;
     this.vectorizedSwiGlu = vectorizedSwiGlu;
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     this.blockMajorQ8Activations = blockMajorQ8Activations;
@@ -340,7 +340,7 @@ final class QuantizedBatchedLayerPlan {
           ffnNorm,
           embeddingDim,
           rmsNormEps,
-          doubleRmsAccumulation);
+          referenceDecoderArithmetic);
     }
     quantize(
         inputActivation,
@@ -369,7 +369,7 @@ final class QuantizedBatchedLayerPlan {
           ffnNorm,
           embeddingDim,
           rmsNormEps,
-          doubleRmsAccumulation);
+          referenceDecoderArithmetic);
     }
     inputActivation.quantizeBatchRange(normalizedInput, activeBatchSize, fromBatch, toBatch);
   }
@@ -402,7 +402,9 @@ final class QuantizedBatchedLayerPlan {
     int length = toRow - fromRow;
     for (int batch = 0; batch < activeBatchSize; batch++) {
       int rowOffset = batch * hiddenDim + fromRow;
-      if (vectorizedSwiGlu) {
+      if (referenceDecoderArithmetic) {
+        TensorOps.swiGluReference(activated, rowOffset, gate, rowOffset, up, rowOffset, length);
+      } else if (vectorizedSwiGlu) {
         VectorUtil.swiGlu(activated, rowOffset, gate, rowOffset, up, rowOffset, length);
       } else {
         TensorOps.swiGlu(activated, rowOffset, gate, rowOffset, up, rowOffset, length);

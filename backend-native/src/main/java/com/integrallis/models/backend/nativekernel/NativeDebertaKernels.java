@@ -129,7 +129,7 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
               .orElse(null);
       visionAttention =
           symbols
-              .find("jmodels_vision_causal_attention")
+              .find("jmodels_vision_causal_attention_f16_cache")
               .map(
                   symbol ->
                       linker.downcallHandle(

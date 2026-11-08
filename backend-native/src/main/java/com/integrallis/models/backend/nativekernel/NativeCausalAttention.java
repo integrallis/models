@@ -223,8 +223,15 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
       for (int head = 0; head < heads; head++) {
         int source = row * state.dimension + head * width;
         int destination = (head * capacity + start + row) * width;
-        System.arraycopy(key, source, state.keys, destination, width);
-        System.arraycopy(value, source, state.values, destination, width);
+        // Flash Attention consumes F16 operands even when the decoder KV setting is F32.
+        // Round each appended row once. Retaining the widened values lets native attention borrow
+        // the Java-owned prefix directly instead of copying and rounding it at every decode step.
+        for (int element = 0; element < width; element++) {
+          state.keys[destination + element] =
+              Float.float16ToFloat(Float.floatToFloat16(key[source + element]));
+          state.values[destination + element] =
+              Float.float16ToFloat(Float.floatToFloat16(value[source + element]));
+        }
       }
     }
     return state;

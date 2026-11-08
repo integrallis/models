@@ -42,10 +42,10 @@ class NativeKernelLibraryTest {
     try (var library = NativeKernelLibrary.open(libraryPath(), 2);
         var kernel = RustGgufBatchedMatrixKernel.open(libraryPath(), 2)) {
       var before = kernel.planRecommendations();
-      assertThat(kernel.usesDoubleRmsAccumulation()).isFalse();
+      assertThat(kernel.usesReferenceDecoderArithmetic()).isFalse();
       boolean supported = library.supports(NativeKernelCapability.Q4_K_BATCH_PACKING);
       assertThat(kernel.configureImagePrefill()).isEqualTo(supported);
-      assertThat(kernel.usesDoubleRmsAccumulation()).isEqualTo(supported);
+      assertThat(kernel.usesReferenceDecoderArithmetic()).isEqualTo(supported);
       if (supported) {
         assertThat(kernel.planRecommendations())
             .containsEntry(PureJavaPlanConfiguration.PREFILL_BATCH_SIZE_PROPERTY, "128");

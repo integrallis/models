@@ -30,3 +30,10 @@ Compile on the remote reference worker with C++17, its `ggml/include`, and its `
 `ggml-base` libraries. No model weights are needed. The Java tests require exact results, including
 offset, ragged-size and in-place calls. Float32 products enter a float64 accumulator; converting the
 input operands to float64 before multiplication is a different operation and is not this contract.
+
+`pr380-swiglu-fixture.cpp` runs `ggml_mul(ggml_silu(x), up)` on the same four sizes,
+including signed zero, infinities, NaN and exponential scaling boundaries. Compile against the
+same pinned independent ggml libraries. `backend-java/src/test/resources/swiglu-ggml/manifest.json`
+binds its generator, executable and binary outputs. The Java Vector API implementation preserves
+the eight-lane reference polynomial and separate SiLU/multiply rounding; the ragged tail follows
+the reference scalar exponential. These tests do not establish whole-model accuracy or speed.

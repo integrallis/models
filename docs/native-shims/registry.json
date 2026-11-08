@@ -48,6 +48,8 @@
       "jmodels_dense_attention",
       "jmodels_dense_causal_attention",
       "jmodels_dense_causal_attention_head_major",
+      "jmodels_dense_gelu_erf",
+      "jmodels_dense_project_ordered",
       "jmodels_dense_quick_gelu",
       "jmodels_gated_delta_net_f32_with_context",
       "jmodels_gated_delta_net_group_f32_with_context",
@@ -74,7 +76,9 @@
       "jmodels_tokenizer_abi",
       "jmodels_tokenizer_create",
       "jmodels_tokenizer_destroy",
-      "jmodels_tokenizer_encode"
+      "jmodels_tokenizer_encode",
+      "jmodels_vision_causal_attention_f16_cache",
+      "jmodels_vision_project_affine"
     ],
     "cuda": [
       "models_gqa_decode_attention",
@@ -975,7 +979,11 @@
           "jmodels_dense_attention",
           "jmodels_dense_causal_attention",
           "jmodels_dense_quick_gelu",
-          "jmodels_dense_causal_attention_head_major"
+          "jmodels_dense_causal_attention_head_major",
+          "jmodels_dense_gelu_erf",
+          "jmodels_dense_project_ordered",
+          "jmodels_vision_causal_attention_f16_cache",
+          "jmodels_vision_project_affine"
         ]
       },
       "dispatch": [
@@ -1014,6 +1022,22 @@
         {
           "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
           "anchor": "jmodels_dense_causal_attention_head_major"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_dense_gelu_erf"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_dense_project_ordered"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_vision_causal_attention_f16_cache"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_vision_project_affine"
         }
       ],
       "sourceScope": "deberta-f32-kernels",
@@ -1314,7 +1338,8 @@
       "backend-native/src/main/rust/model-kernels/src/swiglu.rs",
       "build.gradle.kts",
       "gradle.properties",
-      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeCausalAttention.java"
+      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeCausalAttention.java",
+      "backend-java/src/main/java/com/integrallis/models/backend/purejava/ops/GgmlSwiGlu.java"
     ],
     "cuda": [
       "backend-cuda/build.gradle.kts",
@@ -1545,7 +1570,8 @@
       "backend-java/src/main/java/com/integrallis/models/backend/purejava/LlavaBackend.java",
       "backend-java/src/main/java/com/integrallis/models/backend/purejava/vision/ClipVisionEncoder.java",
       "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeKernelLibrary.java",
-      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGgufBatchedMatrixKernel.java"
+      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGgufBatchedMatrixKernel.java",
+      "backend-native/src/main/rust/model-kernels/src/vision_attention.rs"
     ],
     "onnx-executor-kernels": [
       "backend-native/src/main/rust/model-kernels/src/onnx_kernels.rs",
