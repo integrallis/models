@@ -7,6 +7,8 @@ mod q8f32_reuse;
 // Copyright 2025-2026 Integrallis Software, LLC
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(test)]
+mod attention_layout_bench;
 mod bfloat16;
 #[cfg(target_arch = "aarch64")]
 mod sleef_activations;
@@ -573,6 +575,8 @@ struct AttentionJob {
     value_dim: usize,
     key_length: usize,
     value_length: usize,
+    key_head_stride: usize,
+    value_head_stride: usize,
     num_heads: usize,
     num_kv_heads: usize,
     scale: f32,
@@ -1179,7 +1183,7 @@ unsafe fn execute_attention_partition(
                 let keys = unsafe {
                     slice::from_raw_parts(
                         (job.keys[span] as *const f32)
-                            .add(job.key_offsets[span] + kv * job.key_length),
+                            .add(job.key_offsets[span] + kv * job.key_head_stride),
                         (positions - 1) * job.key_dim + job.key_length,
                     )
                 };
@@ -1200,7 +1204,7 @@ unsafe fn execute_attention_partition(
                 let values = unsafe {
                     slice::from_raw_parts(
                         (job.values[span] as *const f32)
-                            .add(job.value_offsets[span] + kv * job.value_length),
+                            .add(job.value_offsets[span] + kv * job.value_head_stride),
                         (positions - 1) * job.value_dim + job.value_length,
                     )
                 };
@@ -2017,6 +2021,106 @@ pub unsafe extern "C" fn jmodels_causal_depthwise_conv_silu_f32(
     STATUS_OK
 }
 
+/// Decode ordinary MHA from a head-major F32 cache without changing reductions.
+/// # Safety
+/// All pointers must cover the advertised lengths; output and scores must be
+/// disjoint from the inputs and each other for this synchronous call.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn jmodels_head_major_attention_f32_with_context(
+    context: *const KernelContext,
+    query: *const f32,
+    query_elements: u64,
+    keys: *const f32,
+    key_elements: u64,
+    values: *const f32,
+    value_elements: u64,
+    output: *mut f32,
+    output_elements: u64,
+    scores: *mut f32,
+    score_elements: u64,
+    heads: u32,
+    width: u32,
+    capacity: u32,
+    positions: u32,
+    scale: f32,
+) -> i32 {
+    if context.is_null()
+        || [
+            query,
+            keys,
+            values,
+            output.cast_const(),
+            scores.cast_const(),
+        ]
+        .iter()
+        .any(|p| p.is_null())
+    {
+        return STATUS_NULL_POINTER;
+    }
+    let (heads, width, capacity, positions) = (
+        heads as usize,
+        width as usize,
+        capacity as usize,
+        positions as usize,
+    );
+    if heads == 0 || width == 0 || positions == 0 || positions > capacity || !scale.is_finite() {
+        return STATUS_INVALID_SHAPE;
+    }
+    let Some(dimension) = heads.checked_mul(width) else {
+        return STATUS_INVALID_SHAPE;
+    };
+    let Some(cache_size) = dimension.checked_mul(capacity) else {
+        return STATUS_INVALID_SHAPE;
+    };
+    let Some(score_size) = heads.checked_mul(positions) else {
+        return STATUS_INVALID_SHAPE;
+    };
+    if [dimension, cache_size, score_size]
+        .iter()
+        .any(|n| *n > isize::MAX as usize / 4)
+    {
+        return STATUS_INVALID_SHAPE;
+    }
+    if dimension as u64 > query_elements
+        || dimension as u64 > output_elements
+        || cache_size as u64 > key_elements
+        || cache_size as u64 > value_elements
+        || score_size as u64 > score_elements
+    {
+        return STATUS_BUFFER_TOO_SMALL;
+    }
+    let job = AttentionJob {
+        query: query as usize,
+        query_offset: 0,
+        keys: [keys as usize, 0],
+        key_offsets: [0, 0],
+        values: [values as usize, 0],
+        value_offsets: [0, 0],
+        positions: [positions, 0],
+        output: output as usize,
+        output_offset: 0,
+        scores: scores as usize,
+        key_dim: width,
+        value_dim: width,
+        key_length: width,
+        value_length: width,
+        key_head_stride: capacity * width,
+        value_head_stride: capacity * width,
+        num_heads: heads,
+        num_kv_heads: heads,
+        scale,
+    };
+    match catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: the caller owns the context; all buffer shapes were checked above.
+        unsafe { &*context }.workers.execute_attention(job)
+    })) {
+        Ok(true) => STATUS_OK,
+        Ok(false) => STATUS_PANIC,
+        Err(_) => STATUS_PANIC,
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn jmodels_kernels_context_create(thread_count: u32) -> *mut KernelContext {
     match catch_unwind(AssertUnwindSafe(|| {
@@ -2148,6 +2252,8 @@ pub unsafe extern "C" fn jmodels_grouped_attention_f32_with_context(
         value_dim,
         key_length,
         value_length,
+        key_head_stride: key_length,
+        value_head_stride: value_length,
         num_heads,
         num_kv_heads,
         scale,
@@ -3519,8 +3625,19 @@ unsafe fn compute_batched_row_range(
                 // The packed tile keeps the existing scalar block fold, with eight
                 // independent output rows in the SIMD lanes.
                 unsafe {
-                    compute_q4_k_packed_rows(weights, quantized, activation_scales,
-                        activation_sums, output, batch_size, rows, cols, start_row, end_row, true);
+                    compute_q4_k_packed_rows(
+                        weights,
+                        quantized,
+                        activation_scales,
+                        activation_sums,
+                        output,
+                        batch_size,
+                        rows,
+                        cols,
+                        start_row,
+                        end_row,
+                        true,
+                    );
                 }
                 return;
             }
@@ -3549,8 +3666,19 @@ unsafe fn compute_batched_row_range(
                 // SAFETY: dispatch checked CPU features and the worker owns these rows.
                 // Packed rows preserve the original eight partial sums and reduction tree.
                 unsafe {
-                    compute_q4_k_packed_rows(weights, quantized, activation_scales,
-                        activation_sums, output, batch_size, rows, cols, start_row, end_row, false);
+                    compute_q4_k_packed_rows(
+                        weights,
+                        quantized,
+                        activation_scales,
+                        activation_sums,
+                        output,
+                        batch_size,
+                        rows,
+                        cols,
+                        start_row,
+                        end_row,
+                        false,
+                    );
                 }
                 return;
             }
@@ -7569,7 +7697,8 @@ mod tests {
             .collect();
         for (i, block) in weights.chunks_exact_mut(Q4_K_BLOCK_BYTES).enumerate() {
             let sign = if i % 3 == 0 { -1.0 } else { 1.0 };
-            block[..2].copy_from_slice(&f32_to_f16(sign * (i % 7 + 1) as f32 * 0.03125).to_le_bytes());
+            block[..2]
+                .copy_from_slice(&f32_to_f16(sign * (i % 7 + 1) as f32 * 0.03125).to_le_bytes());
             block[2..4]
                 .copy_from_slice(&f32_to_f16(sign * (i % 5 + 1) as f32 * 0.015625).to_le_bytes());
         }
@@ -8349,6 +8478,103 @@ mod tests {
                 attention_claims_every_query_head_exactly_once(num_kv, threads);
             }
         }
+    }
+
+    #[test]
+    fn head_major_attention_matches_existing_decode_and_rejects_short_caches() {
+        let context = jmodels_kernels_context_create(3);
+        assert!(!context.is_null());
+        for width in [5_usize, 16, 128, 131] {
+            let (heads, positions, capacity) = (3, 7, 11);
+            let dimension = heads * width;
+            let query: Vec<f32> = (0..dimension)
+                .map(|i| (i % 17) as f32 * 0.13 - 1.0)
+                .collect();
+            let keys: Vec<f32> = (0..capacity * dimension)
+                .map(|i| (i % 29) as f32 * 0.07 - 1.0)
+                .collect();
+            let values: Vec<f32> = (0..keys.len())
+                .map(|i| (i % 23) as f32 * 0.09 - 1.0)
+                .collect();
+            let mut head_keys = vec![0.0; keys.len()];
+            let mut head_values = head_keys.clone();
+            for row in 0..capacity {
+                for head in 0..heads {
+                    let a = row * dimension + head * width;
+                    let b = (head * capacity + row) * width;
+                    head_keys[b..b + width].copy_from_slice(&keys[a..a + width]);
+                    head_values[b..b + width].copy_from_slice(&values[a..a + width]);
+                }
+            }
+            let mut expected = vec![0.0; dimension];
+            let mut actual = expected.clone();
+            let mut scores = vec![0.0; heads * positions];
+            let scale = 0.125;
+            let status = unsafe {
+                jmodels_grouped_attention_f32_with_context(
+                    context,
+                    query.as_ptr(),
+                    0,
+                    query.len() as u64,
+                    keys.as_ptr(),
+                    0,
+                    keys.len() as u64,
+                    values.as_ptr(),
+                    0,
+                    values.len() as u64,
+                    positions as u32,
+                    std::ptr::null(),
+                    0,
+                    0,
+                    std::ptr::null(),
+                    0,
+                    0,
+                    0,
+                    expected.as_mut_ptr(),
+                    0,
+                    expected.len() as u64,
+                    scores.as_mut_ptr(),
+                    scores.len() as u64,
+                    dimension as u32,
+                    dimension as u32,
+                    width as u32,
+                    width as u32,
+                    heads as u32,
+                    heads as u32,
+                    scale,
+                )
+            };
+            assert_eq!(status, STATUS_OK);
+            for advertised in [head_keys.len(), head_keys.len() - 1] {
+                let status = unsafe {
+                    jmodels_head_major_attention_f32_with_context(
+                        context,
+                        query.as_ptr(),
+                        query.len() as u64,
+                        head_keys.as_ptr(),
+                        advertised as u64,
+                        head_values.as_ptr(),
+                        head_values.len() as u64,
+                        actual.as_mut_ptr(),
+                        actual.len() as u64,
+                        scores.as_mut_ptr(),
+                        scores.len() as u64,
+                        heads as u32,
+                        width as u32,
+                        capacity as u32,
+                        positions as u32,
+                        scale,
+                    )
+                };
+                if advertised == head_keys.len() {
+                    assert_eq!(status, STATUS_OK);
+                    assert_eq!(actual, expected);
+                } else {
+                    assert_eq!(status, STATUS_BUFFER_TOO_SMALL);
+                }
+            }
+        }
+        unsafe { jmodels_kernels_context_destroy(context) };
     }
 
     #[test]

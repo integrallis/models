@@ -284,6 +284,25 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
         valueDimension);
   }
 
+  boolean supportsHeadMajorAttention() {
+    return library.supportsHeadMajorAttention();
+  }
+
+  synchronized void headMajorAttention(
+      float[] query,
+      float[] keys,
+      float[] values,
+      float[] output,
+      float[] scores,
+      int heads,
+      int width,
+      int capacity,
+      int positions,
+      float scale) {
+    library.headMajorAttentionF32(
+        query, keys, values, output, scores, heads, width, capacity, positions, scale);
+  }
+
   int threadCount() {
     return library.threadCount();
   }

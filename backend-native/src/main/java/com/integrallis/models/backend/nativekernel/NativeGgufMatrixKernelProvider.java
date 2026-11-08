@@ -52,7 +52,8 @@ public final class NativeGgufMatrixKernelProvider implements GgufMatrixKernelPro
   @Override
   public com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel openAttention(
       int threads, GgufBatchedMatrixKernel matrix) {
-    if (!matrix.supportsGroupedAttention())
+    if (!(matrix instanceof RustGgufBatchedMatrixKernel nativeMatrix)
+        || !nativeMatrix.supportsHeadMajorAttention())
       return com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel.none();
     String configured = System.getProperty(RustFfmBackend.LIBRARY_PATH_PROPERTY);
     if (configured == null || configured.isBlank())
@@ -62,7 +63,7 @@ public final class NativeGgufMatrixKernelProvider implements GgufMatrixKernelPro
           configured == null || configured.isBlank()
               ? NativeDebertaKernels.load(threads)
               : NativeDebertaKernels.load(Path.of(configured), threads);
-      if (dense.supportsCausalAttention()) return new NativeCausalAttention(matrix, dense);
+      if (dense.supportsCausalAttention()) return new NativeCausalAttention(nativeMatrix, dense);
       dense.close();
       return com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel.none();
     } catch (java.io.IOException failure) {

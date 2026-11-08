@@ -108,3 +108,66 @@ between ratios 0.9902 and 1.0166. This does not justify the added production
 complexity or establish closure of the admission gap. Retain the original native
 kernels for the full normalization qualification. Keep the experiment's raw data
 and source as diagnostics, outside the shipping branch.
+
+## Cache-layout diagnostic, to run only after admission collection stops
+
+Both arithmetic-level experiments produced negligible decode benefit. Test whether
+F32 attention's token-major cache stride limits throughput before changing the
+shipping cache. An ignored remote-only synthetic benchmark compares token-major,
+16-float row padding, head-major, and token-major repeat with identical 32-head,
+128-wide inputs at 64/606/1024 positions and eight workers. All outputs must be
+bit-identical. Record seven samples of thirty calls after twenty warmups, both
+with warm caches and a separately labeled controller-only 64 MiB eviction (not
+a guarantee of eviction from every worker cache). This is component evidence,
+never model qualification. Public ABI and default layout remain unchanged. Only
+a substantial measured gain warrants integrating a new layout and rerunning the
+full workload; do not overlap this experiment with the current admission run.
+
+The isolated worker below supersedes that initial same-host scheduling plan;
+no additional workload runs on the admission host.
+
+## Isolated component worker — declared before provisioning
+
+- Experiment: synthetic attention-cache layout A/B; only if material, prototype
+  the winning layout and run original/candidate/original real-decoder A/B.
+- Branch: `experiment/llava-attention-layout`; every payload records its commit.
+- Provider: AWS us-east-1, one additional m6a.4xlarge, 16 vCPU, 64 GiB RAM,
+  Ubuntu 24.04 ami-0d6dd9e8265d48906, 40 GiB disposable gp3 root.
+- Expected duration: 20 minutes; maximum one hour, automatic terminate on shutdown.
+- Spend: within the original USD 6 combined experiment ceiling; total maximum
+  five instance-hours across the four-hour primary and one-hour auxiliary worker.
+- Create before 2026-11-08 05:00 UTC; delete no later than 06:00 UTC and one hour
+  after creation. Keep the primary admission host idle except its frozen workload.
+- Correctness: exact synthetic output parity across all layouts/context lengths;
+  a real-decoder candidate must also preserve every generated token.
+- Performance: same auxiliary host, original/candidate/original; component
+  results are not model admission. Full admission stays on the primary worker.
+- Stop on corrupt payloads, nonfinite values, exhausted budget or deadline.
+- No service credentials on the worker; ephemeral SSH public key only.
+- Local evidence: `audit-artifacts/pr380-attention-layout-2026-11-08/`. Record and
+  delete only the auxiliary instance/key/security group created by this experiment.
+- Re-read live quota and account instances before launch; the existing primary
+  `i-04b38cce99ef0308c` must remain running and untouched.
+
+The synthetic run preserves every output. At 606 positions, head-major warm
+latency is 0.1666 ms versus 0.2373/0.2236 ms in the two token-major runs. The
+eviction diagnostic is nearly neutral (0.3368 versus 0.3457/0.3272 ms); 1,024
+positions under eviction regress. Do not claim a decoder gain. Prototype an
+explicit head-major F32 cache through both prefill and decode, retaining the
+same GEMM, dot-product and softmax arithmetic and worker pool. Preserve old C
+entry points as compatibility wrappers, not a selectable Java implementation.
+Require synthetic public-ABI parity/bounds tests and existing chunk/reset/rewind
+Java tests before the same-host real caption A/B (3 warmups, 7 repetitions,
+original/candidate/original). Reject an end-to-end regression or negligible gain.
+
+## Head-major decoder result
+
+The real caption A/B preserves all 30 token sequences. Decode medians are
+4008.752 / 3888.977 / 4012.910 ms for original/head-major/original, improving
+by 2.99% and 3.09% against the two baselines. Prefill ratios are 0.9685 and
+0.9931. Retain this candidate for full frozen qualification; this diagnostic
+does not establish catalog admission. All 63 active Rust tests, Clippy, and
+seven Java native tests pass. The A/B reducer initially referenced a Python
+virtualenv absent on the auxiliary host; its three timing arms completed.
+Run the same standard-library reducer with system Python, preserving the
+original exit-127 log and all timings. No inference was repeated for this fix.
