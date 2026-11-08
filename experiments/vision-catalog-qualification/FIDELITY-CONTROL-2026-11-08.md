@@ -52,3 +52,14 @@ preprocessing, weights, prompts or decoder. The hypothesis is lower normalizatio
 roundoff; it is not established until intermediate/output arrays are compared.
 Retain a change only if it improves fidelity over multiple images and passes the
 full frozen task and performance workload. No lookup or case-specific branch.
+
+## Decode SIMD scale-broadcast experiment
+
+A CPU-timer profile of the original caption decode, using an optimized symbol-bearing
+build whose generated tokens and every top-two margin match the original binary,
+places 55.2% of samples in Q4_K dot products, 16.6% in Q6_K and 14.8% in attention
+score/value products. Test keeping Q4_K scale broadcasts in SIMD registers instead
+of extracting eight scalar lanes per block. Integer products and floating reduction
+order remain unchanged. Require synthetic reduction parity and real-output parity,
+then same-host sequential A/B latency before retaining it. Profile samples themselves
+are not throughput evidence. Do not promote a slowdown or retain an alternate mode.
