@@ -1,0 +1,23 @@
+[
+  "/opt/embedding390/java/bin/java",
+  "--add-modules=jdk.incubator.vector",
+  "--enable-native-access=ALL-UNNAMED",
+  "-Xmx4g",
+  "-Dvectors.gguf.threads=8",
+  "-Dmodels.native.kernels.threads=8",
+  "-Dmodels.purejava.maxContextLength=1024",
+  "-Dembedding.reference=/opt/embedding390/references/reference-embeddinggemma2-q8_0.json",
+  "-Dembedding.probes=/opt/embedding390/references/probes.txt",
+  "-Dembedding.profiler.library=/opt/embedding390/profiler/lib/libasyncProfiler.so",
+  "-cp",
+  "/opt/embedding390/short-candidate/lib/*:/opt/embedding390/profiler/lib/async-profiler.jar",
+  "EmbeddingProfile",
+  "/opt/embedding390/models/eg2.gguf",
+  "/opt/embedding390/short-results/eg2-candidate-32.json",
+  "32",
+  "1",
+  "5",
+  "11",
+  "mean",
+  "latency"
+]

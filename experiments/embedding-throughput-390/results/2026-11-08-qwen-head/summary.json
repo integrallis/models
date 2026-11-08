@@ -1,0 +1,35 @@
+{
+  "sourceRevision": "16a4410fa23cc9e465f2cc189d8a85e33295254f",
+  "archive": {
+    "sha256": "215a4dae438bdccb8fbf796feb3c034144ce6041095c3237c0253c8d2d80d603",
+    "bytes": 25420922
+  },
+  "retained": false,
+  "reason": "No gain beyond bracketing baseline drift at any tested length; 128-token candidate was 2.46% slower than faster baseline. Preserve evidence and defer this implementation rather than retain an unproven performance change.",
+  "comparison": {
+    "32": {
+      "baseline1MedianMs": 293.905259,
+      "candidateMedianMs": 296.881017,
+      "baseline2MedianMs": 299.606388,
+      "baselineDriftMs": 5.70112899999998,
+      "conservativeGainMs": -2.975757999999985,
+      "gainExceedsDrift": false
+    },
+    "128": {
+      "baseline1MedianMs": 1275.272634,
+      "candidateMedianMs": 1299.291015,
+      "baseline2MedianMs": 1268.041955,
+      "baselineDriftMs": 7.230679000000009,
+      "conservativeGainMs": -31.2490600000001,
+      "gainExceedsDrift": false
+    },
+    "512": {
+      "baseline1MedianMs": 6883.096951,
+      "candidateMedianMs": 6760.997388,
+      "baseline2MedianMs": 6719.348286,
+      "baselineDriftMs": 163.74866500000007,
+      "conservativeGainMs": -41.6491019999994,
+      "gainExceedsDrift": false
+    }
+  }
+}

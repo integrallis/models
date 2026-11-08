@@ -1,0 +1,22 @@
+[
+  "/opt/embedding390/java/bin/java",
+  "--add-modules=jdk.incubator.vector",
+  "--enable-native-access=ALL-UNNAMED",
+  "-Xmx4g",
+  "-Dvectors.gguf.threads=8",
+  "-Dmodels.native.kernels.threads=8",
+  "-Dmodels.purejava.maxContextLength=1024",
+  "-Dembedding.reference=/opt/embedding390/references/reference-qwen3-embedding-0.6b-q8_0.json",
+  "-Dembedding.probes=/opt/embedding390/references/probes.txt",
+  "-cp",
+  "/opt/embedding390/baseline/lib/*",
+  "EmbeddingProfile",
+  "/opt/embedding390/models/qwen.gguf",
+  "/opt/embedding390/qwen-results/qwen-baseline-1-32-latency.json",
+  "32",
+  "1",
+  "5",
+  "11",
+  "last-token",
+  "latency"
+]

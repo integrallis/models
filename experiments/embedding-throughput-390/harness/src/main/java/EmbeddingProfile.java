@@ -51,7 +51,10 @@ public class EmbeddingProfile {
     int length = Integer.parseInt(args[2]), batch = Integer.parseInt(args[3]);
     int warmups = Integer.parseInt(args[4]), repetitions = Integer.parseInt(args[5]);
     String mode = args[7];
-    if (length < 1 || batch < 1 || warmups < 0 || repetitions < 1
+    if (length < 1
+        || batch < 1
+        || warmups < 0
+        || repetitions < 1
         || !List.of("latency", "trace", "profile", "oracle").contains(mode)
         || !List.of("mean", "last-token").contains(args[6])) {
       throw new IllegalArgumentException("Invalid benchmark configuration");
@@ -77,9 +80,11 @@ public class EmbeddingProfile {
     report.put("classpathSha256", jars);
     Map<String, Long> calls = new TreeMap<>();
     GgufBatchedMatrixKernel nativeKernel = RustGgufBatchedMatrixKernel.openBundled();
-    GgufBatchedMatrixKernel injected = mode.equals("trace") ? observed(nativeKernel, calls) : nativeKernel;
+    GgufBatchedMatrixKernel injected =
+        mode.equals("trace") ? observed(nativeKernel, calls) : nativeKernel;
     long loadStart = System.nanoTime();
-    try (nativeKernel; var backend = PureJavaBackend.load(artifact, injected)) {
+    try (nativeKernel;
+        var backend = PureJavaBackend.load(artifact, injected)) {
       report.put("verifiedArtifactLoadMs", (System.nanoTime() - loadStart) / 1e6);
       report.put("family", backend.metadata().modelFamily());
       report.put("planEnvironment", backend.diagnostics().environment());
@@ -103,27 +108,39 @@ public class EmbeddingProfile {
         for (int index = -warmups; index < repetitions; index++) {
           if (index == 0 && mode.equals("profile")) {
             Class<?> type = Class.forName("one.profiler.AsyncProfiler");
-            profiler = type.getMethod("getInstance", String.class)
-                .invoke(null, System.getProperty("embedding.profiler.library"));
-            type.getMethod("execute", String.class).invoke(profiler,
-                "start,event=cpu,interval=1000000,cstack=dwarf,file=" + output + ".jfr");
+            profiler =
+                type.getMethod("getInstance", String.class)
+                    .invoke(null, System.getProperty("embedding.profiler.library"));
+            type.getMethod("execute", String.class)
+                .invoke(
+                    profiler,
+                    "start,event=cpu,interval=1000000,cstack=dwarf,file=" + output + ".jfr");
           }
           long start = System.nanoTime();
-          float[][] vectors = batch == 1
-              ? new float[][] {embedding.embed(text)} : embedding.embedAll(texts);
+          float[][] vectors =
+              batch == 1 ? new float[][] {embedding.embed(text)} : embedding.embedAll(texts);
           double milliseconds = (System.nanoTime() - start) / 1e6;
-          if (expected == null) expected = Arrays.stream(vectors).map(float[]::clone).toArray(float[][]::new);
+          if (expected == null)
+            expected = Arrays.stream(vectors).map(float[]::clone).toArray(float[][]::new);
           for (int row = 0; row < vectors.length; row++) {
             if (!Arrays.equals(expected[row], vectors[row]))
               throw new IllegalStateException("Nondeterministic vector at run " + index);
-            for (float value : vectors[row]) if (!Float.isFinite(value))
-              throw new IllegalStateException("Nonfinite embedding");
+            for (float value : vectors[row])
+              if (!Float.isFinite(value)) throw new IllegalStateException("Nonfinite embedding");
           }
-          runs.add(Map.of("run", index, "phase", index < 0 ? "warmup" : "measured",
-              "milliseconds", milliseconds));
-          System.out.printf("run=%d tokens=%d batch=%d ms=%.3f%n", index, length, batch, milliseconds);
+          runs.add(
+              Map.of(
+                  "run",
+                  index,
+                  "phase",
+                  index < 0 ? "warmup" : "measured",
+                  "milliseconds",
+                  milliseconds));
+          System.out.printf(
+              "run=%d tokens=%d batch=%d ms=%.3f%n", index, length, batch, milliseconds);
         }
-        if (profiler != null) profiler.getClass().getMethod("execute", String.class).invoke(profiler, "stop");
+        if (profiler != null)
+          profiler.getClass().getMethod("execute", String.class).invoke(profiler, "stop");
         report.put("runs", runs);
         report.put("vectors", expected);
         report.put("vectorBitsSha256", vectorDigest(expected));
@@ -133,11 +150,14 @@ public class EmbeddingProfile {
     }
     report.put("completedUtc", Instant.now().toString());
     Files.createDirectories(output.toAbsolutePath().getParent());
-    new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT).writeValue(output.toFile(), report);
+    new ObjectMapper()
+        .enable(SerializationFeature.INDENT_OUTPUT)
+        .writeValue(output.toFile(), report);
   }
 
-  private static void checkOracle(GgufEmbeddingBackend embedding, Path artifact,
-      Map<String, Object> report, Path output) throws Exception {
+  private static void checkOracle(
+      GgufEmbeddingBackend embedding, Path artifact, Map<String, Object> report, Path output)
+      throws Exception {
     Path reference = Path.of(System.getProperty("embedding.reference"));
     Path probes = Path.of(System.getProperty("embedding.probes"));
     var mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
@@ -154,16 +174,20 @@ public class EmbeddingProfile {
     List<Double> cosines = new ArrayList<>();
     double minimum = 1.0;
     for (int row = 0; row < expected.length; row++) {
-      if (actual[row].length != expected[row].length) throw new IllegalStateException("Dimension mismatch");
+      if (actual[row].length != expected[row].length)
+        throw new IllegalStateException("Dimension mismatch");
       double dot = 0, a = 0, b = 0;
       for (int col = 0; col < expected[row].length; col++) {
         double x = expected[row][col], y = actual[row][col];
         if (!Double.isFinite(y)) throw new IllegalStateException("Nonfinite vector");
-        dot += x * y; a += x * x; b += y * y;
+        dot += x * y;
+        a += x * x;
+        b += y * y;
       }
       double cosine = dot / Math.sqrt(a * b);
       if (!Double.isFinite(cosine)) throw new IllegalStateException("Nonfinite cosine");
-      cosines.add(cosine); minimum = Math.min(minimum, cosine);
+      cosines.add(cosine);
+      minimum = Math.min(minimum, cosine);
     }
     report.put("referenceSha256", digest(reference));
     report.put("probeSetSha256", digest(probes));
@@ -181,21 +205,24 @@ public class EmbeddingProfile {
     if (minimum < 0.999) throw new IllegalStateException("Oracle equivalence failed: " + minimum);
   }
 
-  private static GgufBatchedMatrixKernel observed(GgufBatchedMatrixKernel delegate, Map<String, Long> calls) {
-    return (GgufBatchedMatrixKernel) Proxy.newProxyInstance(
-        GgufBatchedMatrixKernel.class.getClassLoader(), new Class<?>[] {GgufBatchedMatrixKernel.class},
-        (proxy, method, args) -> {
-          try {
-            Object result = method.invoke(delegate, args);
-            if (method.getName().startsWith("multiply")
-                || method.getName().startsWith("try") && Boolean.TRUE.equals(result)) {
-              calls.merge(method.getName(), 1L, Long::sum);
-            }
-            return result;
-          } catch (InvocationTargetException failure) {
-            throw failure.getCause();
-          }
-        });
+  private static GgufBatchedMatrixKernel observed(
+      GgufBatchedMatrixKernel delegate, Map<String, Long> calls) {
+    return (GgufBatchedMatrixKernel)
+        Proxy.newProxyInstance(
+            GgufBatchedMatrixKernel.class.getClassLoader(),
+            new Class<?>[] {GgufBatchedMatrixKernel.class},
+            (proxy, method, args) -> {
+              try {
+                Object result = method.invoke(delegate, args);
+                if (method.getName().startsWith("multiply")
+                    || method.getName().startsWith("try") && Boolean.TRUE.equals(result)) {
+                  calls.merge(method.getName(), 1L, Long::sum);
+                }
+                return result;
+              } catch (InvocationTargetException failure) {
+                throw failure.getCause();
+              }
+            });
   }
 
   private static String fixedLengthText(PureJavaBackend backend, int count) {
@@ -210,7 +237,7 @@ public class EmbeddingProfile {
     MessageDigest digest = MessageDigest.getInstance("SHA-256");
     try (var input = Files.newInputStream(path)) {
       byte[] buffer = new byte[1 << 20];
-      for (int size; (size = input.read(buffer)) >= 0;) digest.update(buffer, 0, size);
+      for (int size; (size = input.read(buffer)) >= 0; ) digest.update(buffer, 0, size);
     }
     return HexFormat.of().formatHex(digest.digest());
   }
@@ -218,9 +245,12 @@ public class EmbeddingProfile {
   private static String vectorDigest(float[][] values) throws Exception {
     MessageDigest digest = MessageDigest.getInstance("SHA-256");
     ByteBuffer buffer = ByteBuffer.allocate(Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-    for (float[] row : values) for (float value : row) {
-      buffer.clear(); buffer.putInt(Float.floatToRawIntBits(value)); digest.update(buffer.array());
-    }
+    for (float[] row : values)
+      for (float value : row) {
+        buffer.clear();
+        buffer.putInt(Float.floatToRawIntBits(value));
+        digest.update(buffer.array());
+      }
     return HexFormat.of().formatHex(digest.digest());
   }
 }
