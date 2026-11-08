@@ -20,8 +20,7 @@ description: >
 #
 # `gradlew --version` is enough to trigger the download and unpack, so afterwards the real build step
 # reuses what this step placed in GRADLE_USER_HOME and never touches the network for it.
-# Not applied to native-kernels.yml or release.yml: their Windows matrix legs invoke Gradle through
-# a per-platform `matrix.gradle`, not `./gradlew`, so warming it needs a different command there.
+# Use the platform's wrapper so native Windows matrix legs receive the same bounded download retry.
 # Referencing this action: the path is resolved from GITHUB_WORKSPACE, NOT from a step's
 # working-directory. Workflows here that check the repository out with `path: models` must therefore
 # say `./models/.github/actions/warm-gradle`; only a root checkout uses `./.github/actions/...`.
@@ -36,7 +35,8 @@ inputs:
 runs:
   using: composite
   steps:
-    - shell: bash
+    - if: runner.os != 'Windows'
+      shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
         set -uo pipefail
@@ -55,3 +55,22 @@ runs:
           echo "Gradle distribution fetch failed (attempt $attempt); retrying in ${delay}s."
           sleep "$delay"
         done
+    - if: runner.os == 'Windows'
+      shell: pwsh
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        $PSNativeCommandUseErrorActionPreference = $false
+        for ($attempt = 1; $attempt -le 5; $attempt++) {
+          & .\gradlew.bat --version
+          if ($LASTEXITCODE -eq 0) {
+            Write-Output "Gradle distribution ready (attempt $attempt)."
+            exit 0
+          }
+          if ($attempt -eq 5) {
+            Write-Output "::error::Could not fetch the Gradle distribution after $attempt attempts."
+            exit 1
+          }
+          $delay = $attempt * 15
+          Write-Output "Gradle distribution fetch failed (attempt $attempt); retrying in ${delay}s."
+          Start-Sleep -Seconds $delay
+        }

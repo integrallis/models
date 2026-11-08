@@ -19,7 +19,9 @@ ENV PATH="$JAVA_HOME/bin:$PATH"
 
 ARG JJAVA_VERSION=1.0-a7
 RUN cd /tmp && \
-    wget -q "https://github.com/dflib/jjava/releases/download/${JJAVA_VERSION}/jjava-${JJAVA_VERSION}-kernelspec.zip" && \
+    wget --no-verbose --timeout=30 --tries=5 --waitretry=5 \
+        --retry-connrefused --retry-on-host-error --retry-on-http-error=429,500,502,503,504 \
+        "https://github.com/dflib/jjava/releases/download/${JJAVA_VERSION}/jjava-${JJAVA_VERSION}-kernelspec.zip" && \
     unzip -q "jjava-${JJAVA_VERSION}-kernelspec.zip" -d jjava-kernel && \
     jupyter kernelspec install jjava-kernel --name=java --prefix=/opt/conda && \
     rm -rf /tmp/jjava-kernel "/tmp/jjava-${JJAVA_VERSION}-kernelspec.zip"

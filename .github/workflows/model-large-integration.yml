@@ -65,6 +65,8 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
       - uses: gradle/actions/setup-gradle@v6
+      - name: Warm the Gradle distribution
+        uses: ./.github/actions/warm-gradle
       - name: Install pinned Rust toolchain
         run: |
           rustup toolchain install 1.96.0 --profile minimal --no-self-update
