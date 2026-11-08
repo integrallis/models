@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Combine every required arm; backend success is distinct from catalog publication."""
 import json
-import statistics
 import sys
 from pathlib import Path
 
@@ -46,18 +45,27 @@ def stronger_performance(root, corpus, variant, task):
 
 
 def integration(directory, receipt):
-    result = dict(directory=directory.name, probes=[], decoders=[])
+    result = dict(directory=directory.name, probes=[], decoders=[], missingEvidence=[])
     for image in ["cats", "wide-gradient", "tall-bands"]:
-        verdict = read(directory / "results" / image / "verdict.json")
+        path = directory / "results" / image / "verdict.json"
+        if not path.is_file():
+            result["missingEvidence"].append(str(path.relative_to(directory)))
+            continue
+        verdict = read(path)
         candidate = verdict["candidate"]
         require(candidate["candidateRevision"] == receipt["revision"] and candidate["host"] == receipt["host"], "Integration runtime/host mismatch")
         require(candidate["mmprojSha256"] == receipt["artifacts"]["llava-v1.5-7b-mmproj-model-f16.gguf"], "Integration projector mismatch")
         result["probes"].append(dict(image=image, numericalPass=verdict["numericalPass"],
                                     performancePass=verdict["performancePass"], ratio=verdict["candidateToOracleLatencyRatio"]))
     for kv in ["f32", "f16"]:
-        verdict = read(directory / "results/cats" / f"decoder-verdict-{kv}.json")
+        path = directory / "results/cats" / f"decoder-verdict-{kv}.json"
+        if not path.is_file():
+            result["missingEvidence"].append(str(path.relative_to(directory)))
+            continue
+        verdict = read(path)
         result["decoders"].append(dict(kv=kv, **{k: verdict[k] for k in ["numericalPass", "performancePass", "greedyTokensMatch", "imageTextPrefillRatio", "decodeRatio", "totalRatio"]}))
-    result["passed"] = all(r["numericalPass"] and r["performancePass"] for r in result["probes"] + result["decoders"])
+    result["passed"] = not result["missingEvidence"] and all(
+        r["numericalPass"] and r["performancePass"] for r in result["probes"] + result["decoders"])
     return result
 
 
