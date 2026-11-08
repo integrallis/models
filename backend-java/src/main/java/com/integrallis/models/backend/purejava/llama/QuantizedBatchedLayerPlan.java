@@ -48,6 +48,7 @@ final class QuantizedBatchedLayerPlan {
   private final int attentionOutputDim;
   private final int hiddenDim;
   private final float rmsNormEps;
+  private final boolean doubleRmsAccumulation;
   private final boolean vectorizedSwiGlu;
   private final GgufQ4Kernel q4Kernel;
   private final boolean blockMajorQ8Activations;
@@ -99,7 +100,8 @@ final class QuantizedBatchedLayerPlan {
       float[] projected,
       float[] laneScratch,
       AttentionStage attentionPreparation,
-      AttentionStage attentionComputation) {
+      AttentionStage attentionComputation,
+      boolean doubleRmsAccumulation) {
     if (batchCapacity < 2) {
       throw new IllegalArgumentException("batchCapacity must be at least two");
     }
@@ -113,6 +115,7 @@ final class QuantizedBatchedLayerPlan {
     this.attentionOutputDim = attentionOutputDim;
     this.hiddenDim = hiddenDim;
     this.rmsNormEps = rmsNormEps;
+    this.doubleRmsAccumulation = doubleRmsAccumulation;
     this.vectorizedSwiGlu = vectorizedSwiGlu;
     this.q4Kernel = Objects.requireNonNull(q4Kernel, "q4Kernel");
     this.blockMajorQ8Activations = blockMajorQ8Activations;
@@ -330,7 +333,14 @@ final class QuantizedBatchedLayerPlan {
     for (int batch = 0; batch < activeBatchSize; batch++) {
       int offset = batch * embeddingDim;
       TensorOps.rmsNorm(
-          normalizedInput, offset, residual, offset, ffnNorm, embeddingDim, rmsNormEps);
+          normalizedInput,
+          offset,
+          residual,
+          offset,
+          ffnNorm,
+          embeddingDim,
+          rmsNormEps,
+          doubleRmsAccumulation);
     }
     quantize(
         inputActivation,
@@ -352,7 +362,14 @@ final class QuantizedBatchedLayerPlan {
         residual[index] += attentionProjected[index];
       }
       TensorOps.rmsNorm(
-          normalizedInput, offset, residual, offset, ffnNorm, embeddingDim, rmsNormEps);
+          normalizedInput,
+          offset,
+          residual,
+          offset,
+          ffnNorm,
+          embeddingDim,
+          rmsNormEps,
+          doubleRmsAccumulation);
     }
     inputActivation.quantizeBatchRange(normalizedInput, activeBatchSize, fromBatch, toBatch);
   }

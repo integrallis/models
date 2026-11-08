@@ -184,6 +184,11 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   }
 
   @Override
+  public boolean usesDoubleRmsAccumulation() {
+    return imagePrefill;
+  }
+
+  @Override
   public Map<String, String> planRecommendations() {
     if (!imagePrefill) return PLAN_RECOMMENDATIONS;
     var recommendations = new java.util.HashMap<>(PLAN_RECOMMENDATIONS);

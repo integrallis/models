@@ -78,3 +78,18 @@ now passes locally with instruction coverage 80.61%, above the unchanged 80% gat
 ModelJars 0.1.77 and its site update are published independently. All 48 Maven JAR/POM/signature
 files match the signed bundle; the published SDK uses Models 0.5.17 and its backend dependencies
 use Vectors 0.1.33. That release does not include this unreleased arithmetic branch.
+
+The next decoder localization found a concrete normalization difference: ggml RMS normalization
+accumulates float32 products in float64, while the existing Models text contract uses a pinned
+float32 reduction. A single-case diagnostic changing only that accumulation produces reference
+`0` for M 38508. The vision matrix provider now selects float64 RMS accumulation for every decoder
+normalization route, including staged quantized layers. Existing text routes retain their numeric
+contract. Independent ggml synthetic fixtures pass bit-for-bit at four sizes with offsets and aliases.
+The frozen full corpus must be repeated on this new source; the earlier screen is not inherited.
+
+The first isolated integration repeat passed encoder and F32 decoder gates, but the M host's F16
+reference still won decode by more than the allowed margin (candidate/reference 1.18236; total
+1.10015). Encoder latency was 0.89–0.93 of the corresponding reference on the final probe. This
+is a remaining decoder performance problem; the encoder optimization alone does not qualify it.
+The superseded payload was stopped after its initial integration, retaining its failed verdict,
+so further work tests the measured RMS correction rather than finishing a known failing campaign.

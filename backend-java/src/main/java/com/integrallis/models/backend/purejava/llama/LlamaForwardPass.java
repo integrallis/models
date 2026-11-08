@@ -204,6 +204,7 @@ public final class LlamaForwardPass {
   }
 
   private final boolean nativeGroupedAttention;
+  private final boolean doubleRmsAccumulation;
 
   private final boolean attentionTemperatureScaling;
 
@@ -508,6 +509,7 @@ public final class LlamaForwardPass {
     this.q8BlockMajorKernel = executionPlan.q8BlockMajorKernel();
     this.parallelQ8FfnPreparation = executionPlan.parallelQ8FfnPreparation();
     this.batchedMatrixKernel = loadedMatrixKernel;
+    this.doubleRmsAccumulation = loadedMatrixKernel.usesDoubleRmsAccumulation();
     this.batchedAttentionKernel =
         Objects.requireNonNull(batchedAttentionKernel, "batchedAttentionKernel");
     if (!config.usesStandardLlamaLayerSemantics()
@@ -718,7 +720,8 @@ public final class LlamaForwardPass {
                 batchFfnProjected,
                 batchQ4LaneScratch,
                 this::prepareBatchedAttention,
-                this::computeBatchedAttention)
+                this::computeBatchedAttention,
+                doubleRmsAccumulation)
             : null;
   }
 
@@ -1340,8 +1343,7 @@ public final class LlamaForwardPass {
     LlamaWeights.LayerWeights lw = weights.layer(layer);
     for (int batch = 0; batch < batchSize; batch++) {
       int xOffset = batch * dim;
-      TensorOps.rmsNorm(
-          batchXNorm, xOffset, batchX, xOffset, lw.attentionNorm(), dim, config.rmsNormEps());
+      rmsNorm(batchXNorm, xOffset, batchX, xOffset, lw.attentionNorm(), dim, config.rmsNormEps());
     }
     boolean canPrune = canDiscardFinalLayer(layer, allLogits);
     if (finalLayerKvOnlyPrefill && canPrune) {
@@ -1432,8 +1434,7 @@ public final class LlamaForwardPass {
     int dim = config.embeddingDim();
     for (int batch = 0; batch < batchSize; batch++) {
       int xOffset = batch * dim;
-      TensorOps.rmsNorm(
-          batchXNorm, xOffset, batchX, xOffset, lw.ffnNorm(), dim, config.rmsNormEps());
+      rmsNorm(batchXNorm, xOffset, batchX, xOffset, lw.ffnNorm(), dim, config.rmsNormEps());
     }
     if (lw.moe() != null) {
       for (int batch = 0; batch < batchSize; batch++) {
@@ -1506,8 +1507,7 @@ public final class LlamaForwardPass {
   private void projectPrefillLogits(int stateOffset) {
     int dim = config.embeddingDim();
     int vocabSize = config.vocabSize();
-    TensorOps.rmsNorm(
-        xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
+    rmsNorm(xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
     matmulDispatch(logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
     scaleLogits(logits, 0, vocabSize);
     softcapLogits(logits);
@@ -1594,7 +1594,7 @@ public final class LlamaForwardPass {
       float[] target, float[] source, int batchSize, int dim, float[] norm) {
     for (int batch = 0; batch < batchSize; batch++) {
       int stateOffset = batch * dim;
-      TensorOps.rmsNorm(target, stateOffset, source, stateOffset, norm, dim, config.rmsNormEps());
+      rmsNorm(target, stateOffset, source, stateOffset, norm, dim, config.rmsNormEps());
     }
   }
 
@@ -1785,8 +1785,7 @@ public final class LlamaForwardPass {
     }
     for (int batch = 0; batch < batchSize; batch++) {
       int stateOffset = batch * dim;
-      TensorOps.rmsNorm(
-          xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
+      rmsNorm(xNorm, 0, batchX, stateOffset, weights.outputNormWeight(), dim, config.rmsNormEps());
       matmulDispatch(logits, xNorm, weights.outputSegment(), weights.outputType(), vocabSize, dim);
       scaleLogits(logits, 0, vocabSize);
       softcapLogits(logits);
@@ -1999,7 +1998,7 @@ public final class LlamaForwardPass {
       LlamaWeights.LayerWeights lw = weights.layer(layer);
 
       // Attention norm
-      TensorOps.rmsNorm(xNorm, x, lw.attentionNorm(), dim, config.rmsNormEps());
+      rmsNorm(xNorm, x, lw.attentionNorm(), dim, config.rmsNormEps());
 
       // Only safe when the activation is genuinely discarded; HIDDEN needs the full final layer.
       if (finalLayerKvOnlyPrefill && canDiscardFinalLayer(layer, head != Head.NONE)) {
@@ -2120,7 +2119,7 @@ public final class LlamaForwardPass {
   private void executeTokenFfn(LlamaWeights.LayerWeights lw, int layer, boolean adapterActive) {
     int dim = config.embeddingDim();
     // FFN norm
-    TensorOps.rmsNorm(xNorm, x, lw.ffnNorm(), dim, config.rmsNormEps());
+    rmsNorm(xNorm, x, lw.ffnNorm(), dim, config.rmsNormEps());
 
     // FFN: routed for a mixture-of-experts layer, dense SwiGLU otherwise
     if (lw.moe() != null) {
@@ -2165,7 +2164,7 @@ public final class LlamaForwardPass {
     if (head == Head.NONE) {
       return null;
     }
-    TensorOps.rmsNorm(xNorm, x, weights.outputNormWeight(), dim, config.rmsNormEps());
+    rmsNorm(xNorm, x, weights.outputNormWeight(), dim, config.rmsNormEps());
     if (head == Head.HIDDEN) {
       // The normalized activation the vocabulary projection would consume. Skipping that matmul
       // is the entire saving: it is the widest one in the pass.
@@ -2478,7 +2477,7 @@ public final class LlamaForwardPass {
 
   private void finishFinalLayerFfnRow(
       LlamaWeights.LayerWeights layer, int stateOffset, int dim, int hiddenDim) {
-    TensorOps.rmsNorm(xNorm, 0, batchX, stateOffset, layer.ffnNorm(), dim, config.rmsNormEps());
+    rmsNorm(xNorm, 0, batchX, stateOffset, layer.ffnNorm(), dim, config.rmsNormEps());
     if (layer.moe() != null) {
       // finishFinalLayerFfnRow is, by name and contract, the last layer, so its index is not
       // ambiguous -- but it is passed explicitly rather than defaulted, because a clamp read from
@@ -3265,9 +3264,25 @@ public final class LlamaForwardPass {
     }
   }
 
+  private void rmsNorm(float[] out, float[] input, float[] weight, int size, float epsilon) {
+    rmsNorm(out, 0, input, 0, weight, size, epsilon);
+  }
+
+  private void rmsNorm(
+      float[] out,
+      int outOffset,
+      float[] input,
+      int inputOffset,
+      float[] weight,
+      int size,
+      float epsilon) {
+    TensorOps.rmsNorm(
+        out, outOffset, input, inputOffset, weight, size, epsilon, doubleRmsAccumulation);
+  }
+
   private void normalizeHead(float[] vector, int offset, float[] weight, int headDim) {
     if (weight.length != 0) {
-      TensorOps.rmsNorm(vector, offset, vector, offset, weight, headDim, config.rmsNormEps());
+      rmsNorm(vector, offset, vector, offset, weight, headDim, config.rmsNormEps());
     }
   }
 
@@ -3327,7 +3342,7 @@ public final class LlamaForwardPass {
 
   private void normalizeProjection(float[] projection, float[] norm, int size) {
     if (norm.length != 0) {
-      TensorOps.rmsNorm(projection, projection, norm, size, config.rmsNormEps());
+      rmsNorm(projection, projection, norm, size, config.rmsNormEps());
     }
   }
 
@@ -3337,7 +3352,7 @@ public final class LlamaForwardPass {
     }
     for (int batch = 0; batch < batchSize; batch++) {
       int offset = batch * size;
-      TensorOps.rmsNorm(projection, offset, projection, offset, norm, size, config.rmsNormEps());
+      rmsNorm(projection, offset, projection, offset, norm, size, config.rmsNormEps());
     }
   }
 

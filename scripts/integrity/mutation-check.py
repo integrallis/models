@@ -20,12 +20,19 @@ Exits 1 if any guard passes on a mutated tree, or fails on a clean one.
 """
 import argparse
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+# The mutation tests the guard's ability to reject a stale version. CI separately checks the live
+# Central version; a historical release literal here would reject every valid documentation bump.
+DOCUMENTED_MODELJARS = re.search(
+    r"^modeljarsVersion\s*=\s*(\S+)\s*$",
+    (ROOT / "gradle.properties").read_text(), re.MULTILINE,
+).group(1)
 
 
 def sub(path, old, new):
@@ -66,9 +73,9 @@ def oversized_tracked_path(root):
 MUTATIONS = [
     (
         "modeljars-currency/documented-version-behind-central",
-        ["python3", "scripts/verify-modeljars-currency.py", ".", "0.1.76"],
+        ["python3", "scripts/verify-modeljars-currency.py", ".", DOCUMENTED_MODELJARS],
         sub("gradle.properties",
-            "modeljarsVersion = 0.1.76",
+            f"modeljarsVersion = {DOCUMENTED_MODELJARS}",
             "modeljarsVersion = 0.1.65"),
         "documentation advertising ModelJars 0.1.65 against a published 0.1.76 -- shipped on "
         "2026-11-03, and 0.1.65 predates the ONNX intake and the speech loader, so a reader "

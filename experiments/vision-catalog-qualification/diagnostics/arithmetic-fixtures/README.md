@@ -22,3 +22,11 @@ Fixture locations and their hash manifests:
 
 These fixtures catch arithmetic and lifecycle regressions. They do not replace the full frozen
 80-case task corpus or the same-host two-arm performance gates.
+
+`pr380-rms-fixture.cpp` runs the independent pinned ggml RMS-normalization and weight-multiply
+operators on 7, 32, 4096 and 8193 synthetic elements. It generates
+`backend-java/src/test/resources/rms-ggml/`; that directory's manifest records hashes and provenance.
+Compile on the remote reference worker with C++17, its `ggml/include`, and its `ggml-cpu` /
+`ggml-base` libraries. No model weights are needed. The Java tests require exact results, including
+offset, ragged-size and in-place calls. Float32 products enter a float64 accumulator; converting the
+input operands to float64 before multiplication is a different operation and is not this contract.

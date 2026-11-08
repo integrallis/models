@@ -41,6 +41,38 @@ class TensorOpsTest {
   class RmsNorm {
 
     @Test
+    void doubleAccumulationMatchesIndependentGgmlFixturesWithOffsetsAndAliases() throws Exception {
+      for (int size : new int[] {7, 32, 4096, 8193}) {
+        float[][] fixture = new float[3][];
+        String[] parts = {"input", "weight", "expected"};
+        for (int part = 0; part < parts.length; part++) {
+          try (var stream =
+              TensorOpsTest.class.getResourceAsStream(
+                  "/rms-ggml/" + size + "-" + parts[part] + ".f32")) {
+            assertThat(stream).isNotNull();
+            var values =
+                ByteBuffer.wrap(stream.readAllBytes())
+                    .order(ByteOrder.LITTLE_ENDIAN)
+                    .asFloatBuffer();
+            fixture[part] = new float[values.remaining()];
+            values.get(fixture[part]);
+          }
+        }
+        float[] input = new float[size + 2];
+        input[0] = 99f;
+        input[size + 1] = 77f;
+        System.arraycopy(fixture[0], 0, input, 1, size);
+        float[] output = input.clone();
+        TensorOps.rmsNorm(output, 1, input, 1, fixture[1], size, 1e-5f, true);
+        assertThat(java.util.Arrays.copyOfRange(output, 1, size + 1)).containsExactly(fixture[2]);
+        assertThat(output[0]).isEqualTo(99f);
+        assertThat(output[size + 1]).isEqualTo(77f);
+        TensorOps.rmsNorm(input, 1, input, 1, fixture[1], size, 1e-5f, true);
+        assertThat(input).containsExactly(output);
+      }
+    }
+
+    @Test
     void identityWeightNormalizesCorrectly() {
       float[] x = {3.0f, 4.0f};
       float[] weight = {1.0f, 1.0f};

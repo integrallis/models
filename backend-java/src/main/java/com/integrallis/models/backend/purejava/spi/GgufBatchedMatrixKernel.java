@@ -27,6 +27,15 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
     return "custom";
   }
 
+  /**
+   * Whether this decoder route requires float64 accumulation of float32 squared values in RMS
+   * normalization. The vision route matches its reference this way; existing text routes retain
+   * their pinned float32 reduction contract.
+   */
+  default boolean usesDoubleRmsAccumulation() {
+    return false;
+  }
+
   /** Load-time planner recommendations needed to route eligible projections through this kernel. */
   default Map<String, String> planRecommendations() {
     return Map.of();

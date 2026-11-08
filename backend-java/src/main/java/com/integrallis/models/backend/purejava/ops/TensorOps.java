@@ -80,12 +80,36 @@ public final class TensorOps {
   /** Offset-aware RMS normalization for attention heads stored in contiguous buffers. */
   public static void rmsNorm(
       float[] out, int outOffset, float[] x, int xOffset, float[] weight, int size, float eps) {
+    rmsNorm(out, outOffset, x, xOffset, weight, size, eps, false);
+  }
+
+  /** RMS normalization with a decoder-selected accumulation contract. */
+  public static void rmsNorm(
+      float[] out,
+      int outOffset,
+      float[] x,
+      int xOffset,
+      float[] weight,
+      int size,
+      float eps,
+      boolean doubleAccumulator) {
     // Host-independent: VectorUtil.dotProduct sizes its reduction from the host (four accumulators
     // of SPECIES_PREFERRED lanes, folded by a width switch), so this sum -- and therefore every
     // token this model selects -- differed between a 128-bit, 256-bit and 512-bit machine. See
     // PinnedReduction; at the 256-bit default this is bit-identical to what it replaces.
-    float sumSq = PinnedReduction.sumOfSquares(x, xOffset, size);
-    float rms = (float) Math.sqrt(sumSq / size + eps);
+    float mean;
+    if (doubleAccumulator) {
+      double sum = 0;
+      for (int j = 0; j < size; j++) {
+        float value = x[xOffset + j];
+        // The multiplication rounds to float32 before the exact-width accumulator sees it.
+        sum += value * value;
+      }
+      mean = (float) (sum / size);
+    } else {
+      mean = PinnedReduction.sumOfSquares(x, xOffset, size) / size;
+    }
+    float rms = (float) Math.sqrt(mean + eps);
     float scale = 1.0f / rms;
     // (x * scale) * weight lanewise, the same two roundings in the same order as the scalar
     // loop, so the vector and tail paths and the pre-vectorization results are bit-identical.
