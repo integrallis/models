@@ -192,6 +192,7 @@ const CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL: u64 = 1 << 29;
 /// Q4_K with Java-compatible sequential floating-point block accumulation.
 const CAPABILITY_Q4_K_ORDERED_REDUCTION: u64 = 1 << 30;
 const CAPABILITY_Q4_K_BATCH_PACKING: u64 = 1 << 31;
+#[cfg(target_arch = "x86_64")]
 const CAPABILITY_REFERENCE_K_QUANT_REDUCTION: u64 = 1 << 35;
 mod ptq;
 const Q8_0_BLOCK_BYTES: usize = 34;
