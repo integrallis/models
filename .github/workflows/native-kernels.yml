@@ -150,6 +150,11 @@ jobs:
         with:
           cache-disabled: ${{ matrix.platform == 'windows-aarch64' }}
 
+      - name: Warm the Gradle distribution
+        uses: ./models/.github/actions/warm-gradle
+        with:
+          working-directory: models
+
       - name: Compile, test, and package native kernels
         run: >
           ${{ matrix.gradle }}
