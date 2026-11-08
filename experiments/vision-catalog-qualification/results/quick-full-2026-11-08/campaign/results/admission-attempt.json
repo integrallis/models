@@ -1,0 +1,380 @@
+{
+  "schema": "llava-catalog-attempt-v1",
+  "receipt": {
+    "schema": 2,
+    "referenceFlashAttention": "auto",
+    "host": "ip-172-31-6-189",
+    "revision": "3f31646c743647449310de2c5ff57fbd55d9e957",
+    "manifestSha256": "d6f476071a23529a2e429a3057292b03cebcfec3723575abc14acccf66e7abfe",
+    "corpusSha256": "b0120176e445cf46e6d85d7aab6f96e37ec417ec73532adca6425466eb621e41",
+    "nativeSha256": "1bbaab081e3607f3d0cfc81d2d76ce3e523a2a7d65dc70badae9c3d481a4ab1f",
+    "threads": 8,
+    "context": 1024,
+    "maximumOutputTokens": 32,
+    "kvType": "f32",
+    "jars": {
+      "backend-java-0.5.15.jar": "f925e74d7fe99a7508ffe3385ee820b94a3ada0283adfeb7e64a7bf60f9a8178",
+      "backend-native-0.5.15.jar": "b06832dd5ac89c09eff350c453c55029a6ade2bcb5cb112e00193d7f4ce131c0",
+      "jackson-core-2.22.3.jar": "8a501126a385b25841915d839508f8a66e2a0dbc8a6709d055ef3b3e852b094c",
+      "vectors-db-0.1.33.jar": "cf4c3f5dc6091d64ed2c7c7156ee93f911510826239e33dff258c4b3487792fb",
+      "models-router-0.5.15.jar": "214701adb5fbb3c5982bd6836db94820bef6bb5b7faea32b292528f8b5d873cd",
+      "vectors-storage-0.1.33.jar": "8c67518fa9ff66fb3dcc8cb07d367331617706ff57f1965a67de911fdd4ef380",
+      "vectors-quantization-0.1.33.jar": "19d12a0640a847d051dcaa585a95867697920c570127b7a4fe12f4ef04c358d9",
+      "jackson-datatype-jdk8-2.22.3.jar": "f223061a5aaecdc9506458143807c73bcd1a744d6b3bbb8da4703a0abc408f7d",
+      "vectors-hnsw-0.1.33.jar": "fe127e1000b1542ee5d052b18362fdeba2594bec3b1341215082c4190d168a52",
+      "models-backend-onnx-0.5.15.jar": "46dadfb378e64bf1692e48e9c96d35113db499bf87b8822398ff5f58e0ce02ec",
+      "models-decisions-0.5.15.jar": "4be2b67100a07a4d5bdf076258bba1fa0c403c65784809ed94f622620195dbab",
+      "models-api-0.5.15.jar": "47cba3b8fd6107b2620381b2e735266d659de472cfe8e7761badffa695b62d18",
+      "jackson-annotations-2.22.jar": "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0",
+      "vectors-core-0.1.33.jar": "cd301576cdba6c05c09bacb41abe8a416f79a05b70fe7d21e97bf1789f5108f0",
+      "models-kernels-macos-x86_64-0.5.15.jar": "fe704d974d63e02cb53b1eb6d72ce5a6a47cddd987e736b724731bdac7afc82f",
+      "jackson-databind-2.22.3.jar": "556db5439e206114346043f68d200497dc96a0bca62a360a81784092ebd0e0a9",
+      "models-runtime-0.5.15.jar": "e6fc161bf0d9dd3379afcf1806448f44ef33a75f6737c58ceb652a57c79e5218",
+      "slf4j-api-2.0.20.jar": "7e1446499b359675d8aabe6af2de86b85e72ae8a2a932c0b40d0e5ba57097439",
+      "models-bench-0.5.15.jar": "71c94d789c270f7fbfaaf4efdf2b5d78a56da72c9d99f92d8191d3b72351f489",
+      "vectors-vamana-0.1.33.jar": "90be0744875dedcd4537f5fd2df879c31c6cff06efba8e4a676cf7b5ed2720fc",
+      "vectors-ivf-0.1.33.jar": "476805fe6e1439e9f934c54e41b34a3652f5aad08418e7c0113de8a8a9344c52",
+      "backend-cuda-0.5.15.jar": "2358867851686a1baf57aab31e6c2efc28a3209fbf1c4dd25c4a1554efd5fe2c"
+    },
+    "artifacts": {
+      "llava-v1.5-7b-mmproj-model-f16.gguf": "50da4e5b0a011615f77686f9b02613571e65d23083c225e107c08c3b1775d9b1",
+      "llava-v1.5-7b-Q4_K_M.gguf": "2687b20ac8b7a23f6c70296d5b1e7f908fef2ce4769ecdebd1bb9503528a75bf",
+      "llava-v1.5-7b-Q4_K_S.gguf": "e785cbe9042356448cad670b31069316ea91b9c5149a6c79fe2f737d63cfac0e"
+    },
+    "oracleBinarySha256": "099e16822c211671a4ed941cfc67a0ec835730b20cb00914aa9c3c16bec27ec7",
+    "oracleCommit": "2cbca389f515df455412dafa07e2b1359cc72a6d"
+  },
+  "initialIntegration": {
+    "directory": "integration-quick",
+    "probes": [
+      {
+        "image": "cats",
+        "numericalPass": true,
+        "performancePass": true,
+        "ratio": 1.007364532816253
+      },
+      {
+        "image": "wide-gradient",
+        "numericalPass": true,
+        "performancePass": true,
+        "ratio": 0.9988221080432039
+      },
+      {
+        "image": "tall-bands",
+        "numericalPass": true,
+        "performancePass": true,
+        "ratio": 1.0478868204368526
+      }
+    ],
+    "decoders": [
+      {
+        "kv": "f32",
+        "numericalPass": true,
+        "performancePass": true,
+        "greedyTokensMatch": true,
+        "imageTextPrefillRatio": 1.0652936762678935,
+        "decodeRatio": 0.8608547679985997,
+        "totalRatio": 1.007664411963898
+      },
+      {
+        "kv": "f16",
+        "numericalPass": true,
+        "performancePass": true,
+        "greedyTokensMatch": true,
+        "imageTextPrefillRatio": 1.0750472354792253,
+        "decodeRatio": 1.0928697456993268,
+        "totalRatio": 1.0756114424946563
+      }
+    ],
+    "missingEvidence": [],
+    "passed": true
+  },
+  "confirmationIntegration": {
+    "directory": "integration-quick-confirmation",
+    "probes": [
+      {
+        "image": "cats",
+        "numericalPass": true,
+        "performancePass": true,
+        "ratio": 0.9476796018706348
+      },
+      {
+        "image": "wide-gradient",
+        "numericalPass": true,
+        "performancePass": true,
+        "ratio": 0.9820380398363977
+      },
+      {
+        "image": "tall-bands",
+        "numericalPass": true,
+        "performancePass": true,
+        "ratio": 0.9017381676674173
+      }
+    ],
+    "decoders": [
+      {
+        "kv": "f32",
+        "numericalPass": true,
+        "performancePass": true,
+        "greedyTokensMatch": true,
+        "imageTextPrefillRatio": 1.0364064645618507,
+        "decodeRatio": 0.8596075418084066,
+        "totalRatio": 0.986302274665174
+      },
+      {
+        "kv": "f16",
+        "numericalPass": true,
+        "performancePass": true,
+        "greedyTokensMatch": true,
+        "imageTextPrefillRatio": 1.0442085675386428,
+        "decodeRatio": 1.0671287242706946,
+        "totalRatio": 1.0482368837699123
+      }
+    ],
+    "missingEvidence": [],
+    "passed": true
+  },
+  "candidates": [
+    {
+      "variant": "Q4_K_S",
+      "backendQualified": false,
+      "gates": {
+        "accuracyLoss": true,
+        "vqaFloor": true,
+        "textVqaFloor": true,
+        "imageContribution": true,
+        "tokenAgreement": false,
+        "performance": true,
+        "strongestReferencePerformance": false,
+        "integrationConfirmation": true
+      },
+      "datasets": {
+        "vqav2": {
+          "cases": 32,
+          "candidateScore": 0.6875,
+          "referenceScore": 0.6875,
+          "blankCases": 8,
+          "imageContribution": 0.5375
+        },
+        "textvqa": {
+          "cases": 32,
+          "candidateScore": 0.434375,
+          "referenceScore": 0.415625,
+          "blankCases": 8,
+          "imageContribution": 0.375
+        }
+      },
+      "tokenAgreement": 0.984375,
+      "disagreements": [
+        "textvqa-36979"
+      ],
+      "performance": [
+        {
+          "id": "vqav2-132415014",
+          "dataset": "vqav2",
+          "warmups": 1,
+          "repetitions": 3,
+          "f16Ratios": {
+            "prefillMs": 1.0819372085530743,
+            "totalMs": 1.0822599887931565,
+            "decodeMs": 1.098517384045562
+          },
+          "worstRatios": {
+            "prefillMs": 1.0819372085530743,
+            "decodeMs": 1.098517384045562,
+            "totalMs": 1.0822599887931565
+          },
+          "generationLengthsMatch": true,
+          "tokenSequencesMatch": true,
+          "passed": true
+        },
+        {
+          "id": "vqav2-423731001",
+          "dataset": "vqav2",
+          "warmups": 1,
+          "repetitions": 3,
+          "f16Ratios": {
+            "prefillMs": 1.0418102073786493,
+            "totalMs": 1.0431070686239312,
+            "decodeMs": 1.1081989206096103
+          },
+          "worstRatios": {
+            "prefillMs": 1.0418102073786493,
+            "decodeMs": 1.1081989206096103,
+            "totalMs": 1.0431070686239312
+          },
+          "generationLengthsMatch": true,
+          "tokenSequencesMatch": true,
+          "passed": false
+        },
+        {
+          "id": "textvqa-36063",
+          "dataset": "textvqa",
+          "warmups": 1,
+          "repetitions": 3,
+          "f16Ratios": {
+            "prefillMs": 1.0436441052157308,
+            "totalMs": 1.044372801970374,
+            "decodeMs": 1.0879265634557562
+          },
+          "worstRatios": {
+            "prefillMs": 1.0436441052157308,
+            "decodeMs": 1.0879265634557562,
+            "totalMs": 1.044372801970374
+          },
+          "generationLengthsMatch": true,
+          "tokenSequencesMatch": true,
+          "passed": true
+        },
+        {
+          "id": "textvqa-37476",
+          "dataset": "textvqa",
+          "warmups": 1,
+          "repetitions": 3,
+          "f16Ratios": {
+            "prefillMs": 1.0375908035512489,
+            "totalMs": 1.037682280520657,
+            "decodeMs": 1.0566881642222716
+          },
+          "worstRatios": {
+            "prefillMs": 1.0375908035512489,
+            "decodeMs": 1.0566881642222716,
+            "totalMs": 1.037682280520657
+          },
+          "generationLengthsMatch": true,
+          "tokenSequencesMatch": true,
+          "passed": true
+        }
+      ],
+      "resources": {
+        "candidatePeakRssKiB": 10594500,
+        "referenceDecoderPeakRssKiB": 8308668,
+        "candidateLoadMs": 2073.845209,
+        "referenceDecoderLoadMs": 4254.98,
+        "referenceEncoderLoadMs": 3526.1379930000203
+      }
+    },
+    {
+      "variant": "Q4_K_M",
+      "backendQualified": false,
+      "gates": {
+        "accuracyLoss": true,
+        "vqaFloor": true,
+        "textVqaFloor": true,
+        "imageContribution": true,
+        "tokenAgreement": false,
+        "performance": true,
+        "strongestReferencePerformance": false,
+        "integrationConfirmation": true
+      },
+      "datasets": {
+        "vqav2": {
+          "cases": 32,
+          "candidateScore": 0.675,
+          "referenceScore": 0.675,
+          "blankCases": 8,
+          "imageContribution": 0.5375
+        },
+        "textvqa": {
+          "cases": 32,
+          "candidateScore": 0.384375,
+          "referenceScore": 0.384375,
+          "blankCases": 8,
+          "imageContribution": 0.375
+        }
+      },
+      "tokenAgreement": 0.984375,
+      "disagreements": [
+        "textvqa-38337"
+      ],
+      "performance": [
+        {
+          "id": "vqav2-132415014",
+          "dataset": "vqav2",
+          "warmups": 1,
+          "repetitions": 3,
+          "f16Ratios": {
+            "prefillMs": 1.0483005830285594,
+            "totalMs": 1.0490675272797358,
+            "decodeMs": 1.1031121761492848
+          },
+          "worstRatios": {
+            "prefillMs": 1.0483005830285594,
+            "decodeMs": 1.1031121761492848,
+            "totalMs": 1.0490675272797358
+          },
+          "generationLengthsMatch": true,
+          "tokenSequencesMatch": true,
+          "passed": false
+        },
+        {
+          "id": "vqav2-423731001",
+          "dataset": "vqav2",
+          "warmups": 1,
+          "repetitions": 3,
+          "f16Ratios": {
+            "prefillMs": 1.0373750548170906,
+            "totalMs": 1.038731415181153,
+            "decodeMs": 1.0593031461753972
+          },
+          "worstRatios": {
+            "prefillMs": 1.0373750548170906,
+            "decodeMs": 1.0593031461753972,
+            "totalMs": 1.038731415181153
+          },
+          "generationLengthsMatch": true,
+          "tokenSequencesMatch": true,
+          "passed": true
+        },
+        {
+          "id": "textvqa-36063",
+          "dataset": "textvqa",
+          "warmups": 1,
+          "repetitions": 3,
+          "f16Ratios": {
+            "prefillMs": 1.036198895135331,
+            "totalMs": 1.037119210895012,
+            "decodeMs": 1.0905021904094672
+          },
+          "worstRatios": {
+            "prefillMs": 1.036198895135331,
+            "decodeMs": 1.0905021904094672,
+            "totalMs": 1.037119210895012
+          },
+          "generationLengthsMatch": true,
+          "tokenSequencesMatch": true,
+          "passed": true
+        },
+        {
+          "id": "textvqa-37476",
+          "dataset": "textvqa",
+          "warmups": 1,
+          "repetitions": 3,
+          "f16Ratios": {
+            "prefillMs": 1.0428545508313771,
+            "totalMs": 1.043041718780626,
+            "decodeMs": 1.0707659832737562
+          },
+          "worstRatios": {
+            "prefillMs": 1.0428545508313771,
+            "decodeMs": 1.0707659832737562,
+            "totalMs": 1.043041718780626
+          },
+          "generationLengthsMatch": true,
+          "tokenSequencesMatch": true,
+          "passed": true
+        }
+      ],
+      "resources": {
+        "candidatePeakRssKiB": 10887620,
+        "referenceDecoderPeakRssKiB": 8119740,
+        "candidateLoadMs": 2073.106134,
+        "referenceDecoderLoadMs": 3882.72,
+        "referenceEncoderLoadMs": 3526.1379930000203
+      }
+    }
+  ],
+  "catalogPublished": false,
+  "releasedRuntimeVerified": false,
+  "modeljarsRuntimeVerified": false
+}
