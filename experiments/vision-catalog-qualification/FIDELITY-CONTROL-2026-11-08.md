@@ -41,3 +41,14 @@ Next diagnostic: disable Flash Attention explicitly in the F32 reference, preser
 the original outputs. If this removes the mismatch, repeat correctness with genuinely
 F32 attention and document this as a comparator correction. Keep AUTO/F16 as the
 faster performance arm and retain every existing accuracy/performance threshold.
+
+## Encoder precision experiment
+
+The corrected F32 reference still differs on the two encoder-sensitive cases. The
+shipping CLIP layer-normalization implementation sums 1,024 values and squared
+centered values sequentially in F32. Test wider moment accumulation against the
+same independent encoder and all three retained images, without changing image
+preprocessing, weights, prompts or decoder. The hypothesis is lower normalization
+roundoff; it is not established until intermediate/output arrays are compared.
+Retain a change only if it improves fidelity over multiple images and passes the
+full frozen task and performance workload. No lookup or case-specific branch.
