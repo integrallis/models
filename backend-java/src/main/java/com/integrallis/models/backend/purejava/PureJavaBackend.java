@@ -1086,7 +1086,8 @@ public final class PureJavaBackend
             batchedMatrixKernel);
     PureJavaDecoder decoder =
         new EncoderDecoderAdapter(
-            EmbeddingGemma2Encoder.fromGgufFile(file, config, contextCapacity));
+            EmbeddingGemma2Encoder.fromGgufFile(
+                file, config, contextCapacity, batchedMatrixKernel));
     ModelMetadata metadata =
         new ModelMetadata(
             "gemma-embedding2",

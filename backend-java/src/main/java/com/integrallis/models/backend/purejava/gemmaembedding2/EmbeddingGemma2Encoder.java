@@ -22,6 +22,7 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
 import com.integrallis.models.backend.purejava.ops.PinnedReduction;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.util.Arrays;
 import java.util.Objects;
@@ -55,6 +56,7 @@ public final class EmbeddingGemma2Encoder implements SequenceEncoder {
 
   private static final float[] EMPTY_SCRATCH = new float[0];
   private final EmbeddingGemma2Config config;
+  private final GgufBatchedMatrixKernel matrixKernel;
   private final int contextCapacity;
   private final GgufTensorData embedding;
   private final Matrix perLayerProjection;
@@ -89,11 +91,25 @@ public final class EmbeddingGemma2Encoder implements SequenceEncoder {
   /** Loads only supported matrix encodings, validates all shapes before any inference. */
   public static EmbeddingGemma2Encoder fromGgufFile(
       GgufFile file, EmbeddingGemma2Config config, int contextCapacity) {
-    return new EmbeddingGemma2Encoder(file, config, contextCapacity);
+    return fromGgufFile(file, config, contextCapacity, GgufBatchedMatrixKernel.none());
   }
 
-  private EmbeddingGemma2Encoder(GgufFile file, EmbeddingGemma2Config config, int contextCapacity) {
+  /** Loads an encoder using the supplied, caller-owned kernel for eligible projections. */
+  public static EmbeddingGemma2Encoder fromGgufFile(
+      GgufFile file,
+      EmbeddingGemma2Config config,
+      int contextCapacity,
+      GgufBatchedMatrixKernel matrixKernel) {
+    return new EmbeddingGemma2Encoder(file, config, contextCapacity, matrixKernel);
+  }
+
+  private EmbeddingGemma2Encoder(
+      GgufFile file,
+      EmbeddingGemma2Config config,
+      int contextCapacity,
+      GgufBatchedMatrixKernel matrixKernel) {
     this.config = Objects.requireNonNull(config, "config");
+    this.matrixKernel = Objects.requireNonNull(matrixKernel, "matrixKernel");
     if (contextCapacity <= 0 || contextCapacity > config.contextLength()) {
       throw new IllegalArgumentException("context capacity must be within the model context");
     }
@@ -276,6 +292,17 @@ public final class EmbeddingGemma2Encoder implements SequenceEncoder {
   }
 
   private void project(float[] out, float[] input, int count, Matrix matrix) {
+    if (matrixKernel.isEligible(matrix.tensor().type(), count, matrix.rows(), matrix.columns())) {
+      matrixKernel.multiply(
+          out,
+          input,
+          matrix.tensor().dataSegment(),
+          matrix.tensor().type(),
+          count,
+          matrix.rows(),
+          matrix.columns());
+      return;
+    }
     TensorOps.ggufBatchedMatmul(
         out,
         input,
