@@ -26,7 +26,7 @@ static void write(const std::filesystem::path &path, const float *values, size_t
     if (!f) throw std::runtime_error("trace write failed");
 }
 
-struct Trace { std::filesystem::path output; bool active = false; int position = 0; };
+struct Trace { std::filesystem::path output; bool active = false; int position = 0; int dimension = 0; int batch = 0; };
 static bool observe(ggml_tensor *tensor, bool ask, void *data) {
     auto &trace = *static_cast<Trace *>(data);
     std::string name = tensor->name;
@@ -43,7 +43,12 @@ static bool observe(ggml_tensor *tensor, bool ask, void *data) {
         auto path = trace.output / (name+"-all.f32");
         if (!std::filesystem::exists(path)) { std::ofstream create(path, std::ios::binary); }
         std::fstream all(path, std::ios::in | std::ios::out | std::ios::binary);
-        all.seekp(static_cast<long long>(trace.position)*tensor->ne[0]*tensor->ne[1]*sizeof(float));
+        std::ofstream metadata(trace.output / "qkv-chunks.jsonl", std::ios::app);
+        metadata << "{\"tensor\":\"" << name << "\",\"position\":" << trace.position
+            << ",\"batch\":" << trace.batch << ",\"shape\":[" << tensor->ne[0] << "," << tensor->ne[1] << "," << tensor->ne[2]
+            << "],\"values\":" << values.size() << "}\n";
+        if (values.size() != static_cast<size_t>(trace.dimension)*trace.batch) throw std::runtime_error("QKV chunk shape");
+        all.seekp(static_cast<long long>(trace.position)*trace.dimension*sizeof(float));
         all.write(reinterpret_cast<const char *>(values.data()), values.size()*sizeof(float));
         if (!all) throw std::runtime_error("QKV trace write failed");
     }
@@ -74,6 +79,7 @@ int main(int argc, char **argv) {
     cp.n_threads = 8; cp.n_threads_batch = 8;
     cp.type_k = GGML_TYPE_F32; cp.type_v = GGML_TYPE_F32;
     cp.cb_eval = observe; cp.cb_eval_user_data = &trace;
+    trace.dimension = llama_model_n_embd(model);
     auto ctx = llama_init_from_model(model, cp);
     if (!ctx) throw std::runtime_error("context failed");
     int dim = llama_model_n_embd(model), pos = 0;
@@ -81,7 +87,7 @@ int main(int argc, char **argv) {
         throw std::runtime_error("invalid context shape");
     auto tb = llama_batch_init(128, 0, 1), eb = llama_batch_init(128, dim, 1);
     auto submit = [&](llama_batch &batch, int n, bool final) {
-        batch.n_tokens = n; trace.active = final; trace.position = pos;
+        batch.n_tokens = n; trace.active = final; trace.position = pos; trace.batch = n;
         for (int i=0; i<n; ++i) {
             batch.pos[i] = pos++; batch.n_seq_id[i] = 1; batch.seq_id[i][0] = 0;
             batch.logits[i] = final && i==n-1;
