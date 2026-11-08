@@ -22,6 +22,9 @@ import java.util.Arrays;
 
 /** Bidirectional attention with independent heads sharing the configured GGUF worker pool. */
 final class EmbeddingGemma2Attention {
+  // Publishing four short head tasks costs more than their work at 32 tokens. Keep the same
+  // arithmetic inline for short inputs; larger contexts amortize the shared-pool publication.
+  private static final int MIN_PARALLEL_TOKENS = 64;
   private final int heads;
   private final GgufStagePlan plan;
   private final float[][] scores;
@@ -63,7 +66,8 @@ final class EmbeddingGemma2Attention {
     this.headDim = headDim;
     this.window = window;
     try {
-      plan.execute();
+      if (count < MIN_PARALLEL_TOKENS) attendHeads(0, heads);
+      else plan.execute();
     } finally {
       this.queries = null;
       this.keys = null;
