@@ -14,6 +14,7 @@ extern "C" int oracle_attention(const float * query, const float * keys,
     if (!query || !keys || !values || !output || batch < 1 || start < 0 ||
         heads < 1 || width < 1 || capacity < batch || start > capacity-batch ||
         threads < 1 || capacity > 4096 || heads > 128 || width > 512) return -1;
+    ggml_cpu_init();
     // Match llama.cpp's Flash Attention KV padding and causal mask. Inputs are
     // batch-major Q and head-major F32 cache; its graph casts K/V to F16.
     const int positions = start + batch;
