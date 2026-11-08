@@ -135,3 +135,14 @@ full workload; do not overlap this experiment with the current admission run.
   delete only the auxiliary instance/key/security group created by this experiment.
 - Re-read live quota and account instances before launch; the existing primary
   `i-04b38cce99ef0308c` must remain running and untouched.
+
+The synthetic run preserves every output. At 606 positions, head-major warm
+latency is 0.1666 ms versus 0.2373/0.2236 ms in the two token-major runs. The
+eviction diagnostic is nearly neutral (0.3368 versus 0.3457/0.3272 ms); 1,024
+positions under eviction regress. Do not claim a decoder gain. Prototype an
+explicit head-major F32 cache through both prefill and decode, retaining the
+same GEMM, dot-product and softmax arithmetic and worker pool. Preserve old C
+entry points as compatibility wrappers, not a selectable Java implementation.
+Require synthetic public-ABI parity/bounds tests and existing chunk/reset/rewind
+Java tests before the same-host real caption A/B (3 warmups, 7 repetitions,
+original/candidate/original). Reject an end-to-end regression or negligible gain.

@@ -36,13 +36,13 @@ class NativeDebertaKernelsTest {
       float[] value = {5, 6, 7, 8};
       for (float[] output : new float[][] {query, key, value}) {
         float[] original = output.clone();
-        assertThatThrownBy(() -> kernels.causalAttention(output, query, key, value, 2, 2, 2, 1))
+        assertThatThrownBy(() -> kernels.causalAttention(output, query, key, value, 2, 2, 2, 1, 2))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("alias");
         assertThat(output).containsExactly(original);
       }
       float[] output = new float[4];
-      kernels.causalAttention(output, query, key, value, 2, 2, 2, 1);
+      kernels.causalAttention(output, query, key, value, 2, 2, 2, 1, 2);
       assertThat(output[0]).isEqualTo(value[0]);
       assertThat(output[1]).isEqualTo(value[1]);
     }
