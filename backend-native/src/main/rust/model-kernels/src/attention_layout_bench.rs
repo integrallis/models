@@ -92,11 +92,7 @@ fn compare_attention_cache_layouts() {
                     assert_eq!(Some(&output), expected.as_ref());
                 }
                 println!(
-                    "{}",
-                    serde_json::json!({"schema":"attention-layout-diagnostic-v1", "layout":layout,
-                    "positions":positions,"heads":heads,"width":width,"threads":8,
-                    "controllerEviction":evict,"warmups":20,"callsPerSample":30,
-                    "latencyMs":samples,"exactOutputParity":true})
+                    "{{\"schema\":\"attention-layout-diagnostic-v1\",\"layout\":\"{layout}\",\"positions\":{positions},\"heads\":{heads},\"width\":{width},\"threads\":8,\"controllerEviction\":{evict},\"warmups\":20,\"callsPerSample\":30,\"latencyMs\":{samples:?},\"exactOutputParity\":true}}"
                 );
             }
         }
