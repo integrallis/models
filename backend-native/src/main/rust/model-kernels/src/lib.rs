@@ -6567,14 +6567,15 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
         record_k_quant_weight_block_decode();
         let activation_offset = batch * cols + block * QK_K;
         let sum_offset = batch * cols / Q8_K_SUM_BLOCK + block * QK_K / Q8_K_SUM_BLOCK;
-        let d = f16_to_f32_f16c(u16::from_le_bytes([
-            weight[0],
-            weight[1],
-        ])) * activation_scale;
-        let d_min = f16_to_f32_f16c(u16::from_le_bytes([
-            weight[2],
-            weight[3],
-        ])) * activation_scale;
+        let scale_bits = u32::from_le_bytes([weight[0], weight[1], weight[2], weight[3]]);
+        #[cfg(test)]
+        F16C_CONVERSIONS.with(|count| count.set(count.get() + 1));
+        let block_scales = _mm_mul_ps(
+            _mm_cvtph_ps(_mm_cvtsi32_si128(scale_bits as i32)),
+            _mm_set1_ps(activation_scale),
+        );
+        let d = _mm_cvtss_f32(block_scales);
+        let d_min = _mm_cvtss_f32(_mm_shuffle_ps::<0x55>(block_scales, block_scales));
         let scales = &weight[4..16];
         let quants = weight.as_ptr().wrapping_add(16);
         let mut quantized_lanes = _mm256_setzero_si256();
@@ -9824,6 +9825,8 @@ chunks_per_partition={chunks} available_parallelism={processors}"
             )
         };
         assert!((q4_avx2 - q4_scalar).abs() <= 1e-4);
+        // One F16C instruction converts both adjacent Q4_K scales.
+        F16C_CONVERSIONS.with(|count| assert_eq!(count.get(), 1));
 
         let mut q5_weights = [0_u8; Q5_K_BLOCK_BYTES];
         q5_weights[..2].copy_from_slice(&f32_to_f16(0.125).to_le_bytes());
@@ -9874,7 +9877,7 @@ chunks_per_partition={chunks} available_parallelism={processors}"
             )
         };
         assert!((q6_avx2 - q6_scalar).abs() <= 1e-4);
-        F16C_CONVERSIONS.with(|count| assert_eq!(count.get(), 5));
+        F16C_CONVERSIONS.with(|count| assert_eq!(count.get(), 4));
     }
 
     #[cfg(target_arch = "x86_64")]
