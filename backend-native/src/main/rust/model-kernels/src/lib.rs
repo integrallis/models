@@ -4493,7 +4493,28 @@ unsafe fn compute_q4_k_batched_row_range_avx2(
     end_row: usize,
 ) {
     if batch_size == 1 {
-        for row in start_row..end_row {
+        let mut row = start_row;
+        while row + 2 <= end_row {
+            // SAFETY: both rows belong to this worker; buffers and CPU features were checked.
+            let values = unsafe {
+                dot_q4_k_q8_k_rows_avx2_impl::<false, 2>(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    0,
+                    row,
+                    cols,
+                )
+            };
+            // SAFETY: this worker owns both complete output rows.
+            unsafe {
+                output.add(row).write(values[0]);
+                output.add(row + 1).write(values[1]);
+            }
+            row += 2;
+        }
+        for row in row..end_row {
             // SAFETY: AVX2, FMA, and F16C are enabled and all buffers were validated.
             let sum = unsafe {
                 dot_q4_k_q8_k_row_avx2(
@@ -6553,86 +6574,124 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
     row: usize,
     cols: usize,
 ) -> f32 {
+    // SAFETY: callers validate complete buffers and CPU features.
+    unsafe {
+        dot_q4_k_q8_k_rows_avx2_impl::<ORDERED, 1>(
+            weights,
+            quantized,
+            activation_scales,
+            activation_sums,
+            batch,
+            row,
+            cols,
+        )[0]
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn dot_q4_k_q8_k_rows_avx2_impl<const ORDERED: bool, const ROWS: usize>(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    activation_sums: &[i16],
+    batch: usize,
+    row: usize,
+    cols: usize,
+) -> [f32; ROWS] {
     let blocks_per_row = cols / QK_K;
     let nibble_mask = _mm256_set1_epi8(0x0f);
-    let mut accumulated = _mm256_setzero_ps();
-    let mut minimum_accumulated = _mm_setzero_ps();
-    let mut ordered_sum = 0_f32;
-    let row_start = row * blocks_per_row * Q4_K_BLOCK_BYTES;
-    let row_end = row_start + blocks_per_row * Q4_K_BLOCK_BYTES;
-    let (weight_blocks, _) = weights[row_start..row_end].as_chunks::<Q4_K_BLOCK_BYTES>();
+    let mut accumulated = [_mm256_setzero_ps(); ROWS];
+    let mut minimum_accumulated = [_mm_setzero_ps(); ROWS];
+    let mut ordered_sum = [0_f32; ROWS];
+    let weight_rows: [&[[u8; Q4_K_BLOCK_BYTES]]; ROWS] = std::array::from_fn(|lane| {
+        let start = (row + lane) * blocks_per_row * Q4_K_BLOCK_BYTES;
+        weights[start..start + blocks_per_row * Q4_K_BLOCK_BYTES]
+            .as_chunks::<Q4_K_BLOCK_BYTES>()
+            .0
+    });
     let scale_start = batch * blocks_per_row;
     let row_scales = &activation_scales[scale_start..scale_start + blocks_per_row];
-    for (block, (weight, &activation_scale)) in weight_blocks.iter().zip(row_scales).enumerate() {
-        record_k_quant_weight_block_decode();
+    for (block, &activation_scale) in row_scales.iter().enumerate() {
         let activation_offset = batch * cols + block * QK_K;
         let sum_offset = batch * cols / Q8_K_SUM_BLOCK + block * QK_K / Q8_K_SUM_BLOCK;
-        let d = f16_to_f32_f16c(u16::from_le_bytes([
-            weight[0],
-            weight[1],
-        ])) * activation_scale;
-        let d_min = f16_to_f32_f16c(u16::from_le_bytes([
-            weight[2],
-            weight[3],
-        ])) * activation_scale;
-        let scales = &weight[4..16];
-        let quants = weight.as_ptr().wrapping_add(16);
-        let mut quantized_lanes = _mm256_setzero_si256();
-        let (scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
-        // SAFETY: every block carries QK_K / Q8_K_SUM_BLOCK = 16 activation sums.
-        let min_products = unsafe {
-            qk_block_minimum_products(
-                _mm256_extracti128_si256(mins_and_scales, 1),
-                activation_sums.as_ptr().add(sum_offset),
-            )
-        };
+        let unpacked: [([i16; 8], __m256i); ROWS] = std::array::from_fn(|lane| {
+            record_k_quant_weight_block_decode();
+            qk_unpack_scales_and_mins(&weight_rows[lane][block][4..16])
+        });
+        let mut quantized_lanes = [_mm256_setzero_si256(); ROWS];
         for pair in 0..4 {
-            // SAFETY: each Q4_K block contains four complete 32-byte packed groups.
-            let packed = unsafe { _mm256_loadu_si256(quants.add(pair * 32).cast()) };
-            let low = _mm256_and_si256(packed, nibble_mask);
-            let high = _mm256_and_si256(_mm256_srli_epi16(packed, 4), nibble_mask);
-            let low_activation = quantized
-                .as_ptr()
-                .wrapping_add(activation_offset + pair * 64);
-            let high_activation = low_activation.wrapping_add(32);
-            // SAFETY: every activation group contains 32 signed bytes.
-            let low_products = unsafe { unsigned_signed_products_avx2(low, low_activation) };
-            // SAFETY: every activation group contains 32 signed bytes.
-            let high_products = unsafe { unsigned_signed_products_avx2(high, high_activation) };
-            let low_scale = _mm256_set1_epi16(scale_values[pair * 2]);
-            let high_scale = _mm256_set1_epi16(scale_values[pair * 2 + 1]);
-            quantized_lanes =
-                _mm256_add_epi32(quantized_lanes, _mm256_madd_epi16(low_products, low_scale));
-            quantized_lanes = _mm256_add_epi32(
-                quantized_lanes,
-                _mm256_madd_epi16(high_products, high_scale),
-            );
+            // SAFETY: each activation block has four complete pairs of 32-byte groups.
+            let (low_activation, high_activation) = unsafe {
+                let ptr = quantized.as_ptr().add(activation_offset + pair * 64);
+                (
+                    _mm256_loadu_si256(ptr.cast()),
+                    _mm256_loadu_si256(ptr.add(32).cast()),
+                )
+            };
+            for lane in 0..ROWS {
+                let weight = &weight_rows[lane][block];
+                // SAFETY: the fixed-size weight block contains all four packed groups.
+                let packed =
+                    unsafe { _mm256_loadu_si256(weight.as_ptr().add(16 + pair * 32).cast()) };
+                let low = _mm256_and_si256(packed, nibble_mask);
+                let high = _mm256_and_si256(_mm256_srli_epi16(packed, 4), nibble_mask);
+                let low_products = _mm256_maddubs_epi16(low, low_activation);
+                let high_products = _mm256_maddubs_epi16(high, high_activation);
+                let low_scale = _mm256_set1_epi16(unpacked[lane].0[pair * 2]);
+                let high_scale = _mm256_set1_epi16(unpacked[lane].0[pair * 2 + 1]);
+                quantized_lanes[lane] = _mm256_add_epi32(
+                    quantized_lanes[lane],
+                    _mm256_madd_epi16(low_products, low_scale),
+                );
+                quantized_lanes[lane] = _mm256_add_epi32(
+                    quantized_lanes[lane],
+                    _mm256_madd_epi16(high_products, high_scale),
+                );
+            }
         }
+        for lane in 0..ROWS {
+            let weight = &weight_rows[lane][block];
+            let d = f16_to_f32_f16c(u16::from_le_bytes([weight[0], weight[1]])) * activation_scale;
+            let d_min =
+                f16_to_f32_f16c(u16::from_le_bytes([weight[2], weight[3]])) * activation_scale;
+            // SAFETY: every activation block includes sixteen i16 sums.
+            let min_products = unsafe {
+                qk_block_minimum_products(
+                    _mm256_extracti128_si256(unpacked[lane].1, 1),
+                    activation_sums.as_ptr().add(sum_offset),
+                )
+            };
+            if ORDERED {
+                let integer_sum = horizontal_sum_i32_avx2(quantized_lanes[lane]);
+                ordered_sum[lane] = d.mul_add(integer_sum as f32, ordered_sum[lane]);
+                ordered_sum[lane] = (-d_min).mul_add(
+                    horizontal_sum_i32_sse2(min_products) as f32,
+                    ordered_sum[lane],
+                );
+            } else {
+                accumulated[lane] = _mm256_fmadd_ps(
+                    _mm256_set1_ps(d),
+                    _mm256_cvtepi32_ps(quantized_lanes[lane]),
+                    accumulated[lane],
+                );
+                minimum_accumulated[lane] = _mm_fmadd_ps(
+                    _mm_set1_ps(-d_min),
+                    _mm_cvtepi32_ps(min_products),
+                    minimum_accumulated[lane],
+                );
+            }
+        }
+    }
+    std::array::from_fn(|lane| {
         if ORDERED {
-            // Integer lanes may fold freely; floating-point blocks must follow Java's order.
-            let integer_sum = horizontal_sum_i32_avx2(quantized_lanes);
-            ordered_sum = d.mul_add(integer_sum as f32, ordered_sum);
-            ordered_sum =
-                (-d_min).mul_add(horizontal_sum_i32_sse2(min_products) as f32, ordered_sum);
+            ordered_sum[lane]
         } else {
-            accumulated = _mm256_fmadd_ps(
-                _mm256_set1_ps(d),
-                _mm256_cvtepi32_ps(quantized_lanes),
-                accumulated,
-            );
-            minimum_accumulated = _mm_fmadd_ps(
-                _mm_set1_ps(-d_min),
-                _mm_cvtepi32_ps(min_products),
-                minimum_accumulated,
-            );
+            record_q4_k_single_horizontal_reduction();
+            horizontal_sum_f32_avx2(accumulated[lane])
+                + horizontal_sum_f32_sse2(minimum_accumulated[lane])
         }
-    }
-    if ORDERED {
-        ordered_sum
-    } else {
-        record_q4_k_single_horizontal_reduction();
-        horizontal_sum_f32_avx2(accumulated) + horizontal_sum_f32_sse2(minimum_accumulated)
-    }
+    })
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -6811,14 +6870,6 @@ unsafe fn dot_q6_k_q8_k_row_avx2(
     }
     record_q6_k_single_horizontal_reduction();
     horizontal_sum_f32_avx2(accumulated)
-}
-
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2")]
-unsafe fn unsigned_signed_products_avx2(unsigned: __m256i, signed: *const i8) -> __m256i {
-    // SAFETY: callers provide 32 signed activation bytes.
-    let signed = unsafe { _mm256_loadu_si256(signed.cast()) };
-    _mm256_maddubs_epi16(unsigned, signed)
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -9391,7 +9442,7 @@ chunks_per_partition={chunks} available_parallelism={processors}"
         {
             return;
         }
-        const ROWS: usize = 3;
+        const ROWS: usize = 7;
         const BLOCKS: usize = 4;
         const COLS: usize = BLOCKS * QK_K;
         let mut weights = vec![0_u8; ROWS * BLOCKS * Q4_K_BLOCK_BYTES];
@@ -9420,31 +9471,40 @@ chunks_per_partition={chunks} available_parallelism={processors}"
                 .chunks_exact(Q8_K_SUM_BLOCK)
                 .map(|values| values.iter().map(|&value| value as i16).sum())
                 .collect();
-            let mut actual = vec![f32::NAN; batch_size * ROWS];
-            // SAFETY: CPU features are checked above and all complete fixture buffers are disjoint.
-            unsafe {
-                compute_q4_k_batched_row_range_avx2(
-                    &weights,
-                    &quantized,
-                    &scales,
-                    &sums,
-                    actual.as_mut_ptr(),
-                    batch_size,
-                    ROWS,
-                    COLS,
-                    0,
-                    ROWS,
-                );
-                for batch in 0..batch_size {
-                    for row in 0..ROWS {
-                        let expected = dot_q4_k_q8_k_row_avx2(
-                            &weights, &quantized, &scales, &sums, batch, row, COLS,
-                        );
-                        assert_eq!(
-                            actual[batch * ROWS + row].to_bits(),
-                            expected.to_bits(),
-                            "batch size {batch_size}, batch {batch}, row {row}"
-                        );
+            for (start_row, end_row) in [(0, ROWS), (1, ROWS - 1), (2, 3), (3, 3)] {
+                let mut actual = vec![f32::NAN; batch_size * ROWS];
+                // SAFETY: CPU features are checked above and all complete fixture buffers are disjoint.
+                unsafe {
+                    compute_q4_k_batched_row_range_avx2(
+                        &weights,
+                        &quantized,
+                        &scales,
+                        &sums,
+                        actual.as_mut_ptr(),
+                        batch_size,
+                        ROWS,
+                        COLS,
+                        start_row,
+                        end_row,
+                    );
+                    for batch in 0..batch_size {
+                        for row in 0..ROWS {
+                            if row < start_row || row >= end_row {
+                                assert!(
+                                    actual[batch * ROWS + row].is_nan(),
+                                    "write outside worker range"
+                                );
+                                continue;
+                            }
+                            let expected = dot_q4_k_q8_k_row_avx2(
+                                &weights, &quantized, &scales, &sums, batch, row, COLS,
+                            );
+                            assert_eq!(
+                                actual[batch * ROWS + row].to_bits(),
+                                expected.to_bits(),
+                                "batch size {batch_size}, batch {batch}, row {row}"
+                            );
+                        }
                     }
                 }
             }
