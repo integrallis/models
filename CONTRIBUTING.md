@@ -26,7 +26,7 @@ All commands run from the `models/` directory:
 # Full build (all library modules)
 ./gradlew build
 
-# Run all tests (excludes slow/benchmark/integration)
+# Run default tests (excludes slow/benchmark/integration/model-fixture)
 ./gradlew test
 
 # Run a single test class
@@ -65,13 +65,17 @@ We follow **test-driven development** with integration tests first:
 
 | Tag           | Task                | Description                              |
 |---------------|---------------------|------------------------------------------|
-| *(default)*   | `test`              | All tests except slow/benchmark/infra    |
+| *(default)*   | `test`              | All tests except explicit model/infrastructure tags    |
 | `unit`        | `unitTest`          | Fine-grained unit tests                  |
 | `slow`        | `slowTest`          | Large model / extended inference tests   |
 | `benchmark`   | —                   | Performance regression tests             |
 | `integration` | `integrationTest`   | Integration tests                        |
+| `model-fixture` | Named model integration tasks | Tests that load real model artifacts |
 
-Always add the appropriate `@Tag` annotation to new test classes.
+Always add the appropriate `@Tag` annotation to new test classes. Real-model fixture tests
+run through their named tasks, such as `:backend-java:layaDecisionIntegrationTest` and
+`:backend-java:mxbaiDebertaRerankerIntegrationTest`. Installing weights must not change
+which tests the default `test` task executes.
 
 ## Code Style
 
