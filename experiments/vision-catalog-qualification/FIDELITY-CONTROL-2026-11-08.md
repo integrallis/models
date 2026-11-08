@@ -112,3 +112,26 @@ a guarantee of eviction from every worker cache). This is component evidence,
 never model qualification. Public ABI and default layout remain unchanged. Only
 a substantial measured gain warrants integrating a new layout and rerunning the
 full workload; do not overlap this experiment with the current admission run.
+
+## Isolated component worker — declared before provisioning
+
+- Experiment: synthetic attention-cache layout A/B; only if material, prototype
+  the winning layout and run original/candidate/original real-decoder A/B.
+- Branch: `experiment/llava-attention-layout`; every payload records its commit.
+- Provider: AWS us-east-1, one additional m6a.4xlarge, 16 vCPU, 64 GiB RAM,
+  Ubuntu 24.04 ami-0d6dd9e8265d48906, 40 GiB disposable gp3 root.
+- Expected duration: 20 minutes; maximum one hour, automatic terminate on shutdown.
+- Spend: within the original USD 6 combined experiment ceiling; total maximum
+  five instance-hours across the four-hour primary and one-hour auxiliary worker.
+- Create before 2026-11-08 05:00 UTC; delete no later than 06:00 UTC and one hour
+  after creation. Keep the primary admission host idle except its frozen workload.
+- Correctness: exact synthetic output parity across all layouts/context lengths;
+  a real-decoder candidate must also preserve every generated token.
+- Performance: same auxiliary host, original/candidate/original; component
+  results are not model admission. Full admission stays on the primary worker.
+- Stop on corrupt payloads, nonfinite values, exhausted budget or deadline.
+- No service credentials on the worker; ephemeral SSH public key only.
+- Local evidence: `audit-artifacts/pr380-attention-layout-2026-11-08/`. Record and
+  delete only the auxiliary instance/key/security group created by this experiment.
+- Re-read live quota and account instances before launch; the existing primary
+  `i-04b38cce99ef0308c` must remain running and untouched.
