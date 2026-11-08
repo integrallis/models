@@ -1,0 +1,211 @@
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.integrallis.models.api.Pooling;
+import com.integrallis.models.backend.nativekernel.RustGgufBatchedMatrixKernel;
+import com.integrallis.models.backend.purejava.GgufEmbeddingBackend;
+import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Remote-only diagnosis; trace/profile runs are excluded from latency comparisons. */
+public class EmbeddingProfile {
+  public static void main(String[] args) throws Exception {
+    if (!System.getProperty("os.name").equals("Linux") || args.length != 8) {
+      throw new IllegalArgumentException(
+          "MODEL OUTPUT TOKENS BATCH WARMUPS REPETITIONS mean|last-token latency|trace|profile|oracle");
+    }
+    Path artifact = Path.of(args[0]), output = Path.of(args[1]);
+    if (Files.exists(output)) throw new IllegalArgumentException("Preserve existing reports");
+    Files.createDirectories(output.toAbsolutePath().getParent());
+    int length = Integer.parseInt(args[2]), batch = Integer.parseInt(args[3]);
+    int warmups = Integer.parseInt(args[4]), repetitions = Integer.parseInt(args[5]);
+    String mode = args[7];
+    if (length < 1 || batch < 1 || warmups < 0 || repetitions < 1
+        || !List.of("latency", "trace", "profile", "oracle").contains(mode)
+        || !List.of("mean", "last-token").contains(args[6])) {
+      throw new IllegalArgumentException("Invalid benchmark configuration");
+    }
+    Map<String, Object> report = new LinkedHashMap<>();
+    report.put("schema", "embedding-throughput-diagnostic-v1");
+    report.put("startedUtc", Instant.now().toString());
+    report.put("mode", mode);
+    report.put("artifactSha256", digest(artifact));
+    report.put("artifactHashReadBeforeLoad", true);
+    report.put("javaVersion", System.getProperty("java.runtime.version"));
+    report.put("jvmArguments", ManagementFactory.getRuntimeMXBean().getInputArguments());
+    report.put("availableProcessors", Runtime.getRuntime().availableProcessors());
+    report.put("requestedTokens", length);
+    report.put("batchSize", batch);
+    report.put("warmups", warmups);
+    report.put("repetitions", repetitions);
+    Map<String, String> jars = new TreeMap<>();
+    for (String entry : System.getProperty("java.class.path").split(java.io.File.pathSeparator)) {
+      Path path = Path.of(entry);
+      if (Files.isRegularFile(path)) jars.put(path.toAbsolutePath().toString(), digest(path));
+    }
+    report.put("classpathSha256", jars);
+    Map<String, Long> calls = new TreeMap<>();
+    GgufBatchedMatrixKernel nativeKernel = RustGgufBatchedMatrixKernel.openBundled();
+    GgufBatchedMatrixKernel injected = mode.equals("trace") ? observed(nativeKernel, calls) : nativeKernel;
+    long loadStart = System.nanoTime();
+    try (nativeKernel; var backend = PureJavaBackend.load(artifact, injected)) {
+      report.put("verifiedArtifactLoadMs", (System.nanoTime() - loadStart) / 1e6);
+      report.put("family", backend.metadata().modelFamily());
+      report.put("planEnvironment", backend.diagnostics().environment());
+      report.put("kernelImplementation", nativeKernel.implementation());
+      var builder = GgufEmbeddingBackend.builder(backend).normalize(true);
+      if (!backend.supportsSequenceEmbedding()) {
+        builder.pooling(args[6].equals("mean") ? Pooling.MEAN : Pooling.LAST_TOKEN);
+      }
+      try (var embedding = builder.build()) {
+        if (mode.equals("oracle")) {
+          checkOracle(embedding, artifact, report, output);
+          return;
+        }
+        String text = fixedLengthText(backend, length);
+        report.put("text", text);
+        report.put("tokenIds", backend.tokenizer().encode(text));
+        List<String> texts = Collections.nCopies(batch, text);
+        List<Map<String, Object>> runs = new ArrayList<>();
+        float[][] expected = null;
+        Object profiler = null;
+        for (int index = -warmups; index < repetitions; index++) {
+          if (index == 0 && mode.equals("profile")) {
+            Class<?> type = Class.forName("one.profiler.AsyncProfiler");
+            profiler = type.getMethod("getInstance", String.class)
+                .invoke(null, System.getProperty("embedding.profiler.library"));
+            type.getMethod("execute", String.class).invoke(profiler,
+                "start,event=cpu,interval=1000000,cstack=dwarf,file=" + output + ".jfr");
+          }
+          long start = System.nanoTime();
+          float[][] vectors = batch == 1
+              ? new float[][] {embedding.embed(text)} : embedding.embedAll(texts);
+          double milliseconds = (System.nanoTime() - start) / 1e6;
+          if (expected == null) expected = Arrays.stream(vectors).map(float[]::clone).toArray(float[][]::new);
+          for (int row = 0; row < vectors.length; row++) {
+            if (!Arrays.equals(expected[row], vectors[row]))
+              throw new IllegalStateException("Nondeterministic vector at run " + index);
+            for (float value : vectors[row]) if (!Float.isFinite(value))
+              throw new IllegalStateException("Nonfinite embedding");
+          }
+          runs.add(Map.of("run", index, "phase", index < 0 ? "warmup" : "measured",
+              "milliseconds", milliseconds));
+          System.out.printf("run=%d tokens=%d batch=%d ms=%.3f%n", index, length, batch, milliseconds);
+        }
+        if (profiler != null) profiler.getClass().getMethod("execute", String.class).invoke(profiler, "stop");
+        report.put("runs", runs);
+        report.put("vectors", expected);
+        report.put("vectorBitsSha256", vectorDigest(expected));
+        report.put("observedKernelCalls", calls);
+        report.put("routeObservationEnabled", mode.equals("trace"));
+      }
+    }
+    report.put("completedUtc", Instant.now().toString());
+    Files.createDirectories(output.toAbsolutePath().getParent());
+    new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT).writeValue(output.toFile(), report);
+  }
+
+  private static void checkOracle(GgufEmbeddingBackend embedding, Path artifact,
+      Map<String, Object> report, Path output) throws Exception {
+    Path reference = Path.of(System.getProperty("embedding.reference"));
+    Path probes = Path.of(System.getProperty("embedding.probes"));
+    var mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    var oracle = mapper.readTree(reference.toFile());
+    if (!digest(artifact).equals(oracle.path("artifactSha256").asText())
+        || !digest(probes).equals(oracle.path("probeSetSha256").asText())
+        || !oracle.path("normalized").asBoolean()) {
+      throw new IllegalArgumentException("Reference provenance mismatch");
+    }
+    List<String> texts = Files.readAllLines(probes).stream().filter(s -> !s.isEmpty()).toList();
+    float[][] expected = mapper.treeToValue(oracle.get("vectors"), float[][].class);
+    if (expected.length != texts.size()) throw new IllegalArgumentException("Probe count mismatch");
+    float[][] actual = embedding.embedAll(texts);
+    List<Double> cosines = new ArrayList<>();
+    double minimum = 1.0;
+    for (int row = 0; row < expected.length; row++) {
+      if (actual[row].length != expected[row].length) throw new IllegalStateException("Dimension mismatch");
+      double dot = 0, a = 0, b = 0;
+      for (int col = 0; col < expected[row].length; col++) {
+        double x = expected[row][col], y = actual[row][col];
+        if (!Double.isFinite(y)) throw new IllegalStateException("Nonfinite vector");
+        dot += x * y; a += x * x; b += y * y;
+      }
+      double cosine = dot / Math.sqrt(a * b);
+      if (!Double.isFinite(cosine)) throw new IllegalStateException("Nonfinite cosine");
+      cosines.add(cosine); minimum = Math.min(minimum, cosine);
+    }
+    report.put("referenceSha256", digest(reference));
+    report.put("probeSetSha256", digest(probes));
+    report.put("oracleVersion", oracle.path("oracleVersion").asText());
+    report.put("cosines", cosines);
+    report.put("minimumCosine", minimum);
+    report.put("catalogThreshold", 0.999);
+    report.put("memoryProposedThreshold", 0.99999);
+    report.put("memoryProposedFidelityPassed", minimum >= 0.99999);
+    report.put("passed", minimum >= 0.999);
+    report.put("vectors", actual);
+    report.put("vectorBitsSha256", vectorDigest(actual));
+    report.put("completedUtc", Instant.now().toString());
+    mapper.writeValue(output.toFile(), report);
+    if (minimum < 0.999) throw new IllegalStateException("Oracle equivalence failed: " + minimum);
+  }
+
+  private static GgufBatchedMatrixKernel observed(GgufBatchedMatrixKernel delegate, Map<String, Long> calls) {
+    return (GgufBatchedMatrixKernel) Proxy.newProxyInstance(
+        GgufBatchedMatrixKernel.class.getClassLoader(), new Class<?>[] {GgufBatchedMatrixKernel.class},
+        (proxy, method, args) -> {
+          try {
+            Object result = method.invoke(delegate, args);
+            if (method.getName().startsWith("multiply")
+                || method.getName().startsWith("try") && Boolean.TRUE.equals(result)) {
+              calls.merge(method.getName(), 1L, Long::sum);
+            }
+            return result;
+          } catch (InvocationTargetException failure) {
+            throw failure.getCause();
+          }
+        });
+  }
+
+  private static String fixedLengthText(PureJavaBackend backend, int count) {
+    for (int words = 1; words <= count + 4; words++) {
+      String text = "memory" + " memory".repeat(words - 1);
+      if (backend.tokenizer().encode(text).length == count) return text;
+    }
+    throw new IllegalArgumentException("Could not construct exact token length " + count);
+  }
+
+  private static String digest(Path path) throws Exception {
+    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+    try (var input = Files.newInputStream(path)) {
+      byte[] buffer = new byte[1 << 20];
+      for (int size; (size = input.read(buffer)) >= 0;) digest.update(buffer, 0, size);
+    }
+    return HexFormat.of().formatHex(digest.digest());
+  }
+
+  private static String vectorDigest(float[][] values) throws Exception {
+    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+    ByteBuffer buffer = ByteBuffer.allocate(Float.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+    for (float[] row : values) for (float value : row) {
+      buffer.clear(); buffer.putInt(Float.floatToRawIntBits(value)); digest.update(buffer.array());
+    }
+    return HexFormat.of().formatHex(digest.digest());
+  }
+}

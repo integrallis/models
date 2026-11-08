@@ -19,9 +19,9 @@ import com.integrallis.models.backend.purejava.SequenceEncoder;
 import com.integrallis.models.backend.purejava.gguf.GgufFile;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorData;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
-import com.integrallis.models.backend.purejava.ops.PinnedReduction;
 import com.integrallis.models.backend.purejava.ops.RotaryTable;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.vectors.core.GgufQ4Kernel;
 import java.util.Arrays;
 import java.util.Objects;
@@ -55,6 +55,7 @@ public final class EmbeddingGemma2Encoder implements SequenceEncoder {
 
   private static final float[] EMPTY_SCRATCH = new float[0];
   private final EmbeddingGemma2Config config;
+  private final GgufBatchedMatrixKernel matrixKernel;
   private final int contextCapacity;
   private final GgufTensorData embedding;
   private final Matrix perLayerProjection;
@@ -79,7 +80,7 @@ public final class EmbeddingGemma2Encoder implements SequenceEncoder {
   private float[] up = new float[0];
   private float[] inputGate = new float[0];
   private float[] outputTokens = new float[0];
-  private float[] scores = new float[0];
+  private final EmbeddingGemma2Attention attentionKernel;
   private byte[] quantized = new byte[0];
   private float[] scales = new float[0];
   private int[] zeroPoints = new int[0];
@@ -89,11 +90,26 @@ public final class EmbeddingGemma2Encoder implements SequenceEncoder {
   /** Loads only supported matrix encodings, validates all shapes before any inference. */
   public static EmbeddingGemma2Encoder fromGgufFile(
       GgufFile file, EmbeddingGemma2Config config, int contextCapacity) {
-    return new EmbeddingGemma2Encoder(file, config, contextCapacity);
+    return fromGgufFile(file, config, contextCapacity, GgufBatchedMatrixKernel.none());
   }
 
-  private EmbeddingGemma2Encoder(GgufFile file, EmbeddingGemma2Config config, int contextCapacity) {
+  /** Loads an encoder using the supplied, caller-owned kernel for eligible projections. */
+  public static EmbeddingGemma2Encoder fromGgufFile(
+      GgufFile file,
+      EmbeddingGemma2Config config,
+      int contextCapacity,
+      GgufBatchedMatrixKernel matrixKernel) {
+    return new EmbeddingGemma2Encoder(file, config, contextCapacity, matrixKernel);
+  }
+
+  private EmbeddingGemma2Encoder(
+      GgufFile file,
+      EmbeddingGemma2Config config,
+      int contextCapacity,
+      GgufBatchedMatrixKernel matrixKernel) {
     this.config = Objects.requireNonNull(config, "config");
+    this.matrixKernel = Objects.requireNonNull(matrixKernel, "matrixKernel");
+    this.attentionKernel = new EmbeddingGemma2Attention(config.numHeads());
     if (contextCapacity <= 0 || contextCapacity > config.contextLength()) {
       throw new IllegalArgumentException("context capacity must be within the model context");
     }
@@ -198,14 +214,12 @@ public final class EmbeddingGemma2Encoder implements SequenceEncoder {
       for (int head = 0; head < kvHeads; head++)
         rotary.apply(keys, (position * kvHeads + head) * headDim, true);
     }
-    attend(
+    attentionKernel.compute(
         queries,
         keys,
         values,
         attention,
-        scores,
         count,
-        heads,
         kvHeads,
         headDim,
         sliding ? config.slidingWindow() : 0);
@@ -231,43 +245,6 @@ public final class EmbeddingGemma2Encoder implements SequenceEncoder {
     for (int i = 0; i < count * dim; i++) hidden[i] = (hidden[i] + projected[i]) * layer.scale();
   }
 
-  /** Attention uses scale 1: the learned query norm already supplies the scale. */
-  static void attend(
-      float[] queries,
-      float[] keys,
-      float[] values,
-      float[] out,
-      float[] scores,
-      int count,
-      int heads,
-      int kvHeads,
-      int headDim,
-      int window) {
-    int queryDim = heads * headDim;
-    int keyDim = kvHeads * headDim;
-    Arrays.fill(out, 0, count * queryDim, 0);
-    for (int position = 0; position < count; position++) {
-      int start = window == 0 ? 0 : Math.max(0, position - window / 2);
-      int end = window == 0 ? count : Math.min(count, position + window / 2 + 1);
-      for (int head = 0; head < heads; head++) {
-        int kvHead = head / (heads / kvHeads);
-        int queryOffset = position * queryDim + head * headDim;
-        for (int keyPosition = start; keyPosition < end; keyPosition++) {
-          scores[keyPosition] =
-              PinnedReduction.dot(
-                  queries, queryOffset, keys, keyPosition * keyDim + kvHead * headDim, headDim);
-        }
-        TensorOps.softmax(scores, start, end - start);
-        for (int keyPosition = start; keyPosition < end; keyPosition++) {
-          float weight = scores[keyPosition];
-          int valueOffset = keyPosition * keyDim + kvHead * headDim;
-          for (int i = 0; i < headDim; i++)
-            out[queryOffset + i] += weight * values[valueOffset + i];
-        }
-      }
-    }
-  }
-
   private void normalize(float[] out, float[] input, int rows, float[] norm) {
     for (int row = 0; row < rows; row++) {
       int offset = row * norm.length;
@@ -276,6 +253,17 @@ public final class EmbeddingGemma2Encoder implements SequenceEncoder {
   }
 
   private void project(float[] out, float[] input, int count, Matrix matrix) {
+    if (matrixKernel.isEligible(matrix.tensor().type(), count, matrix.rows(), matrix.columns())) {
+      matrixKernel.multiply(
+          out,
+          input,
+          matrix.tensor().dataSegment(),
+          matrix.tensor().type(),
+          count,
+          matrix.rows(),
+          matrix.columns());
+      return;
+    }
     TensorOps.ggufBatchedMatmul(
         out,
         input,
@@ -314,7 +302,6 @@ public final class EmbeddingGemma2Encoder implements SequenceEncoder {
     up = buffer(count, config.hiddenDim());
     inputGate = buffer(count, config.perLayerDim());
     outputTokens = buffer(count, config.outputDim());
-    scores = new float[count];
     int width =
         Math.max(Math.max(dim, queryDim), Math.max(config.hiddenDim(), config.perLayerDim()));
     quantized = new byte[Math.multiplyExact(count, width)];
