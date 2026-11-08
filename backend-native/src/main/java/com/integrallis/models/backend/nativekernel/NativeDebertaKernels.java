@@ -37,6 +37,7 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
   private final MethodHandle denseAttention;
   private final MethodHandle causalAttention;
   private final MethodHandle visionAttention;
+  private final MethodHandle rotaryFactors;
   private final MethodHandle quickGelu;
   private final MethodHandle geluErf;
   private final MethodHandle destroy;
@@ -126,6 +127,25 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
                               ValueLayout.JAVA_LONG),
                           Linker.Option.critical(true)))
               .map(method -> MethodHandles.dropArguments(method, 14, long.class))
+              .orElse(null);
+      rotaryFactors =
+          symbols
+              .find("jmodels_vision_rotary_factors")
+              .map(
+                  symbol ->
+                      linker.downcallHandle(
+                          symbol,
+                          FunctionDescriptor.of(
+                              ValueLayout.JAVA_INT,
+                              ValueLayout.JAVA_INT,
+                              ValueLayout.JAVA_INT,
+                              ValueLayout.JAVA_FLOAT,
+                              ValueLayout.JAVA_FLOAT,
+                              ValueLayout.JAVA_FLOAT,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.ADDRESS),
+                          Linker.Option.critical(true)))
               .orElse(null);
       visionAttention =
           symbols
@@ -374,6 +394,40 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
         heads,
         capacity,
         batch);
+  }
+
+  synchronized boolean rotaryFactors(
+      int position,
+      int pairs,
+      float base,
+      float scale,
+      float magnitude,
+      float[] divisors,
+      float[] cosine,
+      float[] sine,
+      int offset) {
+    if (handle == 0) throw new IllegalStateException("Dense kernels are closed");
+    if (rotaryFactors == null) return false;
+    if (pairs < 1
+        || offset < 0
+        || offset > cosine.length - pairs
+        || offset > sine.length - pairs
+        || cosine == sine
+        || cosine == divisors
+        || sine == divisors
+        || (divisors != null && divisors.length < pairs))
+      throw new IllegalArgumentException("Invalid rotary factor buffers");
+    MemorySegment ff = divisors == null ? MemorySegment.NULL : MemorySegment.ofArray(divisors);
+    MemorySegment cs = MemorySegment.ofArray(cosine).asSlice((long) offset * 4, (long) pairs * 4);
+    MemorySegment sn = MemorySegment.ofArray(sine).asSlice((long) offset * 4, (long) pairs * 4);
+    try {
+      int result =
+          (int) rotaryFactors.invokeExact(position, pairs, base, scale, magnitude, ff, cs, sn);
+      if (result != 0) throw new IllegalStateException("Rotary factors failed: " + result);
+      return true;
+    } catch (Throwable failure) {
+      throw new IllegalStateException("Rotary factor call failed", failure);
+    }
   }
 
   synchronized void visionAttention(

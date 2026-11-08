@@ -38,12 +38,12 @@ import org.junit.jupiter.api.Test;
 class NativeKernelLibraryTest {
 
   @Test
-  void imagePrefillPolicyRequiresTheLoadedPackingCapability() {
+  void imagePrefillPolicyRequiresTheReferenceReductionCapability() {
     try (var library = NativeKernelLibrary.open(libraryPath(), 2);
         var kernel = RustGgufBatchedMatrixKernel.open(libraryPath(), 2)) {
       var before = kernel.planRecommendations();
       assertThat(kernel.usesReferenceDecoderArithmetic()).isFalse();
-      boolean supported = library.supports(NativeKernelCapability.Q4_K_BATCH_PACKING);
+      boolean supported = library.supports(NativeKernelCapability.REFERENCE_K_QUANT_REDUCTION);
       assertThat(kernel.configureImagePrefill()).isEqualTo(supported);
       assertThat(kernel.usesReferenceDecoderArithmetic()).isEqualTo(supported);
       if (supported) {

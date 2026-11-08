@@ -22,6 +22,11 @@ import java.util.Map;
 /** Optional batched GGUF projection implementation injected into the Java transformer pipeline. */
 public interface GgufBatchedMatrixKernel extends AutoCloseable {
 
+  /** Whether projecting one retained row preserves this batch's accumulation order. */
+  default boolean preservesPrunedBatchRow(GgufTensorType type, int batchSize, int rowIndex) {
+    return true;
+  }
+
   /** Stable implementation identifier used in diagnostics. */
   default String implementation() {
     return "custom";

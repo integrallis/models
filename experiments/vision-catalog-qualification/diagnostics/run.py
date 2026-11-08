@@ -29,11 +29,9 @@ def main():
         raise SystemExit('Remote Linux only')
     root, campaign, distribution, reference, output = map(Path, sys.argv[1:])
     # Never run alongside qualification workloads, including a failed or unfinished repeat.
-    for marker in ['worker-exit.txt', 'integration-confirmation-exit.txt', 'f16-performance-exit.txt']:
-        if not (root / marker).is_file():
-            raise ValueError('Qualification has not exited: ' + marker)
-    if (root / 'worker-exit.txt').read_text().strip() != '0':
-        raise ValueError('Incomplete original arms')
+    for marker in [root / 'COLLECTION_COMPLETE', campaign / 'results/COLLECTION_COMPLETE']:
+        if not marker.is_file():
+            raise ValueError('Qualification has not completed: ' + str(marker))
     output.mkdir(exist_ok=False)
     receipt = read(campaign / 'results/receipt.json')
     cases = {c['id']: c for c in read(campaign / 'cases.json')['cases'] if not c['blank']}
@@ -41,6 +39,8 @@ def main():
     source = Path(__file__).with_name('DecoderAblation.java')
     java = Path(os.environ['VISION_JAVA'])
     native = Path(os.environ['VISION_NATIVE_LIBRARY'])
+    if sha(native) != receipt['nativeSha256']:
+        raise ValueError('Diagnostic native library differs from the measured binary')
     jars = sorted(p for p in (distribution / 'lib').glob('*.jar') if not p.name.startswith('._'))
     if not jars or any(not zipfile.is_zipfile(p) or sha(p) != receipt['jars'][p.name] for p in jars):
         raise ValueError('Diagnostic classpath differs from the measured executable JARs')

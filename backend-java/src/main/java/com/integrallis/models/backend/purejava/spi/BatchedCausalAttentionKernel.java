@@ -23,6 +23,20 @@ public interface BatchedCausalAttentionKernel extends AutoCloseable {
     return false;
   }
 
+  /** Fills reference float factors, or returns false without modifying the outputs. */
+  default boolean rotaryFactors(
+      int position,
+      int pairs,
+      float base,
+      float scale,
+      float magnitude,
+      float[] divisors,
+      float[] cosine,
+      float[] sine,
+      int offset) {
+    return false;
+  }
+
   /** Returns whether this prompt chunk can run without breaking retained cache continuity. */
   boolean isEligible(
       int layer,

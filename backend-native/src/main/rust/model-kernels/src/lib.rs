@@ -1,17 +1,22 @@
 mod clip_math;
-mod vision_attention;
 mod deberta_kernels;
 mod hf_tokenizer;
 mod onnx_kernels;
+#[cfg(target_arch = "x86_64")]
+mod q4_repack;
 mod q51_reuse;
 #[cfg(target_arch = "x86_64")]
 mod q8f32_reuse;
+mod rotary;
+mod vision_attention;
 // Copyright 2025-2026 Integrallis Software, LLC
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(test)]
 mod attention_layout_bench;
 mod bfloat16;
+#[cfg(all(test, target_arch = "x86_64"))]
+mod q5k_reference_tests;
 #[cfg(target_arch = "aarch64")]
 mod sleef_activations;
 mod swiglu;
@@ -96,7 +101,7 @@ const CAPABILITY_MIXED_K_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 9;
 /// only identical formats, or K-quants under CAPABILITY_MIXED_K -- so a model whose projections mix
 /// Q4_0 and Q8_0 silently fell back to one call per matrix. This bit lets the caller detect the
 /// support that was already here rather than infer it.
-const CAPABILITY_MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 31;
+const CAPABILITY_MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL: u64 = 1 << 34;
 /// TQ1_0 rows inside a grouped dispatch, sharing the group's Q8_K activation.
 ///
 /// `compute_grouped_with_scratch` quantizes the activation once for the whole group and then takes
@@ -187,6 +192,7 @@ const CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL: u64 = 1 << 29;
 /// Q4_K with Java-compatible sequential floating-point block accumulation.
 const CAPABILITY_Q4_K_ORDERED_REDUCTION: u64 = 1 << 30;
 const CAPABILITY_Q4_K_BATCH_PACKING: u64 = 1 << 31;
+const CAPABILITY_REFERENCE_K_QUANT_REDUCTION: u64 = 1 << 35;
 mod ptq;
 const Q8_0_BLOCK_BYTES: usize = 34;
 const Q4_K_BLOCK_BYTES: usize = 144;
@@ -316,15 +322,21 @@ enum DotKernel {
     #[cfg(target_arch = "x86_64")]
     Q4KAvx2,
     #[cfg(target_arch = "x86_64")]
+    Q4KRepackedAvx2,
+    #[cfg(target_arch = "x86_64")]
     Q4KOrderedAvx2,
     #[cfg(target_arch = "aarch64")]
     Q4KNeon,
     Q5K,
     #[cfg(target_arch = "x86_64")]
     Q5KAvx2,
+    #[cfg(target_arch = "x86_64")]
+    Q5KReferenceAvx2,
     Q6K,
     #[cfg(target_arch = "x86_64")]
     Q6KAvx2,
+    #[cfg(target_arch = "x86_64")]
+    Q6KReferenceAvx2,
     #[cfg(target_arch = "aarch64")]
     Q6KNeon,
 }
@@ -340,9 +352,15 @@ enum WeightFormat {
     /// existing Q8_0 route and every generative model on it are untouched.
     Q8_0F32Activation,
     Q4K,
+    #[cfg(target_arch = "x86_64")]
+    Q4KRepacked,
     Q4KOrdered,
     Q5K,
+    #[cfg(target_arch = "x86_64")]
+    Q5KReference,
     Q6K,
+    #[cfg(target_arch = "x86_64")]
+    Q6KReference,
     Tq1_0,
 }
 
@@ -368,6 +386,12 @@ impl WeightFormat {
             8 => Some(Self::Q8_0F32Activation),
             9 => Some(Self::Tq1_0),
             10 => Some(Self::Q4KOrdered),
+            #[cfg(target_arch = "x86_64")]
+            11 if q4_repack::supported() => Some(Self::Q4KRepacked),
+            #[cfg(target_arch = "x86_64")]
+            12 if q4_repack::supported() => Some(Self::Q5KReference),
+            #[cfg(target_arch = "x86_64")]
+            13 if q4_repack::supported() => Some(Self::Q6KReference),
             _ => None,
         }
     }
@@ -382,8 +406,14 @@ impl WeightFormat {
             Self::Tq1_0 => TQ1_0_BLOCK_BYTES,
             Self::Q8_0 => Q8_0_BLOCK_BYTES,
             Self::Q4K | Self::Q4KOrdered => Q4_K_BLOCK_BYTES,
+            #[cfg(target_arch = "x86_64")]
+            Self::Q4KRepacked => Q4_K_BLOCK_BYTES,
             Self::Q5K => Q5_K_BLOCK_BYTES,
+            #[cfg(target_arch = "x86_64")]
+            Self::Q5KReference => Q5_K_BLOCK_BYTES,
             Self::Q6K => Q6_K_BLOCK_BYTES,
+            #[cfg(target_arch = "x86_64")]
+            Self::Q6KReference => Q6_K_BLOCK_BYTES,
         }
     }
 
@@ -392,6 +422,12 @@ impl WeightFormat {
             Self::Ptq => 128,
             Self::Q4_0 | Self::Q5_0 | Self::Q5_1 | Self::Q8_0 | Self::Q8_0F32Activation => QK_0,
             Self::Q4K | Self::Q4KOrdered | Self::Q5K | Self::Q6K | Self::Tq1_0 => QK_K,
+            #[cfg(target_arch = "x86_64")]
+            Self::Q4KRepacked => QK_K,
+            #[cfg(target_arch = "x86_64")]
+            Self::Q6KReference => QK_K,
+            #[cfg(target_arch = "x86_64")]
+            Self::Q5KReference => QK_K,
         }
     }
 
@@ -399,6 +435,12 @@ impl WeightFormat {
         match self {
             Self::Q4_0 | Self::Q5_0 | Self::Q8_0 | Self::Ptq => ActivationFormat::Q8_0,
             Self::Q5_1 | Self::Q8_0F32Activation => ActivationFormat::F32,
+            #[cfg(target_arch = "x86_64")]
+            Self::Q4KRepacked => ActivationFormat::Q8K,
+            #[cfg(target_arch = "x86_64")]
+            Self::Q6KReference => ActivationFormat::Q8K,
+            #[cfg(target_arch = "x86_64")]
+            Self::Q5KReference => ActivationFormat::Q8K,
             Self::Q4K | Self::Q4KOrdered | Self::Q5K | Self::Q6K | Self::Tq1_0 => {
                 ActivationFormat::Q8K
             }
@@ -431,6 +473,12 @@ impl WeightFormat {
             }
             Self::Q8_0 => selected_q8_kernel(),
             Self::Q4K => selected_q4_k_kernel(),
+            #[cfg(target_arch = "x86_64")]
+            Self::Q4KRepacked => DotKernel::Q4KRepackedAvx2,
+            #[cfg(target_arch = "x86_64")]
+            Self::Q6KReference => DotKernel::Q6KReferenceAvx2,
+            #[cfg(target_arch = "x86_64")]
+            Self::Q5KReference => DotKernel::Q5KReferenceAvx2,
             Self::Q4KOrdered => {
                 #[cfg(target_arch = "x86_64")]
                 if std::arch::is_x86_feature_detected!("avx2")
@@ -1720,6 +1768,14 @@ fn q4_batch_packing_capability() -> u64 {
     }
 }
 
+fn reference_k_quant_capability() -> u64 {
+    #[cfg(target_arch = "x86_64")]
+    if q4_repack::supported() {
+        return CAPABILITY_REFERENCE_K_QUANT_REDUCTION;
+    }
+    0
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
     CAPABILITY_Q4_0_F32_BATCHED_MATMUL
@@ -1744,6 +1800,7 @@ pub extern "C" fn jmodels_kernels_capabilities() -> u64 {
         | CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL
         | CAPABILITY_Q4_K_ORDERED_REDUCTION
         | q4_batch_packing_capability()
+        | reference_k_quant_capability()
         | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
         | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
         | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL
@@ -3324,6 +3381,7 @@ fn compute_outputs(
             activations,
             rows,
             cols,
+            batch_size,
             0,
             output,
             kernel,
@@ -3344,6 +3402,7 @@ fn compute_outputs(
                     activations,
                     rows,
                     cols,
+                    batch_size,
                     start_index,
                     output_chunk,
                     kernel,
@@ -3604,6 +3663,24 @@ unsafe fn compute_batched_row_range(
                 );
             }
         }
+        #[cfg(target_arch = "x86_64")]
+        DotKernel::Q4KRepackedAvx2 => {
+            // SAFETY: format 11 is accepted only on AVX2/FMA/F16C hosts; rows are exclusive.
+            unsafe {
+                q4_repack::rows(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    output,
+                    batch_size,
+                    rows,
+                    cols,
+                    start_row,
+                    end_row,
+                );
+            }
+        }
         DotKernel::Q4K => {
             // SAFETY: the caller assigns this worker an exclusive matrix-row range.
             unsafe {
@@ -3638,7 +3715,7 @@ unsafe fn compute_batched_row_range(
                         cols,
                         start_row,
                         end_row,
-                        true,
+                        Q4Reduction::Sequential,
                     );
                 }
                 return;
@@ -3679,7 +3756,7 @@ unsafe fn compute_batched_row_range(
                         cols,
                         start_row,
                         end_row,
-                        false,
+                        Q4Reduction::Lanes,
                     );
                 }
                 return;
@@ -3698,6 +3775,39 @@ unsafe fn compute_batched_row_range(
                     start_row,
                     end_row,
                 );
+            }
+        }
+        #[cfg(target_arch = "x86_64")]
+        DotKernel::Q5KReferenceAvx2 => {
+            // SAFETY: gated by CPU features and complete, exclusive row buffers.
+            unsafe {
+                if batch_size >= 8 {
+                    compute_q5_k_batched_row_range_avx2_impl::<true>(
+                        weights,
+                        quantized,
+                        activation_scales,
+                        activation_sums,
+                        output,
+                        batch_size,
+                        rows,
+                        cols,
+                        start_row,
+                        end_row,
+                    );
+                } else {
+                    compute_q5_k_batched_row_range_avx2(
+                        weights,
+                        quantized,
+                        activation_scales,
+                        activation_sums,
+                        output,
+                        batch_size,
+                        rows,
+                        cols,
+                        start_row,
+                        end_row,
+                    );
+                }
             }
         }
         DotKernel::Q5K => {
@@ -3733,6 +3843,39 @@ unsafe fn compute_batched_row_range(
                     start_row,
                     end_row,
                 );
+            }
+        }
+        #[cfg(target_arch = "x86_64")]
+        DotKernel::Q6KReferenceAvx2 => {
+            // SAFETY: gated by CPU features and complete, exclusive row buffers.
+            unsafe {
+                if batch_size >= 8 {
+                    compute_q6_k_batched_row_range_avx2_impl::<true>(
+                        weights,
+                        quantized,
+                        activation_scales,
+                        activation_sums,
+                        output,
+                        batch_size,
+                        rows,
+                        cols,
+                        start_row,
+                        end_row,
+                    );
+                } else {
+                    compute_q6_k_batched_row_range_avx2(
+                        weights,
+                        quantized,
+                        activation_scales,
+                        activation_sums,
+                        output,
+                        batch_size,
+                        rows,
+                        cols,
+                        start_row,
+                        end_row,
+                    );
+                }
             }
         }
         DotKernel::Q6K => {
@@ -4697,6 +4840,37 @@ unsafe fn compute_q5_k_batched_row_range_avx2(
     start_row: usize,
     end_row: usize,
 ) {
+    unsafe {
+        compute_q5_k_batched_row_range_avx2_impl::<false>(
+            weights,
+            quantized,
+            activation_scales,
+            activation_sums,
+            output,
+            batch_size,
+            rows,
+            cols,
+            start_row,
+            end_row,
+        );
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments)]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn compute_q5_k_batched_row_range_avx2_impl<const TILED: bool>(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    activation_sums: &[i16],
+    output: *mut f32,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
     if batch_size == 1 {
         for row in start_row..end_row {
             // SAFETY: AVX2, FMA, and F16C are enabled and all buffers were validated.
@@ -4719,16 +4893,60 @@ unsafe fn compute_q5_k_batched_row_range_avx2(
         return;
     }
 
+    // Keep the activation and weight tiles in the private cache during image prefill.
+    // The block/lane accumulation order for every output is unchanged.
+    for row_tile in (start_row..end_row).step_by(16) {
+        for batch_tile in (0..batch_size).step_by(16) {
+            // SAFETY: disjoint output tiles within the validated worker-owned row range.
+            unsafe {
+                compute_q5_k_tile_range_avx2::<TILED>(
+                    weights,
+                    quantized,
+                    activation_scales,
+                    activation_sums,
+                    output,
+                    batch_tile,
+                    (batch_size - batch_tile).min(16),
+                    rows,
+                    cols,
+                    row_tile,
+                    (row_tile + 16).min(end_row),
+                );
+            }
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments)]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn compute_q5_k_tile_range_avx2<const TILED: bool>(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    activation_sums: &[i16],
+    output: *mut f32,
+    batch_start: usize,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
     let blocks_per_row = cols / QK_K;
     let sums_per_batch = cols / Q8_K_SUM_BLOCK;
     let nibble_mask = _mm256_set1_epi8(0x0f);
     let high_value = _mm256_set1_epi8(16);
-    batch_scratch!(sums, batch_size, 0_f32, f32);
+    batch_scratch!(sums, batch_size, _mm256_setzero_ps(), __m256);
+    batch_scratch!(minimum_sums, batch_size, 0_f32, f32);
+    batch_scratch!(reference_sums, batch_size, 0_f32, f32);
     let mut decoded = [_mm256_setzero_si256(); 8];
     let mut group_scales = [0_i32; 8];
     let mut group_mins = [0_i32; 8];
     for row in start_row..end_row {
-        sums.fill(0.0);
+        sums.fill(_mm256_setzero_ps());
+        minimum_sums.fill(0.0);
+        reference_sums.fill(0.0);
         for block in 0..blocks_per_row {
             record_k_quant_weight_block_decode();
             let weight_offset = (row * blocks_per_row + block) * Q5_K_BLOCK_BYTES;
@@ -4781,8 +4999,9 @@ unsafe fn compute_q5_k_batched_row_range_avx2(
             );
 
             for batch in 0..batch_size {
-                let activation_offset = batch * cols + block * QK_K;
-                let sum_offset = batch * sums_per_batch + block * QK_K / Q8_K_SUM_BLOCK;
+                let activation_offset = (batch_start + batch) * cols + block * QK_K;
+                let sum_offset =
+                    (batch_start + batch) * sums_per_batch + block * QK_K / Q8_K_SUM_BLOCK;
                 let mut quantized_lanes = _mm256_setzero_si256();
                 for pair in 0..4 {
                     let low_group = pair * 2;
@@ -4806,24 +5025,41 @@ unsafe fn compute_q5_k_batched_row_range_avx2(
                         _mm256_add_epi32(low_scaled, high_scaled),
                     );
                 }
-                let quantized_sum = horizontal_sum_i32_avx2(quantized_lanes);
                 // SAFETY: each Q8_K activation block has sixteen signed group sums.
                 let activation_sum_values =
                     unsafe { _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast()) };
                 let paired_sums = _mm256_madd_epi16(activation_sum_values, _mm256_set1_epi16(1));
                 let minimum_sum =
                     horizontal_sum_i32_avx2(_mm256_mullo_epi32(minimum_values, paired_sums));
-                let activation_scale = activation_scales[batch * blocks_per_row + block];
+                let activation_scale =
+                    activation_scales[(batch_start + batch) * blocks_per_row + block];
                 let d = weight_scale * activation_scale;
                 let d_min = weight_min_scale * activation_scale;
-                sums[batch] = d.mul_add(quantized_sum as f32, sums[batch]);
-                sums[batch] = (-d_min).mul_add(minimum_sum as f32, sums[batch]);
+                if TILED {
+                    let scaled = weight_scale * horizontal_sum_i32_avx2(quantized_lanes) as f32;
+                    let corrected = (-weight_min_scale).mul_add(minimum_sum as f32, scaled);
+                    reference_sums[batch] =
+                        corrected.mul_add(activation_scale, reference_sums[batch]);
+                } else {
+                    sums[batch] = _mm256_fmadd_ps(
+                        _mm256_set1_ps(d),
+                        _mm256_cvtepi32_ps(quantized_lanes),
+                        sums[batch],
+                    );
+                    minimum_sums[batch] = (-d_min).mul_add(minimum_sum as f32, minimum_sums[batch]);
+                }
             }
         }
         for (batch, &sum) in sums.iter().enumerate() {
             // SAFETY: each worker owns this row across all batch-major output planes.
             unsafe {
-                output.add(batch * rows + row).write(sum);
+                output
+                    .add((batch_start + batch) * rows + row)
+                    .write(if TILED {
+                        reference_sums[batch]
+                    } else {
+                        horizontal_sum_f32_avx2(sum) + minimum_sums[batch]
+                    });
             }
         }
     }
@@ -4833,6 +5069,37 @@ unsafe fn compute_q5_k_batched_row_range_avx2(
 #[allow(clippy::too_many_arguments)]
 #[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn compute_q6_k_batched_row_range_avx2(
+    weights: &[u8],
+    quantized: &[i8],
+    activation_scales: &[f32],
+    activation_sums: &[i16],
+    output: *mut f32,
+    batch_size: usize,
+    rows: usize,
+    cols: usize,
+    start_row: usize,
+    end_row: usize,
+) {
+    unsafe {
+        compute_q6_k_batched_row_range_avx2_impl::<false>(
+            weights,
+            quantized,
+            activation_scales,
+            activation_sums,
+            output,
+            batch_size,
+            rows,
+            cols,
+            start_row,
+            end_row,
+        );
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[allow(clippy::too_many_arguments)]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn compute_q6_k_batched_row_range_avx2_impl<const TILED: bool>(
     weights: &[u8],
     quantized: &[i8],
     activation_scales: &[f32],
@@ -4875,16 +5142,23 @@ unsafe fn compute_q6_k_batched_row_range_avx2(
                 let mut batch = batch_tile;
                 while batch + 8 <= batch_end {
                     unsafe {
-                        compute_q6_k_tile::<8>(
-                            weights, quantized, activation_scales, activation_sums,
-                            output, batch, row, rows, cols,
+                        compute_q6_k_tile::<8, TILED>(
+                            weights,
+                            quantized,
+                            activation_scales,
+                            activation_sums,
+                            output,
+                            batch,
+                            row,
+                            rows,
+                            cols,
                         );
                     }
                     batch += 8;
                 }
                 while batch + 4 <= batch_end {
                     unsafe {
-                        compute_q6_k_tile::<4>(
+                        compute_q6_k_tile::<4, TILED>(
                             weights,
                             quantized,
                             activation_scales,
@@ -4900,7 +5174,7 @@ unsafe fn compute_q6_k_batched_row_range_avx2(
                 }
                 match batch_end - batch {
                     3 => unsafe {
-                        compute_q6_k_tile::<3>(
+                        compute_q6_k_tile::<3, TILED>(
                             weights,
                             quantized,
                             activation_scales,
@@ -4913,7 +5187,7 @@ unsafe fn compute_q6_k_batched_row_range_avx2(
                         );
                     },
                     2 => unsafe {
-                        compute_q6_k_tile::<2>(
+                        compute_q6_k_tile::<2, TILED>(
                             weights,
                             quantized,
                             activation_scales,
@@ -4926,7 +5200,7 @@ unsafe fn compute_q6_k_batched_row_range_avx2(
                         );
                     },
                     1 => unsafe {
-                        compute_q6_k_tile::<1>(
+                        compute_q6_k_tile::<1, TILED>(
                             weights,
                             quantized,
                             activation_scales,
@@ -4948,7 +5222,7 @@ unsafe fn compute_q6_k_batched_row_range_avx2(
 #[cfg(target_arch = "x86_64")]
 #[allow(clippy::too_many_arguments)]
 #[target_feature(enable = "avx2,fma,f16c")]
-unsafe fn compute_q6_k_tile<const B: usize>(
+unsafe fn compute_q6_k_tile<const B: usize, const TILED: bool>(
     weights: &[u8],
     quantized: &[i8],
     activation_scales: &[f32],
@@ -4963,6 +5237,7 @@ unsafe fn compute_q6_k_tile<const B: usize>(
     let low_mask = _mm256_set1_epi8(0x0f);
     let high_two_mask = _mm256_set1_epi8(0x03);
     let mut sums = [_mm256_setzero_ps(); B];
+    let mut reference_sums = [0_f32; B];
     let mut decoded = [_mm256_setzero_si256(); 8];
     sums.fill(_mm256_setzero_ps());
     for block in 0..blocks_per_row {
@@ -5046,11 +5321,19 @@ unsafe fn compute_q6_k_tile<const B: usize>(
             integer_lanes = _mm256_sub_epi32(integer_lanes, offset_lanes);
             let d =
                 weight_scale * activation_scales[(batch_start + batch) * blocks_per_row + block];
-            sums[batch] = _mm256_fmadd_ps(
-                _mm256_set1_ps(d),
-                _mm256_cvtepi32_ps(integer_lanes),
-                sums[batch],
-            );
+            if TILED {
+                let scaled = weight_scale * horizontal_sum_i32_avx2(integer_lanes) as f32;
+                reference_sums[batch] = scaled.mul_add(
+                    activation_scales[(batch_start + batch) * blocks_per_row + block],
+                    reference_sums[batch],
+                );
+            } else {
+                sums[batch] = _mm256_fmadd_ps(
+                    _mm256_set1_ps(d),
+                    _mm256_cvtepi32_ps(integer_lanes),
+                    sums[batch],
+                );
+            }
         }
     }
     for (batch, &sum) in sums.iter().enumerate() {
@@ -5059,7 +5342,11 @@ unsafe fn compute_q6_k_tile<const B: usize>(
         unsafe {
             output
                 .add((batch_start + batch) * rows + row)
-                .write(horizontal_sum_f32_avx2(sum));
+                .write(if TILED {
+                    reference_sums[batch]
+                } else {
+                    horizontal_sum_f32_avx2(sum)
+                });
         }
     }
 }
@@ -5073,10 +5360,12 @@ fn compute_output_range(
     activations: &[f32],
     rows: usize,
     cols: usize,
+    batch_size: usize,
     start_index: usize,
     output: &mut [f32],
     kernel: DotKernel,
 ) {
+    let _ = batch_size;
     for (local_index, slot) in output.iter_mut().enumerate() {
         let output_index = start_index + local_index;
         let batch = output_index / rows;
@@ -5140,6 +5429,22 @@ fn compute_output_range(
                     dot_q8_0_q8_0_row_avx2(weights, quantized, activation_scales, batch, row, cols)
                 }
             }
+            #[cfg(target_arch = "x86_64")]
+            DotKernel::Q4KRepackedAvx2 => {
+                // SAFETY: selected only after feature detection; all row buffers are validated.
+                unsafe {
+                    q4_repack::dot(
+                        weights,
+                        quantized,
+                        activation_scales,
+                        activation_sums,
+                        batch,
+                        row,
+                        cols,
+                        batch < batch_size / 4 * 4,
+                    )
+                }
+            }
             DotKernel::Q4K => dot_q4_k_q8_k_row_scalar(
                 weights,
                 quantized,
@@ -5179,6 +5484,35 @@ fn compute_output_range(
                     )
                 }
             }
+            #[cfg(target_arch = "x86_64")]
+            DotKernel::Q5KReferenceAvx2 => {
+                // SAFETY: buffers and CPU features are checked by the caller.
+                unsafe {
+                    if batch_size >= 8 {
+                        let mut value = 0_f32;
+                        let blocks = cols / 256;
+                        let w = &weights[row * blocks * Q5_K_BLOCK_BYTES
+                            ..(row + 1) * blocks * Q5_K_BLOCK_BYTES];
+                        let q = &quantized[batch * cols..(batch + 1) * cols];
+                        let scales = &activation_scales[batch * blocks..(batch + 1) * blocks];
+                        let sums = &activation_sums[batch * cols / 16..(batch + 1) * cols / 16];
+                        compute_q5_k_tile_range_avx2::<true>(
+                            w, q, scales, sums, &mut value, 0, 1, 1, cols, 0, 1,
+                        );
+                        value
+                    } else {
+                        dot_q5_k_q8_k_row_avx2(
+                            weights,
+                            quantized,
+                            activation_scales,
+                            activation_sums,
+                            batch,
+                            row,
+                            cols,
+                        )
+                    }
+                }
+            }
             DotKernel::Q5K => dot_q5_k_q8_k_row_scalar(
                 weights,
                 quantized,
@@ -5201,6 +5535,33 @@ fn compute_output_range(
                         row,
                         cols,
                     )
+                }
+            }
+            #[cfg(target_arch = "x86_64")]
+            DotKernel::Q6KReferenceAvx2 => {
+                // SAFETY: buffers and CPU features are checked by the caller.
+                unsafe {
+                    if batch_size >= 8 {
+                        let mut value = 0_f32;
+                        let blocks = cols / 256;
+                        let w = &weights[row * blocks * Q6_K_BLOCK_BYTES
+                            ..(row + 1) * blocks * Q6_K_BLOCK_BYTES];
+                        let q = &quantized[batch * cols..(batch + 1) * cols];
+                        let scales = &activation_scales[batch * blocks..(batch + 1) * blocks];
+                        let sums = &activation_sums[batch * cols / 16..(batch + 1) * cols / 16];
+                        compute_q6_k_tile::<1, true>(w, q, scales, sums, &mut value, 0, 0, 1, cols);
+                        value
+                    } else {
+                        dot_q6_k_q8_k_row_avx2(
+                            weights,
+                            quantized,
+                            activation_scales,
+                            activation_sums,
+                            batch,
+                            row,
+                            cols,
+                        )
+                    }
                 }
             }
             DotKernel::Q6K => {
@@ -6651,7 +7012,8 @@ unsafe fn dot_q5_k_q8_k_row_avx2(
     let blocks_per_row = cols / QK_K;
     let nibble_mask = _mm256_set1_epi8(0x0f);
     let high_value = _mm256_set1_epi8(16);
-    let mut sum = 0_f32;
+    let mut accumulated = _mm256_setzero_ps();
+    let mut minimum_sum_total = 0_f32;
     for block in 0..blocks_per_row {
         record_k_quant_weight_block_decode();
         let weight_offset = (row * blocks_per_row + block) * Q5_K_BLOCK_BYTES;
@@ -6709,7 +7071,6 @@ unsafe fn dot_q5_k_q8_k_row_avx2(
             quantized_lanes =
                 _mm256_add_epi32(quantized_lanes, _mm256_add_epi32(low_scaled, high_scaled));
         }
-        let quantized_sum = horizontal_sum_i32_avx2(quantized_lanes);
         // SAFETY: each Q8_K activation block has sixteen signed group sums.
         let activation_sum_values =
             unsafe { _mm256_loadu_si256(activation_sums.as_ptr().add(sum_offset).cast()) };
@@ -6717,10 +7078,16 @@ unsafe fn dot_q5_k_q8_k_row_avx2(
         // Mins come from the same single unpack: widen lanes 8..15 to i32 in group order.
         let minimum_values = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(mins_and_scales, 1));
         let minimum_sum = horizontal_sum_i32_avx2(_mm256_mullo_epi32(minimum_values, paired_sums));
-        sum = d.mul_add(quantized_sum as f32, sum);
-        sum = (-d_min).mul_add(minimum_sum as f32, sum);
+        // Keep the reference's eight accumulation lanes across the whole row. Reducing each
+        // block first changes rounding in Q5_K value/down projections, even in Q4_K models.
+        accumulated = _mm256_fmadd_ps(
+            _mm256_set1_ps(d),
+            _mm256_cvtepi32_ps(quantized_lanes),
+            accumulated,
+        );
+        minimum_sum_total = (-d_min).mul_add(minimum_sum as f32, minimum_sum_total);
     }
-    sum
+    horizontal_sum_f32_avx2(accumulated) + minimum_sum_total
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -7434,6 +7801,14 @@ fn transpose_q4_rows(a: [__m256i; 8]) -> [__m256i; 8] {
     out
 }
 #[cfg(target_arch = "x86_64")]
+#[derive(Clone, Copy)]
+enum Q4Reduction {
+    Sequential,
+    Lanes,
+    Repacked,
+}
+
+#[cfg(target_arch = "x86_64")]
 #[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
 #[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn compute_q4_k_packed_rows(
@@ -7447,7 +7822,7 @@ unsafe fn compute_q4_k_packed_rows(
     cols: usize,
     start: usize,
     end: usize,
-    ordered: bool,
+    reduction: Q4Reduction,
 ) {
     let blocks = cols / 256;
     let empty = PackedQ4Block {
@@ -7492,8 +7867,10 @@ unsafe fn compute_q4_k_packed_rows(
         let mut b = 0;
         while b + 4 <= batch {
             unsafe {
-                if ordered {
+                if matches!(reduction, Q4Reduction::Sequential) {
                     compute_q4_packed_tile::<4>(&packed, q, scales, sums, out, b, row, rows, cols);
+                } else if matches!(reduction, Q4Reduction::Repacked) {
+                    q4_repack::tile::<4>(&packed, q, scales, sums, out, b, row, rows, cols);
                 } else {
                     compute_q4_packed_lane_tile::<4>(
                         &packed, q, scales, sums, out, b, row, rows, cols,
@@ -7504,8 +7881,10 @@ unsafe fn compute_q4_k_packed_rows(
         }
         while b < batch {
             unsafe {
-                if ordered {
+                if matches!(reduction, Q4Reduction::Sequential) {
                     compute_q4_packed_tile::<1>(&packed, q, scales, sums, out, b, row, rows, cols);
+                } else if matches!(reduction, Q4Reduction::Repacked) {
+                    q4_repack::tile::<1>(&packed, q, scales, sums, out, b, row, rows, cols);
                 } else {
                     compute_q4_packed_lane_tile::<1>(
                         &packed, q, scales, sums, out, b, row, rows, cols,
@@ -7519,11 +7898,14 @@ unsafe fn compute_q4_k_packed_rows(
     for r in row..end {
         for b in 0..batch {
             unsafe {
-                out.add(b * rows + r).write(if ordered {
-                    dot_q4_k_q8_k_row_ordered_avx2(weights, q, scales, sums, b, r, cols)
-                } else {
-                    dot_q4_k_q8_k_row_avx2(weights, q, scales, sums, b, r, cols)
-                });
+                out.add(b * rows + r)
+                    .write(if matches!(reduction, Q4Reduction::Sequential) {
+                        dot_q4_k_q8_k_row_ordered_avx2(weights, q, scales, sums, b, r, cols)
+                    } else if matches!(reduction, Q4Reduction::Repacked) {
+                        q4_repack::dot(weights, q, scales, sums, b, r, cols, b < batch / 4 * 4)
+                    } else {
+                        dot_q4_k_q8_k_row_avx2(weights, q, scales, sums, b, r, cols)
+                    });
             }
         }
     }
@@ -7731,7 +8113,11 @@ mod tests {
                             cols,
                             start,
                             end,
-                            ordered,
+                            if ordered {
+                                Q4Reduction::Sequential
+                            } else {
+                                Q4Reduction::Lanes
+                            },
                         );
                     }
                     for b in 0..batch {
@@ -8233,7 +8619,8 @@ mod tests {
                 | CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL
                 | CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL
                 | CAPABILITY_Q4_K_ORDERED_REDUCTION
-        | q4_batch_packing_capability()
+                | q4_batch_packing_capability()
+                | reference_k_quant_capability()
                 | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
                 | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
                 | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL
@@ -10934,3 +11321,6 @@ chunks_per_partition={chunks} available_parallelism={processors}"
         );
     }
 }
+
+#[cfg(all(test, target_arch = "x86_64"))]
+mod k_quant_reference_tests;

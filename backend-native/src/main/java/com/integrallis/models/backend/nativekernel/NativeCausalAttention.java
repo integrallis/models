@@ -50,6 +50,22 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
   }
 
   @Override
+  public boolean rotaryFactors(
+      int position,
+      int pairs,
+      float base,
+      float scale,
+      float magnitude,
+      float[] divisors,
+      float[] cosine,
+      float[] sine,
+      int offset) {
+    if (closed) throw new IllegalStateException("Native attention is closed");
+    return dense.rotaryFactors(
+        position, pairs, base, scale, magnitude, divisors, cosine, sine, offset);
+  }
+
+  @Override
   public boolean isEligible(
       int layer,
       int start,

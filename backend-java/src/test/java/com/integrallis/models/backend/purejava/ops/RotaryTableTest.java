@@ -26,6 +26,55 @@ import org.junit.jupiter.api.Test;
 class RotaryTableTest {
 
   @Test
+  void injectedFloatFactorsPreserveReferenceRotationAndCacheReuse() throws Exception {
+    int[] positions = {0, 1, 31, 639, 4095};
+    float[] factors = fixture("factors.f32");
+    float[] expected = fixture("rope-0.f32");
+    var calls = new java.util.concurrent.atomic.AtomicInteger();
+    var table =
+        new RotaryTable(128, 10000f, .25f)
+            .withFloatRecurrence(
+                (position, pairs, base, scale, magnitude, divisors, cosine, sine, offset) -> {
+                  int row = java.util.Arrays.binarySearch(positions, position);
+                  assertThat(row).isNotNegative();
+                  for (int pair = 0; pair < pairs; pair++) {
+                    cosine[offset + pair] = factors[row * 128 + pair * 2];
+                    sine[offset + pair] = factors[row * 128 + pair * 2 + 1];
+                  }
+                  calls.incrementAndGet();
+                  return true;
+                });
+    float[] actual = new float[128 * 2 * positions.length];
+    for (int i = 0; i < actual.length; i++) actual[i] = (i % 19 - 9) * .125f;
+    for (int row = 0; row < positions.length; row++) {
+      table.prepare(positions[row]);
+      for (int head = 0; head < 2; head++) {
+        table.prepare(positions[row]);
+        table.apply(actual, (row * 2 + head) * 128, false);
+      }
+    }
+    for (int i = 0; i < actual.length; i++) {
+      assertThat(Float.floatToRawIntBits(actual[i]))
+          .as("output %s", i)
+          .isEqualTo(Float.floatToRawIntBits(expected[i]));
+    }
+    assertThat(calls.get()).isEqualTo(positions.length);
+  }
+
+  private float[] fixture(String name) throws Exception {
+    try (var input = getClass().getResourceAsStream("/vision-rotary/" + name)) {
+      assertThat(input).isNotNull();
+      var bytes =
+          java.nio.ByteBuffer.wrap(input.readAllBytes())
+              .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+              .asFloatBuffer();
+      float[] result = new float[bytes.remaining()];
+      bytes.get(result);
+      return result;
+    }
+  }
+
+  @Test
   void floatRecurrenceMatchesIndependentGgmlAcrossHeadsAndPositions() throws Exception {
     int[] positions = {0, 1, 31, 639, 4095};
     for (int mode : new int[] {0, 2}) {

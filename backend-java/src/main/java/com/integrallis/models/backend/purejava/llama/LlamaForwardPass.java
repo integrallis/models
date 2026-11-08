@@ -524,7 +524,7 @@ public final class LlamaForwardPass {
         config.globalRotaryTable(weights.ropeFactorsLong(), weights.ropeFactorsShort());
     this.globalRopeTable =
         batchedAttentionKernel.usesFloatRotaryRecurrence()
-            ? configuredRope.withFloatRecurrence()
+            ? configuredRope.withFloatRecurrence(batchedAttentionKernel::rotaryFactors)
             : configuredRope;
     this.slidingWindowRopeTable =
         config.slidingWindow() > 0 ? config.slidingWindowRotaryTable() : globalRopeTable;
@@ -1346,7 +1346,12 @@ public final class LlamaForwardPass {
       rmsNorm(batchXNorm, xOffset, batchX, xOffset, lw.attentionNorm(), dim, config.rmsNormEps());
     }
     boolean canPrune = canDiscardFinalLayer(layer, allLogits);
-    if (finalLayerKvOnlyPrefill && canPrune) {
+    boolean canPruneQuery =
+        !computeFinalLogits
+            || (batchedMatrixKernel.preservesPrunedBatchRow(lw.wqType(), batchSize, batchSize - 1)
+                && batchedMatrixKernel.preservesPrunedBatchRow(
+                    lw.woType(), batchSize, batchSize - 1));
+    if (finalLayerKvOnlyPrefill && canPrune && canPruneQuery) {
       finishFinalLayerKvOnlyBatch(lw, layer, batchSize, startPosition, computeFinalLogits);
       return true;
     }
