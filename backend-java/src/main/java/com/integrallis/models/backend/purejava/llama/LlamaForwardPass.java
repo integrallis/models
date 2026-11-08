@@ -2360,6 +2360,10 @@ public final class LlamaForwardPass {
       cache.store(layerIndex, startPosition + batch, batchK, keyOffset, batchV, valueOffset);
     }
 
+    int prefixRows = computeFinalLogits ? batchSize - 1 : batchSize;
+    boolean retainedPrefix =
+        appendAttentionPrefix(batchK, batchV, layerIndex, startPosition, prefixRows);
+
     if (!computeFinalLogits) {
       return;
     }
@@ -2378,7 +2382,27 @@ public final class LlamaForwardPass {
     }
     scaleQueryTemperature(q, 0, startPosition + finalBatch);
 
-    attendHeads(q, 0, attnOut, 0, layerIndex, startPosition + finalBatch, cache);
+    if (retainedPrefix
+        && batchedAttentionKernelEligible(layerIndex, startPosition + finalBatch, 1)) {
+      System.arraycopy(batchK, finalBatch * keyDim, k, 0, keyDim);
+      System.arraycopy(batchV, finalBatch * valueDim, v, 0, valueDim);
+      batchedAttentionKernel.attend(
+          attnOut,
+          q,
+          k,
+          v,
+          layerIndex,
+          startPosition + finalBatch,
+          1,
+          numHeads,
+          numKvHeads,
+          keyLength,
+          config.valueLength(),
+          cache.maxSeqLen(),
+          config.usesSlidingWindow(layerIndex) ? config.slidingWindow() : 0);
+    } else {
+      attendHeads(q, 0, attnOut, 0, layerIndex, startPosition + finalBatch, cache);
+    }
     matmulDispatch(
         attnProjected, attnOut, layer.wo(), layer.woType(), dim, config.attentionOutputDim());
     normalizeProjection(attnProjected, layer.attentionPostNorm(), dim);
@@ -2425,6 +2449,27 @@ public final class LlamaForwardPass {
       }
     }
     sequenceCache.store(layerIndex, position, k, v);
+    if (sequenceCache == cache) {
+      appendAttentionPrefix(k, v, layerIndex, position, 1);
+    }
+  }
+
+  private boolean appendAttentionPrefix(
+      float[] keys, float[] values, int layer, int start, int count) {
+    if (config.usesGraniteScaling()) return false;
+    if (count == 0) return batchedAttentionKernelEligible(layer, start, 1);
+    return batchedAttentionKernel.append(
+        keys,
+        values,
+        layer,
+        start,
+        count,
+        config.numHeads(),
+        config.numKvHeads(),
+        config.keyLength(),
+        config.valueLength(),
+        cache.maxSeqLen(),
+        config.usesSlidingWindow(layer) ? config.slidingWindow() : 0);
   }
 
   private void finishFinalLayerFfnRow(
