@@ -12,3 +12,11 @@ The four cells identify whether the discrepancy follows the embeddings, the deco
 or their interaction. First reproduce the diagonal cells against the original outputs.
 If they do not reproduce, investigate nondeterminism before interpreting the cross cells.
 The diagnostic does not establish performance or full-corpus qualification.
+
+The diagnostic classpath selects valid executable JARs and checks their hashes against
+the measurement receipt. macOS AppleDouble `._*.jar` metadata is excluded explicitly:
+the JVM ignored it during execution, but `javac` rejects it as an invalid archive. The
+first diagnostic compilation failure is retained separately; no inference ran in that
+failed diagnostic attempt, and correcting its classpath does not alter the measured
+payload or repeat any qualification timings. Future macOS payload archives should use
+`COPYFILE_DISABLE=1` when invoking `tar`.

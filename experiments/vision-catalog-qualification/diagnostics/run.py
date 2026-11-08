@@ -6,6 +6,7 @@ import os
 import platform
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 
@@ -40,14 +41,19 @@ def main():
     source = Path(__file__).with_name('DecoderAblation.java')
     java = Path(os.environ['VISION_JAVA'])
     native = Path(os.environ['VISION_NATIVE_LIBRARY'])
+    jars = sorted(p for p in (distribution / 'lib').glob('*.jar') if not p.name.startswith('._'))
+    if not jars or any(not zipfile.is_zipfile(p) or sha(p) != receipt['jars'][p.name] for p in jars):
+        raise ValueError('Diagnostic classpath differs from the measured executable JARs')
+    classpath = ':'.join(map(str, jars))
     classes = output / 'classes'
     classes.mkdir()
-    run([java.with_name('javac'), '-cp', str(distribution / 'lib/*'), '-d', classes, source], output / 'compile.log')
+    run([java.with_name('javac'), '-cp', classpath, '-d', classes, source], output / 'compile.log')
     common = [java, '--add-modules=jdk.incubator.vector', '--enable-native-access=ALL-UNNAMED', '-Xmx12g',
               '-Dvectors.gguf.threads=8', '-Dmodels.purejava.maxContextLength=1024',
               f'-Dmodels.native.kernels.library={native}', f'-Dmodels.qualification.revision={receipt["revision"]}',
-              '-cp', str(distribution / 'lib/*') + ':' + str(classes)]
-    metadata = dict(receipt=receipt, sourceSha256=sha(source), scriptSha256=sha(Path(__file__)), results=[])
+              '-cp', classpath + ':' + str(classes)]
+    metadata = dict(receipt=receipt, sourceSha256=sha(source), scriptSha256=sha(Path(__file__)),
+                    executableJars=[p.name for p in jars], results=[])
     for variant in task['variants']:
         quant = variant['variant']
         model = campaign / 'artifacts' / f'llava-v1.5-7b-{quant}.gguf'
