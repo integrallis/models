@@ -27,3 +27,17 @@ The initial diagnostic reuses the measured ff627e32 JAR/kernel payload and retai
 embeddings to reproduce the discrepancy. This is explicitly not a released-runtime
 qualification. New implementation candidates and published 0.5.15 are identified by
 separate receipts, never substituted into the original admission evidence.
+
+## Comparator precision diagnosis — declared before the corrected repeat
+
+The pinned reference's `build_attn_mha` explicitly casts F32 K/V tensors to F16
+when Flash Attention is active. `task-oracle` left `flash_attn_type` at AUTO, so its
+reported F32 cache does not mean F32 attention arithmetic. On identical full first-layer
+Q/K/V inputs in textvqa-38337, independently computed float64 attention differs from
+Models by 3.84e-7 normalized RMSE and from that reference by 0.00255. This is a
+precision mismatch to investigate, not permission to alter an answer or admission gate.
+
+Next diagnostic: disable Flash Attention explicitly in the F32 reference, preserving
+the original outputs. If this removes the mismatch, repeat correctness with genuinely
+F32 attention and document this as a comparator correction. Keep AUTO/F16 as the
+faster performance arm and retain every existing accuracy/performance threshold.

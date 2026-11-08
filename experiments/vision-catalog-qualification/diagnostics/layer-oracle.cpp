@@ -65,7 +65,7 @@ static bool observe(ggml_tensor *tensor, bool ask, void *data) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 6) { std::cerr << "MODEL PREFIX.i32 SUFFIX.i32 EMBEDDINGS.f32 NEW_OUTPUT_DIR\n"; return 2; }
+    if (argc != 6 && argc != 7) { std::cerr << "MODEL PREFIX.i32 SUFFIX.i32 EMBEDDINGS.f32 NEW_OUTPUT_DIR [auto|off]\n"; return 2; }
     Trace trace{argv[5]};
     if (!std::filesystem::create_directory(trace.output)) throw std::runtime_error("preserve prior output");
     auto prefix = read<llama_token>(argv[2]), suffix = read<llama_token>(argv[3]);
@@ -78,6 +78,11 @@ int main(int argc, char **argv) {
     cp.n_ctx = 1024; cp.n_batch = 128; cp.n_ubatch = 128;
     cp.n_threads = 8; cp.n_threads_batch = 8;
     cp.type_k = GGML_TYPE_F32; cp.type_v = GGML_TYPE_F32;
+    if (argc == 7) {
+        std::string attention = argv[6];
+        if (attention != "auto" && attention != "off") throw std::runtime_error("attention mode");
+        if (attention == "off") cp.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+    }
     cp.cb_eval = observe; cp.cb_eval_user_data = &trace;
     trace.dimension = llama_model_n_embd(model);
     auto ctx = llama_init_from_model(model, cp);
