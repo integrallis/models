@@ -249,3 +249,30 @@ task results, with integration and faster-reference performance still collecting
 - Local evidence: `audit-artifacts/pr380-vision-repeat-2026-11-08/`.
 - Re-read live quota and active fleet. Do not modify any unrelated resource or the
   ongoing primary measurement. This worker has a distinct key and security group.
+
+## Arithmetic diagnostics on the repeat worker
+
+The upstream Transformers 4.57.1 `QuickGELUActivation.forward` computes
+`input * torch.sigmoid(1.702 * input)`. Our native AVX2 implementation divides
+`input` directly by `1 + exp(...)`, omitting the intermediate F32 reciprocal
+rounding. Test the upstream operation graph without adding a runtime toggle.
+The independent component fixture uses 4,097 evenly spaced F32 inputs on [-12,12]
+and records every PyTorch/baseline/candidate output, exact-match fraction, RMSE,
+and maximum error. This synthetic operator check is not model qualification.
+
+- e915d344: diagnostic Java rounding of attention Q/K/V inputs to F16, following
+  the reference's effective AUTO precision; cache storage and accumulation remain
+  F32. Includes the separate pairwise-Welford experiment. No shipping claim.
+- 5c64c8f7: same experimental Java/runtime plus multiply-after-sigmoid QuickGELU.
+  Require native unit tests/Clippy, then the component comparison and all seven
+  retained nonblank disagreement questions for both variants as applicable.
+- The repeat worker runs these two diagnostics sequentially on the same host.
+  Neither diagnostic changes the frozen reference, accuracy/performance gates,
+  nor the already collected negative reports. Only a justified implementation
+  can become the payload for a new full original-corpus admission run.
+
+The repeat setup initially unpacked an archive's enclosing directory into an
+extra nested directory. Artifact downloads verified correctly; image verification
+failed before any inference. Preserve that failed setup log and exit status,
+extract with one stripped path component, verify all 80 image hashes, and resume
+setup without redownloading the model files. No model result came from this error.
