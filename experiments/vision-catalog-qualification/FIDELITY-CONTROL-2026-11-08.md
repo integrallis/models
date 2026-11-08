@@ -194,3 +194,24 @@ Do not promote the three-case diagnostic to a full-corpus correctness claim.
 Use the remaining isolated-worker time for crossed encoder/decoder diagnostics
 on these cases after its timing finishes. Preserve the complete running primary
 campaign and all gates unchanged.
+
+## Short-answer confirmation and rejected normalization variants
+
+On the same auxiliary worker, the combined cache/block-view changes reduce the
+hardest retained Q4_K_S short-answer decode median from 255.400 to 244.735 ms
+(4.18%). The AUTO/F16 reference takes 223.391 ms, giving a 1.09555 ratio; prefill
+ratio is 1.05734. All token sequences match across 3 warmups and 7 repetitions.
+Inputs use fixed independent image embeddings. This is a decoder diagnostic,
+not an end-to-end admission result or a substitute for the frozen full repeat.
+
+Five-case normalization diagnostics separately tested F32 reciprocal-square-root
+rounding after double moments (e8998d62), then pairwise Welford moments matching
+the independent encoder's published algorithm (a7a40f8c). Both trade mismatches
+instead of resolving them; exclude both implementations from this branch.
+The full normalization-only admission continues without interruption.
+
+The isolated worker's 380-file archive, 106112899 bytes, has SHA-256
+f328332ae339018d1466490db6a2e6708969fe9094b0a7de68dd27482dcf37f8.
+It retains executable payloads, source, inputs, timings, answer traces and failure
+records; excludes model weights, credentials and build caches. Verify the local
+copy before terminating i-091c95dd56f03732a and deleting its key/security group.
