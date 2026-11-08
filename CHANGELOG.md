@@ -4,6 +4,38 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.16] - 2026-11-08
+
+### Fixed
+
+- Reduce CLIP normalization roundoff by accumulating moments in double precision.
+  Match the upstream QuickGELU reciprocal-then-multiply operation order in both
+  the Java fallback and native implementation. A pinned PyTorch float32 fixture
+  covers the activation independently of model outputs.
+
+### Changed
+
+- Store native LLaVA causal-attention keys and values by head while retaining F32
+  arithmetic, and remove redundant bounds checks through fixed-size Q4_K block
+  views. The same-host caption measurements preserve every generated token and
+  show 2.99–3.09% lower decode latency for the cache layout, with a further
+  0.80–1.01% from the Q4_K views. These are component diagnostics, not catalog
+  qualification claims. Rejected arithmetic and performance experiments remain
+  evidence only and are not included in the runtime.
+
+### Qualification and dependencies
+
+- Catalog admission remains separate from this library release. It requires the
+  complete paired task and performance results, public ModelJars API execution,
+  and verification of the actual released artifacts. The original qualification
+  reports remain immutable; publishing this library does not change their verdicts.
+- Retain released Vectors 0.1.33. No unreleased Vectors changes are required or
+  included in this runtime.
+- `backend-cuda` remains opt-in and its numeric path is unchanged. The last recorded
+  G1 result is exact-token parity on RTX 4090; G4 is 6.184x against a 3.00x gate.
+  Device gates were not rerun for this release; the prior evidence remains under
+  `benchmark-results/2026-10-07-g4-dualpath`.
+
 ## [0.5.15] - 2026-11-08
 
 ### Added
