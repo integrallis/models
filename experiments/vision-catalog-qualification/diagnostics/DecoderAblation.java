@@ -11,13 +11,15 @@ import java.util.ServiceLoader;
 /** External diagnostic: the shipping native decoder with independently supplied image tokens. */
 class DecoderAblation {
   public static void main(String[] args) throws Exception {
-    if (!System.getProperty("os.name").equals("Linux") || args.length != 5)
-      throw new IllegalArgumentException("Remote Linux: MODEL PREFIX.i32 SUFFIX.i32 EMBEDDINGS.f32 OUTPUT.json");
+    if (!System.getProperty("os.name").equals("Linux") || (args.length != 5 && args.length != 6))
+      throw new IllegalArgumentException("Remote Linux: MODEL PREFIX.i32 SUFFIX.i32 EMBEDDINGS.f32 OUTPUT.json [ATTENTION_CLASS]");
     Path output = Path.of(args[4]);
     if (Files.exists(output)) throw new IllegalArgumentException("Preserve prior diagnostics");
     var provider = ServiceLoader.load(GgufMatrixKernelProvider.class).findFirst().orElseThrow();
     var kernel = provider.open(8).orElseThrow();
-    var attention = provider.openAttention(8, kernel);
+    var attention = args.length == 5 ? provider.openAttention(8, kernel)
+        : (com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel)
+            Class.forName(args[5]).getDeclaredConstructor().newInstance();
     int[] prefix = ints(Path.of(args[1]));
     int[] suffix = ints(Path.of(args[2]));
     var floats = ByteBuffer.wrap(Files.readAllBytes(Path.of(args[3]))).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer();
@@ -35,6 +37,7 @@ class DecoderAblation {
       json.writeStartObject();
       json.writeStringField("embeddingPath", args[3]);
       json.writeStringField("candidateRevision", System.getProperty("models.qualification.revision"));
+      json.writeStringField("attentionImplementation", attention.getClass().getName());
       json.writeArrayFieldStart("trace");
       for (int step = 0; step < 32; step++) {
         int best = 0, second = -1;

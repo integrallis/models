@@ -20,3 +20,26 @@ first diagnostic compilation failure is retained separately; no inference ran in
 failed diagnostic attempt, and correcting its classpath does not alter the measured
 payload or repeat any qualification timings. Future macOS payload archives should use
 `COPYFILE_DISABLE=1` when invoking `tar`.
+
+## Exact reference attention substitution
+
+`attention-substitution.py` compiles `oracle-attention.cpp` against the pinned
+independent ggml CPU library and injects `OracleAttention` through the existing
+attention SPI in the standalone decoder diagnostic. It preserves the Java graph,
+weights, projections, tokenizer and greedy generation, replacing only attention.
+Both candidate and independent encoder embeddings are crossed with both attention
+implementations and the complete reference decoder. The previous candidate tokens
+must reproduce before interpreting the result.
+
+This tests the reference's actual F16 casts, tiled prefill, online softmax,
+half-precision accumulation and split-KV decode together. Merely rounding operands
+in our existing F32 kernel does not reproduce that calculation. Analytic bridge
+checks cover tensor layout, causal masking and split-KV lengths before model cases.
+The probe is external research code and must never enter a runtime artifact or a
+qualification performance result. Its eight selected cases localize the problem;
+only the complete frozen corpus can establish admission.
+
+On the 2026-11-08 attention-dispatch worker this probe is queued after the timing
+worker exits, capped at 15 minutes and skipped if fewer than 15 minutes remain
+before the 19:40 UTC collection safety window. The independent 19:50 UTC deletion
+deadline is unchanged. Capture partial reports and failures in the raw archive.
