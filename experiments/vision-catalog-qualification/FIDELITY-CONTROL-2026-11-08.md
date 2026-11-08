@@ -276,3 +276,25 @@ extra nested directory. Artifact downloads verified correctly; image verificatio
 failed before any inference. Preserve that failed setup log and exit status,
 extract with one stripped path component, verify all 80 image hashes, and resume
 setup without redownloading the model files. No model result came from this error.
+
+## Remaining arithmetic diagnostics on the primary worker
+
+The normalization-only full collection and all its timing arms are complete and
+archived. The primary worker now runs sequential diagnostics only; the fresh
+worker's frozen full repeat remains isolated. Keep the existing combined USD 6
+ceiling and primary automatic termination deadline.
+
+Double moments plus the corrected QuickGELU reproduce six of seven retained
+cases; Q4_K_M textvqa-38337 still differs. F16 Q/K/V rounding, F32 reciprocal-square-root
+rounding and their combination trade other disagreements, so none is promoted.
+Normalizing after the prefill value accumulation (548656f7) also trades mismatches
+and remains experimental. Both the old and new raw results are preserved.
+
+Inspection of the pinned reference distinguishes batched prefill from single-token
+decode: its tiled prefill keeps Q in F32, while its one-chunk decode converts Q to
+the K dot-product type (F16 after the graph's K/V casts). Test that distinction
+with double CLIP moments and corrected QuickGELU. The earlier all-Q-F16 experiment
+did not implement this distinction. This is a precision diagnostic, not a passing
+F32-kernel contract or admission claim. Retain a precision change only after its
+public contract, independent numerical checks, full accuracy and performance gates
+are verified. No question-dependent paths, answer rewriting or gate relaxation.
