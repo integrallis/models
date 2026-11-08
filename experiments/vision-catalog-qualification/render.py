@@ -30,6 +30,15 @@ def render(report):
             r=p['worstRatios']
             lines.append(f"| {p['id']} | {r['prefillMs']:.6f} | {r['decodeMs']:.6f} | {r['totalMs']:.6f} | {p['generationLengthsMatch']} |")
         lines += ['', 'Token disagreements: ' + (', '.join(c['disagreements']) or 'none') + '.']
+        r = c['resources']
+        lines += ['', '| Resource observation | Value |', '| --- | --- |',
+                  f"| Candidate peak process RSS | {r['candidatePeakRssKiB'] / 1048576:.3f} GiB |",
+                  f"| Reference decoder peak process RSS | {r['referenceDecoderPeakRssKiB'] / 1048576:.3f} GiB |",
+                  f"| Candidate two-file load | {r['candidateLoadMs']:.3f} ms |",
+                  f"| Reference decoder load | {r['referenceDecoderLoadMs']:.3f} ms |",
+                  f"| Reference encoder load | {r['referenceEncoderLoadMs']:.3f} ms |", '',
+                  'Loads use the warm filesystem. The reference encoder and decoder ran separately;',
+                  'encoder RSS was not measured, so this is not a combined-pipeline memory comparison.']
     lines += ['', '## Integration repeats', '',
               'The initial one-warmup/three-run result and the declared three-warmup/seven-run confirmation are both retained.', '',
               '| Attempt | Passed | Missing reports |', '| --- | --- | --- |']
