@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.integrallis.models.backend.nativekernel.NativeDebertaKernelsTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-08T06:34:26.199Z" hostname="Brians-MacBook-Pro.local" time="2.356">
+  <properties/>
+  <testcase name="causalAttentionPreservesPrefixThroughChunksDecodeResetAndRewind()" classname="com.integrallis.models.backend.nativekernel.NativeDebertaKernelsTest" time="1.933"/>
+  <testcase name="causalAttentionRejectsAliasingBeforeNativeDispatch()" classname="com.integrallis.models.backend.nativekernel.NativeDebertaKernelsTest" time="0.031"/>
+  <testcase name="disentangledAttentionMatchesIndependentScalarCalculationAndRejectsBadIndices()" classname="com.integrallis.models.backend.nativekernel.NativeDebertaKernelsTest" time="0.054"/>
+  <testcase name="retainedAttentionRejectsOversizedShapesAndAliasingWithoutAdvancing()" classname="com.integrallis.models.backend.nativekernel.NativeDebertaKernelsTest" time="0.01"/>
+  <testcase name="denseAttentionMatchesScalarWithUnevenHeadsAndReusesScratch()" classname="com.integrallis.models.backend.nativekernel.NativeDebertaKernelsTest" time="0.023"/>
+  <testcase name="quickGeluMatchesDoublePrecisionOnRaggedAndParallelInputs()" classname="com.integrallis.models.backend.nativekernel.NativeDebertaKernelsTest" time="0.179"/>
+  <testcase name="quickGeluMatchesUpstreamFloat32Graph()" classname="com.integrallis.models.backend.nativekernel.NativeDebertaKernelsTest" time="0.012"/>
+  <testcase name="projectsUnevenBatchesAndReusesBuffersWithoutWritingPastOutput()" classname="com.integrallis.models.backend.nativekernel.NativeDebertaKernelsTest" time="0.047"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Nov 07, 2026 11:34:26 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 07, 2026 11:34:26 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=countdown ggufThreads=6 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+]]></system-err>
+</testsuite>

@@ -5,3 +5,5 @@ Pinned PyTorch 2.9.0+cpu, 4097 float32 inputs in [-12,12], eight threads. Matchi
 The seven retained disagreements are diagnostic cases, not admission. `production-quickgelu-worker.log` uses double CLIP moments and F32 attention; `quickgelu-diagnostic.log` additionally uses experimental Welford normalization and F16-rounded attention. Neither experimental precision change is retained in the production branch. The production diagnostic still disagrees on Q4_K_M textvqa-38337 (Movies versus the current AUTO reference Electronics). Full corpus collection is required, and no catalog claim is made here.
 
 `quick-build-receipt.json` binds the full-repeat JARs and Linux native library to production revision 3f31646c743647449310de2c5ff57fbd55d9e957. The fixture-test-only commit follows that immutable runtime source.
+
+Updated full `complianceCheck -x :docs:build` passes (208 tasks). All eight native Java tests also pass on the developer macOS x86_64 host using synthetic fixtures only; no real-model inference was run locally.
