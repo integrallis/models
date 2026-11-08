@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "repository": "second-state/Llava-v1.5-7B-GGUF",
+  "revision": "ffb5e9a1a3172f82448fbdbe578a051c8dc2ff77",
+  "files": {
+    "llava-v1.5-7b-Q4_K_M.gguf": {
+      "sha256": "2687b20ac8b7a23f6c70296d5b1e7f908fef2ce4769ecdebd1bb9503528a75bf",
+      "size": 4081004320
+    },
+    "llava-v1.5-7b-Q4_K_S.gguf": {
+      "sha256": "e785cbe9042356448cad670b31069316ea91b9c5149a6c79fe2f737d63cfac0e",
+      "size": 3856740128
+    },
+    "llava-v1.5-7b-mmproj-model-f16.gguf": {
+      "sha256": "50da4e5b0a011615f77686f9b02613571e65d23083c225e107c08c3b1775d9b1",
+      "size": 624434368
+    }
+  },
+  "variants": [
+    "Q4_K_S",
+    "Q4_K_M"
+  ],
+  "datasets": [
+    {
+      "repository": "lmms-lab-encoder/VQAv2",
+      "revision": "32665d35052eb4a6d4414851c3c829a72754915a",
+      "split": "validation",
+      "files": [
+        {
+          "path": "data/validation-00000-of-00068.parquet",
+          "sha256": "f21976c1b29cc26655613395d51c3e301ffd8c29d43ebfc499bde92657dfd933",
+          "size": 89434882
+        },
+        {
+          "path": "data/validation-00017-of-00068.parquet",
+          "sha256": "7698577945e7a567f27d14ab46999d5d2a1e871768812da47a3b339010a0c42b",
+          "size": 102410894
+        },
+        {
+          "path": "data/validation-00034-of-00068.parquet",
+          "sha256": "180c3928c6594e4ed9a035a5660c252c39153b773996ab6b71e018f13252c175",
+          "size": 95915442
+        },
+        {
+          "path": "data/validation-00051-of-00068.parquet",
+          "sha256": "154849bccf88835f2652e983ba54a40f8dd518cfff5d6cd135b5bd780759ae66",
+          "size": 93613238
+        }
+      ]
+    },
+    {
+      "repository": "lmms-lab-encoder/textvqa",
+      "revision": "9c0699cd19768ac5ab97568f6b3cbac4c0062884",
+      "split": "validation",
+      "files": [
+        {
+          "path": "data/validation-00000-of-00003.parquet",
+          "sha256": "491649b5b8add2c5bde13a1e36707002fcd11898699255d65e2e568ac4fbddff",
+          "size": 310398494
+        },
+        {
+          "path": "data/validation-00001-of-00003.parquet",
+          "sha256": "909ad12a378217431548a7f4b66fda163a6def9d21e70844c96449e64206c2dd",
+          "size": 311190265
+        },
+        {
+          "path": "data/validation-00002-of-00003.parquet",
+          "sha256": "a770d03ec95fef58def04cda949d97669b7666caaf174af927856d75684e6fe6",
+          "size": 298732781
+        }
+      ]
+    }
+  ],
+  "caseSelection": {
+    "seed": "modeljars-vision-qa-v1",
+    "casesPerDataset": 32,
+    "method": "within each pinned shard sort unique image/question cases by sha256(seed + question id); round-robin shards until 32 cases; no selection based on answers"
+  },
+  "maximumOutputTokens": 32,
+  "context": 1024,
+  "threads": 8,
+  "performance": {
+    "caseCountPerDataset": 2,
+    "warmups": 1,
+    "repetitions": 3,
+    "maximumMedianLatencyRatio": 1.1
+  },
+  "accuracy": {
+    "maximumScoreLoss": 0.005,
+    "minimumTokenSequenceAgreement": 0.99,
+    "minimumVqaScore": 0.5,
+    "minimumTextVqaScore": 0.2,
+    "blankImageCasesPerDataset": 8,
+    "minimumVqaImageContribution": 0.05
+  },
+  "scorer": {
+    "uri": "https://raw.githubusercontent.com/haotian-liu/LLaVA/c121f0432da27facab705978f83c4ada465e46fd/llava/eval/m4c_evaluator.py",
+    "sha256": "8b49e1033e29d551c0bdd86d9149e2b54370e4cd17e52176ac9061b3521f0774",
+    "class": "TextVQAAccuracyEvaluator"
+  }
+}

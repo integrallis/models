@@ -25,23 +25,9 @@ def sha(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("mmproj", type=Path)
-    parser.add_argument("image", type=Path)
-    parser.add_argument("output", type=Path)
-    parser.add_argument("--threads", type=int, default=8)
-    parser.add_argument("--warmups", type=int, default=1)
-    parser.add_argument("--repetitions", type=int, default=3)
-    args = parser.parse_args()
-    if platform.system() != "Linux":
-        parser.error("Real-model qualification must run on the remote Linux worker")
-    if args.threads < 1 or args.warmups < 1 or args.repetitions < 3:
-        parser.error("Require positive threads, warmups >= 1 and repetitions >= 3")
-    torch.set_num_threads(args.threads)
-    torch.set_num_interop_threads(1)
+def load_encoder(mmproj):
     started = time.perf_counter()
-    reader = gguf.GGUFReader(str(args.mmproj))
+    reader = gguf.GGUFReader(str(mmproj))
     tensors = {t.name: t for t in reader.tensors}
 
     def field(name):
@@ -100,8 +86,14 @@ def main():
     load_ms = (time.perf_counter() - started) * 1000
     mean = np.array(field("clip.vision.image_mean"), dtype=np.float32)
     std = np.array(field("clip.vision.image_std"), dtype=np.float32)
+
+    return model, first, first_bias, second, second_bias, size, mean, std, load_ms
+
+
+def prepare_encoder(state, image):
+    model, first, first_bias, second, second_bias, size, mean, std, load_ms = state
     started = time.perf_counter()
-    source = Image.open(args.image).convert("RGB")
+    source = Image.open(image).convert("RGB")
     side = max(source.size)
     square = Image.new("RGB", (side, side), tuple(int(x * 255) for x in mean))
     square.paste(source, ((side - source.width) // 2, (side - source.height) // 2))
@@ -116,6 +108,27 @@ def main():
         return torch.nn.functional.linear(torch.nn.functional.gelu(
             torch.nn.functional.linear(patches, first, first_bias), approximate="none"), second, second_bias)
 
+    return pixels, preprocess_ms, encode
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("mmproj", type=Path)
+    parser.add_argument("image", type=Path)
+    parser.add_argument("output", type=Path)
+    parser.add_argument("--threads", type=int, default=8)
+    parser.add_argument("--warmups", type=int, default=1)
+    parser.add_argument("--repetitions", type=int, default=3)
+    args = parser.parse_args()
+    if platform.system() != "Linux":
+        parser.error("Real-model qualification must run on the remote Linux worker")
+    if args.threads < 1 or args.warmups < 1 or args.repetitions < 3:
+        parser.error("Require positive threads, warmups >= 1 and repetitions >= 3")
+    torch.set_num_threads(args.threads)
+    torch.set_num_interop_threads(1)
+    state = load_encoder(args.mmproj)
+    pixels, preprocess_ms, encode = prepare_encoder(state, args.image)
+    size, load_ms = state[5], state[8]
     for _ in range(args.warmups):
         encode()
     timings = []
