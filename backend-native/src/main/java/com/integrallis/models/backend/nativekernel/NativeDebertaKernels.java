@@ -110,7 +110,7 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
               .orElse(null);
       causalAttention =
           symbols
-              .find("jmodels_dense_causal_attention")
+              .find("jmodels_dense_causal_attention_head_major")
               .map(
                   symbol ->
                       linker.downcallHandle(
@@ -125,6 +125,7 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
                               ValueLayout.ADDRESS,
                               ValueLayout.JAVA_LONG,
                               ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG,
                               ValueLayout.JAVA_LONG,
                               ValueLayout.JAVA_LONG,
                               ValueLayout.JAVA_LONG,
@@ -253,11 +254,17 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
       int batch,
       int positions,
       int dimension,
-      int heads) {
+      int heads,
+      int capacity) {
     if (handle == 0) throw new IllegalStateException("Dense kernels are closed");
-    if (batch < 1 || positions < batch || dimension < 1 || heads < 1 || dimension % heads != 0)
+    if (batch < 1
+        || positions < batch
+        || capacity < positions
+        || dimension < 1
+        || heads < 1
+        || dimension % heads != 0)
       throw new IllegalArgumentException("Invalid causal attention shape");
-    int qn = Math.multiplyExact(batch, dimension), kn = Math.multiplyExact(positions, dimension);
+    int qn = Math.multiplyExact(batch, dimension), kn = Math.multiplyExact(capacity, dimension);
     if (query.length < qn || output.length < qn || key.length < kn || value.length < kn)
       throw new IllegalArgumentException("Invalid causal attention buffer");
     // The native ABI requires output storage disjoint from every input.
@@ -281,7 +288,8 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
                   (long) batch,
                   (long) positions,
                   (long) dimension,
-                  (long) heads);
+                  (long) heads,
+                  (long) capacity);
       if (result != 0) throw new IllegalStateException("Causal attention failed: " + result);
     } catch (Throwable failure) {
       throw new IllegalStateException("Causal attention call failed", failure);

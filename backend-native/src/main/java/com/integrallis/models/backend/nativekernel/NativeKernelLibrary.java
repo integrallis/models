@@ -285,6 +285,26 @@ public final class NativeKernelLibrary implements AutoCloseable {
           ValueLayout.JAVA_INT,
           ValueLayout.JAVA_INT);
 
+  private static final FunctionDescriptor HEAD_MAJOR_ATTENTION_DESCRIPTOR =
+      FunctionDescriptor.of(
+          ValueLayout.JAVA_INT,
+          ValueLayout.ADDRESS,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.ADDRESS,
+          ValueLayout.JAVA_LONG,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_INT,
+          ValueLayout.JAVA_FLOAT);
+
   private final Arena libraryArena;
   private final long capabilities;
   private final MemorySegment context;
@@ -296,6 +316,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private final DeferredCriticalCall groupedGatedDeltaNetHandle;
   private final MethodHandle setActiveThreadsHandle;
   private final DeferredCriticalCall groupedAttentionHandle;
+  private final DeferredCriticalCall headMajorAttentionHandle;
   private final DeferredCriticalCall bfloat16Handle;
   private final DeferredCriticalCall swiGluHandle;
   private final DeferredCriticalCall sigmoidSoftplusHandle;
@@ -325,6 +346,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
       DeferredCriticalCall groupedGatedDeltaNetHandle,
       MethodHandle setActiveThreadsHandle,
       DeferredCriticalCall groupedAttentionHandle,
+      DeferredCriticalCall headMajorAttentionHandle,
       DeferredCriticalCall bfloat16Handle,
       DeferredCriticalCall swiGluHandle,
       DeferredCriticalCall sigmoidSoftplusHandle,
@@ -343,6 +365,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
     this.groupedGatedDeltaNetHandle = groupedGatedDeltaNetHandle;
     this.setActiveThreadsHandle = setActiveThreadsHandle;
     this.groupedAttentionHandle = groupedAttentionHandle;
+    this.headMajorAttentionHandle = headMajorAttentionHandle;
     this.bfloat16Handle = bfloat16Handle;
     this.swiGluHandle = swiGluHandle;
     this.sigmoidSoftplusHandle = sigmoidSoftplusHandle;
@@ -473,6 +496,13 @@ public final class NativeKernelLibrary implements AutoCloseable {
                   "jmodels_grouped_attention_f32_with_context",
                   GROUPED_ATTENTION_DESCRIPTOR)
               : null;
+      DeferredCriticalCall headMajorAttention =
+          lookup.find("jmodels_head_major_attention_f32_with_context").isPresent()
+              ? deferredCritical(
+                  lookup,
+                  "jmodels_head_major_attention_f32_with_context",
+                  HEAD_MAJOR_ATTENTION_DESCRIPTOR)
+              : null;
       DeferredCriticalCall bfloat16 =
           (capabilityMask & NativeKernelCapability.BF16_F32_BATCHED_MATMUL.mask()) != 0
               ? deferredCritical(
@@ -525,6 +555,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
           groupedGatedDeltaNet,
           setActiveThreads,
           groupedAttention,
+          headMajorAttention,
           bfloat16,
           swiGlu,
           sigmoidSoftplus,
@@ -2123,6 +2154,54 @@ public final class NativeKernelLibrary implements AutoCloseable {
     } catch (NumberFormatException failure) {
       throw new IllegalArgumentException(
           POLL_MILLIS_PROPERTY + " must be an integer: " + configured, failure);
+    }
+  }
+
+  boolean supportsHeadMajorAttention() {
+    return headMajorAttentionHandle != null;
+  }
+
+  void headMajorAttentionF32(
+      float[] query,
+      float[] keys,
+      float[] values,
+      float[] output,
+      float[] scores,
+      int heads,
+      int width,
+      int capacity,
+      int positions,
+      float scale) {
+    if (headMajorAttentionHandle == null)
+      throw new UnsupportedOperationException("Native head-major attention unavailable");
+    selectWorkers(1);
+    try {
+      int status =
+          (int)
+              headMajorAttentionHandle
+                  .handle()
+                  .invokeExact(
+                      context,
+                      MemorySegment.ofArray(query),
+                      (long) query.length,
+                      MemorySegment.ofArray(keys),
+                      (long) keys.length,
+                      MemorySegment.ofArray(values),
+                      (long) values.length,
+                      MemorySegment.ofArray(output),
+                      (long) output.length,
+                      MemorySegment.ofArray(scores),
+                      (long) scores.length,
+                      heads,
+                      width,
+                      capacity,
+                      positions,
+                      scale);
+      if (status != 0)
+        throw new IllegalStateException(
+            "Native head-major attention failed: " + statusName(status));
+    } catch (Throwable failure) {
+      throw bridgeFailure("head-major attention", failure);
     }
   }
 

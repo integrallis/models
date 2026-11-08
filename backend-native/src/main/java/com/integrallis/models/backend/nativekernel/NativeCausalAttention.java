@@ -21,7 +21,7 @@ import java.util.Map;
 
 /** Owned continuous MHA prefix for the LLaVA decoder, sharing the dense GEMM implementation. */
 final class NativeCausalAttention implements BatchedCausalAttentionKernel {
-  private final com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel kernels;
+  private final RustGgufBatchedMatrixKernel kernels;
   private final NativeDebertaKernels dense;
   private float[] scores = new float[0];
   private final Map<Integer, Layer> layers = new HashMap<>();
@@ -31,18 +31,18 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
     final float[] keys;
     final float[] values;
     final int dimension;
+    final int heads;
     int positions;
 
-    Layer(int dimension, int capacity) {
-      this.dimension = dimension;
+    Layer(int heads, int width, int capacity) {
+      this.heads = heads;
+      this.dimension = Math.multiplyExact(heads, width);
       keys = new float[Math.multiplyExact(dimension, capacity)];
       values = new float[keys.length];
     }
   }
 
-  NativeCausalAttention(
-      com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel kernels,
-      NativeDebertaKernels dense) {
+  NativeCausalAttention(RustGgufBatchedMatrixKernel kernels, NativeDebertaKernels dense) {
     this.kernels = kernels;
     this.dense = dense;
   }
@@ -76,6 +76,7 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
         ? start == 0
         : state.positions == start
             && state.dimension == dimension
+            && state.heads == heads
             && state.keys.length == (long) capacity * state.dimension;
   }
 
@@ -102,37 +103,39 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
       throw new IllegalArgumentException("Attention buffer too small");
     if (output == query || output == key || output == value)
       throw new IllegalArgumentException("Attention output must not alias inputs");
-    Layer state = layers.computeIfAbsent(layer, ignored -> new Layer(dimension, capacity));
-    System.arraycopy(key, 0, state.keys, start * dimension, count);
-    System.arraycopy(value, 0, state.values, start * dimension, count);
+    Layer state = layers.computeIfAbsent(layer, ignored -> new Layer(heads, keyLength, capacity));
+    for (int row = 0; row < batch; row++) {
+      for (int head = 0; head < heads; head++) {
+        int source = row * dimension + head * keyLength;
+        int destination = (head * capacity + start + row) * keyLength;
+        System.arraycopy(key, source, state.keys, destination, keyLength);
+        System.arraycopy(value, source, state.values, destination, keyLength);
+      }
+    }
     if (batch > 1) {
       dense.causalAttention(
-          output, query, state.keys, state.values, batch, start + batch, dimension, heads);
+          output,
+          query,
+          state.keys,
+          state.values,
+          batch,
+          start + batch,
+          dimension,
+          heads,
+          capacity);
     } else {
       int needed = Math.multiplyExact(heads, start + 1);
       if (scores.length < needed) scores = new float[needed];
-      kernels.groupedAttention(
+      kernels.headMajorAttention(
           query,
-          0,
           state.keys,
-          0,
           state.values,
-          0,
-          start + 1,
-          null,
-          0,
-          null,
-          0,
-          0,
           output,
-          0,
           scores,
-          dimension,
-          dimension,
-          keyLength,
-          valueLength,
           heads,
-          kvHeads,
+          keyLength,
+          capacity,
+          start + 1,
           (float) (1.0 / Math.sqrt(keyLength)));
     }
     state.positions = start + batch;

@@ -47,10 +47,12 @@
       "jmodels_deberta_project",
       "jmodels_dense_attention",
       "jmodels_dense_causal_attention",
+      "jmodels_dense_causal_attention_head_major",
       "jmodels_dense_quick_gelu",
       "jmodels_gated_delta_net_f32_with_context",
       "jmodels_gated_delta_net_group_f32_with_context",
       "jmodels_grouped_attention_f32_with_context",
+      "jmodels_head_major_attention_f32_with_context",
       "jmodels_kernels_abi_version",
       "jmodels_kernels_capabilities",
       "jmodels_kernels_context_create",
@@ -558,13 +560,18 @@
       ],
       "exports": {
         "cpu": [
-          "jmodels_grouped_attention_f32_with_context"
+          "jmodels_grouped_attention_f32_with_context",
+          "jmodels_head_major_attention_f32_with_context"
         ]
       },
       "dispatch": [
         {
           "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGgufBatchedMatrixKernel.java",
           "anchor": "GROUPED_ATTENTION_F32"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeKernelLibrary.java",
+          "anchor": "jmodels_head_major_attention_f32_with_context"
         }
       ],
       "requiredProfiles": [
@@ -580,11 +587,17 @@
           "path": "benchmark-results/2026-09-15-granite-4.1-3b-alora-hybrid/preflight.md",
           "sha256": "98ce15ec320529f79f99dff698a2c9d2648c91d793698389adb228e74281abe1",
           "kind": "historical"
+        },
+        {
+          "path": "experiments/vision-catalog-qualification/results/headmajor-ab-2026-11-08/comparison.json",
+          "sha256": "4bc6cdb1d50bc1d0e6c374b9ce628c34e37fe84532896d9e2c4b20af7694f636",
+          "kind": "same-host-caption-diagnostic"
         }
       ],
       "remaining": [
         "Repeat matched current Java/Rust full-model attention measurements across contexts and head layouts.",
-        "Isolate compilation, arithmetic organization, memory reuse and dispatch."
+        "Isolate compilation, arithmetic organization, memory reuse and dispatch.",
+        "Complete full LLaVA frozen qualification for the head-major cache; caption parity and latency alone are not admission or proof of native necessity."
       ],
       "sourceScope": "cpu"
     },
@@ -961,7 +974,8 @@
           "jmodels_deberta_attend",
           "jmodels_dense_attention",
           "jmodels_dense_causal_attention",
-          "jmodels_dense_quick_gelu"
+          "jmodels_dense_quick_gelu",
+          "jmodels_dense_causal_attention_head_major"
         ]
       },
       "dispatch": [
@@ -996,6 +1010,10 @@
         {
           "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
           "anchor": "jmodels_dense_quick_gelu"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_dense_causal_attention_head_major"
         }
       ],
       "sourceScope": "deberta-f32-kernels",
@@ -1007,12 +1025,19 @@
         "windows-x86_64",
         "windows-aarch64"
       ],
-      "evidence": [],
+      "evidence": [
+        {
+          "path": "experiments/vision-catalog-qualification/results/headmajor-ab-2026-11-08/comparison.json",
+          "sha256": "4bc6cdb1d50bc1d0e6c374b9ce628c34e37fe84532896d9e2c4b20af7694f636",
+          "kind": "same-host-caption-diagnostic"
+        }
+      ],
       "remaining": [
         "Measure exact-checkpoint parity and all frozen performance buckets, including staging-copy costs.",
         "Adopt only with passing end-to-end quality and reranker regression; otherwise remove candidate production code.",
         "Complete platform checks and necessity review; no JVM limitation or catalog admission is claimed.",
-        "Retain CLIP/LLaVA encoder and decoder correctness plus matched-host performance receipts; complete supported-platform necessity review before PROVEN_REQUIRED."
+        "Retain CLIP/LLaVA encoder and decoder correctness plus matched-host performance receipts; complete supported-platform necessity review before PROVEN_REQUIRED.",
+        "Complete full LLaVA frozen qualification for the head-major cache; caption parity and latency alone are not admission or proof of native necessity."
       ]
     },
     {
@@ -1288,7 +1313,8 @@
       "backend-native/src/main/rust/model-kernels/src/sleef_activations.rs",
       "backend-native/src/main/rust/model-kernels/src/swiglu.rs",
       "build.gradle.kts",
-      "gradle.properties"
+      "gradle.properties",
+      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeCausalAttention.java"
     ],
     "cuda": [
       "backend-cuda/build.gradle.kts",
@@ -1517,7 +1543,9 @@
       "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeCausalAttention.java",
       "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeGgufMatrixKernelProvider.java",
       "backend-java/src/main/java/com/integrallis/models/backend/purejava/LlavaBackend.java",
-      "backend-java/src/main/java/com/integrallis/models/backend/purejava/vision/ClipVisionEncoder.java"
+      "backend-java/src/main/java/com/integrallis/models/backend/purejava/vision/ClipVisionEncoder.java",
+      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeKernelLibrary.java",
+      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGgufBatchedMatrixKernel.java"
     ],
     "onnx-executor-kernels": [
       "backend-native/src/main/rust/model-kernels/src/onnx_kernels.rs",

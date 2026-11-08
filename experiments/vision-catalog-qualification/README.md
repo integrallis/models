@@ -42,6 +42,14 @@ Failure, missing evidence, mismatched inputs or missing reference means no admis
 Do not tune selection, scoring or thresholds after observation. Runtime defects may
 be fixed, but every subsequent attempt gets a new source hash and output directory.
 
+## Native qualification payload
+
+Build the benchmark distribution with `./gradlew -PmodelsBenchNative=true
+:models-bench:installDist`. The default benchmark distribution intentionally omits
+the native provider. Collection checks for its class before reference encoding and
+checks the loaded native projection/attention plan before task inference. A
+fallback execution is invalid collection evidence, not a failed model gate.
+
 ## Catalog integration
 
 A passing backend result is necessary but insufficient: the ModelJars branch must

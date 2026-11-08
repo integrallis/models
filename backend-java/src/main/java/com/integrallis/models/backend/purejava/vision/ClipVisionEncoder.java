@@ -32,7 +32,7 @@ import java.util.Arrays;
  * <ul>
  *   <li>{@link com.integrallis.models.backend.purejava.ops.TensorOps#ggufBatchedMatmul} for linear
  *       projections
- *   <li>{@link com.integrallis.models.backend.purejava.ops.TensorOps#layerNorm} for pre-layer norms
+ *   <li>Wider moment accumulation for pre-layer normalization
  *   <li>{@link com.integrallis.models.backend.purejava.ops.TensorOps#softmax} for attention scores
  *   <li>{@link com.integrallis.models.backend.purejava.ops.TensorOps#geluErf} for FFN activation
  *   <li>{@link com.integrallis.vectors.core.VectorUtil#batchDotProductExact} and {@link
@@ -248,7 +248,8 @@ final class ClipVisionEncoder {
                     (from, to) -> {
                       for (int i = from * hiddenDim; i < to * hiddenDim; i++) {
                         feedForward[i] =
-                            (float) (feedForward[i] / (1.0 + Math.exp(-1.702 * feedForward[i])));
+                            feedForward[i]
+                                * (1.0f / (1.0f + (float) Math.exp(-1.702f * feedForward[i])));
                       }
                     }))
             .execute();
@@ -334,11 +335,27 @@ final class ClipVisionEncoder {
                 (from, to) -> {
                   for (int r = from; r < to; r++) {
                     int offset = r * dim;
-                    TensorOps.layerNorm(
-                        out, offset, in, offset, weight, bias, dim, config.layerNormEps());
+                    normalizeRow(out, in, offset, weight, bias, dim, config.layerNormEps());
                   }
                 }))
         .execute();
+  }
+
+  static void normalizeRow(
+      float[] out, float[] in, int offset, float[] weight, float[] bias, int size, float epsilon) {
+    double sum = 0;
+    for (int i = 0; i < size; i++) sum += in[offset + i];
+    double mean = sum / size;
+    double variance = 0;
+    for (int i = 0; i < size; i++) {
+      double centered = in[offset + i] - mean;
+      variance += centered * centered;
+    }
+    float center = (float) mean;
+    float scale = (float) (1.0 / Math.sqrt(variance / size + epsilon));
+    for (int i = 0; i < size; i++) {
+      out[offset + i] = (in[offset + i] - center) * scale * weight[i] + bias[i];
+    }
   }
 
   private void project(

@@ -32,12 +32,15 @@ int main(int argc, char **argv) {
     auto cp=llama_context_default_params(); cp.n_ctx=1024; cp.n_batch=capacity; cp.n_ubatch=capacity;
     cp.n_threads=threads; cp.n_threads_batch=threads;
     cp.type_k=kv=="f32" ? GGML_TYPE_F32 : GGML_TYPE_F16; cp.type_v=cp.type_k;
+    // Preserve the frozen reference route explicitly. AUTO casts F32 cache values
+    // to F16 inside Flash Attention; kvType describes storage, not arithmetic.
+    cp.flash_attn_type=LLAMA_FLASH_ATTN_TYPE_AUTO;
     auto ctx=llama_init_from_model(model,cp); if (!ctx) return 3;
     int dim=llama_model_n_embd(model); auto vocab=llama_model_get_vocab(model); int nv=llama_vocab_n_tokens(vocab);
     auto tb=llama_batch_init(capacity,0,1); auto eb=llama_batch_init(capacity,dim,1);
     std::cout << "{\"configuration\":{\"threads\":" << threads
       << ",\"context\":1024,\"maximumOutputTokens\":32,\"batch\":" << capacity
-      << ",\"kvType\":\"" << kv << "\",\"loadMs\":" << ms(loaded) << "}}" << std::endl;
+      << ",\"kvType\":\"" << kv << "\",\"flashAttention\":\"" << "auto" << "\",\"loadMs\":" << ms(loaded) << "}}" << std::endl;
     std::ifstream cases(argv[2]); if (!cases) throw std::runtime_error("missing cases");
     std::string line;
     while (std::getline(cases,line)) {

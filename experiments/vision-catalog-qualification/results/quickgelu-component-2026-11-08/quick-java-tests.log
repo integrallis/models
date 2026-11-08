@@ -1,0 +1,36 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+
+Thanks for using JUnit! Support its development at https://junit.org/sponsoring
+
+Nov 08, 2026 6:20:49 AM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 08, 2026 6:20:49 AM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=countdown ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+[36m╷[0m
+[36m├─[0m [36mJUnit Platform Suite[0m [32m✔[0m
+[36m├─[0m [36mJUnit Jupiter[0m [32m✔[0m
+[36m│  └─[0m [36mNativeDebertaKernelsTest[0m [32m✔[0m
+[36m│     ├─[0m [34mcausalAttentionPreservesPrefixThroughChunksDecodeResetAndRewind()[0m [32m✔[0m
+[36m│     ├─[0m [34mcausalAttentionRejectsAliasingBeforeNativeDispatch()[0m [32m✔[0m
+[36m│     ├─[0m [34mdisentangledAttentionMatchesIndependentScalarCalculationAndRejectsBadIndices()[0m [32m✔[0m
+[36m│     ├─[0m [34mretainedAttentionRejectsOversizedShapesAndAliasingWithoutAdvancing()[0m [32m✔[0m
+[36m│     ├─[0m [34mdenseAttentionMatchesScalarWithUnevenHeadsAndReusesScratch()[0m [32m✔[0m
+[36m│     ├─[0m [34mquickGeluMatchesDoublePrecisionOnRaggedAndParallelInputs()[0m [32m✔[0m
+[36m│     ├─[0m [34mquickGeluMatchesUpstreamFloat32Graph()[0m [32m✔[0m
+[36m│     └─[0m [34mprojectsUnevenBatchesAndReusesBuffersWithoutWritingPastOutput()[0m [32m✔[0m
+[36m└─[0m [36mJUnit Vintage[0m [32m✔[0m
+
+Test run finished after 404 ms
+[         4 containers found      ]
+[         0 containers skipped    ]
+[         4 containers started    ]
+[         0 containers aborted    ]
+[         4 containers successful ]
+[         0 containers failed     ]
+[         8 tests found           ]
+[         0 tests skipped         ]
+[         8 tests started         ]
+[         0 tests aborted         ]
+[         8 tests successful      ]
+[         0 tests failed          ]
+

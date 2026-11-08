@@ -28,6 +28,7 @@ class ProtocolTest(unittest.TestCase):
     def fixture(self, root):
         manifest = json.loads(Path(__file__).with_name("manifest.json").read_text())
         configuration = dict(host="fixture", threads=8, context=1024, maximumOutputTokens=32, revision="a" * 40, kvType="f32")
+        configuration["diagnostics"] = dict(environment={"vision-projections": "rust-fixture", "decoder-attention": "NativeCausalAttention"})
         variant = "Q4_K_S"
         destination = root / variant
         (destination / "candidate").mkdir(parents=True)
@@ -59,6 +60,24 @@ class ProtocolTest(unittest.TestCase):
                         (directory / "runs.json").write_text(json.dumps(rows))
         (destination / "reference.jsonl").write_text("\n".join(map(json.dumps, references)))
         return dict(cases=cases), manifest, variant
+
+    def test_java_fallback_cannot_be_claimed_as_native_qualification(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            corpus, manifest, variant = self.fixture(root)
+            path = root / "receipt.json"
+            receipt = json.loads(path.read_text()); receipt.update(schema=2, referenceFlashAttention="auto")
+            path.write_text(json.dumps(receipt))
+            path = root / variant / "reference.jsonl"
+            rows = [json.loads(line) for line in path.read_text().splitlines()]
+            rows[0]["configuration"]["flashAttention"] = "auto"
+            path.write_text("\n".join(map(json.dumps, rows)))
+            path = root / variant / "candidate/configuration.json"
+            config = json.loads(path.read_text())
+            config["diagnostics"]["environment"] = {"vision-projections": "vector-api", "decoder-attention": "NoKernel"}
+            path.write_text(json.dumps(config))
+            with self.assertRaisesRegex(ValueError, "requires native"):
+                compare.evaluate(corpus, manifest, root, variant, Evaluator())
 
     def test_complete_paired_evidence_passes(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -104,6 +123,26 @@ class ProtocolTest(unittest.TestCase):
             compare.median([dict(latency=float("nan"))], "latency")
         with self.assertRaises(ValueError):
             compare.measured([dict(run=0)], dict(id="x", warmups=1, repetitions=3))
+
+    def test_new_receipt_requires_the_explicit_frozen_attention_route(self):
+        for mode in [None, "auto", "disabled"]:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                corpus, manifest, variant = self.fixture(root)
+                path = root / "receipt.json"
+                receipt = json.loads(path.read_text())
+                receipt.update(schema=2, referenceFlashAttention="auto")
+                path.write_text(json.dumps(receipt))
+                path = root / variant / "reference.jsonl"
+                rows = [json.loads(line) for line in path.read_text().splitlines()]
+                if mode is not None:
+                    rows[0]["configuration"]["flashAttention"] = mode
+                path.write_text("\n".join(map(json.dumps, rows)))
+                if mode == "auto":
+                    self.assertTrue(compare.evaluate(corpus, manifest, root, variant, Evaluator())["taskQualified"])
+                else:
+                    with self.assertRaisesRegex(ValueError, "frozen AUTO"):
+                        compare.evaluate(corpus, manifest, root, variant, Evaluator())
 
 
 if __name__ == "__main__":

@@ -58,6 +58,13 @@ def evaluate(corpus, manifest, output, variant, evaluator):
         for key in ["threads", "context", "maximumOutputTokens"]:
             require(config[key] == manifest[key], "Execution setting mismatch: " + key)
     require(reference_config["kvType"] == receipt["kvType"] == "f32", "KV mismatch")
+    if receipt.get("schema", 1) >= 2:
+        require(reference_config.get("flashAttention") == receipt.get("referenceFlashAttention") == "auto",
+                "Reference must preserve frozen AUTO attention execution")
+        environment = candidate_config.get("diagnostics", {}).get("environment", {})
+        require(environment.get("vision-projections", "").startswith("rust-")
+                and environment.get("decoder-attention") == "NativeCausalAttention",
+                "Frozen qualification requires native projections and attention")
     require(encoder_config["threads"] == manifest["threads"], "Encoder threads mismatch")
     require({row["id"] for row in reference} == {case["id"] for case in cases}, "Reference case coverage mismatch")
     case_results, timings, disagreements = [], [], []

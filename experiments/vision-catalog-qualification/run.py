@@ -7,6 +7,7 @@ import platform
 import socket
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 
@@ -24,6 +25,15 @@ def main():
     if platform.system() != "Linux":
         raise SystemExit("Use the remote Linux worker")
     root, distribution, reference = [Path(p).resolve() for p in sys.argv[1:4]]
+    provider = "com/integrallis/models/backend/nativekernel/NativeDenseProjectionProvider.class"
+    native_runtime = False
+    for jar in distribution.glob("lib/*.jar"):
+        if jar.name.startswith("._"):
+            continue
+        with zipfile.ZipFile(jar) as archive:
+            native_runtime |= provider in archive.namelist()
+    if not native_runtime:
+        raise ValueError("Missing native runtime: build with -PmodelsBenchNative=true")
     revision = sys.argv[4]
     if len(revision) != 40 or any(c not in "0123456789abcdef" for c in revision):
         raise ValueError("Full immutable source commit required")
@@ -34,7 +44,7 @@ def main():
     output = root / "results"
     output.mkdir(exist_ok=False)
     native = Path(os.environ["VISION_NATIVE_LIBRARY"]).resolve()
-    receipt = dict(schema=1, host=socket.gethostname(), revision=revision,
+    receipt = dict(schema=2, referenceFlashAttention="auto", host=socket.gethostname(), revision=revision,
                    manifestSha256=digest(script / "manifest.json"), corpusSha256=digest(corpus),
                    nativeSha256=digest(native), threads=manifest["threads"], context=1024,
                    maximumOutputTokens=32, kvType="f32",

@@ -606,6 +606,71 @@ pub unsafe extern "C" fn jmodels_dense_causal_attention(
     dim: usize,
     heads: usize,
 ) -> i32 {
+    unsafe {
+        dense_causal_attention_impl(
+            handle, query, query_len, key, key_len, value, value_len, out, out_len, batch,
+            positions, dim, heads, None,
+        )
+    }
+}
+
+/// Batched causal attention with an explicit head-major cache capacity.
+/// # Safety
+/// Pointers must cover their advertised lengths and output cannot alias inputs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_dense_causal_attention_head_major(
+    handle: u64,
+    query: *const f32,
+    query_len: usize,
+    key: *const f32,
+    key_len: usize,
+    value: *const f32,
+    value_len: usize,
+    out: *mut f32,
+    out_len: usize,
+    batch: usize,
+    positions: usize,
+    dim: usize,
+    heads: usize,
+    capacity: usize,
+) -> i32 {
+    unsafe {
+        dense_causal_attention_impl(
+            handle,
+            query,
+            query_len,
+            key,
+            key_len,
+            value,
+            value_len,
+            out,
+            out_len,
+            batch,
+            positions,
+            dim,
+            heads,
+            Some(capacity),
+        )
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+unsafe fn dense_causal_attention_impl(
+    handle: u64,
+    query: *const f32,
+    query_len: usize,
+    key: *const f32,
+    key_len: usize,
+    value: *const f32,
+    value_len: usize,
+    out: *mut f32,
+    out_len: usize,
+    batch: usize,
+    positions: usize,
+    dim: usize,
+    heads: usize,
+    capacity: Option<usize>,
+) -> i32 {
     catch_unwind(AssertUnwindSafe(|| {
         if batch == 0
             || positions < batch
@@ -621,7 +686,11 @@ pub unsafe extern "C" fn jmodels_dense_causal_attention(
         let Some(qn) = batch.checked_mul(dim) else {
             return -1;
         };
-        let Some(kn) = positions.checked_mul(dim) else {
+        let cache_positions = capacity.unwrap_or(positions);
+        if cache_positions < positions {
+            return -1;
+        }
+        let Some(kn) = cache_positions.checked_mul(dim) else {
             return -1;
         };
         let Some(sn) = batch.checked_mul(positions) else {
@@ -641,6 +710,12 @@ pub unsafe extern "C" fn jmodels_dense_causal_attention(
         let (qp, kp, vp, yp) = (query as usize, key as usize, value as usize, out as usize);
         let width = dim / heads;
         let scale = 1.0 / (width as f32).sqrt();
+        let row_stride = if capacity.is_some() { width } else { dim };
+        let head_stride = if capacity.is_some() {
+            cache_positions * width
+        } else {
+            width
+        };
         pool.install(|| {
             (0..heads).into_par_iter().for_each(|head| {
                 ATTENTION_SCRATCH.with(|cell| {
@@ -656,9 +731,9 @@ pub unsafe extern "C" fn jmodels_dense_causal_attention(
                             (qp as *const f32).add(head * width),
                             dim as isize,
                             1,
-                            (kp as *const f32).add(head * width),
+                            (kp as *const f32).add(head * head_stride),
                             1,
-                            dim as isize,
+                            row_stride as isize,
                             0.0,
                             scores.as_mut_ptr(),
                             positions as isize,
@@ -678,8 +753,8 @@ pub unsafe extern "C" fn jmodels_dense_causal_attention(
                             scores.as_ptr(),
                             positions as isize,
                             1,
-                            (vp as *const f32).add(head * width),
-                            dim as isize,
+                            (vp as *const f32).add(head * head_stride),
+                            row_stride as isize,
                             1,
                             0.0,
                             (yp as *mut f32).add(head * width),
@@ -730,7 +805,7 @@ pub unsafe extern "C" fn jmodels_dense_quick_gelu(
                     return;
                 }
                 for x in values {
-                    *x = (*x as f64 / (1.0 + (-1.702 * *x as f64).exp())) as f32;
+                    *x *= 1.0 / (1.0 + (-1.702_f32 * *x).exp());
                 }
             })
         });
@@ -752,16 +827,84 @@ unsafe fn quick_gelu_avx2(values: &mut [f32]) {
             let x = _mm256_loadu_ps(ptr);
             let denominator =
                 _mm256_add_ps(one, super::onnx_kernels::exp8(_mm256_mul_ps(scale, x)));
-            _mm256_storeu_ps(ptr, _mm256_div_ps(x, denominator));
+            _mm256_storeu_ps(ptr, _mm256_mul_ps(x, _mm256_div_ps(one, denominator)));
         }
     }
     for x in &mut values[end..] {
-        *x = (*x as f64 / (1.0 + (-1.702 * *x as f64).exp())) as f32;
+        *x *= 1.0 / (1.0 + (-1.702_f32 * *x).exp());
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn head_major_prefill_preserves_gemm_results_with_unused_capacity() {
+        let handle = jmodels_deberta_create(3);
+        assert_ne!(handle, 0);
+        let (batch, positions, heads, width, capacity) = (8, 13, 3, 16, 17);
+        let dim = heads * width;
+        let query: Vec<f32> = (0..batch * dim)
+            .map(|i| (i % 19) as f32 * 0.1 - 1.0)
+            .collect();
+        let keys: Vec<f32> = (0..capacity * dim)
+            .map(|i| (i % 23) as f32 * 0.09 - 1.0)
+            .collect();
+        let values: Vec<f32> = (0..keys.len())
+            .map(|i| (i % 17) as f32 * 0.11 - 1.0)
+            .collect();
+        let mut head_keys = vec![0.0; keys.len()];
+        let mut head_values = head_keys.clone();
+        for row in 0..capacity {
+            for head in 0..heads {
+                let a = row * dim + head * width;
+                let b = (head * capacity + row) * width;
+                head_keys[b..b + width].copy_from_slice(&keys[a..a + width]);
+                head_values[b..b + width].copy_from_slice(&values[a..a + width]);
+            }
+        }
+        let mut expected = vec![0.0; query.len()];
+        let mut actual = expected.clone();
+        let old = unsafe {
+            jmodels_dense_causal_attention(
+                handle,
+                query.as_ptr(),
+                query.len(),
+                keys.as_ptr(),
+                keys.len(),
+                values.as_ptr(),
+                values.len(),
+                expected.as_mut_ptr(),
+                expected.len(),
+                batch,
+                positions,
+                dim,
+                heads,
+            )
+        };
+        let new = unsafe {
+            jmodels_dense_causal_attention_head_major(
+                handle,
+                query.as_ptr(),
+                query.len(),
+                head_keys.as_ptr(),
+                head_keys.len(),
+                head_values.as_ptr(),
+                head_values.len(),
+                actual.as_mut_ptr(),
+                actual.len(),
+                batch,
+                positions,
+                dim,
+                heads,
+                capacity,
+            )
+        };
+        assert_eq!(old, 0);
+        assert_eq!(new, 0);
+        assert_eq!(actual, expected);
+        jmodels_deberta_destroy(handle);
+    }
+
     use super::*;
     #[test]
     fn destroying_pool_waits_for_worker_thread_local_cleanup() {
