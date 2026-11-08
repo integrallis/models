@@ -80,3 +80,14 @@ For decode optimization A/B use the original caption inputs, eight threads, thre
 warmups and seven measured generations in baseline/candidate/baseline order.
 Compare every token sequence; report both baseline medians and raw distributions.
 A/B timing is diagnostic; final admission retains its original schedules.
+
+## SIMD result and full-corpus candidate
+
+The scale-broadcast experiment preserves all 30 generated sequences but does not
+improve decode: candidate median 4012.566 ms versus 4002.542 ms and 4002.233 ms
+in the two baselines (ratios 1.002504 and 1.002582). Remove the experimental
+production code; preserve the raw A/B evidence. The next full frozen workload
+uses only wider CLIP normalization moments with the original native kernels.
+Reuse the exact archived 80-image corpus, verifying its manifest and image hashes,
+rather than selecting or preprocessing new inputs. Collect both quantizations,
+both reference KV types and the declared integration schedules on this worker.

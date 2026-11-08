@@ -6447,8 +6447,7 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
         let scales = &weights[weight_offset + 4..weight_offset + 16];
         let quants = weights.as_ptr().wrapping_add(weight_offset + 16);
         let mut quantized_lanes = _mm256_setzero_si256();
-        let (_, mins_and_scales) = qk_unpack_scales_and_mins(scales);
-        let scale_lanes = _mm256_broadcastsi128_si256(_mm256_castsi256_si128(mins_and_scales));
+        let (scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
         // SAFETY: every block carries QK_K / Q8_K_SUM_BLOCK = 16 activation sums.
         let min_products = unsafe {
             qk_block_minimum_products(
@@ -6469,18 +6468,8 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
             let low_products = unsafe { unsigned_signed_products_avx2(low, low_activation) };
             // SAFETY: every activation group contains 32 signed bytes.
             let high_products = unsafe { unsigned_signed_products_avx2(high, high_activation) };
-            // Broadcast the selected i16 scale inside SIMD registers. Extracting each
-            // lane through a scalar register adds eight vector/scalar crossings per block.
-            let low_byte = (pair * 4) as i16;
-            let high_byte = low_byte + 2;
-            let low_scale = _mm256_shuffle_epi8(
-                scale_lanes,
-                _mm256_set1_epi16(low_byte | ((low_byte + 1) << 8)),
-            );
-            let high_scale = _mm256_shuffle_epi8(
-                scale_lanes,
-                _mm256_set1_epi16(high_byte | ((high_byte + 1) << 8)),
-            );
+            let low_scale = _mm256_set1_epi16(scale_values[pair * 2]);
+            let high_scale = _mm256_set1_epi16(scale_values[pair * 2 + 1]);
             quantized_lanes =
                 _mm256_add_epi32(quantized_lanes, _mm256_madd_epi16(low_products, low_scale));
             quantized_lanes = _mm256_add_epi32(
