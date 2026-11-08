@@ -17,6 +17,9 @@ package com.integrallis.models.backend.nativekernel;
 
 import static org.assertj.core.api.Assertions.*;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -73,6 +76,38 @@ class NativeDebertaKernelsTest {
       }
       attention.attend(new float[4], query, key, value, 0, 0, 2, 1, 1, 2, 2, 4, 0);
       assertThat(attention.isEligible(0, 2, 1, 1, 1, 2, 2, 4, 0)).isTrue();
+    }
+  }
+
+  @Test
+  void quickGeluMatchesUpstreamFloat32Graph() throws IOException {
+    float[] values = readQuickGeluFixture("input.f32");
+    float[] expected = readQuickGeluFixture("torch.f32");
+    assertThat(values).hasSize(4097);
+    assertThat(expected).hasSameSizeAs(values);
+    try (var kernels =
+        NativeDebertaKernels.load(
+            Path.of(System.getProperty("models.native.kernels.library")), 3)) {
+      assertThat(kernels.quickGelu(values)).isTrue();
+      double squaredError = 0;
+      for (int i = 0; i < values.length; i++) {
+        double error = (double) values[i] - expected[i];
+        squaredError += error * error;
+        assertThat(Math.abs(error)).isLessThanOrEqualTo(5e-7);
+      }
+      assertThat(Math.sqrt(squaredError / values.length)).isLessThanOrEqualTo(2e-8);
+    }
+  }
+
+  private static float[] readQuickGeluFixture(String name) throws IOException {
+    try (var input =
+        NativeDebertaKernelsTest.class.getResourceAsStream("/quick-gelu-torch/" + name)) {
+      if (input == null) throw new IOException("Missing QuickGELU fixture: " + name);
+      var buffer =
+          ByteBuffer.wrap(input.readAllBytes()).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer();
+      float[] values = new float[buffer.remaining()];
+      buffer.get(values);
+      return values;
     }
   }
 
