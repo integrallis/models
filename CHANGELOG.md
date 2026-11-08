@@ -4,6 +4,35 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.18] - 2026-11-08
+
+### Fixed
+
+- Match the pinned LLaVA reference's CLIP patch layout, affine accumulation,
+  normalization and activation arithmetic, and its decoder RMS, SwiGLU and
+  attention arithmetic. Keep the Java graph and cache lifecycle with bounded
+  Models-owned native kernels.
+- Preserve the complete KV prefix when pruning final-layer prefill queries.
+  Round newly appended image-decoder cache rows once and borrow the retained
+  Java-owned prefix instead of copying and rounding the full history per token.
+
+### Changed
+
+- Reuse projection loads across rows without changing reduction order. Add
+  independent numerical fixtures, per-quantization worker receipts and source
+  preview checks binding the measured native binary to the public consumer.
+
+### Qualification and dependencies
+
+- Catalog admission remains separate from library publication. The frozen
+  vision task, numerical, performance and released-consumer gates remain in
+  force; measured results live in `experiments/vision-catalog-qualification`.
+- Retain released Vectors 0.1.33; no unreleased Vectors changes are required.
+- `backend-cuda` remains opt-in and its numeric path is unchanged. The last
+  recorded G1 result is exact-token parity on RTX 4090; G4 is 6.184x against a
+  3.00x gate. Device gates were not rerun for this release; prior evidence is in
+  `benchmark-results/2026-10-07-g4-dualpath`. No CUDA vision qualification is claimed.
+
 ## [0.5.17] - 2026-11-08
 
 ### Fixed
