@@ -11,6 +11,8 @@ mod bfloat16;
 #[cfg(target_arch = "aarch64")]
 mod sleef_activations;
 mod swiglu;
+#[cfg(test)]
+mod attention_layout_bench;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::slice;
@@ -573,6 +575,8 @@ struct AttentionJob {
     value_dim: usize,
     key_length: usize,
     value_length: usize,
+    key_head_stride: usize,
+    value_head_stride: usize,
     num_heads: usize,
     num_kv_heads: usize,
     scale: f32,
@@ -1179,7 +1183,7 @@ unsafe fn execute_attention_partition(
                 let keys = unsafe {
                     slice::from_raw_parts(
                         (job.keys[span] as *const f32)
-                            .add(job.key_offsets[span] + kv * job.key_length),
+                            .add(job.key_offsets[span] + kv * job.key_head_stride),
                         (positions - 1) * job.key_dim + job.key_length,
                     )
                 };
@@ -1200,7 +1204,7 @@ unsafe fn execute_attention_partition(
                 let values = unsafe {
                     slice::from_raw_parts(
                         (job.values[span] as *const f32)
-                            .add(job.value_offsets[span] + kv * job.value_length),
+                            .add(job.value_offsets[span] + kv * job.value_head_stride),
                         (positions - 1) * job.value_dim + job.value_length,
                     )
                 };
@@ -2148,6 +2152,8 @@ pub unsafe extern "C" fn jmodels_grouped_attention_f32_with_context(
         value_dim,
         key_length,
         value_length,
+        key_head_stride: key_length,
+        value_head_stride: value_length,
         num_heads,
         num_kv_heads,
         scale,

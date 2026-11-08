@@ -98,3 +98,17 @@ invalid attempt before any task case completed. This is a collection error, not
 a model verdict. Rebuild using `-PmodelsBenchNative=true`, require the native
 execution plan before inference, and start a fresh result directory with the
 same inputs. The evidence evaluator independently rejects a fallback plan.
+
+## Cache-layout diagnostic, to run only after admission collection stops
+
+Both arithmetic-level experiments produced negligible decode benefit. Test whether
+F32 attention's token-major cache stride limits throughput before changing the
+shipping cache. An ignored remote-only synthetic benchmark compares token-major,
+16-float row padding, head-major, and token-major repeat with identical 32-head,
+128-wide inputs at 64/606/1024 positions and eight workers. All outputs must be
+bit-identical. Record seven samples of thirty calls after twenty warmups, both
+with warm caches and a separately labeled controller-only 64 MiB eviction (not
+a guarantee of eviction from every worker cache). This is component evidence,
+never model qualification. Public ABI and default layout remain unchanged. Only
+a substantial measured gain warrants integrating a new layout and rerunning the
+full workload; do not overlap this experiment with the current admission run.
