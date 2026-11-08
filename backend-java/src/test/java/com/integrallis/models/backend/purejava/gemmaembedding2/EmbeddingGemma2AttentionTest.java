@@ -63,7 +63,7 @@ class EmbeddingGemma2AttentionTest {
     int heads = 4;
     var attention = new EmbeddingGemma2Attention(heads);
     var random = new java.util.Random(390);
-    for (int count : new int[] {3, 33, 7, 65, 1}) {
+    for (int count : new int[] {3, 127, 128, 7, 129, 1}) {
       for (int kvHeads : new int[] {1, 2, 4}) {
         for (int width : new int[] {16, 32}) {
           for (int window : new int[] {0, 4, 9}) {
