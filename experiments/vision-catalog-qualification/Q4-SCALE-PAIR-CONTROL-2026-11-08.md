@@ -25,3 +25,17 @@ diagnostic gain is not catalog admission. Keep all rejected results separately.
 The existing 0.5.16 release dry run may continue, but do not label these experimental
 sources as released or qualified. No extra cloud spend is authorized by this file;
 provisioning requires its own control record within the existing campaign cap.
+
+## Outcome: rejected
+
+The complete diagnostic recorded caption decode medians of 3863.366 / 3921.200 /
+3863.722 ms and short-answer medians of 249.079 / 248.056 / 243.943 ms. All token
+sequences match, but caption decode regresses 1.5% and short-answer variation is
+within baseline drift. Do not promote this implementation. The benefit marker was
+never created and no full admission repeat was started.
+
+Evidence-only commit `0f37b81d` and Models PR #385 retain the raw measurements and
+cleanup receipt. The archive checksum is
+`02e0b48bc8f26741d96b53a391d1c32c70e60502649a1a2b0b6d42c84a17c9bd`.
+The worker, security group and key were deleted after archive verification at
+2026-11-08 08:31:28 UTC. Models 0.5.16 excludes this candidate.
