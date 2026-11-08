@@ -98,7 +98,7 @@ def main():
             image = root/'campaign'/cases[identity]['image']
             assert sha(image) == cases[identity]['imageSha256']
             run([*base, 'com.integrallis.models.bench.VisionQualificationCli',
-                 root/'campaign/artifacts/llava-v1.5-7b-mmproj-model-f16.gguf', image, native_encoder, '0', '1'],
+                 root/'campaign/artifacts/llava-v1.5-7b-mmproj-model-f16.gguf', image, native_encoder, '1', '3'],
                 native_encoder.parent/(identity+'.log'))
         vectors = dict(models=native_encoder/'embeddings.f32',
                        reference=inputs/'encoder'/identity/'embeddings.f32')
