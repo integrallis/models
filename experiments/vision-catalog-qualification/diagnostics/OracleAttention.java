@@ -31,7 +31,10 @@ final class OracleAttention implements BatchedCausalAttentionKernel {
     var state = layers.get(layer);
     if (state == null ? start != 0 : state.positions()[0] != start || state.heads() != heads ||
         state.width() != keyLength || state.capacity() != capacity)
-      throw new IllegalArgumentException("Discontinuous diagnostic attention");
+      throw new IllegalArgumentException("Discontinuous diagnostic attention: layer=" + layer
+          + " start=" + start + " batch=" + batch + " heads=" + heads + " width=" + keyLength
+          + " capacity=" + capacity + " state=" + state
+          + " previousPosition=" + (state == null ? -1 : state.positions()[0]));
     return true;
   }
 
