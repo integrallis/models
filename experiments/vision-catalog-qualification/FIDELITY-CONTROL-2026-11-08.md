@@ -298,3 +298,16 @@ did not implement this distinction. This is a precision diagnostic, not a passin
 F32-kernel contract or admission claim. Retain a precision change only after its
 public contract, independent numerical checks, full accuracy and performance gates
 are verified. No question-dependent paths, answer rewriting or gate relaxation.
+
+## Q6 block-view performance diagnostic
+
+Before terminating the primary, test the same validated fixed-size block-view
+simplification in the Q6_K decode row loop (812f6eda). The original profile assigns
+16.6% of CPU samples to Q6_K. Floating/integer arithmetic and reduction order remain
+unchanged; no new runtime mode or unchecked indexing. Require 63 native tests and
+Clippy, then the existing caption original/candidate/original schedule (3 warmups,
+7 repetitions), all 30 token sequences equal. Compare against retained 3f31646c
+native kernels with the same head-major Java decoder payload. Reject negligible
+benefit or regression. This sequential diagnostic does not overlap the frozen
+repeat on the other worker or change its evidence. Keep the existing deadline
+and USD 6 combined ceiling; archive and terminate the primary immediately afterward.
