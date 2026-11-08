@@ -21,10 +21,11 @@ template<class T> static std::vector<T> read(const char *path) {
     if (!f) throw std::runtime_error("short input"); return v;
 }
 int main(int argc, char **argv) {
-    if (argc != 4) { std::cerr << "model cases.tsv threads\n"; return 2; }
+    if (argc != 4 && argc != 5) { std::cerr << "model cases.tsv threads [f32|f16]\n"; return 2; }
     int threads=std::stoi(argv[3]), capacity=128;
     if (threads<1) return 2;
-    std::string kv="f32";
+    std::string kv=argc==5 ? argv[4] : "f32";
+    if (kv!="f32" && kv!="f16") return 2;
     auto loaded=clock_type::now();
     llama_backend_init(); auto mp=llama_model_default_params(); mp.n_gpu_layers=0;
     auto model=llama_model_load_from_file(argv[1],mp); if (!model) return 3;
