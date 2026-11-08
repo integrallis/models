@@ -4,6 +4,46 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.15] - 2026-11-08
+
+### Added
+
+- LLaVA 1.5 image-question inference through `ImageInferenceBackend`,
+  `LlavaBackend.load(textGguf, mmprojGguf)` and a two-file `PureJavaBackend.load`
+  overload. The supported profile is the converted 23-block CLIP encoder with an
+  MLP projector. Image preprocessing, projection, decoder prefill and model ownership
+  use the public runtime path. Incompatible projectors, including Qwen3-VL, are rejected.
+- Reproducible vision qualification with pinned public VQAv2/TextVQA subsets, paired
+  blank-image controls, independent PyTorch encoding and external llama.cpp decoder
+  comparisons. The comparator is not linked into or distributed with the runtime.
+
+### Changed
+
+- Retain native dense vision projections and attention, packed Q4_K rows with the
+  original reduction contract, tiled Q6_K prefill, shared activation preparation and
+  coordinated worker pools. Remove the rejected load-time Q8 conversion path.
+- Reuse Qwen3.5 decode scratch across a session instead of allocating it per token
+  (#374). Resolve byte-fallback tokens once and skip impossible tokenizer probe
+  lengths (#375).
+- Separate preprocessing, weight loading, prefill and benchmark orchestration, and
+  strengthen native attention input validation and load-failure cleanup.
+
+### Qualification and dependencies
+
+- **This library release does not qualify the LLaVA catalog candidates.** On the
+  frozen pre-merge workload, both quantizations pass answer-accuracy gates but fail
+  the 99% token-sequence agreement and faster-reference decode-performance gates.
+  All measured results and the crossed diagnostics remain in
+  `experiments/vision-catalog-qualification/results/2026-11-08`. No public model
+  admission or released-runtime qualification is asserted by shipping the API.
+- Retain released Vectors 0.1.33, whose Central JAR matches the measured dependency.
+  Later Vectors main-branch changes are outside this release and are not needed by
+  this runtime. No source-composite dependency is published.
+- `backend-cuda` remains opt-in and its numeric path is unchanged. The last recorded
+  G1 result is exact-token parity on RTX 4090; G4 is 6.184x against a 3.00x gate.
+  Device gates were not rerun for this release; the prior evidence remains under
+  `benchmark-results/2026-10-07-g4-dualpath`.
+
 ## [0.5.14] - 2026-11-04
 
 ### Fixed
