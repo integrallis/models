@@ -26,17 +26,28 @@ static void write(const std::filesystem::path &path, const float *values, size_t
     if (!f) throw std::runtime_error("trace write failed");
 }
 
-struct Trace { std::filesystem::path output; bool active = false; };
+struct Trace { std::filesystem::path output; bool active = false; int position = 0; };
 static bool observe(ggml_tensor *tensor, bool ask, void *data) {
     auto &trace = *static_cast<Trace *>(data);
     std::string name = tensor->name;
-    bool selected = trace.active && (name.rfind("l_out-", 0) == 0 ||
+    bool cache = name=="Qcur-0" || name=="Kcur-0" || name=="Vcur-0";
+    bool selected = cache || trace.active && (name.rfind("l_out-", 0) == 0 ||
         (name.size()>2 && name.substr(name.size()-2)=="-0"));
     if (ask) return selected;
     if (!selected) return true;
     if (tensor->type != GGML_TYPE_F32 || tensor->nb[0] != sizeof(float)) return true;
     std::vector<float> values(ggml_nbytes(tensor)/sizeof(float));
     ggml_backend_tensor_get(tensor, values.data(), 0, values.size()*sizeof(float));
+    if (cache) {
+        if (!ggml_is_contiguous(tensor)) throw std::runtime_error("noncontiguous QKV");
+        auto path = trace.output / (name+"-all.f32");
+        if (!std::filesystem::exists(path)) { std::ofstream create(path, std::ios::binary); }
+        std::fstream all(path, std::ios::in | std::ios::out | std::ios::binary);
+        all.seekp(static_cast<long long>(trace.position)*tensor->ne[0]*tensor->ne[1]*sizeof(float));
+        all.write(reinterpret_cast<const char *>(values.data()), values.size()*sizeof(float));
+        if (!all) throw std::runtime_error("QKV trace write failed");
+    }
+    if (!trace.active) return true;
     write(trace.output / (name + ".f32"), values.data(), values.size());
     std::ofstream shape(trace.output / (name + ".shape.json"));
     shape << "[" << tensor->ne[0] << "," << tensor->ne[1] << "," << tensor->ne[2] << "," << tensor->ne[3] << "]";
@@ -70,7 +81,7 @@ int main(int argc, char **argv) {
         throw std::runtime_error("invalid context shape");
     auto tb = llama_batch_init(128, 0, 1), eb = llama_batch_init(128, dim, 1);
     auto submit = [&](llama_batch &batch, int n, bool final) {
-        batch.n_tokens = n; trace.active = final;
+        batch.n_tokens = n; trace.active = final; trace.position = pos;
         for (int i=0; i<n; ++i) {
             batch.pos[i] = pos++; batch.n_seq_id[i] = 1; batch.seq_id[i][0] = 0;
             batch.logits[i] = final && i==n-1;

@@ -57,6 +57,21 @@ class LayerTrace {
     Object observedPass = pass;
     observerField.set(pass, Proxy.newProxyInstance(observerType.getClassLoader(), new Class<?>[] {observerType},
         (proxy, method, values) -> {
+          if (method.getName().equals("onLayerComplete") && (int) values[0] == 0) {
+            var cf = observedPass.getClass().getDeclaredField("prefillBatchCapacity"); cf.setAccessible(true);
+            int capacity = cf.getInt(observedPass);
+            int row = (int) values[3] / (int) values[4];
+            for (String name : new String[] {"batchQ", "batchK", "batchV"}) {
+              var field = observedPass.getClass().getDeclaredField(name); field.setAccessible(true);
+              float[] buffer = (float[]) field.get(observedPass);
+              int width = buffer.length / capacity;
+              var bytes = ByteBuffer.allocate(width*4).order(ByteOrder.LITTLE_ENDIAN);
+              bytes.asFloatBuffer().put(buffer, row*width, width);
+              try (var f = new java.io.RandomAccessFile(output.resolve(name+"-all.f32").toFile(), "rw")) {
+                f.seek((long)(int)values[1]*width*4); f.write(bytes.array());
+              }
+            }
+          }
           if (method.getName().equals("onLayerComplete") && (int) values[1] == target) {
             floats(output.resolve("layer-" + values[0] + ".f32"), (float[]) values[2],
                 (int) values[3], (int) values[4]);
