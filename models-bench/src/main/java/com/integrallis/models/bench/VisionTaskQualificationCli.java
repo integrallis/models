@@ -75,7 +75,9 @@ public final class VisionTaskQualificationCli {
       Path destination = output.resolve(id);
       Files.createDirectory(destination);
       byte[] image =
-          Files.readAllBytes(corpus.getParent().resolve(item.required("image").asText()));
+          Files.readAllBytes(
+              java.util.Objects.requireNonNull(corpus.getParent(), "Corpus directory")
+                  .resolve(item.required("image").asText()));
       String suffix =
           "\n"
               + item.required("question").asText()
