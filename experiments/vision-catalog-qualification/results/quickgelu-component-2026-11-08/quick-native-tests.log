@@ -1,0 +1,74 @@
+   Compiling jmodels-kernels v0.5.15 (/opt/vision/quick-protocol/backend-native/src/main/rust/model-kernels)
+    Finished `release` profile [optimized] target(s) in 36.00s
+     Running unittests src/lib.rs (/opt/vision/quickgelu-5c64c8f7/backend-native/src/main/rust/model-kernels/target/release/deps/jmodels_kernels-46e12c56ddf6e0cc)
+
+running 66 tests
+test attention_layout_bench::compare_attention_cache_layouts ... ignored, remote-only layout diagnostic, outside admission
+test bfloat16::tests::bf16_invalid_abi_arguments_do_not_write_output ... ok
+test hf_tokenizer::tests::caller_buffers_and_handle_lifetime ... ok
+test hf_tokenizer::tests::invalid_inputs_and_closed_handles_fail_without_unwinding ... ok
+test deberta_kernels::tests::head_major_prefill_preserves_gemm_results_with_unused_capacity ... ok
+test onnx_kernels::erf_tests::erf_matches_reference_values ... ok
+test onnx_kernels::activation_tests::nan_stays_nan ... ok
+test onnx_kernels::tests::sgemm_accumulates_into_c ... ok
+test hf_tokenizer::tests::insufficient_buffers_utf8_and_concurrent_calls ... ok
+test tests::avx2_q8_0_quantization_matches_scalar_exactly ... ok
+test tests::avx2_q5_0_bit_plane_matches_scalar_kernel ... ok
+test ptq::tests::packed_scalar_and_vector_q8_reductions_are_bit_identical ... ok
+test tests::avx2_k_quantized_rows_match_scalar_kernels ... ok
+test tests::batched_k_quantized_rows_decode_each_weight_block_once ... ok
+test tests::batch_scratch_uses_stack_capacity_and_heap_fallback ... ok
+test tests::completion_poll_observes_finished_workers_without_parking ... ok
+test tests::avx2_q5_0_row_reduces_simd_lanes_once ... ok
+test deberta_kernels::tests::uneven_rows_match_scalar_and_invalid_calls_preserve_output ... ok
+test tests::exports_stable_abi_and_capabilities ... ok
+test tests::creates_and_joins_persistent_worker_context ... ok
+test onnx_kernels::activation_tests::exp_tanh_logistic_track_double_precision ... ok
+test tests::avx2_q8_0_row_matches_scalar_ordered_accumulation ... ok
+test tests::claimed_chunks_cover_every_row_of_every_matrix_exactly_once ... ok
+test tests::grouped_gated_delta_net_matches_each_row_stepped_alone ... ok
+test tests::gated_delta_net_matches_pinned_freetoken_recurrence ... ok
+test tests::grouped_gated_delta_net_rejects_an_out_of_range_slot ... ok
+test tests::half_conversion_preserves_subnormal_boundaries ... ok
+test tests::gated_delta_net_prefix_matches_token_steps_exactly ... ok
+test tests::matrix_dispatch_thread_scaling ... ignored
+test tests::grouped_projection_uses_one_worker_generation ... ok
+test tests::half_round_trip_matches_known_values ... ok
+test onnx_kernels::activation_tests::vector_path_equals_scalar_path_bit_for_bit ... ok
+test tests::persistent_context_reuses_activation_workspace ... ok
+test tests::k_quantized_tiles_match_single_rows_bit_for_bit_across_tile_boundaries ... ok
+test tests::active_count_changes_keep_every_generation_completing ... ok
+test tests::grouped_attention_matches_a_naive_reference_across_two_spans_and_workers ... ok
+test tests::head_major_attention_matches_existing_decode_and_rejects_short_caches ... ok
+test tests::prefill_budget ... ignored
+test tests::q4_k_avx2_preserves_single_row_rounding_across_batch_sizes ... ok
+test tests::independent_projections_use_one_worker_generation ... ok
+test tests::a_published_job_partitions_across_the_active_pool_and_leaves_the_gate_alone ... ok
+test tests::persistent_workers_complete_repeated_generations ... ok
+test tests::q5_1_grouping_is_refused_rather_than_given_empty_activations ... ok
+test tests::q5_1_scalar_and_avx2_rows_agree_exactly ... ok
+test tests::partition_count_bounds_the_rows_a_worker_takes ... ok
+test tests::q4_k_ordered_avx2_matches_scalar_block_fold_bit_for_bit ... ok
+test tests::q8f32_avx2_row_matches_the_scalar_parity_oracle_exactly ... ok
+test tests::q5_1_unpack_matches_the_block_layout ... ok
+test tests::packed_q4_preserves_both_reductions_rows_tails_and_sentinels ... ok
+test tests::rejects_invalid_dimensions_without_dereferencing_buffers ... ok
+test tests::tq1_0_declares_q8_k_activations_and_its_own_block_geometry ... ok
+test tests::q8_k_simd_matches_scalar_bytes_scales_and_sums ... ok
+test tests::tq1_0_q8_k_avx2_is_bit_identical_to_the_scalar_kernel ... ok
+test tests::tq1_0_q8_k_capability_is_advertised ... ok
+test tests::tq1_0_q8_k_row_is_sensitive_to_activation_order ... ok
+test tests::tq1_0_q8_k_row_matches_the_reference_bit_for_bit ... ok
+test tests::multi_query_attention_partitions_across_query_heads ... ok
+test tests::worker_poll_observes_a_published_generation_without_parking ... ok
+test tests::worker_accounts_for_a_published_generation_without_a_job ... ok
+test tests::grouped_query_attention_claims_every_head_at_any_thread_count ... ok
+test onnx_kernels::tests::sine_matches_double_precision_sine_rounded_to_float ... ok
+test tests::q8f32_reuse_matches_scalar_through_real_worker_dispatch ... ok
+test tests::q5_1_reuse_matches_scalar_through_real_worker_dispatch ... ok
+test bfloat16::tests::exported_bf16_matches_selected_lane_and_fma_contract ... ok
+test deberta_kernels::tests::destroying_pool_waits_for_worker_thread_local_cleanup ... ok
+test onnx_kernels::sgemm_tests::sgemm_matches_naive_reference_on_ragged_shapes_and_leading_dimensions ... ok
+
+test result: ok. 63 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
