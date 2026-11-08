@@ -98,3 +98,13 @@ invalid attempt before any task case completed. This is a collection error, not
 a model verdict. Rebuild using `-PmodelsBenchNative=true`, require the native
 execution plan before inference, and start a fresh result directory with the
 same inputs. The evidence evaluator independently rejects a fallback plan.
+
+## Attention span result
+
+The four-row experiment preserves all 30 token sequences. Caption decode medians
+are 4007.679 / 3999.094 / 4009.435 ms for baseline/candidate/baseline: only
+0.21–0.26% improvement, within the observed run variation. Prefill fluctuates
+between ratios 0.9902 and 1.0166. This does not justify the added production
+complexity or establish closure of the admission gap. Retain the original native
+kernels for the full normalization qualification. Keep the experiment's raw data
+and source as diagnostics, outside the shipping branch.
