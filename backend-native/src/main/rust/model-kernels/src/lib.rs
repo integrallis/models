@@ -6869,7 +6869,7 @@ unsafe fn dot_q4_k_q8_k_row_avx2(
 ) -> f32 {
     // SAFETY: this wrapper requires the same features and validated buffers as the implementation.
     unsafe {
-        dot_q4_k_q8_k_row_avx2_impl::<false>(
+        dot_q4_k_q8_k_row_avx2_impl::<false, false>(
             weights,
             quantized,
             activation_scales,
@@ -6894,7 +6894,7 @@ unsafe fn dot_q4_k_q8_k_row_ordered_avx2(
 ) -> f32 {
     // SAFETY: this wrapper requires the same features and validated buffers as the implementation.
     unsafe {
-        dot_q4_k_q8_k_row_avx2_impl::<true>(
+        dot_q4_k_q8_k_row_avx2_impl::<true, false>(
             weights,
             quantized,
             activation_scales,
@@ -6908,7 +6908,7 @@ unsafe fn dot_q4_k_q8_k_row_ordered_avx2(
 
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2,fma,f16c")]
-unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
+unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool, const REPACKED: bool>(
     weights: &[u8],
     quantized: &[i8],
     activation_scales: &[f32],
@@ -6922,6 +6922,7 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
     let mut accumulated = _mm256_setzero_ps();
     let mut minimum_accumulated = _mm_setzero_ps();
     let mut ordered_sum = 0_f32;
+    let mut reference_correction = 0_f32;
     let row_start = row * blocks_per_row * Q4_K_BLOCK_BYTES;
     let row_end = row_start + blocks_per_row * Q4_K_BLOCK_BYTES;
     let (weight_blocks, _) = weights[row_start..row_end].as_chunks::<Q4_K_BLOCK_BYTES>();
@@ -6972,12 +6973,16 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
                 _mm256_madd_epi16(high_products, high_scale),
             );
         }
-        if ORDERED {
+        if ORDERED || REPACKED {
             // Integer lanes may fold freely; floating-point blocks must follow Java's order.
             let integer_sum = horizontal_sum_i32_avx2(quantized_lanes);
             ordered_sum = d.mul_add(integer_sum as f32, ordered_sum);
-            ordered_sum =
-                (-d_min).mul_add(horizontal_sum_i32_sse2(min_products) as f32, ordered_sum);
+            let minimum = horizontal_sum_i32_sse2(min_products) as f32;
+            if REPACKED {
+                reference_correction = d_min.mul_add(minimum, reference_correction);
+            } else {
+                ordered_sum = (-d_min).mul_add(minimum, ordered_sum);
+            }
         } else {
             accumulated = _mm256_fmadd_ps(
                 _mm256_set1_ps(d),
@@ -6991,7 +6996,9 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
             );
         }
     }
-    if ORDERED {
+    if REPACKED {
+        ordered_sum - reference_correction
+    } else if ORDERED {
         ordered_sum
     } else {
         record_q4_k_single_horizontal_reduction();

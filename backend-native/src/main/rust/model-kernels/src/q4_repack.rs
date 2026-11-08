@@ -63,6 +63,14 @@ pub(super) unsafe fn dot(
     cols: usize,
     subblocks: bool,
 ) -> f32 {
+    if !subblocks {
+        // SAFETY: feature and buffer requirements are identical to this function's contract.
+        // The reference GEMV folds all integer lanes once per block, then keeps the
+        // minimum correction separate until the row is complete.
+        return unsafe {
+            dot_q4_k_q8_k_row_avx2_impl::<false, true>(weights, q, scales, sums, batch, row, cols)
+        };
+    }
     let blocks = cols / 256;
     let mut total = 0_f32;
     let mut correction = 0_f32;
@@ -74,8 +82,6 @@ pub(super) unsafe fn dot(
         let dm = f16_to_f32_f16c(u16::from_le_bytes([weights[off + 2], weights[off + 3]]))
             * scales[batch * blocks + block];
         let packed_scales = &weights[off + 4..off + 16];
-        let mut block_dot = 0_i32;
-        let mut block_min = 0_i32;
         for pair in 0..4 {
             // SAFETY: every Q4_K block contains four complete 32-byte quant groups.
             let w =
@@ -107,17 +113,8 @@ pub(super) unsafe fn dot(
             let so = batch * cols / 16 + block * 16 + pair * 4;
             let minimum = qk_min(packed_scales, pair * 2) * (sums[so] as i32 + sums[so + 1] as i32)
                 + qk_min(packed_scales, pair * 2 + 1) * (sums[so + 2] as i32 + sums[so + 3] as i32);
-            if subblocks {
-                total = d.mul_add(integer as f32, total);
-                correction = dm.mul_add(minimum as f32, correction);
-            } else {
-                block_dot += integer;
-                block_min += minimum;
-            }
-        }
-        if !subblocks {
-            total = d.mul_add(block_dot as f32, total);
-            correction = dm.mul_add(block_min as f32, correction);
+            total = d.mul_add(integer as f32, total);
+            correction = dm.mul_add(minimum as f32, correction);
         }
     }
     total - correction
