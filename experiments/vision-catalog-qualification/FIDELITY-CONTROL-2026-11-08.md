@@ -91,3 +91,10 @@ uses only wider CLIP normalization moments with the original native kernels.
 Reuse the exact archived 80-image corpus, verifying its manifest and image hashes,
 rather than selecting or preprocessing new inputs. Collect both quantizations,
 both reference KV types and the declared integration schedules on this worker.
+
+The first full-repeat payload omitted the optional native benchmark runtime. Its
+startup diagnostics showed `vector-api` and `NoKernel`; stop and retain that
+invalid attempt before any task case completed. This is a collection error, not
+a model verdict. Rebuild using `-PmodelsBenchNative=true`, require the native
+execution plan before inference, and start a fresh result directory with the
+same inputs. The evidence evaluator independently rejects a fallback plan.

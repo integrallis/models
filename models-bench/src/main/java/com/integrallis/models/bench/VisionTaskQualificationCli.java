@@ -62,6 +62,13 @@ public final class VisionTaskQualificationCli {
       configuration.put("diagnostics", backend.diagnostics());
       JSON.writerWithDefaultPrettyPrinter()
           .writeValue(output.resolve("configuration.json").toFile(), configuration);
+      var environment = backend.diagnostics().environment();
+      if (!environment.getOrDefault("vision-projections", "").startsWith("rust-")
+          || !"NativeCausalAttention".equals(environment.get("decoder-attention"))) {
+        throw new IllegalStateException(
+            "Frozen vision qualification requires native projections and attention; "
+                + "build the distribution with -PmodelsBenchNative=true");
+      }
       runCases(backend, corpus, output);
     }
   }
