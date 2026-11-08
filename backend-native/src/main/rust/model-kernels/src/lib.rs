@@ -6558,22 +6558,25 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
     let mut accumulated = _mm256_setzero_ps();
     let mut minimum_accumulated = _mm_setzero_ps();
     let mut ordered_sum = 0_f32;
-    for block in 0..blocks_per_row {
+    let row_start = row * blocks_per_row * Q4_K_BLOCK_BYTES;
+    let row_end = row_start + blocks_per_row * Q4_K_BLOCK_BYTES;
+    let (weight_blocks, _) = weights[row_start..row_end].as_chunks::<Q4_K_BLOCK_BYTES>();
+    let scale_start = batch * blocks_per_row;
+    let row_scales = &activation_scales[scale_start..scale_start + blocks_per_row];
+    for (block, (weight, &activation_scale)) in weight_blocks.iter().zip(row_scales).enumerate() {
         record_k_quant_weight_block_decode();
-        let weight_offset = (row * blocks_per_row + block) * Q4_K_BLOCK_BYTES;
         let activation_offset = batch * cols + block * QK_K;
-        let scale_offset = batch * blocks_per_row + block;
         let sum_offset = batch * cols / Q8_K_SUM_BLOCK + block * QK_K / Q8_K_SUM_BLOCK;
         let d = f16_to_f32_f16c(u16::from_le_bytes([
-            weights[weight_offset],
-            weights[weight_offset + 1],
-        ])) * activation_scales[scale_offset];
+            weight[0],
+            weight[1],
+        ])) * activation_scale;
         let d_min = f16_to_f32_f16c(u16::from_le_bytes([
-            weights[weight_offset + 2],
-            weights[weight_offset + 3],
-        ])) * activation_scales[scale_offset];
-        let scales = &weights[weight_offset + 4..weight_offset + 16];
-        let quants = weights.as_ptr().wrapping_add(weight_offset + 16);
+            weight[2],
+            weight[3],
+        ])) * activation_scale;
+        let scales = &weight[4..16];
+        let quants = weight.as_ptr().wrapping_add(16);
         let mut quantized_lanes = _mm256_setzero_si256();
         let (scale_values, mins_and_scales) = qk_unpack_scales_and_mins(scales);
         // SAFETY: every block carries QK_K / Q8_K_SUM_BLOCK = 16 activation sums.

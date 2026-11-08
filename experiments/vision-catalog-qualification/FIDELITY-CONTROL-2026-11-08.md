@@ -171,3 +171,13 @@ seven Java native tests pass. The A/B reducer initially referenced a Python
 virtualenv absent on the auxiliary host; its three timing arms completed.
 Run the same standard-library reducer with system Python, preserving the
 original exit-127 log and all timings. No inference was repeated for this fix.
+## Q4_K fixed-block view experiment
+
+The inner Q4_K decoder indexes scale bytes through a dynamically sized full-model
+slice. Test validating the row once and iterating fixed-size 144-byte blocks
+zipped with activation scales, allowing bounds checks to leave the block loop.
+No unchecked indexing, quantization, integer math or float reduction change.
+After the head-major A/B ends, compare head-major alone versus head-major plus
+this isolated change with the same 3-warmup/7-repeat caption schedule. Require
+all native tests and exact real token parity; remove the block-view change if
+it does not produce a meaningful end-to-end gain. No overlap with timing runs.
