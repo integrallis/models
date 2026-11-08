@@ -34,7 +34,7 @@ def main():
     output = root / "results"
     output.mkdir(exist_ok=False)
     native = Path(os.environ["VISION_NATIVE_LIBRARY"]).resolve()
-    receipt = dict(schema=2, referenceFlashAttention="disabled", host=socket.gethostname(), revision=revision,
+    receipt = dict(schema=2, referenceFlashAttention="auto", host=socket.gethostname(), revision=revision,
                    manifestSha256=digest(script / "manifest.json"), corpusSha256=digest(corpus),
                    nativeSha256=digest(native), threads=manifest["threads"], context=1024,
                    maximumOutputTokens=32, kvType="f32",

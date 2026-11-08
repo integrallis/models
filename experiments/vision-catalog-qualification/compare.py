@@ -59,8 +59,8 @@ def evaluate(corpus, manifest, output, variant, evaluator):
             require(config[key] == manifest[key], "Execution setting mismatch: " + key)
     require(reference_config["kvType"] == receipt["kvType"] == "f32", "KV mismatch")
     if receipt.get("schema", 1) >= 2:
-        require(reference_config.get("flashAttention") == receipt.get("referenceFlashAttention") == "disabled",
-                "F32 reference must disable Flash Attention's implicit F16 casts")
+        require(reference_config.get("flashAttention") == receipt.get("referenceFlashAttention") == "auto",
+                "Reference must preserve frozen AUTO attention execution")
     require(encoder_config["threads"] == manifest["threads"], "Encoder threads mismatch")
     require({row["id"] for row in reference} == {case["id"] for case in cases}, "Reference case coverage mismatch")
     case_results, timings, disagreements = [], [], []

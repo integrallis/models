@@ -63,3 +63,20 @@ of extracting eight scalar lanes per block. Integer products and floating reduct
 order remain unchanged. Require synthetic reduction parity and real-output parity,
 then same-host sequential A/B latency before retaining it. Profile samples themselves
 are not throughput evidence. Do not promote a slowdown or retain an alternate mode.
+
+## Preserve the frozen admission reference
+
+The explicit-F32 run is an operator diagnostic. Inspection confirms the F16 casts
+are deliberate Flash Attention behavior, not corrupted tensors or an incorrect
+weight mapping. Disabling that optimization changes the reference's numerical
+execution and its answers. Do not substitute the new counterfactual for the frozen
+admission reference: retain AUTO with the original F32 cache for task admission,
+AUTO/F16 for faster-reference performance, and disclose the effective attention
+precision. Preserve the OFF traces separately. The original 99% sequence gate,
+accuracy floors/loss bound, corpus and performance thresholds remain unchanged.
+This declaration precedes the full corpus run of the normalization candidate.
+
+For decode optimization A/B use the original caption inputs, eight threads, three
+warmups and seven measured generations in baseline/candidate/baseline order.
+Compare every token sequence; report both baseline medians and raw distributions.
+A/B timing is diagnostic; final admission retains its original schedules.
