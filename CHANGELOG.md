@@ -4,6 +4,38 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.17] - 2026-11-08
+
+### Fixed
+
+- Forward the native matrix kernel supplied to the public EmbeddingGemma 2 loader
+  into its encoder. Eligible projections now reach the supplied kernel; unsupported
+  types and shapes retain the existing Java implementation and backend ownership.
+
+### Changed
+
+- Partition EmbeddingGemma 2 attention over independent heads using the existing
+  Java GGUF worker pool at 128 or more tokens. Shorter inputs use the same arithmetic
+  inline. The dedicated ccx33 512-token comparison measured 3.34 seconds versus
+  9.08–9.13 seconds for the published Models control and 6.42 seconds for the 300M
+  embedding control, with bit-identical vectors. Exact revisions, raw results,
+  scheduling comparisons and rejected experiments are recorded in
+  `experiments/embedding-throughput-390/RESULTS.md`.
+
+### Qualification and dependencies
+
+- Preserve the existing embedding oracle gate and all catalog qualifications.
+  Memory's proposed stricter accuracy/latency targets, bulk ingest and retrieval
+  acceptance remain separate work; these component measurements do not establish
+  a newly qualified memory default. ModelJars must consume this release before
+  released-API performance can be claimed.
+- Retain released Vectors 0.1.33; no unreleased Vectors changes are required.
+- `backend-cuda` remains opt-in and its numeric path is unchanged. The last recorded
+  G1 result is exact-token parity on RTX 4090; G4 is 6.184x against a 3.00x gate.
+  Device gates were not rerun for this release; the prior evidence remains under
+  `benchmark-results/2026-10-07-g4-dualpath`. No CUDA qualification for
+  EmbeddingGemma 2 is claimed.
+
 ## [0.5.16] - 2026-11-08
 
 ### Fixed
