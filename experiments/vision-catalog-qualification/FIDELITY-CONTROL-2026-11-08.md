@@ -181,3 +181,16 @@ After the head-major A/B ends, compare head-major alone versus head-major plus
 this isolated change with the same 3-warmup/7-repeat caption schedule. Require
 all native tests and exact real token parity; remove the block-view change if
 it does not produce a meaningful end-to-end gain. No overlap with timing runs.
+
+The block-view change preserves all 30 output sequences and passes 63 active
+Rust tests and Clippy. Decode medians are 3896.659 / 3857.314 / 3888.310 ms,
+a 0.80–1.01% improvement against bracketing head-major baselines. Prefill ratios
+are 0.9629 and 0.9699. Retain this bounds-check simplification with the cache
+layout for full qualification; this modest measurement is not admission.
+
+The full normalization-only Q4_K_S repeat fixes its original mismatch but finds
+two new mismatches (vqav2-454129000 and textvqa-35501), matching 62/64 sequences.
+Do not promote the three-case diagnostic to a full-corpus correctness claim.
+Use the remaining isolated-worker time for crossed encoder/decoder diagnostics
+on these cases after its timing finishes. Preserve the complete running primary
+campaign and all gates unchanged.
