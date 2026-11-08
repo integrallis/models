@@ -1946,6 +1946,136 @@ class LlamaForwardPassTest {
       }
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {1, 8, 32})
+    void kvOnlyPrefillRetainsInjectedAttentionCacheThroughDecodeAndReset(int batchSize) {
+      GgufFile file = buildQ4NanoModel(new Random(42));
+      LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
+      LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);
+      int[] tokens =
+          java.util.stream.IntStream.range(0, 40).map(i -> (i * 7 + 5) % VOCAB_SIZE).toArray();
+      PureJavaExecutionPlan plan = executionPlan(config, weights, batchSize, true, true);
+      LlamaForwardPass baseline =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(LAYERS, CONTEXT, config.keyDim(), config.valueDim()),
+              plan);
+      float[] expected = baseline.prefill(tokens, 0).clone();
+      int next = argmax(expected);
+      float[] expectedNext = baseline.forward(next, tokens.length).clone();
+      int[] positions = new int[LAYERS];
+      int[] attended = new int[LAYERS];
+      float[][] keys = new float[LAYERS][CONTEXT * config.keyDim()];
+      float[][] values = new float[LAYERS][CONTEXT * config.valueDim()];
+      AtomicInteger appends = new AtomicInteger();
+      BatchedCausalAttentionKernel attention =
+          new BatchedCausalAttentionKernel() {
+            @Override
+            public boolean isEligible(
+                int layer,
+                int start,
+                int count,
+                int heads,
+                int kvHeads,
+                int keyLength,
+                int valueLength,
+                int capacity,
+                int window) {
+              return positions[layer] == start;
+            }
+
+            @Override
+            public boolean append(
+                float[] key,
+                float[] value,
+                int layer,
+                int start,
+                int count,
+                int heads,
+                int kvHeads,
+                int keyLength,
+                int valueLength,
+                int capacity,
+                int window) {
+              assertThat(positions[layer]).isEqualTo(start);
+              System.arraycopy(
+                  key, 0, keys[layer], start * kvHeads * keyLength, count * kvHeads * keyLength);
+              System.arraycopy(
+                  value,
+                  0,
+                  values[layer],
+                  start * kvHeads * valueLength,
+                  count * kvHeads * valueLength);
+              positions[layer] = start + count;
+              appends.incrementAndGet();
+              return true;
+            }
+
+            @Override
+            public void attend(
+                float[] output,
+                float[] query,
+                float[] key,
+                float[] value,
+                int layer,
+                int start,
+                int count,
+                int heads,
+                int kvHeads,
+                int keyLength,
+                int valueLength,
+                int capacity,
+                int window) {
+              assertThat(positions[layer]).isEqualTo(start);
+              referenceBatchedAttention(
+                  output,
+                  query,
+                  key,
+                  value,
+                  keys[layer],
+                  values[layer],
+                  start,
+                  count,
+                  heads,
+                  kvHeads,
+                  keyLength,
+                  valueLength,
+                  window);
+              positions[layer] = start + count;
+              attended[layer]++;
+            }
+
+            @Override
+            public void reset() {
+              java.util.Arrays.fill(positions, 0);
+            }
+          };
+      LlamaForwardPass accelerated =
+          new LlamaForwardPass(
+              config,
+              weights,
+              new KvCache(LAYERS, CONTEXT, config.keyDim(), config.valueDim()),
+              plan,
+              GgufBatchedMatrixKernel.none(),
+              attention);
+      assertThat(accelerated.prefill(tokens, 0))
+          .containsExactly(expected, within(SIMD_REDUCTION_TOLERANCE));
+      assertThat(appends.get()).isPositive();
+      for (int layer = 0; layer < LAYERS; layer++) {
+        assertThat(positions[layer])
+            .as("layer %s cache after prefill", layer)
+            .isEqualTo(tokens.length);
+        assertThat(attended[layer]).as("layer %s must use injected attention", layer).isPositive();
+      }
+      assertThat(accelerated.forward(next, tokens.length))
+          .containsExactly(expectedNext, within(SIMD_REDUCTION_TOLERANCE));
+      for (int position : positions) assertThat(position).isEqualTo(tokens.length + 1);
+      accelerated.reset();
+      assertThat(accelerated.prefill(tokens, 0))
+          .containsExactly(expected, within(SIMD_REDUCTION_TOLERANCE));
+    }
+
     private void assertFinalLayerKvOnlyPrefillIsEquivalent(GgufFile file) {
       LlamaConfig config = LlamaConfig.fromMetadata(file.metadata());
       LlamaWeights weights = LlamaWeights.fromGgufFile(file, config);

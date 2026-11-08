@@ -103,15 +103,7 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
       throw new IllegalArgumentException("Attention buffer too small");
     if (output == query || output == key || output == value)
       throw new IllegalArgumentException("Attention output must not alias inputs");
-    Layer state = layers.computeIfAbsent(layer, ignored -> new Layer(heads, keyLength, capacity));
-    for (int row = 0; row < batch; row++) {
-      for (int head = 0; head < heads; head++) {
-        int source = row * dimension + head * keyLength;
-        int destination = (head * capacity + start + row) * keyLength;
-        System.arraycopy(key, source, state.keys, destination, keyLength);
-        System.arraycopy(value, source, state.values, destination, keyLength);
-      }
-    }
+    Layer state = storeRows(key, value, layer, start, batch, heads, keyLength, capacity);
     if (batch > 1) {
       dense.causalAttention(
           output,
@@ -139,6 +131,50 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
           (float) (1.0 / Math.sqrt(keyLength)));
     }
     state.positions = start + batch;
+  }
+
+  @Override
+  public boolean append(
+      float[] key,
+      float[] value,
+      int layer,
+      int start,
+      int batch,
+      int heads,
+      int kvHeads,
+      int keyLength,
+      int valueLength,
+      int capacity,
+      int window) {
+    if (!isEligible(layer, start, batch, heads, kvHeads, keyLength, valueLength, capacity, window))
+      return false;
+    int count = Math.multiplyExact(batch, Math.multiplyExact(heads, keyLength));
+    if (key.length < count || value.length < count)
+      throw new IllegalArgumentException("Attention cache input too small");
+    Layer state = storeRows(key, value, layer, start, batch, heads, keyLength, capacity);
+    state.positions = start + batch;
+    return true;
+  }
+
+  private Layer storeRows(
+      float[] key,
+      float[] value,
+      int layer,
+      int start,
+      int batch,
+      int heads,
+      int width,
+      int capacity) {
+    Layer state = layers.computeIfAbsent(layer, ignored -> new Layer(heads, width, capacity));
+    for (int row = 0; row < batch; row++) {
+      for (int head = 0; head < heads; head++) {
+        int source = row * state.dimension + head * width;
+        int destination = (head * capacity + start + row) * width;
+        System.arraycopy(key, source, state.keys, destination, width);
+        System.arraycopy(value, source, state.values, destination, width);
+      }
+    }
+    return state;
   }
 
   @Override

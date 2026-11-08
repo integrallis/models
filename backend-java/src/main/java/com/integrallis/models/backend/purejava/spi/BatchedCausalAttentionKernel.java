@@ -46,6 +46,25 @@ public interface BatchedCausalAttentionKernel extends AutoCloseable {
       int maxSequenceLength,
       int slidingWindow);
 
+  /**
+   * Retains K/V rows when prefill prunes unused queries from the final layer. Returning false must
+   * leave provider state unchanged; the caller's ordinary KV cache remains authoritative.
+   */
+  default boolean append(
+      float[] key,
+      float[] value,
+      int layer,
+      int startPosition,
+      int batchSize,
+      int numHeads,
+      int numKvHeads,
+      int keyLength,
+      int valueLength,
+      int maxSequenceLength,
+      int slidingWindow) {
+    return false;
+  }
+
   /** Notifies retained device state that speculative positions were discarded. */
   default void rewind(int checkpoint) {}
 
