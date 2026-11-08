@@ -19,7 +19,12 @@ the translated formula produces bit-identical complete projector output for that
 
 The real unreleased Java/Rust runtime then reproduced the expected tokens on all four targeted
 cases: Q4_K_M 38337 and Q4_K_S 35501, 36979 and 39587. Final-layer pruning stays enabled. These
-four cases are a regression screen, not qualification. A frozen public-API corpus repeat is running.
+four cases are a regression screen, not qualification. The bounded public-API screen completed
+71/80 Q4_K_M cases (55 nonblank) before its deadline. One new mismatch remains: TextVQA 38508
+produces `Unknown` versus reference `0`. Its full image embeddings are bit-identical; disabling
+pruning and substituting independent ggml attention both retain `Unknown`. This isolates the
+remaining discrepancy to another decoder operation, not the encoder or attention kernel alone.
+Q4_K_S did not start before that screen deadline; no full-corpus qualification is claimed.
 
 ## Production boundary
 
@@ -53,3 +58,23 @@ released-coordinate ModelJars consumer repeat after the required libraries are p
 Remote evidence is collected under `audit-artifacts/pr380-attention-dispatch-2026-11-08` in the
 workspace. The owned instance i-08c5a8b85f1833c6d stops workloads at 20:05 UTC, archives by 20:08,
 and has an unchanged hard termination deadline of 20:20 UTC and USD 2 ceiling.
+
+## Isolated repeat and CI follow-up
+
+The diagnostic worker was archived, its archive hash verified locally, and its instance, volume,
+security group and key deleted at 20:13 UTC. The next bounded campaign has two m6a.4xlarge workers,
+one variant each, with a USD 6.50 combined ceiling and deletion by 2026-11-09 00:13:34 UTC.
+The deployed production source is `282bbd8d3c29a7a2c0176380dc73e4dd4dd16862`; subsequent
+documentation and test-only commits do not change that payload. Each worker independently runs
+the unchanged full task and integration gates, including both reference KV formats. Q4_K_M
+first captures a separate last-token decoder layer trace for TextVQA 38508. Diagnostics finish
+before timing begins. Failure remains a failure; these runs do not waive the known discrepancy.
+
+The first PR CI run found native Java instruction coverage at 79.88%. Added tests exercise ordered
+projection cancellation and ownership, a pruned last query versus the complete 64-row attention
+batch, rejected calls preserving state, and prepared-kernel lifetime. The complete native suite
+now passes locally with instruction coverage 80.61%, above the unchanged 80% gate.
+
+ModelJars 0.1.77 and its site update are published independently. All 48 Maven JAR/POM/signature
+files match the signed bundle; the published SDK uses Models 0.5.17 and its backend dependencies
+use Vectors 0.1.33. That release does not include this unreleased arithmetic branch.

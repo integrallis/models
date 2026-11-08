@@ -30,6 +30,76 @@ import org.junit.jupiter.api.Test;
 
 class NativeDebertaKernelsTest {
   @Test
+  void orderedProjectionPreservesCancellationAndPreparedWeightOwnership() {
+    var kernels =
+        NativeDebertaKernels.load(Path.of(System.getProperty("models.native.kernels.library")), 3);
+    var weights = new float[17 * 3];
+    Arrays.fill(weights, 1f);
+    var projection = kernels.prepareOrdered(weights, 17, 3);
+    try {
+      Arrays.fill(weights, 99f);
+      float[] input = new float[7 * 3];
+      for (int row = 0; row < 7; row++) {
+        input[row * 3] = 16777216f;
+        input[row * 3 + 1] = 1f;
+        input[row * 3 + 2] = -16777216f;
+      }
+      float[] output = new float[7 * 17 + 1];
+      output[output.length - 1] = 77f;
+      projection.project(output, input, 7);
+      // A reordered reduction gives 1. Sequential float32 FMA gives 0.
+      assertThat(Arrays.copyOf(output, 7 * 17)).containsOnly(0f);
+      assertThat(output[7 * 17]).isEqualTo(77f);
+      assertThatThrownBy(() -> projection.project(output, new float[3], 7))
+          .isInstanceOf(IllegalArgumentException.class);
+      assertThatThrownBy(() -> kernels.prepareAffine(new float[6], new float[1], 2, 3))
+          .isInstanceOf(IllegalArgumentException.class);
+      assertThat(kernels.geluErf(new float[0])).isTrue();
+    } finally {
+      kernels.close();
+    }
+    assertThatThrownBy(() -> projection.project(new float[17], new float[3], 1))
+        .isInstanceOf(IllegalStateException.class);
+    assertThatThrownBy(() -> kernels.geluErf(new float[] {1}))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void finalPrefillRetainsTheFullBatchArithmeticAfterAppendingItsPrefix() {
+    Path library = Path.of(System.getProperty("models.native.kernels.library"));
+    try (var complete = new NativeCausalAttention(NativeDebertaKernels.load(library, 3));
+        var pruned = new NativeCausalAttention(NativeDebertaKernels.load(library, 3))) {
+      int batch = 64, width = 128, heads = 2, dim = width * heads, capacity = 128;
+      int[] seed = {371};
+      float[] q = fixtureValues(seed, batch * dim);
+      float[] k = fixtureValues(seed, batch * dim);
+      float[] v = fixtureValues(seed, batch * dim);
+      float[] expected = new float[batch * dim];
+      complete.attend(expected, q, k, v, 0, 0, batch, heads, heads, width, width, capacity, 0);
+      assertThat(pruned.usesFloatRotaryRecurrence()).isTrue();
+      assertThat(pruned.append(k, v, 0, 0, batch - 1, heads, heads, width, width, capacity, 0))
+          .isTrue();
+      float[] lastQ = Arrays.copyOfRange(q, (batch - 1) * dim, batch * dim);
+      float[] lastK = Arrays.copyOfRange(k, (batch - 1) * dim, batch * dim);
+      float[] lastV = Arrays.copyOfRange(v, (batch - 1) * dim, batch * dim);
+      float[] actual = new float[dim];
+      assertThatThrownBy(
+              () ->
+                  pruned.attendFinalPrefill(
+                      actual, lastQ, lastK, lastV, 0, batch - 1, batch + 1, heads, heads, width,
+                      width, capacity, 0))
+          .isInstanceOf(IllegalArgumentException.class);
+      pruned.attendFinalPrefill(
+          actual, lastQ, lastK, lastV, 0, batch - 1, batch, heads, heads, width, width, capacity,
+          0);
+      assertThat(actual)
+          .containsExactly(Arrays.copyOfRange(expected, (batch - 1) * dim, batch * dim));
+      assertThat(pruned.isEligible(0, batch, 1, heads, heads, width, width, capacity, 0)).isTrue();
+      assertThatThrownBy(() -> pruned.rewind(-1)).isInstanceOf(IllegalArgumentException.class);
+    }
+  }
+
+  @Test
   void causalAttentionRejectsAliasingBeforeNativeDispatch() {
     try (var kernels =
         NativeDebertaKernels.load(
