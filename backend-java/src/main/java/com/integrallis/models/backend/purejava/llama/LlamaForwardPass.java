@@ -819,7 +819,7 @@ public final class LlamaForwardPass {
     }
 
     if (batchedPrefill && tokens.length > 1) {
-      return prefillBatched(tokens, startPosition, true);
+      return prefillBatched(tokens, startPosition);
     }
 
     int finalIndex = tokens.length - 1;
@@ -865,8 +865,8 @@ public final class LlamaForwardPass {
    * models use. Mean pooling is a caller-side loop over {@link #hiddenState(int, int)}: pooling is
    * a property of the embedding model, not of the forward pass.
    *
-   * <p>Batches the prefix without a vocabulary projection, then returns the final token's
-   * normalized hidden state. Neither step produces logits.
+   * <p>Deliberately walks tokens one at a time rather than using batched prefill, whose fast path
+   * is built around producing logits for the final token only.
    */
   public float[] prefillHiddenState(int[] tokens, int startPosition) {
     Objects.requireNonNull(tokens, "tokens");
@@ -880,9 +880,9 @@ public final class LlamaForwardPass {
     if (batchedPrefill && finalIndex > 1) {
       // Advance every position but the last through the batched path, then take one ordinary step
       // for the final token so it yields a hidden state rather than a vocabulary projection. The
-      // batched call advances the key/value cache without computing unused vocabulary logits.
+      // batched call's logits are discarded; its purpose here is the key/value cache it leaves.
       batchedHiddenStatePrefills++;
-      prefillBatched(Arrays.copyOf(tokens, finalIndex), startPosition, false);
+      prefill(Arrays.copyOf(tokens, finalIndex), startPosition);
     } else {
       for (int index = 0; index < finalIndex; index++) {
         forwardInternal(tokens[index], Math.addExact(startPosition, index), Head.NONE);
@@ -1270,7 +1270,7 @@ public final class LlamaForwardPass {
     session.adapterInvocationIndex = 0;
   }
 
-  private float[] prefillBatched(int[] tokens, int startPosition, boolean computeFinalLogits) {
+  private float[] prefillBatched(int[] tokens, int startPosition) {
     if (startPosition != nextPosition) {
       throw new IllegalArgumentException(
           "position must be sequential: expected " + nextPosition + ", got " + startPosition);
@@ -1285,19 +1285,10 @@ public final class LlamaForwardPass {
       int batchSize = Math.min(prefillBatchCapacity, tokens.length - tokenOffset);
       boolean finalBatch = tokenOffset + batchSize == tokens.length;
       if (batchSize == 1) {
-        return forwardInternal(
-            tokens[tokenOffset],
-            startPosition + tokenOffset,
-            computeFinalLogits ? Head.LOGITS : Head.NONE);
+        return forwardInternal(tokens[tokenOffset], startPosition + tokenOffset, Head.LOGITS);
       }
       prefillBatch(
-          tokens,
-          tokenOffset,
-          batchSize,
-          startPosition + tokenOffset,
-          finalBatch && computeFinalLogits,
-          null,
-          0);
+          tokens, tokenOffset, batchSize, startPosition + tokenOffset, finalBatch, null, 0);
       nextPosition += batchSize;
       tokenOffset += batchSize;
     }

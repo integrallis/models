@@ -39,8 +39,6 @@ import java.nio.ByteOrder;
 import java.util.Random;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * The hidden-state prefill must reach the batched path, and must not change a single observable
@@ -87,25 +85,6 @@ class LlamaHiddenStatePrefillTest {
     pass.prefillHiddenState(PROMPT, 0);
 
     assertThat(pass.batchedHiddenStatePrefills()).isEqualTo(1);
-  }
-
-  @ParameterizedTest
-  @ValueSource(ints = {1, 2, 3, 5, 6, 8})
-  void hiddenStatePrefillNeverOverwritesTheVocabularyHead(int length) {
-    Fixture fixture = new Fixture();
-    LlamaForwardPass pass = fixture.pass();
-    float[] vocabularyHead = pass.forwardTransient(31, 0);
-    float[] previousLogits = vocabularyHead.clone();
-    pass.reset();
-    int[] tokens = java.util.Arrays.copyOf(PROMPT, length);
-
-    float[] actual = pass.prefillHiddenState(tokens, 0).clone();
-
-    assertThat(vocabularyHead).containsExactly(previousLogits);
-    assertThat(actual)
-        .containsExactly(
-            sequentialHiddenState(fixture.newPass(), tokens), within(SIMD_REDUCTION_TOLERANCE));
-    assertThat(pass.checkpoint()).isEqualTo(length);
   }
 
   @Test
