@@ -1187,14 +1187,10 @@ unsafe fn execute_attention_partition(
                         (positions - 1) * job.key_dim + job.key_length,
                     )
                 };
-                attention_scores(
-                    &mut row_scores[written..written + positions],
-                    q,
-                    keys,
-                    job.key_dim,
-                    job.scale,
-                    vectorized,
-                );
+                for row in 0..positions {
+                    let k = &keys[row * job.key_dim..row * job.key_dim + job.key_length];
+                    row_scores[written + row] = attention_dot(q, k, vectorized) * job.scale;
+                }
                 written += positions;
             }
             attention_softmax(row_scores);
@@ -1212,96 +1208,16 @@ unsafe fn execute_attention_partition(
                         (positions - 1) * job.value_dim + job.value_length,
                     )
                 };
-                attention_values(
-                    out,
-                    values,
-                    &row_scores[consumed..consumed + positions],
-                    job.value_dim,
-                    vectorized,
-                );
+                for row in 0..positions {
+                    let v = &values[row * job.value_dim..row * job.value_dim + job.value_length];
+                    attention_axpy(out, v, row_scores[consumed + row], vectorized);
+                }
                 consumed += positions;
             }
         }
     }
 }
 
-/// Enter the ISA-specific loop once per head/span, not once per cached position.
-/// The dot-product reduction and value accumulation order remain unchanged.
-fn attention_scores(
-    scores: &mut [f32],
-    query: &[f32],
-    keys: &[f32],
-    stride: usize,
-    scale: f32,
-    vectorized: bool,
-) {
-    #[cfg(target_arch = "x86_64")]
-    if vectorized && query.len() >= 16 {
-        // SAFETY: the caller checked AVX2/FMA; validated spans cover every row.
-        unsafe { attention_scores_avx2(scores, query, keys, stride, scale) };
-        return;
-    }
-    let _ = vectorized;
-    for (row, score) in scores.iter_mut().enumerate() {
-        *score =
-            attention_dot_scalar(query, &keys[row * stride..row * stride + query.len()]) * scale;
-    }
-}
-
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2,fma")]
-unsafe fn attention_scores_avx2(
-    scores: &mut [f32],
-    query: &[f32],
-    keys: &[f32],
-    stride: usize,
-    scale: f32,
-) {
-    for (row, score) in scores.iter_mut().enumerate() {
-        // SAFETY: this function and the dot product require the same target features.
-        *score =
-            unsafe { attention_dot_avx2(query, &keys[row * stride..row * stride + query.len()]) }
-                * scale;
-    }
-}
-
-fn attention_values(
-    out: &mut [f32],
-    values: &[f32],
-    scores: &[f32],
-    stride: usize,
-    vectorized: bool,
-) {
-    #[cfg(target_arch = "x86_64")]
-    if vectorized && out.len() >= 8 {
-        // SAFETY: the caller checked AVX2/FMA; validated spans cover every row.
-        unsafe { attention_values_avx2(out, values, scores, stride) };
-        return;
-    }
-    let _ = vectorized;
-    for (row, &score) in scores.iter().enumerate() {
-        for (o, &v) in out.iter_mut().zip(&values[row * stride..]) {
-            *o = v.mul_add(score, *o);
-        }
-    }
-}
-
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2,fma")]
-unsafe fn attention_values_avx2(out: &mut [f32], values: &[f32], scores: &[f32], stride: usize) {
-    for (row, &score) in scores.iter().enumerate() {
-        // SAFETY: feature requirements match and the validated row is at least out.len().
-        unsafe {
-            gated_delta_net_add_scaled_avx2(
-                out,
-                &values[row * stride..row * stride + out.len()],
-                score,
-            );
-        }
-    }
-}
-
-#[cfg(test)]
 fn attention_dot(a: &[f32], b: &[f32], vectorized: bool) -> f32 {
     #[cfg(target_arch = "x86_64")]
     if vectorized && a.len() >= 16 {
@@ -1369,7 +1285,6 @@ fn attention_softmax(scores: &mut [f32]) {
     }
 }
 
-#[cfg(test)]
 fn attention_axpy(out: &mut [f32], v: &[f32], weight: f32, vectorized: bool) {
     #[cfg(target_arch = "x86_64")]
     if vectorized && out.len() >= 8 {
@@ -4959,15 +4874,8 @@ unsafe fn compute_q6_k_batched_row_range_avx2(
                 while batch + 8 <= batch_end {
                     unsafe {
                         compute_q6_k_tile::<8>(
-                            weights,
-                            quantized,
-                            activation_scales,
-                            activation_sums,
-                            output,
-                            batch,
-                            row,
-                            rows,
-                            cols,
+                            weights, quantized, activation_scales, activation_sums,
+                            output, batch, row, rows, cols,
                         );
                     }
                     batch += 8;
@@ -6659,8 +6567,14 @@ unsafe fn dot_q4_k_q8_k_row_avx2_impl<const ORDERED: bool>(
         record_k_quant_weight_block_decode();
         let activation_offset = batch * cols + block * QK_K;
         let sum_offset = batch * cols / Q8_K_SUM_BLOCK + block * QK_K / Q8_K_SUM_BLOCK;
-        let d = f16_to_f32_f16c(u16::from_le_bytes([weight[0], weight[1]])) * activation_scale;
-        let d_min = f16_to_f32_f16c(u16::from_le_bytes([weight[2], weight[3]])) * activation_scale;
+        let d = f16_to_f32_f16c(u16::from_le_bytes([
+            weight[0],
+            weight[1],
+        ])) * activation_scale;
+        let d_min = f16_to_f32_f16c(u16::from_le_bytes([
+            weight[2],
+            weight[3],
+        ])) * activation_scale;
         let scales = &weight[4..16];
         let quants = weight.as_ptr().wrapping_add(16);
         let mut quantized_lanes = _mm256_setzero_si256();
@@ -8317,7 +8231,7 @@ mod tests {
                 | CAPABILITY_PTQ1_0_Q8_0_BATCHED_MATMUL
                 | CAPABILITY_TQ1_0_Q8_K_BATCHED_MATMUL
                 | CAPABILITY_Q4_K_ORDERED_REDUCTION
-                | q4_batch_packing_capability()
+        | q4_batch_packing_capability()
                 | CAPABILITY_K_QUANT_BATCH_WEIGHT_REUSE
                 | CAPABILITY_Q4_K_BATCH_VECTOR_ACCUMULATION
                 | CAPABILITY_MANY_GROUPED_BATCHED_MATMUL
@@ -8565,55 +8479,6 @@ mod tests {
         for num_kv in [2, 3] {
             for threads in [1, 2, 4, 8] {
                 attention_claims_every_query_head_exactly_once(num_kv, threads);
-            }
-        }
-    }
-
-    #[test]
-    fn attention_span_dispatch_preserves_per_row_arithmetic() {
-        for vectorized in [false, gated_delta_net_avx2_available()] {
-            for width in [1_usize, 7, 8, 15, 16, 17, 128, 131] {
-                for positions in [0_usize, 1, 7, 577] {
-                    for padding in [0, 11] {
-                        let stride = width + padding;
-                        let query: Vec<f32> =
-                            (0..width).map(|i| (i % 19) as f32 * 0.117 - 0.93).collect();
-                        let values: Vec<f32> = (0..positions * stride)
-                            .map(|i| (i % 31) as f32 * 0.063 - 0.81)
-                            .collect();
-                        let expected: Vec<f32> = (0..positions)
-                            .map(|row| {
-                                attention_dot(
-                                    &query,
-                                    &values[row * stride..row * stride + width],
-                                    vectorized,
-                                ) * 0.125
-                            })
-                            .collect();
-                        let mut scores = vec![f32::NAN; positions];
-                        attention_scores(&mut scores, &query, &values, stride, 0.125, vectorized);
-                        assert_eq!(
-                            scores.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
-                            expected.iter().map(|x| x.to_bits()).collect::<Vec<_>>()
-                        );
-                        // A nonzero initial output also exercises accumulation across two spans.
-                        let mut expected_out = query.clone();
-                        for (row, &score) in expected.iter().enumerate() {
-                            attention_axpy(
-                                &mut expected_out,
-                                &values[row * stride..row * stride + width],
-                                score,
-                                vectorized,
-                            );
-                        }
-                        let mut actual = query;
-                        attention_values(&mut actual, &values, &scores, stride, vectorized);
-                        assert_eq!(
-                            actual.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
-                            expected_out.iter().map(|x| x.to_bits()).collect::<Vec<_>>()
-                        );
-                    }
-                }
             }
         }
     }
