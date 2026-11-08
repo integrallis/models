@@ -32,12 +32,15 @@ int main(int argc, char **argv) {
     auto cp=llama_context_default_params(); cp.n_ctx=1024; cp.n_batch=capacity; cp.n_ubatch=capacity;
     cp.n_threads=threads; cp.n_threads_batch=threads;
     cp.type_k=kv=="f32" ? GGML_TYPE_F32 : GGML_TYPE_F16; cp.type_v=cp.type_k;
+    // AUTO Flash Attention casts even F32 cache tensors to F16 in this pinned reference.
+    // Correctness needs F32 arithmetic; keep AUTO/F16 as the faster performance arm.
+    cp.flash_attn_type=kv=="f32" ? LLAMA_FLASH_ATTN_TYPE_DISABLED : LLAMA_FLASH_ATTN_TYPE_AUTO;
     auto ctx=llama_init_from_model(model,cp); if (!ctx) return 3;
     int dim=llama_model_n_embd(model); auto vocab=llama_model_get_vocab(model); int nv=llama_vocab_n_tokens(vocab);
     auto tb=llama_batch_init(capacity,0,1); auto eb=llama_batch_init(capacity,dim,1);
     std::cout << "{\"configuration\":{\"threads\":" << threads
       << ",\"context\":1024,\"maximumOutputTokens\":32,\"batch\":" << capacity
-      << ",\"kvType\":\"" << kv << "\",\"loadMs\":" << ms(loaded) << "}}" << std::endl;
+      << ",\"kvType\":\"" << kv << "\",\"flashAttention\":\"" << (kv=="f32" ? "disabled" : "auto") << "\",\"loadMs\":" << ms(loaded) << "}}" << std::endl;
     std::ifstream cases(argv[2]); if (!cases) throw std::runtime_error("missing cases");
     std::string line;
     while (std::getline(cases,line)) {

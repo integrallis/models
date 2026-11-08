@@ -105,6 +105,26 @@ class ProtocolTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             compare.measured([dict(run=0)], dict(id="x", warmups=1, repetitions=3))
 
+    def test_new_receipt_rejects_implicit_f16_attention_on_an_f32_cache(self):
+        for mode in [None, "auto", "disabled"]:
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                corpus, manifest, variant = self.fixture(root)
+                path = root / "receipt.json"
+                receipt = json.loads(path.read_text())
+                receipt.update(schema=2, referenceFlashAttention="disabled")
+                path.write_text(json.dumps(receipt))
+                path = root / variant / "reference.jsonl"
+                rows = [json.loads(line) for line in path.read_text().splitlines()]
+                if mode is not None:
+                    rows[0]["configuration"]["flashAttention"] = mode
+                path.write_text("\n".join(map(json.dumps, rows)))
+                if mode == "disabled":
+                    self.assertTrue(compare.evaluate(corpus, manifest, root, variant, Evaluator())["taskQualified"])
+                else:
+                    with self.assertRaisesRegex(ValueError, "implicit F16"):
+                        compare.evaluate(corpus, manifest, root, variant, Evaluator())
+
 
 if __name__ == "__main__":
     unittest.main()
