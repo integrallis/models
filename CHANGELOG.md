@@ -12,6 +12,10 @@ All notable changes to models are documented here.
   normalization and activation arithmetic, and its decoder RMS, SwiGLU and
   attention arithmetic. Keep the Java graph and cache lifecycle with bounded
   Models-owned native kernels.
+- Match image-decoder Q4_K repacked and Q5_K/Q6_K tiled graph arithmetic,
+  including batch-tail and pruning behavior. Preserve native float rotary
+  factors and the reference's fused-operation order. Correct a duplicated
+  native capability bit without advertising the x86 image contract on ARM.
 - Preserve the complete KV prefix when pruning final-layer prefill queries.
   Round newly appended image-decoder cache rows once and borrow the retained
   Java-owned prefix instead of copying and rounding the full history per token.
