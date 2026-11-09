@@ -47,6 +47,18 @@ public final class Needle2ForwardPass {
   private final float[][][] engramValueHistory;
   private int allocatedCapacity;
   private int checkpoint;
+  private final float[] preWeightsScratch;
+  private final float[] postWeightsScratch;
+
+  /**
+   * Two lane buffers, alternated per layer, rather than one reused buffer.
+   *
+   * <p>{@code executeLayer} returns the buffer that becomes the next layer's input, and it computes
+   * each output lane by reading <em>every</em> input lane. One shared buffer would therefore have
+   * the mixing read lanes it had already overwritten, so reuse here has to ping-pong; this is the
+   * site where the usual hold-one-buffer transformation is wrong.
+   */
+  private final float[][][] laneBuffers;
 
   public Needle2ForwardPass(Needle2Weights weights, int capacity) {
     this(weights, capacity, 9);
@@ -72,6 +84,20 @@ public final class Needle2ForwardPass {
     this.valueCache = new float[config.layerCount()][][];
     this.engramValueHistory = new float[config.engramSites().size()][][];
     this.allocatedCapacity = 0;
+    int laneCount = config.mhcLanes();
+    this.preWeightsScratch = new float[laneCount];
+    this.postWeightsScratch = new float[laneCount];
+    this.laneBuffers = new float[2][laneCount][this.modelWidth];
+  }
+
+  /**
+   * The lane buffers this graph reuses, so a test can assert they are not reallocated per token.
+   *
+   * <p>Allocating per call produces identical numbers, so only identity shows the reuse and an
+   * output comparison cannot defend it.
+   */
+  float[][][] laneScratchIdentity() {
+    return laneBuffers;
   }
 
   /**
@@ -173,7 +199,8 @@ public final class Needle2ForwardPass {
     int[] visiblePositions = attentionWindow.visiblePositions(position);
     EngramState[] engrams = prepareEngrams(position);
 
-    float[][] lanes = new float[config.mhcLanes()][modelWidth];
+    // Every element is assigned from the embedding below, so this needs no clearing.
+    float[][] lanes = laneBuffers[0];
     float[] embedding = new float[modelWidth];
     weights.embedding.decodeRow(token, embedding);
     float embeddingScale = (float) Math.sqrt(modelWidth);
@@ -190,7 +217,9 @@ public final class Needle2ForwardPass {
     }
 
     for (int layer = 0; layer < config.layerCount(); layer++) {
-      lanes = executeLayer(lanes, layer, position, visiblePositions, engrams);
+      lanes =
+          executeLayer(
+              lanes, laneBuffers[(layer + 1) & 1], layer, position, visiblePositions, engrams);
       if (hiddenCells != null) {
         hiddenCells.accept(meanLanes(lanes));
       }
@@ -226,6 +255,7 @@ public final class Needle2ForwardPass {
 
   private float[][] executeLayer(
       float[][] lanes,
+      float[][] next,
       int layerIndex,
       int position,
       int[] visiblePositions,
@@ -238,7 +268,7 @@ public final class Needle2ForwardPass {
         multiplyTogether(
             normalizedLanes, layer.mhcPhiPre(), layer.mhcPhiPost(), layer.mhcPhiResidual());
     float[] preProjection = routingProjections[0];
-    float[] preWeights = new float[laneCount];
+    float[] preWeights = preWeightsScratch;
     int activeLane = layerIndex % laneCount;
     for (int lane = 0; lane < laneCount; lane++) {
       float offset = lane == activeLane ? 4.0f : -4.0f;
@@ -265,7 +295,7 @@ public final class Needle2ForwardPass {
     float[] residual = subtract(blockOutput, combined);
 
     float[] postProjection = routingProjections[1];
-    float[] postWeights = new float[laneCount];
+    float[] postWeights = postWeightsScratch;
     for (int lane = 0; lane < laneCount; lane++) {
       float offset = lane == activeLane ? 0.0f : -4.0f;
       postWeights[lane] =
@@ -285,8 +315,9 @@ public final class Needle2ForwardPass {
     }
     Needle2Math.sinkhorn(mixing, laneCount, 20);
 
-    float[][] next = new float[laneCount][modelWidth];
     for (int outputLane = 0; outputLane < laneCount; outputLane++) {
+      // addScaled accumulates, so the row starts at zero exactly as a fresh array did.
+      java.util.Arrays.fill(next[outputLane], 0.0f);
       for (int inputLane = 0; inputLane < laneCount; inputLane++) {
         addScaled(next[outputLane], lanes[inputLane], mixing[outputLane * laneCount + inputLane]);
       }
