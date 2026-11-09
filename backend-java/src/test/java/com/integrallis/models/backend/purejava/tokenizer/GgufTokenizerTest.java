@@ -387,6 +387,30 @@ class GgufTokenizerTest {
     }
 
     @Test
+    void countsTheTokensLongestFirstTruncationDropped() {
+      // #362: truncation was silent, so a pair scored on a prefix was indistinguishable from one
+      // that fit. The existing tests above pin which tokens survive; this pins that the loss is
+      // reported, which is what a caller needs to measure a rate.
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createWordPieceMetadata());
+
+      GgufTokenizer.TokenizedPair fits = tokenizer.encodePair("transit api", "friendly riders", 16);
+      assertThat(fits.droppedTokens()).as("a pair inside the window loses nothing").isZero();
+
+      // "transit api friendly" plus "transit api" is five content tokens; a 7-token window leaves
+      // four after [CLS] and two [SEP], so exactly one token is dropped.
+      GgufTokenizer.TokenizedPair truncated =
+          tokenizer.encodePair("transit api friendly", "transit api", 7);
+      assertThat(truncated.droppedTokens()).isEqualTo(1);
+      assertThat(truncated.tokens()).hasSize(7);
+
+      // Tighter window, more dropped: six content tokens into a budget of three.
+      GgufTokenizer.TokenizedPair harder =
+          tokenizer.encodePair("transit api friendly", "transit api friendly", 6);
+      assertThat(harder.droppedTokens()).isEqualTo(3);
+      assertThat(harder.tokens()).hasSize(6);
+    }
+
+    @Test
     void rejectsPairEncodingForNonWordPieceModels() {
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createTestMetadata());
 

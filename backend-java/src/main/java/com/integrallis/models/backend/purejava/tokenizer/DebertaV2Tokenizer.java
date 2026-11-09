@@ -29,10 +29,25 @@ import java.util.Objects;
 /** Reads the standard Hugging Face DeBERTa-v2 Unigram sentence-pair tokenizer. */
 public final class DebertaV2Tokenizer {
 
-  /** Pair tokens and segment identifiers in the model's expected template. */
-  public record TokenizedPair(int[] tokens, int[] tokenTypes) {
+  /**
+   * Pair tokens and segment identifiers in the model's expected template.
+   *
+   * <p>{@code droppedTokens} is how many tokens longest-first truncation removed to fit the window.
+   * Truncation was previously silent, so a caller scoring a long pair could not tell it had been
+   * scored on a prefix: on conversational memory about one candidate in eight is, per #362. Zero
+   * means the pair fit.
+   */
+  public record TokenizedPair(int[] tokens, int[] tokenTypes, int droppedTokens) {
+
+    /** A pair that fit its window, so nothing was dropped. */
+    public TokenizedPair(int[] tokens, int[] tokenTypes) {
+      this(tokens, tokenTypes, 0);
+    }
 
     public TokenizedPair {
+      if (droppedTokens < 0) {
+        throw new IllegalArgumentException("droppedTokens must be >= 0: " + droppedTokens);
+      }
       tokens = Objects.requireNonNull(tokens, "tokens").clone();
       tokenTypes = Objects.requireNonNull(tokenTypes, "tokenTypes").clone();
       if (tokens.length != tokenTypes.length) {
@@ -102,6 +117,7 @@ public final class DebertaV2Tokenizer {
     List<Integer> first = mutable(unigram.encode(query));
     List<Integer> second = mutable(unigram.encode(document));
     int contentBudget = maxTokens - 3;
+    int dropped = Math.max(0, first.size() + second.size() - contentBudget);
     while (first.size() + second.size() > contentBudget) {
       List<Integer> longer = first.size() >= second.size() ? first : second;
       longer.remove(longer.size() - 1);
@@ -121,7 +137,7 @@ public final class DebertaV2Tokenizer {
     }
     tokens[position] = separatorToken;
     tokenTypes[position] = 1;
-    return new TokenizedPair(tokens, tokenTypes);
+    return new TokenizedPair(tokens, tokenTypes, dropped);
   }
 
   private static List<Integer> mutable(int[] tokens) {
