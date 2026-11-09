@@ -8484,6 +8484,82 @@ mod tests {
     }
 
     #[test]
+    fn head_major_attention_output_does_not_depend_on_the_cache_stride() {
+        // The retained store grows, so one sequence addresses the same logical cache at a tighter
+        // stride than another reaches with a wider one. If the output moved with the stride,
+        // growing the store rather than preallocating the declared context would change a model's
+        // tokens, and every pinned record with it.
+        let context = jmodels_kernels_context_create(3);
+        assert!(!context.is_null());
+        let (heads, width, positions) = (4_usize, 64_usize, 23_usize);
+        let dimension = heads * width;
+        let scale = 1.0 / (width as f32).sqrt();
+        let query: Vec<f32> = (0..dimension)
+            .map(|i| (i % 19) as f32 * 0.11 - 1.0)
+            .collect();
+        let cell = |head: usize, position: usize, lane: usize, salt: usize| {
+            (((head * 131 + position * 17 + lane * 3 + salt) % 37) as f32) * 0.05 - 0.9
+        };
+        let mut reference: Vec<f32> = Vec::new();
+        for stride in [positions, positions + 1, 64, 512] {
+            let mut keys = vec![0.0f32; stride * dimension];
+            let mut values = vec![0.0f32; stride * dimension];
+            for head in 0..heads {
+                for position in 0..positions {
+                    for lane in 0..width {
+                        let at = (head * stride + position) * width + lane;
+                        keys[at] = cell(head, position, lane, 0);
+                        values[at] = cell(head, position, lane, 11);
+                    }
+                }
+            }
+            let mut output = vec![0.0f32; dimension];
+            let mut scores = vec![0.0f32; heads * positions];
+            let status = unsafe {
+                jmodels_head_major_attention_f32_with_context(
+                    context,
+                    query.as_ptr(),
+                    query.len() as u64,
+                    keys.as_ptr(),
+                    keys.len() as u64,
+                    values.as_ptr(),
+                    values.len() as u64,
+                    output.as_mut_ptr(),
+                    output.len() as u64,
+                    scores.as_mut_ptr(),
+                    scores.len() as u64,
+                    heads as u32,
+                    width as u32,
+                    stride as u32,
+                    positions as u32,
+                    scale,
+                )
+            };
+            assert_eq!(status, STATUS_OK, "stride {stride}");
+            if reference.is_empty() {
+                reference = output;
+            } else {
+                // Bit-identical, not approximate: the same values are summed in the same order,
+                // so a tolerance here would hide exactly the drift this test exists to catch.
+                // Reported as the first differing lane rather than two 256-float dumps.
+                let differing = output
+                    .iter()
+                    .zip(reference.iter())
+                    .position(|(a, b)| a.to_bits() != b.to_bits());
+                assert_eq!(
+                    differing,
+                    None,
+                    "stride {stride} changed the attention output at lane {differing:?}: \
+                     {:?} instead of {:?}",
+                    differing.map(|i| output[i]),
+                    differing.map(|i| reference[i])
+                );
+            }
+        }
+        unsafe { jmodels_kernels_context_destroy(context) };
+    }
+
+    #[test]
     fn head_major_attention_matches_existing_decode_and_rejects_short_caches() {
         let context = jmodels_kernels_context_create(3);
         assert!(!context.is_null());

@@ -65,6 +65,17 @@ public interface BatchedCausalAttentionKernel extends AutoCloseable {
     return false;
   }
 
+  /**
+   * Bytes this kernel holds for its own retained sequence state.
+   *
+   * <p>An implementation that retains K and V itself holds a second copy of the sequence, and a
+   * caller asking a session how much it has allocated means both. Zero for an implementation that
+   * reads the caller's cache.
+   */
+  default long allocatedStateBytes() {
+    return 0L;
+  }
+
   /** Notifies retained device state that speculative positions were discarded. */
   default void rewind(int checkpoint) {}
 
