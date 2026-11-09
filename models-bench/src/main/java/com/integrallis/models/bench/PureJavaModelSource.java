@@ -19,11 +19,11 @@ import com.integrallis.models.backend.purejava.PureJavaBackend;
 import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
 import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import com.integrallis.models.backend.purejava.spi.GgufMatrixKernelProvider;
-import java.util.Optional;
-import java.util.ServiceLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.ServiceLoader;
 
 /** Exact filesystem source used by an in-process benchmark. */
 record PureJavaModelSource(String identity, Path artifact) {

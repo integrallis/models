@@ -88,7 +88,9 @@ final class DecodeProfileCli {
         BenchmarkCliArguments.integer(values, "token-id", -1),
         BenchmarkCliArguments.integer(values, "warmup-tokens", 64),
         BenchmarkCliArguments.integer(values, "measure-tokens", 256),
-        values.containsKey("native"),
+        // BenchmarkCliArguments takes --name value pairs only, so this is "--native true",
+        // not a bare flag; parsing the value also makes "--native false" explicit.
+        Boolean.parseBoolean(values.getOrDefault("native", "false")),
         // Mirrors the qualification harness, which pins the pool rather than taking the box's
         // processor count.
         BenchmarkCliArguments.integer(values, "threads", 8),
