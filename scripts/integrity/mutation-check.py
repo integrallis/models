@@ -62,17 +62,38 @@ def oversized_tracked_path(root):
     subprocess.run(["git", "add", "--force", "--", path], cwd=root, check=True)
 
 
+def documented_modeljars_version():
+    """The version this tree documents, read rather than pinned.
+
+    The guard used to carry the literal. Every ModelJars release left it naming the previous one,
+    and the guard then failed on a clean tree -- which mutation-check reports as RED, because a
+    guard that already fails proves nothing when the defect is injected. That is what happened on
+    #404: the branch correctly moved to 0.1.77 and the literal still said 0.1.76.
+
+    Reading it here keeps the mutation honest: the injected defect is always "behind the version
+    this tree declares", which is the defect the guard exists to catch, whatever that version is.
+    """
+    for line in (ROOT / "gradle.properties").read_text().splitlines():
+        if line.startswith("modeljarsVersion"):
+            return line.split("=", 1)[1].strip()
+    raise AssertionError("gradle.properties carries no modeljarsVersion")
+
+
+DOCUMENTED_MODELJARS = documented_modeljars_version()
+
+
 # name, guard command, the defect to inject, what the guard is supposed to notice
 MUTATIONS = [
     (
         "modeljars-currency/documented-version-behind-central",
-        ["python3", "scripts/verify-modeljars-currency.py", ".", "0.1.76"],
+        ["python3", "scripts/verify-modeljars-currency.py", ".", DOCUMENTED_MODELJARS],
         sub("gradle.properties",
-            "modeljarsVersion = 0.1.76",
+            f"modeljarsVersion = {DOCUMENTED_MODELJARS}",
             "modeljarsVersion = 0.1.65"),
-        "documentation advertising ModelJars 0.1.65 against a published 0.1.76 -- shipped on "
-        "2026-11-03, and 0.1.65 predates the ONNX intake and the speech loader, so a reader "
-        "following the docs got a runtime that could not load models the catalog advertises",
+        f"documentation advertising ModelJars 0.1.65 against a published {DOCUMENTED_MODELJARS} "
+        "-- shipped on 2026-11-03, and 0.1.65 predates the ONNX intake and the speech loader, so "
+        "a reader following the docs got a runtime that could not load models the catalog "
+        "advertises",
     ),
     (
         "portable-paths/windows-checkout-limit",
