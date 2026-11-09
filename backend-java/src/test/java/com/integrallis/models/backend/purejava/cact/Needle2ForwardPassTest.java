@@ -130,4 +130,40 @@ class Needle2ForwardPassTest {
     }
     return true;
   }
+
+  @Test
+  void reusesLaneScratchAcrossTokensRatherThanAllocatingPerLayer() throws IOException {
+    // executeLayer allocated preWeights, postWeights and a laneCount-by-modelWidth lane array on
+    // every layer of every token. Allocating per call produces identical numbers, so only identity
+    // shows the reuse.
+    //
+    // This assertion is gated on the Needle 2 fixture like every other test in this file, because
+    // the graph cannot be built without one. It therefore does NOT guard the reuse in CI; it
+    // guards it for whoever runs the fixture. #373 asked for an observable assertion and this is
+    // as observable as the fixture situation allows.
+    String configured = System.getProperty("models.fixtures.needle2Cact", "");
+    assumeTrue(!configured.isBlank(), "set -Dmodels.fixtures.needle2Cact=<needle2.cact>");
+    Path path = Path.of(configured);
+    assumeTrue(Files.isRegularFile(path), "Needle 2 fixture is not installed");
+
+    try (Arena arena = Arena.ofConfined()) {
+      Needle2Weights weights =
+          Needle2Weights.load(CactNeedle2Layout.from(CactParser.parse(path, arena)));
+      Needle2ForwardPass forwardPass = new Needle2ForwardPass(weights, 8);
+
+      forwardPass.forward(2, 0);
+      float[][][] afterFirst = forwardPass.laneScratchIdentity();
+      float[][] firstLaneRows = afterFirst[0];
+      forwardPass.forward(3, 1);
+      float[][][] afterSecond = forwardPass.laneScratchIdentity();
+
+      assertThat(afterSecond)
+          .as("the lane buffers must not be reallocated per token")
+          .isSameAs(afterFirst);
+      assertThat(afterSecond[0])
+          .as("each lane buffer must keep its identity, not just the holder array")
+          .isSameAs(firstLaneRows);
+      assertThat(afterSecond[0]).isNotSameAs(afterSecond[1]);
+    }
+  }
 }

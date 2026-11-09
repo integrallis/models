@@ -53,6 +53,7 @@ final class DebertaV2ForwardPass {
   private float[] feedForwardProjected = new float[0];
   private int capacity;
   private int[] relativeIndices = new int[0];
+  private int[] byDistanceScratch = new int[0];
   private int relativeIndexLength;
 
   DebertaV2ForwardPass(DebertaV2Config config, DebertaV2Weights weights) {
@@ -147,8 +148,20 @@ final class DebertaV2ForwardPass {
     int dim = config.hiddenSize();
     ensureCapacity(sequenceLength);
     if (relativeIndexLength != sequenceLength) {
-      relativeIndices = new int[Math.multiplyExact(sequenceLength, sequenceLength)];
-      int[] byDistance = new int[2 * sequenceLength - 1];
+      // Grown on demand rather than reallocated whenever the length changes. The cache above
+      // already avoids a per-call allocation, but a reranker sees alternating query-document
+      // lengths, and each change previously threw away a sequenceLength^2 array to allocate
+      // another. Held to the longest sequence seen instead; the indices below are recomputed
+      // regardless, because they depend on the length.
+      int required = Math.multiplyExact(sequenceLength, sequenceLength);
+      if (relativeIndices.length < required) {
+        relativeIndices = new int[required];
+      }
+      int spread = 2 * sequenceLength - 1;
+      if (byDistanceScratch.length < spread) {
+        byDistanceScratch = new int[spread];
+      }
+      int[] byDistance = byDistanceScratch;
       for (int distance = 1 - sequenceLength; distance < sequenceLength; distance++) {
         int bucket =
             relativeBucket(distance, config.positionBuckets(), config.maxRelativePositions());
