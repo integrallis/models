@@ -18,13 +18,32 @@ ENV JAVA_HOME=/usr/lib/jvm/temurin-25-jdk
 ENV PATH="$JAVA_HOME/bin:$PATH"
 
 ARG JJAVA_VERSION=1.0-a7
+# Fetched in an outer retry loop, not only with wget's own --tries. wget retries the transient
+# HTTP responses it is told to, but aborts immediately on a network-layer failure (exit 4), which
+# is what a brief GitHub-releases outage looks like. On 2026-11-09 one such minute failed this
+# step on main and on an unrelated PR at the same time, reddening a gate that had passed its
+# previous 23 runs, for a reason no change of ours could cause.
 RUN cd /tmp && \
-    wget --no-verbose --timeout=30 --tries=5 --waitretry=5 \
-        --retry-connrefused --retry-on-host-error --retry-on-http-error=429,500,502,503,504 \
-        "https://github.com/dflib/jjava/releases/download/${JJAVA_VERSION}/jjava-${JJAVA_VERSION}-kernelspec.zip" && \
-    unzip -q "jjava-${JJAVA_VERSION}-kernelspec.zip" -d jjava-kernel && \
+    url="https://github.com/dflib/jjava/releases/download/${JJAVA_VERSION}/jjava-${JJAVA_VERSION}-kernelspec.zip" && \
+    archive="jjava-${JJAVA_VERSION}-kernelspec.zip" && \
+    for attempt in 1 2 3 4 5; do \
+        if wget --no-verbose --timeout=30 --tries=3 --waitretry=5 \
+                --retry-connrefused --retry-on-host-error \
+                --retry-on-http-error=429,500,502,503,504 \
+                -O "${archive}" "${url}"; then \
+            break; \
+        fi; \
+        rm -f "${archive}"; \
+        if [ "${attempt}" = 5 ]; then \
+            echo "Could not fetch ${url} after 5 attempts." >&2; \
+            exit 1; \
+        fi; \
+        echo "Fetch attempt ${attempt} failed; retrying in $((attempt * 10))s." >&2; \
+        sleep $((attempt * 10)); \
+    done && \
+    unzip -q "${archive}" -d jjava-kernel && \
     jupyter kernelspec install jjava-kernel --name=java --prefix=/opt/conda && \
-    rm -rf /tmp/jjava-kernel "/tmp/jjava-${JJAVA_VERSION}-kernelspec.zip"
+    rm -rf /tmp/jjava-kernel "/tmp/${archive}"
 
 COPY jupyter/kernel.json /opt/conda/share/jupyter/kernels/java/kernel.json
 COPY jupyter/prepare-classpath.sh /usr/local/bin/before-notebook.d/20-models-classpath.sh
