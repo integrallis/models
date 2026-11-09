@@ -298,7 +298,7 @@ configure(libraryProjects) {
     // Default 'test' task excludes infrastructure-heavy tags
     tasks.named<Test>("test") {
         useJUnitPlatform {
-            excludeTags("slow", "benchmark", "integration")
+            excludeTags("slow", "benchmark", "integration", "model-fixture")
         }
     }
 
