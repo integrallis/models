@@ -26,6 +26,14 @@ import java.util.Objects;
 /** Package boundary for the pure-Java DeBERTa-v2 reranking implementation. */
 public final class DebertaV2Engine {
 
+  // Atomic because DebertaV2Engine.score is not synchronized, so a plain long would
+  // under-count under concurrent scoring and a synchronized accessor would imply a
+  // safety the writes do not have. Incremented only on the truncation path.
+  private final java.util.concurrent.atomic.AtomicLong truncatedPairs =
+      new java.util.concurrent.atomic.AtomicLong();
+  private final java.util.concurrent.atomic.AtomicLong droppedTokens =
+      new java.util.concurrent.atomic.AtomicLong();
+
   private final DebertaV2Tokenizer tokenizer;
   private final DebertaV2ForwardPass forwardPass;
 
@@ -53,6 +61,30 @@ public final class DebertaV2Engine {
   public double score(String query, String document) {
     Objects.requireNonNull(query, "query");
     Objects.requireNonNull(document, "document");
-    return forwardPass.score(tokenizer.encodePair(query, document).tokens());
+    DebertaV2Tokenizer.TokenizedPair pair = tokenizer.encodePair(query, document);
+    if (pair.droppedTokens() > 0) {
+      truncatedPairs.incrementAndGet();
+      droppedTokens.addAndGet(pair.droppedTokens());
+    }
+    return forwardPass.score(pair.tokens());
+  }
+
+  /**
+   * How many pairs this model truncated, and how many tokens it dropped, since it was opened.
+   *
+   * <p>Truncation was silent. A caller scoring a long query-document pair got a score computed on a
+   * prefix with no way to know: measured over LongMemEval-S, 237 of 1,785 pairs (13.3%) exceeded
+   * the 512-token window, touching 99 of 119 queries, with the longest pair at 8,755 tokens. See
+   * #362. Cumulative rather than per-call so a caller can report a rate over a run without
+   * threading a return value through every score.
+   *
+   * @param truncatedPairs pairs that did not fit the window
+   * @param droppedTokens tokens removed across those pairs
+   */
+  public record TruncationReport(long truncatedPairs, long droppedTokens) {}
+
+  /** Returns the truncation seen so far. Never null; zeroed only by opening a new engine. */
+  public TruncationReport truncationReport() {
+    return new TruncationReport(truncatedPairs.get(), droppedTokens.get());
   }
 }
