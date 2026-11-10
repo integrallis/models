@@ -25,9 +25,15 @@ import com.integrallis.models.backend.purejava.cache.SequenceGrowth;
  * restrides: every head's run moves to a new offset. {@link #stride()} is therefore the number the
  * kernel must receive as its capacity argument, and it is not the declared ceiling.
  *
+ * <p>Rows are held as the IEEE binary16 bit patterns the caller rounds them to, two bytes an
+ * element rather than four. Widening binary16 to binary32 is exact, so the kernel reads the same
+ * operands it read when this store widened them itself, and halving the width halves the bytes a
+ * decode step's read of the retained prefix has to touch. The decode path reads the whole prefix
+ * once per token, which is what makes that the dominant read.
+ *
  * <p>This store holds the rows and nothing else. It deliberately does not copy them in: the caller
- * owns that loop because the values are rounded through F16 on the way, and moving that arithmetic
- * here would put a published numerical contract behind an allocation concern.
+ * owns that loop because the values are rounded to F16 on the way, and moving that arithmetic here
+ * would put a published numerical contract behind an allocation concern.
  *
  * <p>Growth follows {@link SequenceGrowth}, the one definition the Java caches use. This was the
  * fifth copy of the preallocate-the-ceiling arithmetic that {@code SequenceGrowth}'s own
@@ -36,14 +42,14 @@ import com.integrallis.models.backend.purejava.cache.SequenceGrowth;
  */
 final class HeadMajorKvStore {
 
-  private static final float[] EMPTY = new float[0];
+  private static final short[] EMPTY = new short[0];
 
   private final int heads;
   private final int width;
   private final int dimension;
   private final int ceiling;
-  private float[] keys = EMPTY;
-  private float[] values = EMPTY;
+  private short[] keys = EMPTY;
+  private short[] values = EMPTY;
   private int stride;
   int positions;
 
@@ -75,17 +81,19 @@ final class HeadMajorKvStore {
     return stride;
   }
 
-  float[] keys() {
+  /** The retained keys as F16 bit patterns, addressed by {@link #stride()}. */
+  short[] keys() {
     return keys;
   }
 
-  float[] values() {
+  /** The retained values as F16 bit patterns, addressed by {@link #stride()}. */
+  short[] values() {
     return values;
   }
 
   /** Bytes held by this layer's two buffers. */
   long allocatedBytes() {
-    return ((long) keys.length + values.length) * Float.BYTES;
+    return ((long) keys.length + values.length) * Short.BYTES;
   }
 
   /**
@@ -98,8 +106,8 @@ final class HeadMajorKvStore {
     if (grown == stride) {
       return stride;
     }
-    float[] grownKeys = new float[Math.multiplyExact(grown, dimension)];
-    float[] grownValues = new float[grownKeys.length];
+    short[] grownKeys = new short[Math.multiplyExact(grown, dimension)];
+    short[] grownValues = new short[grownKeys.length];
     int retained = Math.min(positions, stride);
     if (retained > 0) {
       // Head-major: each head's run starts at its own multiple of the stride, so a wider stride

@@ -32,9 +32,14 @@ class HeadMajorKvStoreTest {
   private static final int HEADS = 3;
   private static final int WIDTH = 4;
 
-  /** A value identifying its own head, position and lane, so a misplaced row is visible. */
+  /**
+   * A value identifying its own head, position and lane, so a misplaced row is visible.
+   *
+   * <p>Kept under 2048, where every integer is exactly representable in F16, so a marker survives
+   * the rounding the store's caller applies and a shifted row cannot be mistaken for a rounded one.
+   */
   private static float marker(int head, int position, int lane) {
-    return head * 100_000 + position * 100 + lane;
+    return head * 600 + position * 6 + lane;
   }
 
   /**
@@ -45,8 +50,8 @@ class HeadMajorKvStoreTest {
     for (int head = 0; head < HEADS; head++) {
       int destination = (head * stride + position) * WIDTH;
       for (int lane = 0; lane < WIDTH; lane++) {
-        store.keys()[destination + lane] = marker(head, position, lane);
-        store.values()[destination + lane] = -marker(head, position, lane);
+        store.keys()[destination + lane] = Float.floatToFloat16(marker(head, position, lane));
+        store.values()[destination + lane] = Float.floatToFloat16(-marker(head, position, lane));
       }
     }
     store.positions = position + 1;
@@ -57,10 +62,10 @@ class HeadMajorKvStoreTest {
       for (int head = 0; head < HEADS; head++) {
         for (int lane = 0; lane < WIDTH; lane++) {
           int at = (head * store.stride() + position) * WIDTH + lane;
-          assertThat(store.keys()[at])
+          assertThat(Float.float16ToFloat(store.keys()[at]))
               .describedAs("key head %s position %s lane %s", head, position, lane)
               .isEqualTo(marker(head, position, lane));
-          assertThat(store.values()[at])
+          assertThat(Float.float16ToFloat(store.values()[at]))
               .describedAs("value head %s position %s lane %s", head, position, lane)
               .isEqualTo(-marker(head, position, lane));
         }
@@ -75,10 +80,27 @@ class HeadMajorKvStoreTest {
 
     assertThat(store.ensureCapacity(1)).isEqualTo(SequenceGrowth.INITIAL_CAPACITY);
 
-    long declared = 2L * 32 * 128 * 4096 * Float.BYTES;
-    assertThat(declared).isEqualTo(128L * 1024 * 1024); // 128 MiB per layer, 4 GiB over 32 layers
-    assertThat(store.allocatedBytes()).isEqualTo(2L * 32 * 128 * 16 * Float.BYTES);
+    long declared = 2L * 32 * 128 * 4096 * Short.BYTES;
+    assertThat(declared).isEqualTo(64L * 1024 * 1024); // 64 MiB per layer, 2 GiB over 32 layers
+    assertThat(store.allocatedBytes()).isEqualTo(2L * 32 * 128 * 16 * Short.BYTES);
     assertThat(store.allocatedBytes()).isLessThan(declared / 100);
+  }
+
+  @Test
+  void holdsF16BitsRatherThanWidenedValues() {
+    HeadMajorKvStore store = new HeadMajorKvStore(1, 4, 16);
+    int stride = store.ensureCapacity(1);
+    assertThat(stride).isEqualTo(SequenceGrowth.INITIAL_CAPACITY);
+
+    // 0.1 has no exact F16 representation, so it shows what the store keeps and what it discards.
+    float rounded = Float.float16ToFloat(Float.floatToFloat16(0.1f));
+    store.keys()[0] = Float.floatToFloat16(0.1f);
+
+    assertThat(store.keys()[0]).isEqualTo(Float.floatToFloat16(rounded));
+    assertThat(Float.float16ToFloat(store.keys()[0])).isEqualTo(rounded).isNotEqualTo(0.1f);
+    // Two bytes an element, which is the whole point of storing the bits.
+    assertThat(store.allocatedBytes()).isEqualTo(2L * 4 * stride * Short.BYTES);
+    assertThat(store.allocatedBytes()).isEqualTo(2L * 4 * stride * Float.BYTES / 2);
   }
 
   @Test
@@ -114,6 +136,28 @@ class HeadMajorKvStoreTest {
     HeadMajorKvStore store = new HeadMajorKvStore(HEADS, WIDTH, 4096);
 
     assertThat(store.ensureCapacity(40)).isEqualTo(SequenceGrowth.nextCapacity(0, 40, 4096));
+  }
+
+  @Test
+  void javaRoundingIsClosedOverEveryF16Encoding() {
+    // The store's filling loop writes Float.floatToFloat16 bits and the native kernel widens them.
+    // That makes Java and the kernel agree on an encoding rather than on a value, so Java's half of
+    // the boundary is pinned here: re-rounding a widened value must return the encoding it came
+    // from, for all 65536 of them. The kernel's half, including that cvtph_ps and the scalar
+    // widening agree on every non-NaN encoding, is asserted in the Rust crate's
+    // every_f16_encoding_widens_the_same_way_through_both_paths.
+    int finite = 0;
+    for (int encoding = 0; encoding <= 0xFFFF; encoding++) {
+      float widened = Float.float16ToFloat((short) encoding);
+      if (Float.isNaN(widened)) {
+        continue;
+      }
+      finite++;
+      assertThat(Float.floatToFloat16(widened))
+          .describedAs("rounding is not closed on encoding 0x%04X", encoding)
+          .isEqualTo((short) encoding);
+    }
+    assertThat(finite).isEqualTo(63490);
   }
 
   @Test

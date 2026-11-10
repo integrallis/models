@@ -857,6 +857,105 @@ pub unsafe extern "C" fn jmodels_vision_causal_attention_f16_cache(
     }
 }
 
+/// LLaVA attention borrowing a retained head-major cache stored as F16 bits.
+///
+/// Identical arithmetic to [`jmodels_vision_causal_attention_f16_cache`], which takes the same
+/// values already widened to F32. The cache owner rounds appended rows to F16 either way, so this
+/// entry point halves the bytes the decode read touches without changing a single operand.
+/// # Safety
+/// Pointers must cover their advertised element counts and output cannot alias inputs. K/V hold
+/// IEEE binary16 bit patterns, as the Java cache owner guarantees.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jmodels_vision_causal_attention_f16_store(
+    handle: u64,
+    query: *const f32,
+    query_len: usize,
+    key: *const u16,
+    key_len: usize,
+    value: *const u16,
+    value_len: usize,
+    out: *mut f32,
+    out_len: usize,
+    batch: usize,
+    positions: usize,
+    dim: usize,
+    heads: usize,
+    capacity: usize,
+    original_batch: usize,
+) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        if batch == 0
+            || positions < batch
+            || dim == 0
+            || heads == 0
+            || !dim.is_multiple_of(heads)
+            || query.is_null()
+            || out.is_null()
+            || key.is_null()
+            || value.is_null()
+            || !(query as usize).is_multiple_of(4)
+            || !(out as usize).is_multiple_of(4)
+            || !(key as usize).is_multiple_of(2)
+            || !(value as usize).is_multiple_of(2)
+            || original_batch < batch
+            || original_batch > positions
+            || capacity < positions
+        {
+            return -1;
+        }
+        let (Some(qn), Some(kn)) = (batch.checked_mul(dim), capacity.checked_mul(dim)) else {
+            return -1;
+        };
+        if qn > query_len
+            || kn > key_len
+            || kn > value_len
+            || qn > out_len
+            || qn > isize::MAX as usize / 4
+            || kn > isize::MAX as usize / 4
+        {
+            return -1;
+        }
+        let Some(pool) = POOLS.lock().ok().and_then(|r| r.get(&handle).cloned()) else {
+            return -2;
+        };
+        // Disjoint writable output is necessary before constructing shared input slices. K/V are
+        // two bytes an element here, so the spans they occupy are not the F32 entry point's.
+        let out_start = out as usize;
+        let Some(out_end) = out_start.checked_add(qn * 4) else {
+            return -1;
+        };
+        for (start, bytes) in [
+            (query as usize, qn * 4),
+            (key as usize, kn * 2),
+            (value as usize, kn * 2),
+        ] {
+            let Some(end) = start.checked_add(bytes) else {
+                return -1;
+            };
+            if out_start < end && start < out_end {
+                return -1;
+            }
+        }
+        unsafe {
+            super::vision_attention::run(
+                &pool,
+                query,
+                key,
+                value,
+                out,
+                batch,
+                positions,
+                heads,
+                dim / heads,
+                capacity,
+                original_batch,
+            );
+        }
+        0
+    }))
+    .unwrap_or(-3)
+}
+
 #[allow(clippy::too_many_arguments)]
 unsafe fn dense_causal_attention_impl(
     handle: u64,

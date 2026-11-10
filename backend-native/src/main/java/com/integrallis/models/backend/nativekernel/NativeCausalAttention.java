@@ -228,20 +228,21 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
         layers.computeIfAbsent(layer, ignored -> new HeadMajorKvStore(heads, width, capacity));
     // Grown before addressing, and rows are addressed by the allocated stride rather than the
     // ceiling. The rounding below is unchanged: same operand, same order, same per-element
-    // round trip, so the stored values are bit-identical to the preallocating form.
+    // rounding, so the stored values are bit-identical to the preallocating form.
     int stride = state.ensureCapacity(Math.addExact(start, batch));
     for (int row = 0; row < batch; row++) {
       for (int head = 0; head < heads; head++) {
         int source = row * state.dimension() + head * width;
         int destination = (head * stride + start + row) * width;
         // Flash Attention consumes F16 operands even when the decoder KV setting is F32.
-        // Round each appended row once. Retaining the widened values lets native attention borrow
-        // the Java-owned prefix directly instead of copying and rounding it at every decode step.
+        // Round each appended row once and retain the F16 bits, so native attention borrows the
+        // Java-owned prefix directly instead of copying and rounding it at every decode step.
+        // Storing the bits rather than widening them back keeps the same values in half the bytes:
+        // the kernel's widening load is exact, so every operand it reads is the one it read when
+        // this loop widened them here.
         for (int element = 0; element < width; element++) {
-          state.keys()[destination + element] =
-              Float.float16ToFloat(Float.floatToFloat16(key[source + element]));
-          state.values()[destination + element] =
-              Float.float16ToFloat(Float.floatToFloat16(value[source + element]));
+          state.keys()[destination + element] = Float.floatToFloat16(key[source + element]);
+          state.values()[destination + element] = Float.floatToFloat16(value[source + element]);
         }
       }
     }

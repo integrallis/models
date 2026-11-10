@@ -82,10 +82,139 @@ unsafe fn half_update_avx2(dst: &mut [f32], src: &[f32], scale: f32, add: bool) 
         round_slice(&mut dst[n..]);
     }
 }
-fn chunk(
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn dot_half_avx2(x: &[f32], y: &[u16]) -> f32 {
+    use std::arch::x86_64::*;
+    // Lane order, accumulator count, reduction tree and f64 tail are those of dot_avx2. The only
+    // difference is where each operand comes from: cvtph_ps widens exactly, so it reproduces the
+    // f32 a widened cache held bit for bit.
+    unsafe {
+        let mut a = [_mm256_setzero_ps(); 4];
+        let n = x.len() / 32 * 32;
+        for i in (0..n).step_by(32) {
+            for (j, accumulator) in a.iter_mut().enumerate() {
+                *accumulator = _mm256_fmadd_ps(
+                    _mm256_loadu_ps(x.as_ptr().add(i + 8 * j)),
+                    _mm256_cvtph_ps(_mm_loadu_si128(y.as_ptr().add(i + 8 * j).cast())),
+                    *accumulator,
+                );
+            }
+        }
+        a[0] = _mm256_add_ps(a[0], a[2]);
+        a[1] = _mm256_add_ps(a[1], a[3]);
+        a[0] = _mm256_add_ps(a[0], a[1]);
+        let mut v = _mm_add_ps(
+            _mm256_extractf128_ps::<1>(a[0]),
+            _mm256_castps256_ps128(a[0]),
+        );
+        v = _mm_hadd_ps(v, v);
+        v = _mm_hadd_ps(v, v);
+        let mut sum = _mm_cvtss_f32(v) as f64;
+        for i in n..x.len() {
+            sum += (x[i] * super::f16_to_f32(y[i])) as f64;
+        }
+        sum as f32
+    }
+}
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn half_update_half_avx2(dst: &mut [f32], src: &[u16], scale: f32, add: bool) {
+    use std::arch::x86_64::*;
+    unsafe {
+        let n = dst.len() / 8 * 8;
+        let s = _mm256_set1_ps(scale);
+        for i in (0..n).step_by(8) {
+            let d = _mm256_loadu_ps(dst.as_ptr().add(i));
+            let v = if add {
+                _mm256_fmadd_ps(
+                    _mm256_cvtph_ps(_mm_loadu_si128(src.as_ptr().add(i).cast())),
+                    s,
+                    d,
+                )
+            } else {
+                _mm256_mul_ps(d, s)
+            };
+            _mm256_storeu_ps(
+                dst.as_mut_ptr().add(i),
+                _mm256_cvtph_ps(_mm256_cvtps_ph::<0>(v)),
+            );
+        }
+        for i in n..dst.len() {
+            dst[i] = if add {
+                super::f16_to_f32(src[i]).mul_add(scale, dst[i])
+            } else {
+                dst[i] * scale
+            };
+        }
+        round_slice(&mut dst[n..]);
+    }
+}
+/// How the arithmetic reads one retained K/V element.
+///
+/// The Java cache rounds every appended row to F16 exactly once, so `u16` storage holds those F16
+/// bits and `f32` storage holds the same bits already widened. Widening binary16 to binary32 is
+/// exact, so both implementations feed identical operands to identical operations in identical
+/// order, and the storage width is a memory-traffic choice rather than a numerical one. The decode
+/// path reads the whole retained prefix once per token, so halving its width halves that read.
+///
+/// `f32` remains instantiated to serve as the parity oracle the tests compare against; the shipped
+/// decoder stores `u16`.
+pub(super) trait CacheElement: Copy + Send + Sync {
+    /// Dot product of an already-rounded query row with one cache row.
+    ///
+    /// # Safety
+    /// `row` must be at least as long as `query`.
+    unsafe fn dot_row(query: &[f32], row: &[Self]) -> f32;
+    /// `dst = half(dst * scale)`, or `dst = half(row * scale + dst)` when `add`.
+    ///
+    /// # Safety
+    /// When `add`, `row` must be at least as long as `dst`; otherwise `row` is not read.
+    unsafe fn fused_update(dst: &mut [f32], row: &[Self], scale: f32, add: bool);
+    /// One element, widened to the f32 the arithmetic operates on.
+    fn widen(self) -> f32;
+}
+impl CacheElement for f32 {
+    unsafe fn dot_row(query: &[f32], row: &[f32]) -> f32 {
+        unsafe { dot(query, row) }
+    }
+    unsafe fn fused_update(dst: &mut [f32], row: &[f32], scale: f32, add: bool) {
+        unsafe { half_update(dst, row, scale, add) };
+    }
+    fn widen(self) -> f32 {
+        self
+    }
+}
+impl CacheElement for u16 {
+    unsafe fn dot_row(query: &[f32], row: &[u16]) -> f32 {
+        #[cfg(target_arch = "x86_64")]
+        if std::is_x86_feature_detected!("avx2")
+            && std::is_x86_feature_detected!("fma")
+            && std::is_x86_feature_detected!("f16c")
+        {
+            return unsafe { dot_half_avx2(query, row) };
+        }
+        dot_scalar(query, row)
+    }
+    unsafe fn fused_update(dst: &mut [f32], row: &[u16], scale: f32, add: bool) {
+        #[cfg(target_arch = "x86_64")]
+        if std::is_x86_feature_detected!("avx2")
+            && std::is_x86_feature_detected!("fma")
+            && std::is_x86_feature_detected!("f16c")
+        {
+            unsafe { half_update_half_avx2(dst, row, scale, add) };
+            return;
+        }
+        half_update_scalar(dst, row, scale, add);
+    }
+    fn widen(self) -> f32 {
+        super::f16_to_f32(self)
+    }
+}
+fn chunk<E: CacheElement>(
     q: &[f32],
-    k: &[f32],
-    v: &[f32],
+    k: &[E],
+    v: &[E],
     begin: usize,
     end: usize,
     width: usize,
@@ -95,26 +224,26 @@ fn chunk(
     let mut sum = 0f32;
     let mut output = vec![0f32; width];
     for p in begin..end {
-        let score = unsafe { dot(q, &k[p * width..(p + 1) * width]) } * scale;
+        let score = unsafe { E::dot_row(q, &k[p * width..(p + 1) * width]) } * scale;
         let mut ms = 1f32;
         let mut vs = 1f32;
         if score > maximum {
             ms = (maximum - score).exp();
             maximum = score;
-            unsafe { half_update(&mut output, &[], ms, false) };
+            unsafe { E::fused_update(&mut output, &[], ms, false) };
         } else {
             vs = (score - maximum).exp();
         }
-        unsafe { half_update(&mut output, &v[p * width..(p + 1) * width], vs, true) };
+        unsafe { E::fused_update(&mut output, &v[p * width..(p + 1) * width], vs, true) };
         sum = sum.mul_add(ms, vs);
     }
     (maximum, sum, output)
 }
 #[allow(clippy::too_many_arguments)]
-fn small(
+fn small<E: CacheElement>(
     q: &[f32],
-    k: &[f32],
-    v: &[f32],
+    k: &[E],
+    v: &[E],
     visible: usize,
     padded: usize,
     width: usize,
@@ -274,10 +403,10 @@ unsafe fn tile_exp_avx2(row: &mut [f32], max: f32) -> f64 {
     sum
 }
 #[allow(clippy::too_many_arguments)]
-fn tiled(
+fn tiled<E: CacheElement>(
     q: &[f32],
-    k: &[f32],
-    v: &[f32],
+    k: &[E],
+    v: &[E],
     batch: usize,
     start: usize,
     dim: usize,
@@ -311,8 +440,8 @@ fn tiled(
             scores.fill(0.);
             for j in 0..n {
                 for d in 0..width {
-                    kt[d * 64 + j] = k[(begin + j) * width + d];
-                    vt[j * width + d] = v[(begin + j) * width + d];
+                    kt[d * 64 + j] = k[(begin + j) * width + d].widen();
+                    vt[j * width + d] = v[(begin + j) * width + d].widen();
                 }
             }
             unsafe {
@@ -373,21 +502,19 @@ unsafe fn round_slice(values: &mut [f32]) {
         *value = half(*value);
     }
 }
-unsafe fn dot(x: &[f32], y: &[f32]) -> f32 {
-    #[cfg(target_arch = "x86_64")]
-    if std::is_x86_feature_detected!("avx2")
-        && std::is_x86_feature_detected!("fma")
-        && std::is_x86_feature_detected!("f16c")
-    {
-        return unsafe { dot_avx2(x, y) };
-    }
+/// The scalar reduction both storage widths use, so the order exists in one place only.
+///
+/// `widen` is the identity for `f32`, which makes this the F32 body it replaces; for `u16` it
+/// widens each element where it is loaded rather than through a staging buffer, so no allocation
+/// enters the decode loop on a target without the F16 intrinsics.
+fn dot_scalar<E: CacheElement>(x: &[f32], y: &[E]) -> f32 {
     let n = x.len() / 32 * 32;
     let mut sums = [[0f32; 8]; 4];
     for i in (0..n).step_by(32) {
         for (j, group) in sums.iter_mut().enumerate() {
             for (lane, sum) in group.iter_mut().enumerate() {
                 let d = i + 8 * j + lane;
-                *sum = x[d].mul_add(y[d], *sum);
+                *sum = x[d].mul_add(y[d].widen(), *sum);
             }
         }
     }
@@ -403,9 +530,29 @@ unsafe fn dot(x: &[f32], y: &[f32]) -> f32 {
     ];
     let mut sum = ((h[0] + h[1]) + (h[2] + h[3])) as f64;
     for i in n..x.len() {
-        sum += (x[i] * y[i]) as f64;
+        sum += (x[i] * y[i].widen()) as f64;
     }
     sum as f32
+}
+unsafe fn dot(x: &[f32], y: &[f32]) -> f32 {
+    #[cfg(target_arch = "x86_64")]
+    if std::is_x86_feature_detected!("avx2")
+        && std::is_x86_feature_detected!("fma")
+        && std::is_x86_feature_detected!("f16c")
+    {
+        return unsafe { dot_avx2(x, y) };
+    }
+    dot_scalar(x, y)
+}
+/// The scalar update both storage widths use. See [`dot_scalar`] on why this is not two loops.
+fn half_update_scalar<E: CacheElement>(dst: &mut [f32], src: &[E], scale: f32, add: bool) {
+    for i in 0..dst.len() {
+        dst[i] = half(if add {
+            src[i].widen().mul_add(scale, dst[i])
+        } else {
+            dst[i] * scale
+        });
+    }
 }
 unsafe fn half_update(dst: &mut [f32], src: &[f32], scale: f32, add: bool) {
     #[cfg(target_arch = "x86_64")]
@@ -416,13 +563,7 @@ unsafe fn half_update(dst: &mut [f32], src: &[f32], scale: f32, add: bool) {
         unsafe { half_update_avx2(dst, src, scale, add) };
         return;
     }
-    for i in 0..dst.len() {
-        dst[i] = half(if add {
-            src[i].mul_add(scale, dst[i])
-        } else {
-            dst[i] * scale
-        });
-    }
+    half_update_scalar(dst, src, scale, add);
 }
 /// Accumulates C += A B in increasing reduction-index order.
 pub(super) unsafe fn gemm(c: &mut [f32], a: &[f32], b: &[f32], m: usize, k: usize, n: usize) {
@@ -483,11 +624,11 @@ unsafe fn tile_exp(row: &mut [f32], max: f32) -> f64 {
 }
 /// The FFI owner validates all shapes and lifetimes before entering this synchronous call.
 #[allow(clippy::too_many_arguments)]
-pub(super) unsafe fn run(
+pub(super) unsafe fn run<E: CacheElement>(
     pool: &rayon::ThreadPool,
     q: *const f32,
-    k: *const f32,
-    v: *const f32,
+    k: *const E,
+    v: *const E,
     out: *mut f32,
     batch: usize,
     positions: usize,
@@ -550,6 +691,7 @@ pub(super) unsafe fn run(
 mod tests {
     use crate::deberta_kernels::{
         jmodels_deberta_create, jmodels_deberta_destroy, jmodels_vision_causal_attention_f16_cache,
+        jmodels_vision_causal_attention_f16_store,
     };
     fn data(count: usize, state: &mut u32) -> Vec<f32> {
         (0..count)
@@ -558,6 +700,385 @@ mod tests {
                 ((*state >> 8) as f32 / 16777216f32) * 4f32 - 2f32
             })
             .collect()
+    }
+    /// Exhaustive, because this change made the two sides of a boundary agree on bit patterns
+    /// rather than on values.
+    ///
+    /// The store's filling loop is Java and writes `Float.floatToFloat16` bits; the kernel is this
+    /// crate and widens them with `cvtph_ps`. Before, Java did the whole round trip itself and the
+    /// two never had to agree on an encoding. Java's widening is specified to be the exact IEEE
+    /// conversion, so asserting this crate's widening - both the intrinsic the kernel uses and the
+    /// scalar fallback - against that same definition over all 65536 encodings closes the loop,
+    /// including every subnormal, both zeros, the infinities and the NaN payloads.
+    #[test]
+    fn every_f16_encoding_widens_the_same_way_through_both_paths() {
+        let mut finite = 0;
+        // Both counters below are x86-only: the comparison they summarise is.
+        #[cfg(target_arch = "x86_64")]
+        let mut quieted = 0;
+        for bits in 0u16..=u16::MAX {
+            let scalar = crate::f16_to_f32(bits);
+            if !scalar.is_nan() {
+                finite += 1;
+                // Re-encoding a widened value must return the encoding it came from, or a stored
+                // row would not survive being read back and rounded again.
+                assert_eq!(
+                    crate::f32_to_f16(scalar),
+                    bits,
+                    "round trip is not closed on encoding {bits:#06x}"
+                );
+            }
+            #[cfg(target_arch = "x86_64")]
+            if std::is_x86_feature_detected!("f16c") {
+                let intrinsic = unsafe { crate::f16_to_f32_f16c(bits) };
+                if scalar.is_nan() {
+                    // Measured, not assumed: cvtph_ps quiets a signalling payload and the scalar
+                    // widening carries it through, so on a signalling NaN the two paths differ in
+                    // the quiet bit. Both are NaN, which is all a NaN encoding is owed, and a NaN
+                    // in retained K/V means the decode already diverged. Asserted rather than
+                    // skipped so a change in either path has to come past this.
+                    assert!(
+                        intrinsic.is_nan(),
+                        "encoding {bits:#06x} widened to a number"
+                    );
+                    if intrinsic.to_bits() != scalar.to_bits() {
+                        assert_eq!(
+                            intrinsic.to_bits(),
+                            scalar.to_bits() | 0x0040_0000,
+                            "the only NaN difference permitted is the quiet bit, at {bits:#06x}"
+                        );
+                        quieted += 1;
+                    }
+                    continue;
+                }
+                assert_eq!(
+                    intrinsic.to_bits(),
+                    scalar.to_bits(),
+                    "cvtph_ps and the scalar widening disagree on encoding {bits:#06x}"
+                );
+            }
+        }
+        // Every encoding that is not a NaN, which is what the store ever holds, agrees exactly.
+        assert_eq!(finite, 63490);
+        #[cfg(target_arch = "x86_64")]
+        if std::is_x86_feature_detected!("f16c") {
+            // The 2046 NaN encodings are 1023 payloads either side; those with the quiet bit
+            // already set need no change, leaving the signalling half.
+            assert_eq!(quieted, 1022);
+        }
+    }
+    /// The values uniform random data does not reliably produce, where the two widenings could
+    /// disagree without any other test noticing: signed zero, the F16 subnormal range, the
+    /// representable extremes, and values that round *into* the subnormal range.
+    const EDGES: [f32; 13] = [
+        0.0,
+        -0.0,
+        5.9604645e-8, // smallest F16 subnormal, 2^-24
+        -5.9604645e-8,
+        6.097555e-5, // largest F16 subnormal, 1023 * 2^-24
+        -6.097555e-5,
+        3.0517578e-5, // mid subnormal
+        1.0e-8,       // rounds to zero
+        6.1035156e-5, // smallest F16 normal, 2^-14
+        1.0,
+        -1.0,
+        65504.0, // largest finite F16
+        -65504.0,
+    ];
+    #[test]
+    fn widening_agrees_on_signed_zero_subnormals_and_the_extremes() {
+        for value in EDGES {
+            let bits = crate::f32_to_f16(value);
+            let widened = crate::f16_to_f32(bits);
+            // The store's contract: rounding is closed, so re-rounding a stored value is a no-op.
+            assert_eq!(
+                crate::f32_to_f16(widened),
+                bits,
+                "rounding is not closed at {value:e}"
+            );
+            assert_eq!(
+                widened.to_bits(),
+                super::half(value).to_bits(),
+                "widening disagrees with the round trip at {value:e}"
+            );
+            #[cfg(target_arch = "x86_64")]
+            if std::is_x86_feature_detected!("f16c") {
+                // What the kernel's widening load actually produces, including the sign of zero.
+                let intrinsic = unsafe { crate::f16_to_f32_f16c(bits) };
+                assert_eq!(
+                    intrinsic.to_bits(),
+                    widened.to_bits(),
+                    "cvtph_ps disagrees with the scalar widening at {value:e}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn the_scalar_bodies_agree_on_the_edge_values_too() {
+        let widened: Vec<f32> = EDGES.iter().map(|v| super::half(*v)).collect();
+        let bits: Vec<u16> = widened.iter().copied().map(crate::f32_to_f16).collect();
+        let query: Vec<f32> = widened.iter().rev().copied().collect();
+        assert_eq!(
+            super::dot_scalar::<f32>(&query, &widened).to_bits(),
+            super::dot_scalar::<u16>(&query, &bits).to_bits()
+        );
+        for add in [false, true] {
+            let mut a = widened.clone();
+            let mut b = widened.clone();
+            super::half_update_scalar(&mut a, &widened, 0.5, add);
+            super::half_update_scalar(&mut b, &bits, 0.5, add);
+            for (i, (x, y)) in a.iter().zip(&b).enumerate() {
+                assert_eq!(x.to_bits(), y.to_bits(), "add={add} index={i}");
+            }
+        }
+    }
+    /// Covers the shared scalar bodies on every host, including the x86 ones whose dispatch sends
+    /// the kernel through the AVX2 branch and would otherwise never execute these.
+    #[test]
+    fn the_scalar_bodies_read_both_storage_widths_identically() {
+        let mut state = 0x9e3779b9;
+        let mut query = data(136, &mut state);
+        let mut cache = data(136, &mut state);
+        unsafe {
+            super::round_slice(&mut query);
+            super::round_slice(&mut cache);
+        }
+        let bits: Vec<u16> = cache.iter().copied().map(crate::f32_to_f16).collect();
+        // 136 is not a multiple of 32, so the f64 remainder tail is exercised as well as the
+        // four-accumulator body.
+        assert_eq!(
+            super::dot_scalar::<f32>(&query, &cache).to_bits(),
+            super::dot_scalar::<u16>(&query, &bits).to_bits()
+        );
+        for add in [false, true] {
+            for scale in [1f32, 0.5, 1e-3, 7.25] {
+                let mut widened = query.clone();
+                let mut half = query.clone();
+                super::half_update_scalar(&mut widened, &cache, scale, add);
+                super::half_update_scalar(&mut half, &bits, scale, add);
+                for (i, (a, b)) in widened.iter().zip(&half).enumerate() {
+                    assert_eq!(
+                        a.to_bits(),
+                        b.to_bits(),
+                        "add={add} scale={scale} index={i}"
+                    );
+                }
+            }
+        }
+    }
+    /// The nine shapes of the golden-fixture case, as (batch, start, pruned).
+    const SHAPES: [(usize, usize, bool); 9] = [
+        (1, 0, false),
+        (8, 13, false),
+        (31, 609, false),
+        (64, 12, false),
+        (128, 35, false),
+        (1, 639, false),
+        (1, 1023, false),
+        (31, 609, true),
+        (128, 35, true),
+    ];
+    #[test]
+    fn f16_storage_is_bit_identical_to_the_widened_cache() {
+        let handle = jmodels_deberta_create(8);
+        assert_ne!(handle, 0);
+        for (batch, start, pruned) in SHAPES {
+            let mut state = 0x12345678;
+            let q = data(batch * 256, &mut state);
+            let mut k = data(1024 * 256, &mut state);
+            let mut v = data(k.len(), &mut state);
+            // Both entry points receive the same cache: one widened, one as the F16 bits it was
+            // rounded to. Rounding here is what the Java cache owner does on append.
+            unsafe {
+                super::round_slice(&mut k);
+                super::round_slice(&mut v);
+            }
+            let kh: Vec<u16> = k.iter().copied().map(crate::f32_to_f16).collect();
+            let vh: Vec<u16> = v.iter().copied().map(crate::f32_to_f16).collect();
+            // The round trip must be closed, or the two arms would not hold the same values.
+            for (widened, half) in k.iter().zip(&kh).chain(v.iter().zip(&vh)) {
+                assert_eq!(widened.to_bits(), crate::f16_to_f32(*half).to_bits());
+            }
+            let physical = if pruned { 1 } else { batch };
+            let query = if pruned {
+                &q[(batch - 1) * 256..]
+            } else {
+                &q[..]
+            };
+            let mut widened_output = vec![0f32; physical * 256];
+            let mut half_output = vec![0f32; physical * 256];
+            let widened = unsafe {
+                jmodels_vision_causal_attention_f16_cache(
+                    handle,
+                    query.as_ptr(),
+                    query.len(),
+                    k.as_ptr(),
+                    k.len(),
+                    v.as_ptr(),
+                    v.len(),
+                    widened_output.as_mut_ptr(),
+                    widened_output.len(),
+                    physical,
+                    start + batch,
+                    256,
+                    2,
+                    1024,
+                    batch,
+                )
+            };
+            let half = unsafe {
+                jmodels_vision_causal_attention_f16_store(
+                    handle,
+                    query.as_ptr(),
+                    query.len(),
+                    kh.as_ptr(),
+                    kh.len(),
+                    vh.as_ptr(),
+                    vh.len(),
+                    half_output.as_mut_ptr(),
+                    half_output.len(),
+                    physical,
+                    start + batch,
+                    256,
+                    2,
+                    1024,
+                    batch,
+                )
+            };
+            assert_eq!((widened, half), (0, 0));
+            for (i, (a, b)) in widened_output.iter().zip(&half_output).enumerate() {
+                assert_eq!(
+                    a.to_bits(),
+                    b.to_bits(),
+                    "batch={batch} start={start} pruned={pruned} index={i} widened={a} half={b}"
+                );
+            }
+        }
+        jmodels_deberta_destroy(handle);
+    }
+    #[test]
+    fn f16_storage_rejects_exactly_what_the_widened_cache_rejects() {
+        let handle = jmodels_deberta_create(2);
+        let q = [1f32; 8];
+        let k = [1f32; 8];
+        let kh = [0x3c00u16; 8];
+        let mut output = [99f32; 8];
+        // (batch, positions, dim, heads, capacity, original_batch), valid last.
+        let shapes: [(usize, usize, usize, usize, usize, usize); 9] = [
+            (1, 2, 4, 1, 2, 0),
+            (1, 2, 4, 1, 2, 3),
+            (0, 2, 4, 1, 2, 1),
+            (3, 2, 4, 1, 2, 3),
+            (1, 2, 4, 0, 2, 1),
+            (1, 2, 3, 2, 2, 1),
+            (1, 2, 4, 1, 1, 1),
+            (1, 2, 8, 1, 2, 1),
+            (1, 2, 4, 1, 2, 1),
+        ];
+        for shape in shapes {
+            let (batch, positions, dim, heads, capacity, original) = shape;
+            let widened = unsafe {
+                jmodels_vision_causal_attention_f16_cache(
+                    handle,
+                    q.as_ptr(),
+                    8,
+                    k.as_ptr(),
+                    8,
+                    k.as_ptr(),
+                    8,
+                    output.as_mut_ptr(),
+                    8,
+                    batch,
+                    positions,
+                    dim,
+                    heads,
+                    capacity,
+                    original,
+                )
+            };
+            let half = unsafe {
+                jmodels_vision_causal_attention_f16_store(
+                    handle,
+                    q.as_ptr(),
+                    8,
+                    kh.as_ptr(),
+                    8,
+                    kh.as_ptr(),
+                    8,
+                    output.as_mut_ptr(),
+                    8,
+                    batch,
+                    positions,
+                    dim,
+                    heads,
+                    capacity,
+                    original,
+                )
+            };
+            assert_eq!(widened, half, "shape={shape:?}");
+        }
+        // Output aliasing an input, which the F16 entry point measures in two-byte spans.
+        let aliased = unsafe {
+            jmodels_vision_causal_attention_f16_store(
+                handle,
+                output.as_ptr(),
+                8,
+                kh.as_ptr(),
+                8,
+                kh.as_ptr(),
+                8,
+                output.as_mut_ptr(),
+                8,
+                1,
+                2,
+                4,
+                1,
+                2,
+                1,
+            )
+        };
+        assert_eq!(aliased, -1);
+        let overlapping = unsafe {
+            jmodels_vision_causal_attention_f16_store(
+                handle,
+                q.as_ptr(),
+                8,
+                output.as_ptr().cast(),
+                8,
+                kh.as_ptr(),
+                8,
+                output.as_mut_ptr(),
+                8,
+                1,
+                2,
+                4,
+                1,
+                2,
+                1,
+            )
+        };
+        assert_eq!(overlapping, -1);
+        let unknown = unsafe {
+            jmodels_vision_causal_attention_f16_store(
+                0,
+                q.as_ptr(),
+                8,
+                kh.as_ptr(),
+                8,
+                kh.as_ptr(),
+                8,
+                output.as_mut_ptr(),
+                8,
+                1,
+                2,
+                4,
+                1,
+                2,
+                1,
+            )
+        };
+        assert_eq!(unknown, -2);
+        jmodels_deberta_destroy(handle);
     }
     #[test]
     fn matches_independent_flash_attention_including_pruned_queries() {

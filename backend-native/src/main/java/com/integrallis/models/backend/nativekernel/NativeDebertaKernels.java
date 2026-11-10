@@ -149,7 +149,7 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
               .orElse(null);
       visionAttention =
           symbols
-              .find("jmodels_vision_causal_attention_f16_cache")
+              .find("jmodels_vision_causal_attention_f16_store")
               .map(
                   symbol ->
                       linker.downcallHandle(
@@ -430,29 +430,72 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
     }
   }
 
+  /**
+   * LLaVA attention over a retained head-major cache held as F16 bit patterns.
+   *
+   * <p>The native side widens each element on load, which is exact, so this reads the same operands
+   * the widened-cache entry point reads from four-byte storage. {@code key} and {@code value} carry
+   * element counts, not byte counts, as the native signature expects.
+   */
   synchronized void visionAttention(
       float[] output,
       float[] query,
-      float[] key,
-      float[] value,
+      short[] key,
+      short[] value,
       int batch,
       int positions,
       int dimension,
       int heads,
       int capacity,
       int originalBatchSize) {
-    causalAttention(
-        visionAttention,
-        output,
-        query,
-        key,
-        value,
-        batch,
-        positions,
-        dimension,
-        heads,
-        capacity,
-        originalBatchSize);
+    if (handle == 0) throw new IllegalStateException("Dense kernels are closed");
+    validateCausalShape(batch, positions, dimension, heads, capacity, originalBatchSize);
+    int qn = Math.multiplyExact(batch, dimension), kn = Math.multiplyExact(capacity, dimension);
+    if (query.length < qn || output.length < qn || key.length < kn || value.length < kn)
+      throw new IllegalArgumentException("Invalid causal attention buffer");
+    // The native ABI requires output storage disjoint from every input. K/V cannot alias a float
+    // output here, so only the query needs checking.
+    if (output == query)
+      throw new IllegalArgumentException("Causal attention output must not alias inputs");
+    if (visionAttention == null)
+      throw new UnsupportedOperationException("Native causal attention unavailable");
+    try {
+      int result =
+          (int)
+              visionAttention.invokeExact(
+                  handle,
+                  MemorySegment.ofArray(query),
+                  (long) query.length,
+                  MemorySegment.ofArray(key),
+                  (long) key.length,
+                  MemorySegment.ofArray(value),
+                  (long) value.length,
+                  MemorySegment.ofArray(output),
+                  (long) output.length,
+                  (long) batch,
+                  (long) positions,
+                  (long) dimension,
+                  (long) heads,
+                  (long) capacity,
+                  (long) originalBatchSize);
+      if (result != 0) throw new IllegalStateException("Causal attention failed: " + result);
+    } catch (Throwable failure) {
+      throw new IllegalStateException("Causal attention call failed", failure);
+    }
+  }
+
+  /** The geometry both causal-attention entry points require, whatever their cache storage. */
+  private static void validateCausalShape(
+      int batch, int positions, int dimension, int heads, int capacity, int originalBatchSize) {
+    if (originalBatchSize < batch || originalBatchSize > positions)
+      throw new IllegalArgumentException("Invalid original attention batch size");
+    if (batch < 1
+        || positions < batch
+        || capacity < positions
+        || dimension < 1
+        || heads < 1
+        || dimension % heads != 0)
+      throw new IllegalArgumentException("Invalid causal attention shape");
   }
 
   private void causalAttention(
@@ -467,16 +510,8 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
       int heads,
       int capacity,
       int originalBatchSize) {
-    if (originalBatchSize < batch || originalBatchSize > positions)
-      throw new IllegalArgumentException("Invalid original attention batch size");
     if (handle == 0) throw new IllegalStateException("Dense kernels are closed");
-    if (batch < 1
-        || positions < batch
-        || capacity < positions
-        || dimension < 1
-        || heads < 1
-        || dimension % heads != 0)
-      throw new IllegalArgumentException("Invalid causal attention shape");
+    validateCausalShape(batch, positions, dimension, heads, capacity, originalBatchSize);
     int qn = Math.multiplyExact(batch, dimension), kn = Math.multiplyExact(capacity, dimension);
     if (query.length < qn || output.length < qn || key.length < kn || value.length < kn)
       throw new IllegalArgumentException("Invalid causal attention buffer");
