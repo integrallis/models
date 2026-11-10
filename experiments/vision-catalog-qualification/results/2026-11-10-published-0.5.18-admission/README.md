@@ -45,3 +45,5 @@ exactly (`tokenAgreement = 1`) and score identically to it on both datasets.
 `admission-attempt.json` is that output. `receipt.json` records the host, revision, corpus and
 artifact digests and every payload jar's SHA-256. The `.f32` embedding blobs and `.png` probe
 images are excluded, matching the convention of the other committed result directories.
+The omitted binary tensor outputs are preserved in the checksummed
+[raw numerical archive](../2026-11-10-f16-kv-store/README.md#raw-numerical-archive).
