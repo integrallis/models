@@ -713,6 +713,8 @@ mod tests {
     #[test]
     fn every_f16_encoding_widens_the_same_way_through_both_paths() {
         let mut finite = 0;
+        // Both counters below are x86-only: the comparison they summarise is.
+        #[cfg(target_arch = "x86_64")]
         let mut quieted = 0;
         for bits in 0u16..=u16::MAX {
             let scalar = crate::f16_to_f32(bits);
