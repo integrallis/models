@@ -194,8 +194,7 @@ impl CacheElement for u16 {
         {
             return unsafe { dot_half_avx2(query, row) };
         }
-        let widened: Vec<f32> = row[..query.len()].iter().map(|h| h.widen()).collect();
-        unsafe { dot(query, &widened) }
+        dot_scalar(query, row)
     }
     unsafe fn fused_update(dst: &mut [f32], row: &[u16], scale: f32, add: bool) {
         #[cfg(target_arch = "x86_64")]
@@ -206,12 +205,7 @@ impl CacheElement for u16 {
             unsafe { half_update_half_avx2(dst, row, scale, add) };
             return;
         }
-        if !add {
-            unsafe { half_update(dst, &[], scale, false) };
-            return;
-        }
-        let widened: Vec<f32> = row[..dst.len()].iter().map(|h| h.widen()).collect();
-        unsafe { half_update(dst, &widened, scale, true) };
+        half_update_scalar(dst, row, scale, add);
     }
     fn widen(self) -> f32 {
         super::f16_to_f32(self)
@@ -508,21 +502,19 @@ unsafe fn round_slice(values: &mut [f32]) {
         *value = half(*value);
     }
 }
-unsafe fn dot(x: &[f32], y: &[f32]) -> f32 {
-    #[cfg(target_arch = "x86_64")]
-    if std::is_x86_feature_detected!("avx2")
-        && std::is_x86_feature_detected!("fma")
-        && std::is_x86_feature_detected!("f16c")
-    {
-        return unsafe { dot_avx2(x, y) };
-    }
+/// The scalar reduction both storage widths use, so the order exists in one place only.
+///
+/// `widen` is the identity for `f32`, which makes this the F32 body it replaces; for `u16` it
+/// widens each element where it is loaded rather than through a staging buffer, so no allocation
+/// enters the decode loop on a target without the F16 intrinsics.
+fn dot_scalar<E: CacheElement>(x: &[f32], y: &[E]) -> f32 {
     let n = x.len() / 32 * 32;
     let mut sums = [[0f32; 8]; 4];
     for i in (0..n).step_by(32) {
         for (j, group) in sums.iter_mut().enumerate() {
             for (lane, sum) in group.iter_mut().enumerate() {
                 let d = i + 8 * j + lane;
-                *sum = x[d].mul_add(y[d], *sum);
+                *sum = x[d].mul_add(y[d].widen(), *sum);
             }
         }
     }
@@ -538,9 +530,29 @@ unsafe fn dot(x: &[f32], y: &[f32]) -> f32 {
     ];
     let mut sum = ((h[0] + h[1]) + (h[2] + h[3])) as f64;
     for i in n..x.len() {
-        sum += (x[i] * y[i]) as f64;
+        sum += (x[i] * y[i].widen()) as f64;
     }
     sum as f32
+}
+unsafe fn dot(x: &[f32], y: &[f32]) -> f32 {
+    #[cfg(target_arch = "x86_64")]
+    if std::is_x86_feature_detected!("avx2")
+        && std::is_x86_feature_detected!("fma")
+        && std::is_x86_feature_detected!("f16c")
+    {
+        return unsafe { dot_avx2(x, y) };
+    }
+    dot_scalar(x, y)
+}
+/// The scalar update both storage widths use. See [`dot_scalar`] on why this is not two loops.
+fn half_update_scalar<E: CacheElement>(dst: &mut [f32], src: &[E], scale: f32, add: bool) {
+    for i in 0..dst.len() {
+        dst[i] = half(if add {
+            src[i].widen().mul_add(scale, dst[i])
+        } else {
+            dst[i] * scale
+        });
+    }
 }
 unsafe fn half_update(dst: &mut [f32], src: &[f32], scale: f32, add: bool) {
     #[cfg(target_arch = "x86_64")]
@@ -551,13 +563,7 @@ unsafe fn half_update(dst: &mut [f32], src: &[f32], scale: f32, add: bool) {
         unsafe { half_update_avx2(dst, src, scale, add) };
         return;
     }
-    for i in 0..dst.len() {
-        dst[i] = half(if add {
-            src[i].mul_add(scale, dst[i])
-        } else {
-            dst[i] * scale
-        });
-    }
+    half_update_scalar(dst, src, scale, add);
 }
 /// Accumulates C += A B in increasing reduction-index order.
 pub(super) unsafe fn gemm(c: &mut [f32], a: &[f32], b: &[f32], m: usize, k: usize, n: usize) {
@@ -694,6 +700,40 @@ mod tests {
                 ((*state >> 8) as f32 / 16777216f32) * 4f32 - 2f32
             })
             .collect()
+    }
+    /// Covers the shared scalar bodies on every host, including the x86 ones whose dispatch sends
+    /// the kernel through the AVX2 branch and would otherwise never execute these.
+    #[test]
+    fn the_scalar_bodies_read_both_storage_widths_identically() {
+        let mut state = 0x9e3779b9;
+        let mut query = data(136, &mut state);
+        let mut cache = data(136, &mut state);
+        unsafe {
+            super::round_slice(&mut query);
+            super::round_slice(&mut cache);
+        }
+        let bits: Vec<u16> = cache.iter().copied().map(crate::f32_to_f16).collect();
+        // 136 is not a multiple of 32, so the f64 remainder tail is exercised as well as the
+        // four-accumulator body.
+        assert_eq!(
+            super::dot_scalar::<f32>(&query, &cache).to_bits(),
+            super::dot_scalar::<u16>(&query, &bits).to_bits()
+        );
+        for add in [false, true] {
+            for scale in [1f32, 0.5, 1e-3, 7.25] {
+                let mut widened = query.clone();
+                let mut half = query.clone();
+                super::half_update_scalar(&mut widened, &cache, scale, add);
+                super::half_update_scalar(&mut half, &bits, scale, add);
+                for (i, (a, b)) in widened.iter().zip(&half).enumerate() {
+                    assert_eq!(
+                        a.to_bits(),
+                        b.to_bits(),
+                        "add={add} scale={scale} index={i}"
+                    );
+                }
+            }
+        }
     }
     /// The nine shapes of the golden-fixture case, as (batch, start, pruned).
     const SHAPES: [(usize, usize, bool); 9] = [
