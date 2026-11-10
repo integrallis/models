@@ -65,7 +65,7 @@ static bool observe(ggml_tensor *tensor, bool ask, void *data) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 6 && argc != 7) { std::cerr << "MODEL PREFIX.i32 SUFFIX.i32 EMBEDDINGS.f32 NEW_OUTPUT_DIR [auto|off]\n"; return 2; }
+    if (argc != 6 && argc != 7 && argc != 8) { std::cerr << "MODEL PREFIX.i32 SUFFIX.i32 EMBEDDINGS.f32 NEW_OUTPUT_DIR [auto|off] [FORCED_TOKEN]\n"; return 2; }
     Trace trace{argv[5]};
     if (!std::filesystem::create_directory(trace.output)) throw std::runtime_error("preserve prior output");
     auto prefix = read<llama_token>(argv[2]), suffix = read<llama_token>(argv[3]);
@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
     cp.n_ctx = 1024; cp.n_batch = 128; cp.n_ubatch = 128;
     cp.n_threads = 8; cp.n_threads_batch = 8;
     cp.type_k = GGML_TYPE_F32; cp.type_v = GGML_TYPE_F32;
-    if (argc == 7) {
+    if (argc >= 7) {
         std::string attention = argv[6];
         if (attention != "auto" && attention != "off") throw std::runtime_error("attention mode");
         if (attention == "off") cp.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
@@ -111,7 +111,8 @@ int main(int argc, char **argv) {
         int n = std::min<size_t>(128, embeddings.size()/dim-offset);
         std::copy_n(embeddings.data()+offset*dim, n*dim, eb.embd); submit(eb, n, false);
     }
-    tokens(suffix, true);
+    tokens(suffix, argc != 8);
+    if (argc == 8) tokens(std::vector<llama_token>{std::stoi(argv[7])}, true);
     auto logits = llama_get_logits_ith(ctx, -1);
     int count = llama_vocab_n_tokens(llama_model_get_vocab(model));
     write(trace.output / "logits.f32", logits, count);

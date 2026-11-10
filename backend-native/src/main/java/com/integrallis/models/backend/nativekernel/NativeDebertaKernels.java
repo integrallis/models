@@ -19,6 +19,7 @@ import com.integrallis.models.backend.purejava.deberta.DebertaV2Kernels;
 import java.io.IOException;
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.nio.file.Path;
 import java.util.Objects;
 
@@ -30,10 +31,15 @@ import java.util.Objects;
 public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseable {
   private final Arena arena = Arena.ofShared();
   private final MethodHandle project;
+  private final MethodHandle orderedProject;
+  private final MethodHandle affineProject;
   private final MethodHandle attention;
   private final MethodHandle denseAttention;
   private final MethodHandle causalAttention;
+  private final MethodHandle visionAttention;
+  private final MethodHandle rotaryFactors;
   private final MethodHandle quickGelu;
+  private final MethodHandle geluErf;
   private final MethodHandle destroy;
   private MemorySegment x = MemorySegment.NULL;
   private MemorySegment w = MemorySegment.NULL;
@@ -57,21 +63,9 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
               FunctionDescriptor.of(ValueLayout.JAVA_INT));
       if ((int) abi.invokeExact() != 1)
         throw new IllegalStateException("unsupported dense projection ABI");
-      project =
-          linker.downcallHandle(
-              symbols.find("jmodels_deberta_project").orElseThrow(),
-              FunctionDescriptor.of(
-                  ValueLayout.JAVA_INT,
-                  ValueLayout.JAVA_LONG,
-                  ValueLayout.ADDRESS,
-                  ValueLayout.JAVA_LONG,
-                  ValueLayout.ADDRESS,
-                  ValueLayout.JAVA_LONG,
-                  ValueLayout.ADDRESS,
-                  ValueLayout.JAVA_LONG,
-                  ValueLayout.JAVA_LONG,
-                  ValueLayout.JAVA_LONG,
-                  ValueLayout.JAVA_LONG));
+      project = projectionHandle(linker, symbols, "jmodels_deberta_project");
+      orderedProject = projectionHandle(linker, symbols, "jmodels_dense_project_ordered");
+      affineProject = projectionHandle(linker, symbols, "jmodels_vision_project_affine");
       attention =
           linker.downcallHandle(
               symbols.find("jmodels_deberta_attend").orElseThrow(),
@@ -132,10 +126,70 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
                               ValueLayout.JAVA_LONG,
                               ValueLayout.JAVA_LONG),
                           Linker.Option.critical(true)))
+              .map(method -> MethodHandles.dropArguments(method, 14, long.class))
+              .orElse(null);
+      rotaryFactors =
+          symbols
+              .find("jmodels_vision_rotary_factors")
+              .map(
+                  symbol ->
+                      linker.downcallHandle(
+                          symbol,
+                          FunctionDescriptor.of(
+                              ValueLayout.JAVA_INT,
+                              ValueLayout.JAVA_INT,
+                              ValueLayout.JAVA_INT,
+                              ValueLayout.JAVA_FLOAT,
+                              ValueLayout.JAVA_FLOAT,
+                              ValueLayout.JAVA_FLOAT,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.ADDRESS),
+                          Linker.Option.critical(true)))
+              .orElse(null);
+      visionAttention =
+          symbols
+              .find("jmodels_vision_causal_attention_f16_cache")
+              .map(
+                  symbol ->
+                      linker.downcallHandle(
+                          symbol,
+                          FunctionDescriptor.of(
+                              ValueLayout.JAVA_INT,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.JAVA_LONG),
+                          Linker.Option.critical(true)))
               .orElse(null);
       quickGelu =
           symbols
               .find("jmodels_dense_quick_gelu")
+              .map(
+                  symbol ->
+                      linker.downcallHandle(
+                          symbol,
+                          FunctionDescriptor.of(
+                              ValueLayout.JAVA_INT,
+                              ValueLayout.JAVA_LONG,
+                              ValueLayout.ADDRESS,
+                              ValueLayout.JAVA_LONG),
+                          Linker.Option.critical(true)))
+              .orElse(null);
+      geluErf =
+          symbols
+              .find("jmodels_dense_gelu_erf")
               .map(
                   symbol ->
                       linker.downcallHandle(
@@ -163,6 +217,23 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
     }
   }
 
+  private static MethodHandle projectionHandle(Linker linker, SymbolLookup symbols, String name) {
+    return linker.downcallHandle(
+        symbols.find(name).orElseThrow(),
+        FunctionDescriptor.of(
+            ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+            ValueLayout.JAVA_LONG,
+            ValueLayout.JAVA_LONG,
+            ValueLayout.JAVA_LONG,
+            ValueLayout.JAVA_LONG));
+  }
+
   /** Loads from an integrity-checked bundled platform artifact. */
   public static NativeDebertaKernels load(int threads) throws IOException {
     return load(BundledNativeKernelLibrary.resolve(), threads);
@@ -180,6 +251,33 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
 
   @Override
   public synchronized Projection prepare(float[] weights, int outputs, int inputs) {
+    return prepareInternal(weights, outputs, inputs, false);
+  }
+
+  @Override
+  public synchronized Projection prepareOrdered(float[] weights, int outputs, int inputs) {
+    return prepareInternal(weights, outputs, inputs, true);
+  }
+
+  @Override
+  public synchronized Projection prepareAffine(
+      float[] weights, float[] bias, int outputs, int inputs) {
+    if (handle == 0) throw new IllegalStateException("Dense kernels are closed");
+    if (outputs < 1
+        || inputs < 1
+        || bias.length != outputs
+        || weights.length != Math.multiplyExact(outputs, inputs))
+      throw new IllegalArgumentException("Invalid affine projection shape");
+    long weightBytes = (long) weights.length * Float.BYTES;
+    MemorySegment matrix = arena.allocate(weightBytes + (long) outputs * Float.BYTES, 64);
+    MemorySegment.copy(MemorySegment.ofArray(weights), 0, matrix, 0, weightBytes);
+    MemorySegment.copy(
+        MemorySegment.ofArray(bias), 0, matrix, weightBytes, (long) outputs * Float.BYTES);
+    return (output, input, batch) ->
+        projectPrepared(output, input, batch, matrix, outputs, inputs, affineProject);
+  }
+
+  private Projection prepareInternal(float[] weights, int outputs, int inputs, boolean ordered) {
     if (handle == 0) throw new IllegalStateException("DeBERTa kernels are closed");
     Objects.requireNonNull(weights, "weights");
     if (outputs < 1 || inputs < 1)
@@ -187,13 +285,28 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
     int count = Math.multiplyExact(outputs, inputs);
     if (weights.length != count)
       throw new IllegalArgumentException("projection weight shape mismatch");
+    if (ordered) {
+      float[] transposed = new float[count];
+      for (int output = 0; output < outputs; output++)
+        for (int input = 0; input < inputs; input++)
+          transposed[input * outputs + output] = weights[output * inputs + input];
+      weights = transposed;
+    }
     MemorySegment matrix = arena.allocate((long) count * Float.BYTES, 64);
     MemorySegment.copy(MemorySegment.ofArray(weights), 0, matrix, 0, matrix.byteSize());
-    return (output, input, batch) -> projectPrepared(output, input, batch, matrix, outputs, inputs);
+    return (output, input, batch) ->
+        projectPrepared(
+            output, input, batch, matrix, outputs, inputs, ordered ? orderedProject : project);
   }
 
   private synchronized void projectPrepared(
-      float[] output, float[] input, int batch, MemorySegment matrix, int outputs, int inputs) {
+      float[] output,
+      float[] input,
+      int batch,
+      MemorySegment matrix,
+      int outputs,
+      int inputs,
+      MethodHandle selected) {
     if (handle == 0) throw new IllegalStateException("DeBERTa kernels are closed");
     Objects.requireNonNull(output, "output");
     Objects.requireNonNull(input, "input");
@@ -208,7 +321,7 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
     try {
       int result =
           (int)
-              project.invokeExact(
+              selected.invokeExact(
                   handle,
                   x,
                   (long) xn,
@@ -229,17 +342,30 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
 
   @Override
   public synchronized boolean quickGelu(float[] values) {
+    return activate(quickGelu, values);
+  }
+
+  @Override
+  public synchronized boolean geluErf(float[] values) {
+    return activate(geluErf, values);
+  }
+
+  private boolean activate(MethodHandle operation, float[] values) {
     if (handle == 0) throw new IllegalStateException("Dense kernels are closed");
-    if (quickGelu == null) return false;
+    if (operation == null) return false;
     if (values.length == 0) return true;
     try {
       int result =
-          (int) quickGelu.invokeExact(handle, MemorySegment.ofArray(values), (long) values.length);
-      if (result != 0) throw new IllegalStateException("QuickGELU failed: " + result);
+          (int) operation.invokeExact(handle, MemorySegment.ofArray(values), (long) values.length);
+      if (result != 0) throw new IllegalStateException("Dense activation failed: " + result);
     } catch (Throwable failure) {
-      throw new IllegalStateException("QuickGELU call failed", failure);
+      throw new IllegalStateException("Dense activation call failed", failure);
     }
     return true;
+  }
+
+  boolean supportsVisionAttention() {
+    return visionAttention != null;
   }
 
   boolean supportsCausalAttention() {
@@ -256,6 +382,93 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
       int dimension,
       int heads,
       int capacity) {
+    causalAttention(
+        causalAttention,
+        output,
+        query,
+        key,
+        value,
+        batch,
+        positions,
+        dimension,
+        heads,
+        capacity,
+        batch);
+  }
+
+  synchronized boolean rotaryFactors(
+      int position,
+      int pairs,
+      float base,
+      float scale,
+      float magnitude,
+      float[] divisors,
+      float[] cosine,
+      float[] sine,
+      int offset) {
+    if (handle == 0) throw new IllegalStateException("Dense kernels are closed");
+    if (rotaryFactors == null) return false;
+    if (pairs < 1
+        || offset < 0
+        || offset > cosine.length - pairs
+        || offset > sine.length - pairs
+        || cosine == sine
+        || cosine == divisors
+        || sine == divisors
+        || (divisors != null && divisors.length < pairs))
+      throw new IllegalArgumentException("Invalid rotary factor buffers");
+    MemorySegment ff = divisors == null ? MemorySegment.NULL : MemorySegment.ofArray(divisors);
+    MemorySegment cs = MemorySegment.ofArray(cosine).asSlice((long) offset * 4, (long) pairs * 4);
+    MemorySegment sn = MemorySegment.ofArray(sine).asSlice((long) offset * 4, (long) pairs * 4);
+    try {
+      int result =
+          (int) rotaryFactors.invokeExact(position, pairs, base, scale, magnitude, ff, cs, sn);
+      if (result != 0) throw new IllegalStateException("Rotary factors failed: " + result);
+      return true;
+    } catch (Throwable failure) {
+      throw new IllegalStateException("Rotary factor call failed", failure);
+    }
+  }
+
+  synchronized void visionAttention(
+      float[] output,
+      float[] query,
+      float[] key,
+      float[] value,
+      int batch,
+      int positions,
+      int dimension,
+      int heads,
+      int capacity,
+      int originalBatchSize) {
+    causalAttention(
+        visionAttention,
+        output,
+        query,
+        key,
+        value,
+        batch,
+        positions,
+        dimension,
+        heads,
+        capacity,
+        originalBatchSize);
+  }
+
+  private void causalAttention(
+      MethodHandle operation,
+      float[] output,
+      float[] query,
+      float[] key,
+      float[] value,
+      int batch,
+      int positions,
+      int dimension,
+      int heads,
+      int capacity,
+      int originalBatchSize) {
+    if (originalBatchSize < batch || originalBatchSize > positions)
+      throw new IllegalArgumentException("Invalid original attention batch size");
     if (handle == 0) throw new IllegalStateException("Dense kernels are closed");
     if (batch < 1
         || positions < batch
@@ -270,12 +483,12 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
     // The native ABI requires output storage disjoint from every input.
     if (output == query || output == key || output == value)
       throw new IllegalArgumentException("Causal attention output must not alias inputs");
-    if (causalAttention == null)
+    if (operation == null)
       throw new UnsupportedOperationException("Native causal attention unavailable");
     try {
       int result =
           (int)
-              causalAttention.invokeExact(
+              operation.invokeExact(
                   handle,
                   MemorySegment.ofArray(query),
                   (long) query.length,
@@ -289,7 +502,8 @@ public final class NativeDebertaKernels implements DebertaV2Kernels, AutoCloseab
                   (long) positions,
                   (long) dimension,
                   (long) heads,
-                  (long) capacity);
+                  (long) capacity,
+                  (long) originalBatchSize);
       if (result != 0) throw new IllegalStateException("Causal attention failed: " + result);
     } catch (Throwable failure) {
       throw new IllegalStateException("Causal attention call failed", failure);

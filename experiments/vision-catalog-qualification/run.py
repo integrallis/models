@@ -9,6 +9,7 @@ import subprocess
 import sys
 import zipfile
 from pathlib import Path
+from compare import selected_variants
 
 
 def digest(path):
@@ -24,6 +25,8 @@ def run(command, log):
 def main():
     if platform.system() != "Linux":
         raise SystemExit("Use the remote Linux worker")
+    if len(sys.argv) not in (5, 6):
+        raise ValueError("Usage: run.py corpus distribution reference commit [variant]")
     root, distribution, reference = [Path(p).resolve() for p in sys.argv[1:4]]
     provider = "com/integrallis/models/backend/nativekernel/NativeDenseProjectionProvider.class"
     native_runtime = False
@@ -39,12 +42,13 @@ def main():
         raise ValueError("Full immutable source commit required")
     script = Path(__file__).resolve().parent
     manifest = json.loads((script / "manifest.json").read_text())
+    variants = selected_variants(manifest, [sys.argv[5]] if len(sys.argv) == 6 else None)
     corpus = root / "cases.json"
     cases = json.loads(corpus.read_text())["cases"]
     output = root / "results"
     output.mkdir(exist_ok=False)
     native = Path(os.environ["VISION_NATIVE_LIBRARY"]).resolve()
-    receipt = dict(schema=2, referenceFlashAttention="auto", host=socket.gethostname(), revision=revision,
+    receipt = dict(schema=2, variants=variants, referenceFlashAttention="auto", host=socket.gethostname(), revision=revision,
                    manifestSha256=digest(script / "manifest.json"), corpusSha256=digest(corpus),
                    nativeSha256=digest(native), threads=manifest["threads"], context=1024,
                    maximumOutputTokens=32, kvType="f32",
@@ -62,7 +66,7 @@ def main():
     run([sys.executable, "-m", "pip", "freeze"], output / "environment.txt")
     mmproj = root / "artifacts/llava-v1.5-7b-mmproj-model-f16.gguf"
     run([sys.executable, script / "encode_reference.py", mmproj, corpus, output / "encoder"], output / "encoder.log")
-    for variant in manifest["variants"]:
+    for variant in variants:
         model = root / "artifacts" / f"llava-v1.5-7b-{variant}.gguf"
         destination = output / variant
         destination.mkdir()

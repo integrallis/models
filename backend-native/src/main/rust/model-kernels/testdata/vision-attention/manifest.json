@@ -1,0 +1,115 @@
+{
+  "source": "ggml 2cbca389f515df455412dafa07e2b1359cc72a6d",
+  "operatorLibrarySha256": "ef1492e6715554a490f48a6db3f0efd810e284ebceef56923a935d5bdeaea594",
+  "generator": "LCG wrapping u32: state=1664525*state+1013904223; f32((state>>8)/2^24)*4-2; seed resets per case; Q then full head-major K then V",
+  "cases": [
+    {
+      "id": "origin",
+      "batch": 1,
+      "start": 0,
+      "heads": 2,
+      "width": 128,
+      "capacity": 1024,
+      "threads": 8,
+      "pruned": false,
+      "seed": 305419896,
+      "sha256": "9e1133f84cfbec5144c823cec64fd0b367b660b34f53f587b704d8d128fe6d6d"
+    },
+    {
+      "id": "small",
+      "batch": 8,
+      "start": 13,
+      "heads": 2,
+      "width": 128,
+      "capacity": 1024,
+      "threads": 8,
+      "pruned": false,
+      "seed": 305419896,
+      "sha256": "e6e2f1328b41e10f80e27b56a92c6dae3aa578dc9006335553896bb811618e2b"
+    },
+    {
+      "id": "suffix",
+      "batch": 31,
+      "start": 609,
+      "heads": 2,
+      "width": 128,
+      "capacity": 1024,
+      "threads": 8,
+      "pruned": false,
+      "seed": 305419896,
+      "sha256": "1454f7e2c0d2949f5716424b757bf49d49f7ed1b75891380b1715861995e926e"
+    },
+    {
+      "id": "tile64",
+      "batch": 64,
+      "start": 12,
+      "heads": 2,
+      "width": 128,
+      "capacity": 1024,
+      "threads": 8,
+      "pruned": false,
+      "seed": 305419896,
+      "sha256": "5941dc457cbae7bdfa26625855a25c4a9250cf3df9615c1683d8bba06f063b03"
+    },
+    {
+      "id": "tile128",
+      "batch": 128,
+      "start": 35,
+      "heads": 2,
+      "width": 128,
+      "capacity": 1024,
+      "threads": 8,
+      "pruned": false,
+      "seed": 305419896,
+      "sha256": "1af53a0fb0d50447bbc6dea1762c0d08a2f04766247be5d121fea28e23104597"
+    },
+    {
+      "id": "decode640",
+      "batch": 1,
+      "start": 639,
+      "heads": 2,
+      "width": 128,
+      "capacity": 1024,
+      "threads": 8,
+      "pruned": false,
+      "seed": 305419896,
+      "sha256": "696e5ec6ad24baaf99e06ed9a5bbd022ae9baabfda43e47fa49c4f8192426e75"
+    },
+    {
+      "id": "decode1024",
+      "batch": 1,
+      "start": 1023,
+      "heads": 2,
+      "width": 128,
+      "capacity": 1024,
+      "threads": 8,
+      "pruned": false,
+      "seed": 305419896,
+      "sha256": "ff223cbe17aa012e39d48d18876af7c821112ff9b1ae9d5be8dfca2da41d8c74"
+    },
+    {
+      "id": "pruned-suffix",
+      "batch": 31,
+      "start": 609,
+      "heads": 2,
+      "width": 128,
+      "capacity": 1024,
+      "threads": 8,
+      "pruned": true,
+      "seed": 305419896,
+      "sha256": "893823fcb81c27b892a3ae0babedc4bc1d49d5cfe6dc66bcd107c4fa513a6e75"
+    },
+    {
+      "id": "pruned-tile",
+      "batch": 128,
+      "start": 35,
+      "heads": 2,
+      "width": 128,
+      "capacity": 1024,
+      "threads": 8,
+      "pruned": true,
+      "seed": 305419896,
+      "sha256": "a5e5171ff60bbe59ae51ea6f6f01f00a1225dbd3e19f19bc9115f0319114254f"
+    }
+  ]
+}

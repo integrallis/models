@@ -32,7 +32,7 @@ import java.util.Arrays;
  * <ul>
  *   <li>{@link com.integrallis.models.backend.purejava.ops.TensorOps#ggufBatchedMatmul} for linear
  *       projections
- *   <li>Wider moment accumulation for pre-layer normalization
+ *   <li>Pairwise Welford moments with fused accumulation for pre-layer normalization
  *   <li>{@link com.integrallis.models.backend.purejava.ops.TensorOps#softmax} for attention scores
  *   <li>{@link com.integrallis.models.backend.purejava.ops.TensorOps#geluErf} for FFN activation
  *   <li>{@link com.integrallis.vectors.core.VectorUtil#batchDotProductExact} and {@link
@@ -77,12 +77,18 @@ final class ClipVisionEncoder {
 
     for (int i = 0; i < config.numLayers(); i++) {
       var layer = weights.layer(i);
-      for (var matrix :
-          new ClipVisionWeights.Matrix[] {
-            layer.attnQkv(), layer.attnOut(), layer.ffnUp(), layer.ffnDown()
-          }) {
-        projections.put(matrix, VisionProjection.prepare(matrix, denseKernels));
-      }
+      projections.put(
+          layer.attnQkv(),
+          VisionProjection.prepareAffine(layer.attnQkv(), layer.attnQkvBias(), denseKernels));
+      projections.put(
+          layer.attnOut(),
+          VisionProjection.prepareAffine(layer.attnOut(), layer.attnOutBias(), denseKernels));
+      projections.put(
+          layer.ffnUp(),
+          VisionProjection.prepareAffine(layer.ffnUp(), layer.ffnUpBias(), denseKernels));
+      projections.put(
+          layer.ffnDown(),
+          VisionProjection.prepareAffine(layer.ffnDown(), layer.ffnDownBias(), denseKernels));
     }
     int tokens = config.numTokens();
     int dim = config.hiddenSize();
@@ -96,7 +102,7 @@ final class ClipVisionEncoder {
     int batchElements = (int) batchElementsLong;
 
     this.denseKernels = denseKernels;
-    this.patchProjection = VisionProjection.prepare(weights.patchEmbed(), denseKernels);
+    this.patchProjection = VisionProjection.preparePatch(weights.patchEmbed(), denseKernels, 3);
     this.patchPixels = new float[(tokens - 1) * 3 * config.patchSize() * config.patchSize()];
     this.patchOutput = new float[(tokens - 1) * dim];
     this.hidden = new float[batchElements];
@@ -216,7 +222,6 @@ final class ClipVisionEncoder {
 
     // 2. QKV projection (fused)
     project(queryKeyValues, normalized, tokens, layer.attnQkv());
-    addBias(queryKeyValues, tokens, dim * 3, layer.attnQkvBias());
 
     // 3. Split into Q, K, V
     splitQueryKeyValue(tokens, dim);
@@ -226,7 +231,6 @@ final class ClipVisionEncoder {
 
     // 5. Output projection + residual
     project(attentionProjected, attention, tokens, layer.attnOut());
-    addBias(attentionProjected, tokens, dim, layer.attnOutBias());
     for (int i = 0; i < batchElements; i++) {
       attentionProjected[i] += hidden[i];
     }
@@ -237,7 +241,6 @@ final class ClipVisionEncoder {
     // 7. FFN: up projection
     int hiddenDim = config.intermediateSize();
     project(feedForward, normalized, tokens, layer.ffnUp());
-    addBias(feedForward, tokens, hiddenDim, layer.ffnUpBias());
 
     // 8. GELU activation
     if (config.quickGelu()) {
@@ -260,7 +263,6 @@ final class ClipVisionEncoder {
 
     // 9. FFN down projection + residual
     project(feedForwardProjected, feedForward, tokens, layer.ffnDown());
-    addBias(feedForwardProjected, tokens, dim, layer.ffnDownBias());
     for (int i = 0; i < batchElements; i++) {
       feedForwardProjected[i] += attentionProjected[i];
     }
@@ -343,18 +345,11 @@ final class ClipVisionEncoder {
 
   static void normalizeRow(
       float[] out, float[] in, int offset, float[] weight, float[] bias, int size, float epsilon) {
-    double sum = 0;
-    for (int i = 0; i < size; i++) sum += in[offset + i];
-    double mean = sum / size;
-    double variance = 0;
+    float[] moments = ClipMoments.compute(in, offset, size);
+    float center = moments[0];
+    float scale = 1.0f / (float) Math.sqrt(moments[1] + epsilon);
     for (int i = 0; i < size; i++) {
-      double centered = in[offset + i] - mean;
-      variance += centered * centered;
-    }
-    float center = (float) mean;
-    float scale = (float) (1.0 / Math.sqrt(variance / size + epsilon));
-    for (int i = 0; i < size; i++) {
-      out[offset + i] = (in[offset + i] - center) * scale * weight[i] + bias[i];
+      out[offset + i] = Math.fma((in[offset + i] - center) * scale, weight[i], bias[i]);
     }
   }
 

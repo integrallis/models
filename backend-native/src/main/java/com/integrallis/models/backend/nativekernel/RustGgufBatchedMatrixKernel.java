@@ -184,6 +184,11 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   }
 
   @Override
+  public boolean usesReferenceDecoderArithmetic() {
+    return imagePrefill;
+  }
+
+  @Override
   public Map<String, String> planRecommendations() {
     if (!imagePrefill) return PLAN_RECOMMENDATIONS;
     var recommendations = new java.util.HashMap<>(PLAN_RECOMMENDATIONS);
@@ -194,7 +199,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   /** Selects the measured image-prefill policy only when the loaded library provides it. */
   synchronized boolean configureImagePrefill() {
     requireOpen();
-    if (!library.supports(NativeKernelCapability.Q4_K_BATCH_PACKING)) return false;
+    if (!library.supports(NativeKernelCapability.REFERENCE_K_QUANT_REDUCTION)) return false;
     imagePrefill = true;
     return true;
   }
@@ -1069,6 +1074,17 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
               batchSize,
               rows,
               cols);
+        } else if (imagePrefill && rows % 8 == 0) {
+          library.q4_KRepackedBatchedMatmul(
+              weights,
+              weightBytes,
+              nativeInput,
+              inputElements,
+              nativeOutput,
+              outputElements,
+              batchSize,
+              rows,
+              cols);
         } else {
           library.q4_KF32BatchedMatmul(
               weights,
@@ -1084,6 +1100,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       }
       case Q5_K ->
           library.q5_KF32BatchedMatmul(
+              imagePrefill,
               weights,
               weightBytes,
               nativeInput,
@@ -1095,6 +1112,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
               cols);
       case Q6_K ->
           library.q6_KF32BatchedMatmul(
+              imagePrefill,
               weights,
               weightBytes,
               nativeInput,
@@ -1239,7 +1257,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
   private void configureGroupedProjection(
       int index, MemorySegment weights, GgufTensorType type, int rows, int cols) {
     long requiredWeightBytes = requiredWeightBytes(type, rows, cols);
-    nativeFormats.setAtIndex(ValueLayout.JAVA_INT, index, formatCode(type));
+    nativeFormats.setAtIndex(ValueLayout.JAVA_INT, index, formatCode(type, rows));
     nativeWeightPointers.setAtIndex(ValueLayout.ADDRESS, index, weights);
     nativeWeightBytes.setAtIndex(ValueLayout.JAVA_LONG, index, requiredWeightBytes);
     nativeRows.setAtIndex(ValueLayout.JAVA_INT, index, rows);
@@ -1442,8 +1460,21 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     };
   }
 
-  private int formatCode(GgufTensorType type) {
+  @Override
+  public boolean preservesPrunedBatchRow(GgufTensorType type, int batchSize, int rowIndex) {
+    if (!imagePrefill) return true;
+    return switch (type) {
+      case Q4_K -> rowIndex >= batchSize / 4 * 4;
+      case Q5_K, Q6_K -> batchSize < 8;
+      default -> true;
+    };
+  }
+
+  private int formatCode(GgufTensorType type, int rows) {
     if (type == GgufTensorType.Q4_K && sequentialQ4KReduction) return 10;
+    if (type == GgufTensorType.Q4_K && imagePrefill && rows % 8 == 0) return 11;
+    if (imagePrefill && type == GgufTensorType.Q5_K) return 12;
+    if (imagePrefill && type == GgufTensorType.Q6_K) return 13;
     return switch (type) {
       case Q4_0 -> 0;
       case Q8_0 -> 1;

@@ -20,3 +20,15 @@ first diagnostic compilation failure is retained separately; no inference ran in
 failed diagnostic attempt, and correcting its classpath does not alter the measured
 payload or repeat any qualification timings. Future macOS payload archives should use
 `COPYFILE_DISABLE=1` when invoking `tar`.
+
+`run.py` requires both collection-complete markers and checks the actual native binary
+and executable JARs against the measurement receipt. Completion of separately queued
+diagnostics is still an operator precondition; do not overlap workloads.
+
+`LayerTrace` accepts an optional forced token after the output directory;
+`layer-oracle` accepts it after the attention mode (`auto` or `off`). Both feed it
+through a separate one-token decode call so a second-token disagreement can be
+localized without changing the prefill shape. The Java observer reads scalar
+workspace during decode and batched workspace during prefill. Observing layers
+disables the final-layer query-pruning optimization, so reproduce the unobserved
+diagonal first and compare the traced prediction before interpreting layer deltas.

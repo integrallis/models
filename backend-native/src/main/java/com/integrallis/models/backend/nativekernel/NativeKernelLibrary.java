@@ -90,6 +90,7 @@ public final class NativeKernelLibrary implements AutoCloseable {
   private static final int FORMAT_PTQ1_0 = 7;
   private static final int FORMAT_TQ1_0 = 9;
   private static final int FORMAT_Q4_K_ORDERED = 10;
+  private static final int FORMAT_Q4_K_REPACKED = 11;
   private static final Linker LINKER = Linker.nativeLinker();
   private static final MethodHandle FLOAT_ARRAY_SEGMENT = floatArraySegment();
   private static final FunctionDescriptor BF16_BATCHED_DESCRIPTOR =
@@ -1559,7 +1560,56 @@ public final class NativeKernelLibrary implements AutoCloseable {
         cols);
   }
 
+  void q4_KRepackedBatchedMatmul(
+      MemorySegment weights,
+      long weightBytes,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int batchSize,
+      int rows,
+      int cols) {
+    invokeBatched(
+        "Q4_K",
+        FORMAT_Q4_K_REPACKED,
+        NativeKernelCapability.REFERENCE_K_QUANT_REDUCTION,
+        weights,
+        weightBytes,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        rows,
+        cols);
+  }
+
   void q5_KF32BatchedMatmul(
+      MemorySegment weights,
+      long weightBytes,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int batchSize,
+      int rows,
+      int cols) {
+    q5_KF32BatchedMatmul(
+        false,
+        weights,
+        weightBytes,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        rows,
+        cols);
+  }
+
+  void q5_KF32BatchedMatmul(
+      boolean reference,
       MemorySegment weights,
       long weightBytes,
       MemorySegment nativeInput,
@@ -1571,8 +1621,10 @@ public final class NativeKernelLibrary implements AutoCloseable {
       int cols) {
     invokeBatched(
         "Q5_K",
-        FORMAT_Q5_K,
-        NativeKernelCapability.Q5_K_F32_BATCHED_MATMUL,
+        reference ? 12 : FORMAT_Q5_K,
+        reference
+            ? NativeKernelCapability.REFERENCE_K_QUANT_REDUCTION
+            : NativeKernelCapability.Q5_K_F32_BATCHED_MATMUL,
         weights,
         weightBytes,
         nativeInput,
@@ -1594,10 +1646,36 @@ public final class NativeKernelLibrary implements AutoCloseable {
       int batchSize,
       int rows,
       int cols) {
+    q6_KF32BatchedMatmul(
+        false,
+        weights,
+        weightBytes,
+        nativeInput,
+        inputElements,
+        nativeOutput,
+        outputElements,
+        batchSize,
+        rows,
+        cols);
+  }
+
+  void q6_KF32BatchedMatmul(
+      boolean reference,
+      MemorySegment weights,
+      long weightBytes,
+      MemorySegment nativeInput,
+      long inputElements,
+      MemorySegment nativeOutput,
+      long outputElements,
+      int batchSize,
+      int rows,
+      int cols) {
     invokeBatched(
         "Q6_K",
-        FORMAT_Q6_K,
-        NativeKernelCapability.Q6_K_F32_BATCHED_MATMUL,
+        reference ? 13 : FORMAT_Q6_K,
+        reference
+            ? NativeKernelCapability.REFERENCE_K_QUANT_REDUCTION
+            : NativeKernelCapability.Q6_K_F32_BATCHED_MATMUL,
         weights,
         weightBytes,
         nativeInput,

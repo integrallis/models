@@ -22,9 +22,23 @@ import java.util.Map;
 /** Optional batched GGUF projection implementation injected into the Java transformer pipeline. */
 public interface GgufBatchedMatrixKernel extends AutoCloseable {
 
+  /** Whether projecting one retained row preserves this batch's accumulation order. */
+  default boolean preservesPrunedBatchRow(GgufTensorType type, int batchSize, int rowIndex) {
+    return true;
+  }
+
   /** Stable implementation identifier used in diagnostics. */
   default String implementation() {
     return "custom";
+  }
+
+  /**
+   * Whether this decoder route requires the reference RMS and SwiGLU float32 arithmetic. The vision
+   * route uses float64 accumulation of float32 squared values and a fixed exponential polynomial;
+   * existing text routes retain their pinned reduction and activation contracts.
+   */
+  default boolean usesReferenceDecoderArithmetic() {
+    return false;
   }
 
   /** Load-time planner recommendations needed to route eligible projections through this kernel. */

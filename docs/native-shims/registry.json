@@ -31,10 +31,11 @@
     "Q8_0_F32_ACTIVATION_BATCHED_MATMUL": 268435456,
     "TQ1_0_Q8_K_BATCHED_MATMUL": 536870912,
     "Q4_K_ORDERED_REDUCTION": 1073741824,
-    "MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL": 2147483648,
+    "MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL": 17179869184,
     "TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL": 4294967296,
     "Q5_0_INDEPENDENT_BATCHED_MATMUL": 8589934592,
-    "Q4_K_BATCH_PACKING": 2147483648
+    "Q4_K_BATCH_PACKING": 2147483648,
+    "REFERENCE_K_QUANT_REDUCTION": 34359738368
   },
   "exports": {
     "cpu": [
@@ -48,6 +49,8 @@
       "jmodels_dense_attention",
       "jmodels_dense_causal_attention",
       "jmodels_dense_causal_attention_head_major",
+      "jmodels_dense_gelu_erf",
+      "jmodels_dense_project_ordered",
       "jmodels_dense_quick_gelu",
       "jmodels_gated_delta_net_f32_with_context",
       "jmodels_gated_delta_net_group_f32_with_context",
@@ -74,7 +77,10 @@
       "jmodels_tokenizer_abi",
       "jmodels_tokenizer_create",
       "jmodels_tokenizer_destroy",
-      "jmodels_tokenizer_encode"
+      "jmodels_tokenizer_encode",
+      "jmodels_vision_causal_attention_f16_cache",
+      "jmodels_vision_project_affine",
+      "jmodels_vision_rotary_factors"
     ],
     "cuda": [
       "models_gqa_decode_attention",
@@ -227,7 +233,8 @@
         "Q4_K_BATCH_VECTOR_ACCUMULATION",
         "K_QUANT_BATCH_WEIGHT_REUSE",
         "Q4_K_ORDERED_REDUCTION",
-        "Q4_K_BATCH_PACKING"
+        "Q4_K_BATCH_PACKING",
+        "REFERENCE_K_QUANT_REDUCTION"
       ],
       "exports": {
         "cpu": [
@@ -270,7 +277,8 @@
         "Verify the ordered Q4_K variant with all pinned Flint continuations and bounded full-logit tolerances, then rerun unchanged held-out quality and whole-model performance gates; short ablations and synthetic parity do not qualify a model.",
         "Reproduce the best exact Java alternative and native route with matched scheduling and actual model calls.",
         "Identify a controlled JVM cause, qualify whole-model cost and resources on every retained profile, then adopt or remove.",
-        "Retain packed prefill parity and matched LLaVA performance evidence; hardware capability gates the image policy. Existing ordered callers preserve their floating-point block fold."
+        "Retain packed prefill parity and matched LLaVA performance evidence; hardware capability gates the image policy. Existing ordered callers preserve their floating-point block fold.",
+        "Verify the image-decoder Q4 repack and Q5/Q6 tiled numerical contracts against independent graph fixtures and the complete frozen LLaVA protocol; direct vector-dot agreement alone does not cover graph dispatch."
       ],
       "sourceScope": "cpu"
     },
@@ -975,7 +983,12 @@
           "jmodels_dense_attention",
           "jmodels_dense_causal_attention",
           "jmodels_dense_quick_gelu",
-          "jmodels_dense_causal_attention_head_major"
+          "jmodels_dense_causal_attention_head_major",
+          "jmodels_dense_gelu_erf",
+          "jmodels_dense_project_ordered",
+          "jmodels_vision_causal_attention_f16_cache",
+          "jmodels_vision_project_affine",
+          "jmodels_vision_rotary_factors"
         ]
       },
       "dispatch": [
@@ -1014,6 +1027,26 @@
         {
           "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
           "anchor": "jmodels_dense_causal_attention_head_major"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_dense_gelu_erf"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_dense_project_ordered"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_vision_causal_attention_f16_cache"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_vision_project_affine"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_vision_rotary_factors"
         }
       ],
       "sourceScope": "deberta-f32-kernels",
@@ -1314,7 +1347,10 @@
       "backend-native/src/main/rust/model-kernels/src/swiglu.rs",
       "build.gradle.kts",
       "gradle.properties",
-      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeCausalAttention.java"
+      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeCausalAttention.java",
+      "backend-java/src/main/java/com/integrallis/models/backend/purejava/ops/GgmlSwiGlu.java",
+      "backend-native/src/main/rust/model-kernels/src/q4_repack.rs",
+      "backend-native/src/main/rust/model-kernels/src/rotary.rs"
     ],
     "cuda": [
       "backend-cuda/build.gradle.kts",
@@ -1545,7 +1581,9 @@
       "backend-java/src/main/java/com/integrallis/models/backend/purejava/LlavaBackend.java",
       "backend-java/src/main/java/com/integrallis/models/backend/purejava/vision/ClipVisionEncoder.java",
       "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeKernelLibrary.java",
-      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGgufBatchedMatrixKernel.java"
+      "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/RustGgufBatchedMatrixKernel.java",
+      "backend-native/src/main/rust/model-kernels/src/vision_attention.rs",
+      "backend-native/src/main/rust/model-kernels/src/rotary.rs"
     ],
     "onnx-executor-kernels": [
       "backend-native/src/main/rust/model-kernels/src/onnx_kernels.rs",

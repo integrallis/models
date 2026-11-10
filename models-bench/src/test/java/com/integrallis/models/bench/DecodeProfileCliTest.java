@@ -54,6 +54,10 @@ class DecodeProfileCliTest {
             7,
             2,
             3,
+            // Pure-Java: this test drives DecodeProfileCli.profile against a fake backend, so it
+            // exercises the decode loop rather than kernel selection.
+            false,
+            8,
             Path.of("decode.jfr"));
 
     DecodeProfileCli.Result result =

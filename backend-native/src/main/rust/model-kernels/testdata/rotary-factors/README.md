@@ -1,0 +1,1 @@
+Native float factors from the pinned ggml rotary fixture generator at llama.cpp `2cbca389f515df455412dafa07e2b1359cc72a6d`, Linux x86_64. Five positions 0, 1, 31, 639, 4095; 64 pairs; base 10000; scale .25. Interleaved cosine/sine little-endian float32. The generator is in experiments/vision-catalog-qualification/diagnostics/arithmetic-fixtures/pr380-rope-fixture.cpp.

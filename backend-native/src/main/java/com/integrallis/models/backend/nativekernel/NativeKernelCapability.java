@@ -36,7 +36,7 @@ public enum NativeKernelCapability {
    * model mixing Q4_0 and Q8_0 projections fell back to one dispatch per matrix with no diagnostic
    * saying so.
    */
-  MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL(1L << 31),
+  MIXED_Q8_ACTIVATION_F32_GROUPED_BATCHED_MATMUL(1L << 34),
   /** TQ1_0 rows inside a grouped dispatch, sharing the group's Q8_K activation quantization. */
   TQ1_0_Q8_K_GROUPED_BATCHED_MATMUL(1L << 32),
   /**
@@ -95,6 +95,8 @@ public enum NativeKernelCapability {
   Q4_K_ORDERED_REDUCTION(1L << 30),
   /** Packed Q4_K prefill, available only on the supported SIMD host. */
   Q4_K_BATCH_PACKING(1L << 31),
+  /** Image-decoder K-quant arithmetic matching reference repacked and tiled kernels. */
+  REFERENCE_K_QUANT_REDUCTION(1L << 35),
   /** Fixed-tree BF16 projections for the supported shape and vector configuration. */
   BF16_F32_BATCHED_MATMUL(1L << 25),
   /** Deterministic float SwiGLU with checked finite gates. */

@@ -10,8 +10,8 @@ import java.util.ServiceLoader;
 /** Remote-only diagnostic. Uses the existing layer observer, never a production inference mode. */
 class LayerTrace {
   public static void main(String[] args) throws Exception {
-    if (!System.getProperty("os.name").equals("Linux") || args.length != 5)
-      throw new IllegalArgumentException("MODEL PREFIX.i32 SUFFIX.i32 EMBEDDINGS.f32 NEW_OUTPUT_DIR");
+    if (!System.getProperty("os.name").equals("Linux") || (args.length != 5 && args.length != 6))
+      throw new IllegalArgumentException("MODEL PREFIX.i32 SUFFIX.i32 EMBEDDINGS.f32 NEW_OUTPUT_DIR [FORCED_TOKEN]");
     Path output = Path.of(args[4]);
     Files.createDirectory(output);
     int[] prefix = ints(Path.of(args[1]));
@@ -23,12 +23,14 @@ class LayerTrace {
     var kernel = provider.open(8).orElseThrow();
     var attention = provider.openAttention(8, kernel);
     try (var backend = PureJavaBackend.load(Path.of(args[0]), kernel, attention)) {
-      int target = prefix.length + embeddings.length / backend.embeddingInputDimension() + suffix.length - 1;
+      int inputEnd = prefix.length + embeddings.length / backend.embeddingInputDimension() + suffix.length;
+      int target = inputEnd - 1 + (args.length == 6 ? 1 : 0);
       installObserver(backend, output, target);
       backend.prefill(prefix, 0);
       backend.prefillEmbeddings(embeddings, prefix.length);
-      float[] logits = backend.prefill(suffix, target + 1 - suffix.length);
-      // First prediction only: both arms have identical complete inputs at this boundary.
+      float[] logits = backend.prefill(suffix, inputEnd - suffix.length);
+      if (args.length == 6) logits = backend.forward(Integer.parseInt(args[5]), inputEnd);
+      // The optional token is teacher-forced in a separate decode call in both arms.
       floats(output.resolve("logits.f32"), logits, 0, logits.length);
       int best = 0;
       for (int i = 0; i < logits.length; i++) {
@@ -58,11 +60,14 @@ class LayerTrace {
     observerField.set(pass, Proxy.newProxyInstance(observerType.getClassLoader(), new Class<?>[] {observerType},
         (proxy, method, values) -> {
           if (method.getName().equals("onLayerComplete") && (int) values[0] == 0) {
+            var xf = observedPass.getClass().getDeclaredField("x"); xf.setAccessible(true);
+            boolean single = values[2] == xf.get(observedPass);
             var cf = observedPass.getClass().getDeclaredField("prefillBatchCapacity"); cf.setAccessible(true);
-            int capacity = cf.getInt(observedPass);
+            int capacity = single ? 1 : cf.getInt(observedPass);
             int row = (int) values[3] / (int) values[4];
             for (String name : new String[] {"batchQ", "batchK", "batchV"}) {
-              var field = observedPass.getClass().getDeclaredField(name); field.setAccessible(true);
+              String actual = single ? name.substring(5).toLowerCase() : name;
+              var field = observedPass.getClass().getDeclaredField(actual); field.setAccessible(true);
               float[] buffer = (float[]) field.get(observedPass);
               int width = buffer.length / capacity;
               var bytes = ByteBuffer.allocate(width*4).order(ByteOrder.LITTLE_ENDIAN);
@@ -78,12 +83,16 @@ class LayerTrace {
             if ((int) values[0] == 0) {
               var capacityField = observedPass.getClass().getDeclaredField("prefillBatchCapacity");
               capacityField.setAccessible(true);
-              int capacity = capacityField.getInt(observedPass);
+              var xf = observedPass.getClass().getDeclaredField("x"); xf.setAccessible(true);
+              boolean single = values[2] == xf.get(observedPass);
+              int capacity = single ? 1 : capacityField.getInt(observedPass);
               int row = (int) values[3] / (int) values[4];
               for (String name : new String[] {"batchQ", "batchK", "batchV", "batchXNorm",
                   "batchAttnOut", "batchAttnProjected", "batchFfnGate", "batchFfnUp",
                   "batchFfnOut", "batchFfnProjected"}) {
-                var field = observedPass.getClass().getDeclaredField(name);
+                String stem = name.substring(5);
+                String actual = single ? Character.toLowerCase(stem.charAt(0)) + stem.substring(1) : name;
+                var field = observedPass.getClass().getDeclaredField(actual);
                 field.setAccessible(true);
                 float[] buffer = (float[]) field.get(observedPass);
                 int width = buffer.length / capacity;

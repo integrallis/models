@@ -18,6 +18,25 @@ package com.integrallis.models.backend.purejava.spi;
 /** Optional in-process implementation of batched causal attention with retained sequence state. */
 public interface BatchedCausalAttentionKernel extends AutoCloseable {
 
+  /** Whether ordinary RoPE angles use successive float multiplications in this numerical path. */
+  default boolean usesFloatRotaryRecurrence() {
+    return false;
+  }
+
+  /** Fills reference float factors, or returns false without modifying the outputs. */
+  default boolean rotaryFactors(
+      int position,
+      int pairs,
+      float base,
+      float scale,
+      float magnitude,
+      float[] divisors,
+      float[] cosine,
+      float[] sine,
+      int offset) {
+    return false;
+  }
+
   /** Returns whether this prompt chunk can run without breaking retained cache continuity. */
   boolean isEligible(
       int layer,
@@ -45,6 +64,37 @@ public interface BatchedCausalAttentionKernel extends AutoCloseable {
       int valueLength,
       int maxSequenceLength,
       int slidingWindow);
+
+  /** Computes the last retained prefill query without changing the original batch arithmetic. */
+  default void attendFinalPrefill(
+      float[] output,
+      float[] query,
+      float[] key,
+      float[] value,
+      int layer,
+      int position,
+      int originalBatchSize,
+      int numHeads,
+      int numKvHeads,
+      int keyLength,
+      int valueLength,
+      int maxSequenceLength,
+      int slidingWindow) {
+    attend(
+        output,
+        query,
+        key,
+        value,
+        layer,
+        position,
+        1,
+        numHeads,
+        numKvHeads,
+        keyLength,
+        valueLength,
+        maxSequenceLength,
+        slidingWindow);
+  }
 
   /**
    * Retains K/V rows when prefill prunes unused queries from the final layer. Returning false must

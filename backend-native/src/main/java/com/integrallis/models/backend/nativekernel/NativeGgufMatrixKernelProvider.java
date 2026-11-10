@@ -63,7 +63,7 @@ public final class NativeGgufMatrixKernelProvider implements GgufMatrixKernelPro
           configured == null || configured.isBlank()
               ? NativeDebertaKernels.load(threads)
               : NativeDebertaKernels.load(Path.of(configured), threads);
-      if (dense.supportsCausalAttention()) return new NativeCausalAttention(nativeMatrix, dense);
+      if (dense.supportsVisionAttention()) return new NativeCausalAttention(dense);
       dense.close();
       return com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel.none();
     } catch (java.io.IOException failure) {

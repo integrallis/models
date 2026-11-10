@@ -94,8 +94,8 @@ public final class LlavaVisionProjector implements AutoCloseable {
     downBias = ClipVisionWeights.vector(file, "mm.2.bias", output);
     mean = channels(meta.getFloat32Array("clip.vision.image_mean").orElseThrow(), "mean");
     std = channels(meta.getFloat32Array("clip.vision.image_std").orElseThrow(), "std");
-    upProjection = VisionProjection.prepare(up, denseKernels);
-    downProjection = VisionProjection.prepare(down, denseKernels);
+    upProjection = VisionProjection.prepareAffine(up, upBias, denseKernels);
+    downProjection = VisionProjection.prepareAffine(down, downBias, denseKernels);
     encoder =
         new ClipVisionEncoder(config, ClipVisionWeights.fromGgufFile(file, config), denseKernels);
   }
@@ -169,29 +169,29 @@ public final class LlavaVisionProjector implements AutoCloseable {
     float[] features = encoder.encode(chw);
     // LLaVA uses patch features, excluding CLS, with no post-layer normalization.
     float[] patches = Arrays.copyOfRange(features, config.hiddenSize(), features.length);
-    float[] intermediate = project(patches, up, upBias, upProjection);
-    com.integrallis.vectors.core.GgufStagePlan.of(
-            com.integrallis.vectors.core.GgufStagePlan.stage(
-                tokenCount(),
-                (from, to) ->
-                    TensorOps.geluErf(
-                        intermediate,
-                        from * up.rows(),
-                        intermediate,
-                        from * up.rows(),
-                        (to - from) * up.rows())))
-        .execute();
-    return project(intermediate, down, downBias, downProjection);
+    float[] intermediate = project(patches, up, upProjection);
+    if (denseKernels == null || !denseKernels.geluErf(intermediate)) {
+      com.integrallis.vectors.core.GgufStagePlan.of(
+              com.integrallis.vectors.core.GgufStagePlan.stage(
+                  tokenCount(),
+                  (from, to) ->
+                      TensorOps.geluErf(
+                          intermediate,
+                          from * up.rows(),
+                          intermediate,
+                          from * up.rows(),
+                          (to - from) * up.rows())))
+          .execute();
+    }
+    return project(intermediate, down, downProjection);
   }
 
   private float[] project(
       float[] input,
       ClipVisionWeights.Matrix matrix,
-      float[] bias,
       com.integrallis.models.backend.purejava.spi.DenseProjectionKernels.Projection projection) {
     float[] output = new float[Math.multiplyExact(tokenCount(), matrix.rows())];
     projection.project(output, input, tokenCount());
-    for (int i = 0; i < output.length; i++) output[i] += bias[i % bias.length];
     return output;
   }
 
