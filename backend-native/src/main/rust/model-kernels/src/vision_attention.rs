@@ -82,10 +82,145 @@ unsafe fn half_update_avx2(dst: &mut [f32], src: &[f32], scale: f32, add: bool) 
         round_slice(&mut dst[n..]);
     }
 }
-fn chunk(
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn dot_half_avx2(x: &[f32], y: &[u16]) -> f32 {
+    use std::arch::x86_64::*;
+    // Lane order, accumulator count, reduction tree and f64 tail are those of dot_avx2. The only
+    // difference is where each operand comes from: cvtph_ps widens exactly, so it reproduces the
+    // f32 a widened cache held bit for bit.
+    unsafe {
+        let mut a = [_mm256_setzero_ps(); 4];
+        let n = x.len() / 32 * 32;
+        for i in (0..n).step_by(32) {
+            for (j, accumulator) in a.iter_mut().enumerate() {
+                *accumulator = _mm256_fmadd_ps(
+                    _mm256_loadu_ps(x.as_ptr().add(i + 8 * j)),
+                    _mm256_cvtph_ps(_mm_loadu_si128(y.as_ptr().add(i + 8 * j).cast())),
+                    *accumulator,
+                );
+            }
+        }
+        a[0] = _mm256_add_ps(a[0], a[2]);
+        a[1] = _mm256_add_ps(a[1], a[3]);
+        a[0] = _mm256_add_ps(a[0], a[1]);
+        let mut v = _mm_add_ps(
+            _mm256_extractf128_ps::<1>(a[0]),
+            _mm256_castps256_ps128(a[0]),
+        );
+        v = _mm_hadd_ps(v, v);
+        v = _mm_hadd_ps(v, v);
+        let mut sum = _mm_cvtss_f32(v) as f64;
+        for i in n..x.len() {
+            sum += (x[i] * super::f16_to_f32(y[i])) as f64;
+        }
+        sum as f32
+    }
+}
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma,f16c")]
+unsafe fn half_update_half_avx2(dst: &mut [f32], src: &[u16], scale: f32, add: bool) {
+    use std::arch::x86_64::*;
+    unsafe {
+        let n = dst.len() / 8 * 8;
+        let s = _mm256_set1_ps(scale);
+        for i in (0..n).step_by(8) {
+            let d = _mm256_loadu_ps(dst.as_ptr().add(i));
+            let v = if add {
+                _mm256_fmadd_ps(
+                    _mm256_cvtph_ps(_mm_loadu_si128(src.as_ptr().add(i).cast())),
+                    s,
+                    d,
+                )
+            } else {
+                _mm256_mul_ps(d, s)
+            };
+            _mm256_storeu_ps(
+                dst.as_mut_ptr().add(i),
+                _mm256_cvtph_ps(_mm256_cvtps_ph::<0>(v)),
+            );
+        }
+        for i in n..dst.len() {
+            dst[i] = if add {
+                super::f16_to_f32(src[i]).mul_add(scale, dst[i])
+            } else {
+                dst[i] * scale
+            };
+        }
+        round_slice(&mut dst[n..]);
+    }
+}
+/// How the arithmetic reads one retained K/V element.
+///
+/// The Java cache rounds every appended row to F16 exactly once, so `u16` storage holds those F16
+/// bits and `f32` storage holds the same bits already widened. Widening binary16 to binary32 is
+/// exact, so both implementations feed identical operands to identical operations in identical
+/// order, and the storage width is a memory-traffic choice rather than a numerical one. The decode
+/// path reads the whole retained prefix once per token, so halving its width halves that read.
+///
+/// `f32` remains instantiated to serve as the parity oracle the tests compare against; the shipped
+/// decoder stores `u16`.
+pub(super) trait CacheElement: Copy + Send + Sync {
+    /// Dot product of an already-rounded query row with one cache row.
+    ///
+    /// # Safety
+    /// `row` must be at least as long as `query`.
+    unsafe fn dot_row(query: &[f32], row: &[Self]) -> f32;
+    /// `dst = half(dst * scale)`, or `dst = half(row * scale + dst)` when `add`.
+    ///
+    /// # Safety
+    /// When `add`, `row` must be at least as long as `dst`; otherwise `row` is not read.
+    unsafe fn fused_update(dst: &mut [f32], row: &[Self], scale: f32, add: bool);
+    /// One element, widened to the f32 the arithmetic operates on.
+    fn widen(self) -> f32;
+}
+impl CacheElement for f32 {
+    unsafe fn dot_row(query: &[f32], row: &[f32]) -> f32 {
+        unsafe { dot(query, row) }
+    }
+    unsafe fn fused_update(dst: &mut [f32], row: &[f32], scale: f32, add: bool) {
+        unsafe { half_update(dst, row, scale, add) };
+    }
+    fn widen(self) -> f32 {
+        self
+    }
+}
+impl CacheElement for u16 {
+    unsafe fn dot_row(query: &[f32], row: &[u16]) -> f32 {
+        #[cfg(target_arch = "x86_64")]
+        if std::is_x86_feature_detected!("avx2")
+            && std::is_x86_feature_detected!("fma")
+            && std::is_x86_feature_detected!("f16c")
+        {
+            return unsafe { dot_half_avx2(query, row) };
+        }
+        let widened: Vec<f32> = row[..query.len()].iter().map(|h| h.widen()).collect();
+        unsafe { dot(query, &widened) }
+    }
+    unsafe fn fused_update(dst: &mut [f32], row: &[u16], scale: f32, add: bool) {
+        #[cfg(target_arch = "x86_64")]
+        if std::is_x86_feature_detected!("avx2")
+            && std::is_x86_feature_detected!("fma")
+            && std::is_x86_feature_detected!("f16c")
+        {
+            unsafe { half_update_half_avx2(dst, row, scale, add) };
+            return;
+        }
+        if !add {
+            unsafe { half_update(dst, &[], scale, false) };
+            return;
+        }
+        let widened: Vec<f32> = row[..dst.len()].iter().map(|h| h.widen()).collect();
+        unsafe { half_update(dst, &widened, scale, true) };
+    }
+    fn widen(self) -> f32 {
+        super::f16_to_f32(self)
+    }
+}
+fn chunk<E: CacheElement>(
     q: &[f32],
-    k: &[f32],
-    v: &[f32],
+    k: &[E],
+    v: &[E],
     begin: usize,
     end: usize,
     width: usize,
@@ -95,26 +230,26 @@ fn chunk(
     let mut sum = 0f32;
     let mut output = vec![0f32; width];
     for p in begin..end {
-        let score = unsafe { dot(q, &k[p * width..(p + 1) * width]) } * scale;
+        let score = unsafe { E::dot_row(q, &k[p * width..(p + 1) * width]) } * scale;
         let mut ms = 1f32;
         let mut vs = 1f32;
         if score > maximum {
             ms = (maximum - score).exp();
             maximum = score;
-            unsafe { half_update(&mut output, &[], ms, false) };
+            unsafe { E::fused_update(&mut output, &[], ms, false) };
         } else {
             vs = (score - maximum).exp();
         }
-        unsafe { half_update(&mut output, &v[p * width..(p + 1) * width], vs, true) };
+        unsafe { E::fused_update(&mut output, &v[p * width..(p + 1) * width], vs, true) };
         sum = sum.mul_add(ms, vs);
     }
     (maximum, sum, output)
 }
 #[allow(clippy::too_many_arguments)]
-fn small(
+fn small<E: CacheElement>(
     q: &[f32],
-    k: &[f32],
-    v: &[f32],
+    k: &[E],
+    v: &[E],
     visible: usize,
     padded: usize,
     width: usize,
@@ -274,10 +409,10 @@ unsafe fn tile_exp_avx2(row: &mut [f32], max: f32) -> f64 {
     sum
 }
 #[allow(clippy::too_many_arguments)]
-fn tiled(
+fn tiled<E: CacheElement>(
     q: &[f32],
-    k: &[f32],
-    v: &[f32],
+    k: &[E],
+    v: &[E],
     batch: usize,
     start: usize,
     dim: usize,
@@ -311,8 +446,8 @@ fn tiled(
             scores.fill(0.);
             for j in 0..n {
                 for d in 0..width {
-                    kt[d * 64 + j] = k[(begin + j) * width + d];
-                    vt[j * width + d] = v[(begin + j) * width + d];
+                    kt[d * 64 + j] = k[(begin + j) * width + d].widen();
+                    vt[j * width + d] = v[(begin + j) * width + d].widen();
                 }
             }
             unsafe {
@@ -483,11 +618,11 @@ unsafe fn tile_exp(row: &mut [f32], max: f32) -> f64 {
 }
 /// The FFI owner validates all shapes and lifetimes before entering this synchronous call.
 #[allow(clippy::too_many_arguments)]
-pub(super) unsafe fn run(
+pub(super) unsafe fn run<E: CacheElement>(
     pool: &rayon::ThreadPool,
     q: *const f32,
-    k: *const f32,
-    v: *const f32,
+    k: *const E,
+    v: *const E,
     out: *mut f32,
     batch: usize,
     positions: usize,
@@ -550,6 +685,7 @@ pub(super) unsafe fn run(
 mod tests {
     use crate::deberta_kernels::{
         jmodels_deberta_create, jmodels_deberta_destroy, jmodels_vision_causal_attention_f16_cache,
+        jmodels_vision_causal_attention_f16_store,
     };
     fn data(count: usize, state: &mut u32) -> Vec<f32> {
         (0..count)
@@ -558,6 +694,220 @@ mod tests {
                 ((*state >> 8) as f32 / 16777216f32) * 4f32 - 2f32
             })
             .collect()
+    }
+    /// The nine shapes of the golden-fixture case, as (batch, start, pruned).
+    const SHAPES: [(usize, usize, bool); 9] = [
+        (1, 0, false),
+        (8, 13, false),
+        (31, 609, false),
+        (64, 12, false),
+        (128, 35, false),
+        (1, 639, false),
+        (1, 1023, false),
+        (31, 609, true),
+        (128, 35, true),
+    ];
+    #[test]
+    fn f16_storage_is_bit_identical_to_the_widened_cache() {
+        let handle = jmodels_deberta_create(8);
+        assert_ne!(handle, 0);
+        for (batch, start, pruned) in SHAPES {
+            let mut state = 0x12345678;
+            let q = data(batch * 256, &mut state);
+            let mut k = data(1024 * 256, &mut state);
+            let mut v = data(k.len(), &mut state);
+            // Both entry points receive the same cache: one widened, one as the F16 bits it was
+            // rounded to. Rounding here is what the Java cache owner does on append.
+            unsafe {
+                super::round_slice(&mut k);
+                super::round_slice(&mut v);
+            }
+            let kh: Vec<u16> = k.iter().copied().map(crate::f32_to_f16).collect();
+            let vh: Vec<u16> = v.iter().copied().map(crate::f32_to_f16).collect();
+            // The round trip must be closed, or the two arms would not hold the same values.
+            for (widened, half) in k.iter().zip(&kh).chain(v.iter().zip(&vh)) {
+                assert_eq!(widened.to_bits(), crate::f16_to_f32(*half).to_bits());
+            }
+            let physical = if pruned { 1 } else { batch };
+            let query = if pruned {
+                &q[(batch - 1) * 256..]
+            } else {
+                &q[..]
+            };
+            let mut widened_output = vec![0f32; physical * 256];
+            let mut half_output = vec![0f32; physical * 256];
+            let widened = unsafe {
+                jmodels_vision_causal_attention_f16_cache(
+                    handle,
+                    query.as_ptr(),
+                    query.len(),
+                    k.as_ptr(),
+                    k.len(),
+                    v.as_ptr(),
+                    v.len(),
+                    widened_output.as_mut_ptr(),
+                    widened_output.len(),
+                    physical,
+                    start + batch,
+                    256,
+                    2,
+                    1024,
+                    batch,
+                )
+            };
+            let half = unsafe {
+                jmodels_vision_causal_attention_f16_store(
+                    handle,
+                    query.as_ptr(),
+                    query.len(),
+                    kh.as_ptr(),
+                    kh.len(),
+                    vh.as_ptr(),
+                    vh.len(),
+                    half_output.as_mut_ptr(),
+                    half_output.len(),
+                    physical,
+                    start + batch,
+                    256,
+                    2,
+                    1024,
+                    batch,
+                )
+            };
+            assert_eq!((widened, half), (0, 0));
+            for (i, (a, b)) in widened_output.iter().zip(&half_output).enumerate() {
+                assert_eq!(
+                    a.to_bits(),
+                    b.to_bits(),
+                    "batch={batch} start={start} pruned={pruned} index={i} widened={a} half={b}"
+                );
+            }
+        }
+        jmodels_deberta_destroy(handle);
+    }
+    #[test]
+    fn f16_storage_rejects_exactly_what_the_widened_cache_rejects() {
+        let handle = jmodels_deberta_create(2);
+        let q = [1f32; 8];
+        let k = [1f32; 8];
+        let kh = [0x3c00u16; 8];
+        let mut output = [99f32; 8];
+        // (batch, positions, dim, heads, capacity, original_batch), valid last.
+        let shapes: [(usize, usize, usize, usize, usize, usize); 9] = [
+            (1, 2, 4, 1, 2, 0),
+            (1, 2, 4, 1, 2, 3),
+            (0, 2, 4, 1, 2, 1),
+            (3, 2, 4, 1, 2, 3),
+            (1, 2, 4, 0, 2, 1),
+            (1, 2, 3, 2, 2, 1),
+            (1, 2, 4, 1, 1, 1),
+            (1, 2, 8, 1, 2, 1),
+            (1, 2, 4, 1, 2, 1),
+        ];
+        for shape in shapes {
+            let (batch, positions, dim, heads, capacity, original) = shape;
+            let widened = unsafe {
+                jmodels_vision_causal_attention_f16_cache(
+                    handle,
+                    q.as_ptr(),
+                    8,
+                    k.as_ptr(),
+                    8,
+                    k.as_ptr(),
+                    8,
+                    output.as_mut_ptr(),
+                    8,
+                    batch,
+                    positions,
+                    dim,
+                    heads,
+                    capacity,
+                    original,
+                )
+            };
+            let half = unsafe {
+                jmodels_vision_causal_attention_f16_store(
+                    handle,
+                    q.as_ptr(),
+                    8,
+                    kh.as_ptr(),
+                    8,
+                    kh.as_ptr(),
+                    8,
+                    output.as_mut_ptr(),
+                    8,
+                    batch,
+                    positions,
+                    dim,
+                    heads,
+                    capacity,
+                    original,
+                )
+            };
+            assert_eq!(widened, half, "shape={shape:?}");
+        }
+        // Output aliasing an input, which the F16 entry point measures in two-byte spans.
+        let aliased = unsafe {
+            jmodels_vision_causal_attention_f16_store(
+                handle,
+                output.as_ptr(),
+                8,
+                kh.as_ptr(),
+                8,
+                kh.as_ptr(),
+                8,
+                output.as_mut_ptr(),
+                8,
+                1,
+                2,
+                4,
+                1,
+                2,
+                1,
+            )
+        };
+        assert_eq!(aliased, -1);
+        let overlapping = unsafe {
+            jmodels_vision_causal_attention_f16_store(
+                handle,
+                q.as_ptr(),
+                8,
+                output.as_ptr().cast(),
+                8,
+                kh.as_ptr(),
+                8,
+                output.as_mut_ptr(),
+                8,
+                1,
+                2,
+                4,
+                1,
+                2,
+                1,
+            )
+        };
+        assert_eq!(overlapping, -1);
+        let unknown = unsafe {
+            jmodels_vision_causal_attention_f16_store(
+                0,
+                q.as_ptr(),
+                8,
+                kh.as_ptr(),
+                8,
+                kh.as_ptr(),
+                8,
+                output.as_mut_ptr(),
+                8,
+                1,
+                2,
+                4,
+                1,
+                2,
+                1,
+            )
+        };
+        assert_eq!(unknown, -2);
+        jmodels_deberta_destroy(handle);
     }
     #[test]
     fn matches_independent_flash_attention_including_pruned_queries() {
