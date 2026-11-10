@@ -39,6 +39,8 @@ final class DecodeProfileCli {
           "token-id",
           "warmup-tokens",
           "measure-tokens",
+          "native",
+          "threads",
           "output");
   private static final String DEFAULT_PROMPT =
       "Explain why profiling autoregressive decode separately from prompt prefill matters.";
@@ -49,7 +51,13 @@ final class DecodeProfileCli {
     Configuration configuration = parse(args);
     System.setProperty(
         "models.purejava.maxContextLength", Integer.toString(configuration.contextLength()));
-    try (InferenceBackend backend = configuration.model().load();
+    // Default stays pure-Java. --native injects the installed kernel so the profile describes the
+    // route a qualified model runs; a profile of the default path shows the Panama Java matmul as
+    // the hotspot and says nothing about production.
+    try (InferenceBackend backend =
+            configuration.nativeKernel()
+                ? configuration.model().loadNative(configuration.threads())
+                : configuration.model().load();
         ProfileRecording recording = ProfileSupport.jfr("models-pure-java-decode")) {
       Result result = profile(backend, configuration, recording);
       System.out.printf(
@@ -80,6 +88,12 @@ final class DecodeProfileCli {
         BenchmarkCliArguments.integer(values, "token-id", -1),
         BenchmarkCliArguments.integer(values, "warmup-tokens", 64),
         BenchmarkCliArguments.integer(values, "measure-tokens", 256),
+        // BenchmarkCliArguments takes --name value pairs only, so this is "--native true",
+        // not a bare flag; parsing the value also makes "--native false" explicit.
+        Boolean.parseBoolean(values.getOrDefault("native", "false")),
+        // Mirrors the qualification harness, which pins the pool rather than taking the box's
+        // processor count.
+        BenchmarkCliArguments.integer(values, "threads", 8),
         Path.of(values.getOrDefault("output", "build/reports/inference/decode-profile.jfr")));
   }
 
@@ -171,6 +185,8 @@ final class DecodeProfileCli {
       int tokenId,
       int warmupTokens,
       int measuredTokens,
+      boolean nativeKernel,
+      int threads,
       Path output) {
 
     Configuration {
