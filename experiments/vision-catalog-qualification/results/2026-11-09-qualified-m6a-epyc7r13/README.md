@@ -39,26 +39,20 @@ boxes measured the identical runtime at decode ratios of **1.44 to 1.67** — a 
 figures were properties of the hardware rented, not of the runtime, and are retained as failed
 evidence rather than deleted.
 
-## Unresolved: token agreement is not host-portable
+## Retracted: token agreement IS host-portable
 
-Identical runtime, identical model, identical reference commit, three hosts:
+An earlier version of this file claimed the arithmetic was not host-portable and that the cause was
+unidentified, on the strength of one `cpx62` Genoa run reporting 0.96875 / 0.984375.
 
-| host | Q4_K_S | Q4_K_M |
-|---|---|---|
-| EC2 `m6a.4xlarge` EPYC 7R13 (this run) | **1.000** | **1.000** |
-| Hetzner `ccx33` EPYC-Milan, native AVX2 | 1.000 | 1.000 |
-| Hetzner `cpx62` EPYC-Genoa, JVM pinned to 256-bit | 0.96875 | 0.984375 |
+**That claim is withdrawn.** See `../2026-11-10-host-portability-genoa/`: the same CPU model
+produces **byte-identical token sequences to this run — 0 of 80 differing** — with AVX-512 fully
+exposed and again with the JVM capped to 256-bit vectors. EC2 EPYC 7R13, Hetzner Milan and Genoa in
+both configurations all agree.
 
-The three cpx62 divergences were marginal OCR reads scoring 0.0 on both sides (`'Aegerter'` against
-`' Aegre'`, `'Weihenstphaner'` against `' Weihenstephan'`, `'10'` against `' 20'`).
-
-Ruled out by checking rather than assuming: thread count (all runs pinned 8), Rust `target-cpu`
-(baseline x86-64, runtime dispatch on `avx2`/`f16c`/`fma` present on every host, zero AVX-512 paths
-in the kernels), vision-package parallelism (none exists), and `exactActivations` (Q8_0 only, and
-this topology has no Q8_0). LLaVA takes the `v16-packed-q4-k` route, not the ordered-reduction one.
-
-**The cause is not identified.** This qualification is valid on the registered host class; the
-arithmetic is not demonstrably host-portable, and that is a separate open question.
+Ruled out by measurement: instruction set, vector width, the `-XX:MaxVectorSize` flag that had been
+named as the likely cause, thread count (pinned at 8, and the rayon pool is built from that value),
+and the corpus (identical `corpusSha256`). The diverging run's artifacts were not retained, so its
+own cause cannot be established — it was one unreproducible run reported as a property of the code.
 
 ## Provenance
 

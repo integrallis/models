@@ -6,7 +6,8 @@ the earlier attempt retained as failed evidence; nothing under `results/` refere
 
 ## Use the fidelity gates. Do NOT use the performance gates.
 
-**Fidelity is host-independent and these numbers stand:**
+**Fidelity reproduces across hosts and these numbers stand** (confirmed on four hosts, see
+`../2026-11-10-host-portability-genoa/`):
 
 | gate | Q4_K_S | Q4_K_M |
 |---|---|---|
