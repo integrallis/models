@@ -20,12 +20,16 @@ All notable changes to models are documented here.
   commit. Full artifacts, receipts and per-case timings are retained under
   `experiments/vision-catalog-qualification/results/2026-11-09-qualified-m6a-epyc7r13/`.
 
-  **The host class decides these gates.** The identical runtime measured decode ratios of 1.44 to
-  1.67 on two hosts whose physical core counts and instruction sets differed from the registered
-  class; those runs are retained as failed evidence rather than deleted. Token agreement also
-  varied by host and that is **not explained**: the same code gives 1.000 on two AVX2 hosts and
-  0.96875 / 0.984375 on an AVX-512 host. The qualification is valid on the registered class; the
-  arithmetic is not demonstrated to be portable, and the committed README says so.
+  **The host class decides the performance gates.** The identical runtime measured decode ratios of
+  1.44 to 1.67 on two hosts whose physical core counts differed from the registered class; those
+  runs are retained as failed evidence rather than deleted.
+
+  **The arithmetic itself is host-portable.** Four hosts produce byte-identical token sequences --
+  EC2 EPYC 7R13, Hetzner EPYC-Milan, and an EPYC-Genoa box both with AVX-512 exposed to the JVM and
+  with the JVM capped to 256-bit vectors, 0 of 80 cases differing in each comparison. A single
+  earlier Genoa run reporting 0.96875 / 0.984375 is unreproducible and withdrawn; its artifacts were
+  not retained, so its cause cannot be established. Evidence for the retraction is committed under
+  `experiments/vision-catalog-qualification/results/2026-11-10-host-portability-genoa/`.
 
   A passing backend result is necessary but not sufficient for catalog admission, which additionally
   requires ModelJars to verify both files through its installer and answer an image question through
