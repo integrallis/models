@@ -185,7 +185,9 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
         start + batch,
         dimension,
         heads,
-        capacity,
+        // The allocated stride, not the ceiling: visionAttention uses this as the per-head stride
+        // and requires the buffers to be stride*dimension, which is what the store now holds.
+        state.stride(),
         originalBatchSize);
     state.positions = start + batch;
   }
