@@ -701,6 +701,135 @@ mod tests {
             })
             .collect()
     }
+    /// Exhaustive, because this change made the two sides of a boundary agree on bit patterns
+    /// rather than on values.
+    ///
+    /// The store's filling loop is Java and writes `Float.floatToFloat16` bits; the kernel is this
+    /// crate and widens them with `cvtph_ps`. Before, Java did the whole round trip itself and the
+    /// two never had to agree on an encoding. Java's widening is specified to be the exact IEEE
+    /// conversion, so asserting this crate's widening - both the intrinsic the kernel uses and the
+    /// scalar fallback - against that same definition over all 65536 encodings closes the loop,
+    /// including every subnormal, both zeros, the infinities and the NaN payloads.
+    #[test]
+    fn every_f16_encoding_widens_the_same_way_through_both_paths() {
+        let mut finite = 0;
+        let mut quieted = 0;
+        for bits in 0u16..=u16::MAX {
+            let scalar = crate::f16_to_f32(bits);
+            if !scalar.is_nan() {
+                finite += 1;
+                // Re-encoding a widened value must return the encoding it came from, or a stored
+                // row would not survive being read back and rounded again.
+                assert_eq!(
+                    crate::f32_to_f16(scalar),
+                    bits,
+                    "round trip is not closed on encoding {bits:#06x}"
+                );
+            }
+            #[cfg(target_arch = "x86_64")]
+            if std::is_x86_feature_detected!("f16c") {
+                let intrinsic = unsafe { crate::f16_to_f32_f16c(bits) };
+                if scalar.is_nan() {
+                    // Measured, not assumed: cvtph_ps quiets a signalling payload and the scalar
+                    // widening carries it through, so on a signalling NaN the two paths differ in
+                    // the quiet bit. Both are NaN, which is all a NaN encoding is owed, and a NaN
+                    // in retained K/V means the decode already diverged. Asserted rather than
+                    // skipped so a change in either path has to come past this.
+                    assert!(
+                        intrinsic.is_nan(),
+                        "encoding {bits:#06x} widened to a number"
+                    );
+                    if intrinsic.to_bits() != scalar.to_bits() {
+                        assert_eq!(
+                            intrinsic.to_bits(),
+                            scalar.to_bits() | 0x0040_0000,
+                            "the only NaN difference permitted is the quiet bit, at {bits:#06x}"
+                        );
+                        quieted += 1;
+                    }
+                    continue;
+                }
+                assert_eq!(
+                    intrinsic.to_bits(),
+                    scalar.to_bits(),
+                    "cvtph_ps and the scalar widening disagree on encoding {bits:#06x}"
+                );
+            }
+        }
+        // Every encoding that is not a NaN, which is what the store ever holds, agrees exactly.
+        assert_eq!(finite, 63490);
+        #[cfg(target_arch = "x86_64")]
+        if std::is_x86_feature_detected!("f16c") {
+            // The 2046 NaN encodings are 1023 payloads either side; those with the quiet bit
+            // already set need no change, leaving the signalling half.
+            assert_eq!(quieted, 1022);
+        }
+    }
+    /// The values uniform random data does not reliably produce, where the two widenings could
+    /// disagree without any other test noticing: signed zero, the F16 subnormal range, the
+    /// representable extremes, and values that round *into* the subnormal range.
+    const EDGES: [f32; 13] = [
+        0.0,
+        -0.0,
+        5.9604645e-8, // smallest F16 subnormal, 2^-24
+        -5.9604645e-8,
+        6.097555e-5, // largest F16 subnormal, 1023 * 2^-24
+        -6.097555e-5,
+        3.0517578e-5, // mid subnormal
+        1.0e-8,       // rounds to zero
+        6.1035156e-5, // smallest F16 normal, 2^-14
+        1.0,
+        -1.0,
+        65504.0, // largest finite F16
+        -65504.0,
+    ];
+    #[test]
+    fn widening_agrees_on_signed_zero_subnormals_and_the_extremes() {
+        for value in EDGES {
+            let bits = crate::f32_to_f16(value);
+            let widened = crate::f16_to_f32(bits);
+            // The store's contract: rounding is closed, so re-rounding a stored value is a no-op.
+            assert_eq!(
+                crate::f32_to_f16(widened),
+                bits,
+                "rounding is not closed at {value:e}"
+            );
+            assert_eq!(
+                widened.to_bits(),
+                super::half(value).to_bits(),
+                "widening disagrees with the round trip at {value:e}"
+            );
+            #[cfg(target_arch = "x86_64")]
+            if std::is_x86_feature_detected!("f16c") {
+                // What the kernel's widening load actually produces, including the sign of zero.
+                let intrinsic = unsafe { crate::f16_to_f32_f16c(bits) };
+                assert_eq!(
+                    intrinsic.to_bits(),
+                    widened.to_bits(),
+                    "cvtph_ps disagrees with the scalar widening at {value:e}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn the_scalar_bodies_agree_on_the_edge_values_too() {
+        let widened: Vec<f32> = EDGES.iter().map(|v| super::half(*v)).collect();
+        let bits: Vec<u16> = widened.iter().copied().map(crate::f32_to_f16).collect();
+        let query: Vec<f32> = widened.iter().rev().copied().collect();
+        assert_eq!(
+            super::dot_scalar::<f32>(&query, &widened).to_bits(),
+            super::dot_scalar::<u16>(&query, &bits).to_bits()
+        );
+        for add in [false, true] {
+            let mut a = widened.clone();
+            let mut b = widened.clone();
+            super::half_update_scalar(&mut a, &widened, 0.5, add);
+            super::half_update_scalar(&mut b, &bits, 0.5, add);
+            for (i, (x, y)) in a.iter().zip(&b).enumerate() {
+                assert_eq!(x.to_bits(), y.to_bits(), "add={add} index={i}");
+            }
+        }
+    }
     /// Covers the shared scalar bodies on every host, including the x86 ones whose dispatch sends
     /// the kernel through the AVX2 branch and would otherwise never execute these.
     #[test]

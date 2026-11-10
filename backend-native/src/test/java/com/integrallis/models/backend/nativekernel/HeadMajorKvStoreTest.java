@@ -139,6 +139,28 @@ class HeadMajorKvStoreTest {
   }
 
   @Test
+  void javaRoundingIsClosedOverEveryF16Encoding() {
+    // The store's filling loop writes Float.floatToFloat16 bits and the native kernel widens them.
+    // That makes Java and the kernel agree on an encoding rather than on a value, so Java's half of
+    // the boundary is pinned here: re-rounding a widened value must return the encoding it came
+    // from, for all 65536 of them. The kernel's half, including that cvtph_ps and the scalar
+    // widening agree on every non-NaN encoding, is asserted in the Rust crate's
+    // every_f16_encoding_widens_the_same_way_through_both_paths.
+    int finite = 0;
+    for (int encoding = 0; encoding <= 0xFFFF; encoding++) {
+      float widened = Float.float16ToFloat((short) encoding);
+      if (Float.isNaN(widened)) {
+        continue;
+      }
+      finite++;
+      assertThat(Float.floatToFloat16(widened))
+          .describedAs("rounding is not closed on encoding 0x%04X", encoding)
+          .isEqualTo((short) encoding);
+    }
+    assertThat(finite).isEqualTo(63490);
+  }
+
+  @Test
   void rejectsDegenerateGeometry() {
     assertThatThrownBy(() -> new HeadMajorKvStore(0, 4, 16))
         .isInstanceOf(IllegalArgumentException.class)
