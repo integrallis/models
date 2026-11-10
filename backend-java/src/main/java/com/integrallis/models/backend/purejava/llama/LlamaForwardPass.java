@@ -88,9 +88,16 @@ public final class LlamaForwardPass {
       return nextPosition;
     }
 
-    /** Returns all KV-cache bytes reachable by this sequence branch. */
+    /**
+     * Returns all KV-cache bytes reachable by this sequence branch.
+     *
+     * <p>Including the attention kernel's own retained state. A kernel that keeps K and V itself
+     * holds the copy decode reads, and reporting only {@link KvCache} left that out -- roughly half
+     * the truth on the native route, which is the route the product takes for an MHA model.
+     */
     public long allocatedStateBytes() {
-      return cache.allocatedBytes();
+      return Math.addExact(
+          cache.allocatedBytes(), owner.batchedAttentionKernel.allocatedStateBytes());
     }
 
     KvCache cache() {

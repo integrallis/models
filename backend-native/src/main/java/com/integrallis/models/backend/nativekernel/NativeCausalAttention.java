@@ -22,23 +22,8 @@ import java.util.Map;
 /** Owned continuous MHA prefix for the LLaVA decoder, sharing the dense GEMM implementation. */
 final class NativeCausalAttention implements BatchedCausalAttentionKernel {
   private final NativeDebertaKernels dense;
-  private final Map<Integer, Layer> layers = new HashMap<>();
+  private final Map<Integer, HeadMajorKvStore> layers = new HashMap<>();
   private boolean closed;
-
-  private static final class Layer {
-    final float[] keys;
-    final float[] values;
-    final int dimension;
-    final int heads;
-    int positions;
-
-    Layer(int heads, int width, int capacity) {
-      this.heads = heads;
-      this.dimension = Math.multiplyExact(heads, width);
-      keys = new float[Math.multiplyExact(dimension, capacity)];
-      values = new float[keys.length];
-    }
-  }
 
   NativeCausalAttention(NativeDebertaKernels dense) {
     this.dense = dense;
@@ -89,13 +74,16 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
         || start > capacity - batch) return false;
     long dimension = (long) heads * keyLength;
     if (dimension > Integer.MAX_VALUE || dimension * capacity > Integer.MAX_VALUE) return false;
-    Layer state = layers.get(layer);
+    HeadMajorKvStore state = layers.get(layer);
     return state == null
         ? start == 0
         : state.positions == start
-            && state.dimension == dimension
-            && state.heads == heads
-            && state.keys.length == (long) capacity * state.dimension;
+            && state.dimension() == dimension
+            && state.heads() == heads
+            // The ceiling rather than the array length: the store holds only the positions a
+            // sequence has reached, so its length is not capacity * dimension until the context
+            // fills. What must still not change under a retained prefix is the declared capacity.
+            && state.ceiling() == capacity;
   }
 
   @Override
@@ -187,17 +175,19 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
       throw new IllegalArgumentException("Attention buffer too small");
     if (output == query || output == key || output == value)
       throw new IllegalArgumentException("Attention output must not alias inputs");
-    Layer state = storeRows(key, value, layer, start, batch, heads, keyLength, capacity);
+    HeadMajorKvStore state = storeRows(key, value, layer, start, batch, heads, keyLength, capacity);
     dense.visionAttention(
         output,
         query,
-        state.keys,
-        state.values,
+        state.keys(),
+        state.values(),
         batch,
         start + batch,
         dimension,
         heads,
-        capacity,
+        // The allocated stride, not the ceiling: visionAttention uses this as the per-head stride
+        // and requires the buffers to be stride*dimension, which is what the store now holds.
+        state.stride(),
         originalBatchSize);
     state.positions = start + batch;
   }
@@ -220,12 +210,12 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
     int count = Math.multiplyExact(batch, Math.multiplyExact(heads, keyLength));
     if (key.length < count || value.length < count)
       throw new IllegalArgumentException("Attention cache input too small");
-    Layer state = storeRows(key, value, layer, start, batch, heads, keyLength, capacity);
+    HeadMajorKvStore state = storeRows(key, value, layer, start, batch, heads, keyLength, capacity);
     state.positions = start + batch;
     return true;
   }
 
-  private Layer storeRows(
+  private HeadMajorKvStore storeRows(
       float[] key,
       float[] value,
       int layer,
@@ -234,23 +224,37 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
       int heads,
       int width,
       int capacity) {
-    Layer state = layers.computeIfAbsent(layer, ignored -> new Layer(heads, width, capacity));
+    HeadMajorKvStore state =
+        layers.computeIfAbsent(layer, ignored -> new HeadMajorKvStore(heads, width, capacity));
+    // Grown before addressing, and rows are addressed by the allocated stride rather than the
+    // ceiling. The rounding below is unchanged: same operand, same order, same per-element
+    // round trip, so the stored values are bit-identical to the preallocating form.
+    int stride = state.ensureCapacity(Math.addExact(start, batch));
     for (int row = 0; row < batch; row++) {
       for (int head = 0; head < heads; head++) {
-        int source = row * state.dimension + head * width;
-        int destination = (head * capacity + start + row) * width;
+        int source = row * state.dimension() + head * width;
+        int destination = (head * stride + start + row) * width;
         // Flash Attention consumes F16 operands even when the decoder KV setting is F32.
         // Round each appended row once. Retaining the widened values lets native attention borrow
         // the Java-owned prefix directly instead of copying and rounding it at every decode step.
         for (int element = 0; element < width; element++) {
-          state.keys[destination + element] =
+          state.keys()[destination + element] =
               Float.float16ToFloat(Float.floatToFloat16(key[source + element]));
-          state.values[destination + element] =
+          state.values()[destination + element] =
               Float.float16ToFloat(Float.floatToFloat16(value[source + element]));
         }
       }
     }
     return state;
+  }
+
+  @Override
+  public long allocatedStateBytes() {
+    long bytes = 0L;
+    for (HeadMajorKvStore layer : layers.values()) {
+      bytes = Math.addExact(bytes, layer.allocatedBytes());
+    }
+    return bytes;
   }
 
   @Override
