@@ -44,6 +44,20 @@ All notable changes to models are documented here.
 
 ### Fixed
 
+- **The native attention kernel grows its retained KV store instead of allocating the declared
+  context.** It keeps its own K and V and allocated `heads * width * capacity` floats for each of
+  them per layer on the first token touching that layer, where capacity is the declared context: for
+  a 32-layer MHA 7B at its declared 4,096 that is 128 MiB per layer and **4 GiB** held before a
+  sequence reaches a tenth of it, on top of the `KvCache` holding the same positions. Present in
+  0.5.15 through 0.5.17. Growth follows `SequenceGrowth`, the definition the Java caches already
+  use; head-major means the per-head stride is the allocated position count, so growing restrides
+  each head's run.
+
+  The arithmetic is unchanged: the per-element F16 round trip keeps the same operand, order and
+  conversion pair, and only the destination offset moves from the ceiling to the allocated stride.
+  `Session.allocatedStateBytes()` now includes the kernel's retained bytes, which its javadoc
+  already promised and which were omitted on the native route -- roughly half the truth.
+
 - Reuse the Needle 2 lane scratch instead of allocating two lane-count arrays and a
   lane-count-by-model-width array on every layer of every token. The lane buffers alternate rather
   than being shared, because `executeLayer` returns the buffer that becomes the next layer's input
