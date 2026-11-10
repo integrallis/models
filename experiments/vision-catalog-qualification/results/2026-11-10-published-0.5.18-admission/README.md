@@ -1,7 +1,12 @@
-# Eight-gate admission attempt on the published 0.5.18 runtime
+# Eight-gate admission attempt at the 0.5.18 release commit
 
 The baseline the F16 KV store measurement in `../2026-11-10-f16-kv-store/` is compared against,
 banked here because it existed only on an ephemeral instance.
+
+Provenance clarification: the worker built the JARs and native library from the release commit.
+This directory's historical name does not establish that the loaded bytes came from Maven Central.
+The subsequent 0.5.19 admission must separately record downloaded Central runtime JARs and the
+native library extracted from the published JAR.
 
 Runtime `168b7df4bd8eb5bc09e80833569c24ffae4f194d` on `m6a.4xlarge` (AMD EPYC 7R13, 8 cores / 16
 threads, AVX2, no AVX-512), 8 threads, context 1024, 32 output tokens, external oracle

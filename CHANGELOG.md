@@ -14,8 +14,9 @@ All notable changes to models are documented here.
   shared scalar reductions without per-position staging allocations.
 - On the registered EPYC 7R13 host class with eight threads, the source-candidate integration
   confirmation decode ratio improved from 1.10080 to 0.98727 against a 1.10 ceiling.
-  Across four reference/schedule arms, decode improved 1.088–1.115x and greedy tokens
-  matched exactly. Raw evidence and the table generator are in
+  Raw candidate median decode improved 1.088x initially and 1.097x on confirmation;
+  candidate/reference ratios improved 1.088–1.115x across two schedules and two reference
+  KV formats. Greedy tokens matched exactly. Raw evidence and the table generator are in
   `experiments/vision-catalog-qualification/results/2026-11-10-f16-kv-store/`.
   These integration results do not establish catalog admission: both LLaVA quantizations
   still require the complete eight-gate run against the released artifacts, and Q4_K_M

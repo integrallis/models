@@ -20,7 +20,7 @@ code: the mechanism is shared, the magnitude is not.
 | CPU | AMD EPYC 7R13 (Zen 3, AVX2, **no AVX-512**), 8 cores / 16 threads |
 | threads | `VISION_THREADS=8`, the physical core count |
 | candidate | `05595e73b684307b0d4fb589a2e7fb475846ae2e` |
-| baseline | `168b7df4bd8eb5bc09e80833569c24ffae4f194d`, the published 0.5.18 runtime |
+| baseline | source build at `168b7df4bd8eb5bc09e80833569c24ffae4f194d`, the 0.5.18 release commit |
 | external reference | llama.cpp `2cbca389f515df455412dafa07e2b1359cc72a6d` |
 
 Both runs executed sequentially on the same box as the baseline, against the same pinned artifacts
@@ -33,22 +33,30 @@ Reproduce the table from the committed artifacts — it is not hand-typed:
 
     python3 derive.py --baseline baseline-0.5.18-admission-attempt.json
 
-| schedule | reference KV | baseline decodeRatio | decodeRatio | change |
+| schedule | reference KV | baseline decodeRatio | decodeRatio | ratio improvement |
 | --- | --- | --- | --- | --- |
-| initial, 2 warmups / 5 repetitions | f32 | 0.88712 | 0.80947 | 1.096x faster |
-| initial, 2 warmups / 5 repetitions | f16 | 1.09546 | 0.98606 | 1.111x faster |
-| confirmation, 3 warmups / 7 repetitions | f32 | 0.88802 | 0.81583 | 1.088x faster |
-| confirmation, 3 warmups / 7 repetitions | f16 | 1.10080 | 0.98727 | 1.115x faster |
+| initial, 2 warmups / 5 repetitions | f32 | 0.88712 | 0.80947 | 1.096x |
+| initial, 2 warmups / 5 repetitions | f16 | 1.09546 | 0.98606 | 1.111x |
+| confirmation, 3 warmups / 7 repetitions | f32 | 0.88802 | 0.81583 | 1.088x |
+| confirmation, 3 warmups / 7 repetitions | f16 | 1.10080 | 0.98727 | 1.115x |
 
 `greedyTokensMatch` and `numericalPass` are true on all four arms, and both runs wrote
 `STATUS = INTEGRATION_PERFORMANCE_PASS` where the baseline's confirmation run did not.
 
-**Our decode is 1.09-1.12x faster**, consistently across four arms and two warmup schedules. That
-matches neither of the two prior figures, which is the point of having measured it.
+**Raw candidate decode is 1.08838x faster initially and 1.09691x faster on confirmation.**
+The medians are 3986.172098 -> 3662.482666 ms and 3994.973393 -> 3642.017006 ms,
+respectively. `derive.py` derives these from the newly banked baseline decoder verdicts and
+the candidate verdicts. There is one candidate timing series per schedule, reused in both
+reference-KV comparisons; these are two candidate runs, not four independent candidate runs.
+
+The earlier wording "1.09-1.12x faster" described the change in the candidate/reference
+ratio. That ratio also reflects reference timing variation and is not the raw candidate speedup.
+The gate measurements above are unchanged. The baseline used locally built JARs and a native
+library at the release commit; it was not a fresh resolution of Maven Central artifacts.
 
 ## The gate this moves
 
-`integrationConfirmation` is the 3w/7r row. On the published 0.5.18 runtime it read **1.10080
+`integrationConfirmation` is the 3w/7r row. On the source build at the 0.5.18 release commit it read **1.10080
 against a 1.10 ceiling — 0.0727% over** — and it was the sole remaining Q4_K_S blocker, the other
 seven admission gates having passed. It now reads **0.98727**, 10.2% inside the ceiling.
 
