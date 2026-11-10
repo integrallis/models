@@ -4,6 +4,90 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.18] - 2026-11-10
+
+### Added
+
+- **LLaVA 1.5 7B Q4_K_S and Q4_K_M pass every task gate of the frozen vision qualification.**
+  Token agreement is **1.000 with zero disagreements** on both variants -- all 64 nonblank
+  generated sequences match the independent reference exactly -- and dataset score loss is
+  **+0.0000** on both VQAv2 and TextVQA. Decode runs **11-14% faster** than the reference on every
+  measured case, with worst-case latency ratios of **0.9546** (Q4_K_S) and **1.0113** (Q4_K_M)
+  against a 1.10 ceiling.
+
+  Measured on an AWS `m6a.4xlarge`: AMD EPYC 7R13, 16 logical / 8 physical cores, AVX2 only, eight
+  threads, 1024 context, F32 KV, against an independently built llama.cpp at the recorded oracle
+  commit. Full artifacts, receipts and per-case timings are retained under
+  `experiments/vision-catalog-qualification/results/2026-11-09-qualified-m6a-epyc7r13/`.
+
+  **The host class decides the performance gates.** The identical runtime measured decode ratios of
+  1.44 to 1.67 on two hosts whose physical core counts differed from the registered class; those
+  runs are retained as failed evidence rather than deleted.
+
+  **The arithmetic itself is host-portable.** Four hosts produce byte-identical token sequences --
+  EC2 EPYC 7R13, Hetzner EPYC-Milan, and an EPYC-Genoa box both with AVX-512 exposed to the JVM and
+  with the JVM capped to 256-bit vectors, 0 of 80 cases differing in each comparison. A single
+  earlier Genoa run reporting 0.96875 / 0.984375 is unreproducible and withdrawn; its artifacts were
+  not retained, so its cause cannot be established. Evidence for the retraction is committed under
+  `experiments/vision-catalog-qualification/results/2026-11-10-host-portability-genoa/`.
+
+  A passing backend result is necessary but not sufficient for catalog admission, which additionally
+  requires ModelJars to verify both files through its installer and answer an image question through
+  its public API.
+
+### Changed
+
+- **Vectors pinned to 0.1.34**, which caps an explicit `vectors.gguf.threads` override at the
+  machine's compute-thread count rather than at its processor count. Measured on an 8-logical /
+  4-physical box, decode ran 10.13 tok/s at four threads against 7.20 at eight: honouring a pinned
+  eight literally cost **29%**.
+
+### Fixed
+
+- **The native attention kernel grows its retained KV store instead of allocating the declared
+  context.** It keeps its own K and V and allocated `heads * width * capacity` floats for each of
+  them per layer on the first token touching that layer, where capacity is the declared context: for
+  a 32-layer MHA 7B at its declared 4,096 that is 128 MiB per layer and **4 GiB** held before a
+  sequence reaches a tenth of it, on top of the `KvCache` holding the same positions. Present in
+  0.5.15 through 0.5.17. Growth follows `SequenceGrowth`, the definition the Java caches already
+  use; head-major means the per-head stride is the allocated position count, so growing restrides
+  each head's run.
+
+  The arithmetic is unchanged: the per-element F16 round trip keeps the same operand, order and
+  conversion pair, and only the destination offset moves from the ceiling to the allocated stride.
+  `Session.allocatedStateBytes()` now includes the kernel's retained bytes, which its javadoc
+  already promised and which were omitted on the native route -- roughly half the truth.
+
+- Reuse the Needle 2 lane scratch instead of allocating two lane-count arrays and a
+  lane-count-by-model-width array on every layer of every token. The lane buffers alternate rather
+  than being shared, because `executeLayer` returns the buffer that becomes the next layer's input
+  and computes each output lane from every input lane, so one buffer would have the mixing read
+  lanes it had already overwritten.
+
+- Grow DeBERTa's relative-index buffers on demand. They were already cached per sequence length, so
+  the cost was discarding a `sequenceLength^2` array whenever the length changed -- which a
+  reranker sees constantly across query-document pairs.
+
+- **Report reranker pair truncation instead of dropping tokens silently.** Both qualified rerankers
+  truncated query-document pairs to their window with no record, so a score computed on a prefix was
+  indistinguishable from one computed on the whole pair; on conversational memory about one candidate
+  in eight is truncated. `TokenizedPair` now carries `droppedTokens`, and `GgufRerankingModel` and
+  `DebertaV2Engine` expose a cumulative `TruncationReport`. Truncation behaviour itself is unchanged,
+  because changing the strategy would change scores and invalidate the reranking qualifications.
+
+- Retry the JJava kernelspec fetch when the notebook image is built. `wget` aborts on a
+  network-layer failure rather than retrying it, so one brief GitHub-releases outage failed the
+  notebooks job on `main` and on an unrelated pull request in the same minute, after 23 consecutive
+  passes.
+
+- `profile-decode` can measure the production route. It loaded through a path that passes no kernel,
+  so every decode profile it produced described the pure-Java Panama path: an eight-thread LLaVA
+  profile taken that way spends 9,780 of 11,204 samples in `ggufQ4_KQ8_KLongOffsetRowDot` and 43 in
+  native frames, because the Rust kernel was never opened. `--native true` injects the installed
+  kernel through the same `ServiceLoader` selection the LLaVA backend performs, and refuses with a
+  named error when no provider answers rather than quietly measuring Java. The difference is
+  material: native decode runs 10.13 tok/s at four threads where the pure-Java path runs 2.23.
+
 ## [0.5.17] - 2026-11-08
 
 ### Fixed
