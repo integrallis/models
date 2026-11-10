@@ -26,6 +26,8 @@ code: the mechanism is shared, the magnitude is not.
 Both runs executed sequentially on the same box as the baseline, against the same pinned artifacts
 and the same external decoder reference build. `cpu.txt`, `java-version.txt`,
 `payload-sha256.txt`, `native-library-sha256.txt` and `candidate-commit.txt` are recorded per run.
+The decoder integration probe uses Q4_K_M and the `cats` image. It is the shared integration gate
+for both catalog candidates; it does not independently measure Q4_K_S task throughput.
 
 ## Result
 
