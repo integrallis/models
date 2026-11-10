@@ -79,6 +79,7 @@
       "jmodels_tokenizer_destroy",
       "jmodels_tokenizer_encode",
       "jmodels_vision_causal_attention_f16_cache",
+      "jmodels_vision_causal_attention_f16_store",
       "jmodels_vision_project_affine",
       "jmodels_vision_rotary_factors"
     ],
@@ -987,6 +988,7 @@
           "jmodels_dense_gelu_erf",
           "jmodels_dense_project_ordered",
           "jmodels_vision_causal_attention_f16_cache",
+          "jmodels_vision_causal_attention_f16_store",
           "jmodels_vision_project_affine",
           "jmodels_vision_rotary_factors"
         ]
@@ -1037,8 +1039,12 @@
           "anchor": "jmodels_dense_project_ordered"
         },
         {
-          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "path": "backend-native/src/main/rust/model-kernels/src/vision_attention.rs",
           "anchor": "jmodels_vision_causal_attention_f16_cache"
+        },
+        {
+          "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
+          "anchor": "jmodels_vision_causal_attention_f16_store"
         },
         {
           "path": "backend-native/src/main/java/com/integrallis/models/backend/nativekernel/NativeDebertaKernels.java",
