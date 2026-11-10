@@ -4,6 +4,31 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.19] - 2026-11-10
+
+### Changed
+
+- Store the native vision attention cache as F16 bits instead of widened F16 floats,
+  halving its retained K/V storage. Widening loads preserve the operands and accumulation
+  order; parity tests cover nine attention shapes and every binary16 encoding. ARM uses
+  shared scalar reductions without per-position staging allocations.
+- On the registered EPYC 7R13 host class with eight threads, the source-candidate integration
+  confirmation decode ratio improved from 1.10080 to 0.98727 against a 1.10 ceiling.
+  Across four reference/schedule arms, decode improved 1.088–1.115x and greedy tokens
+  matched exactly. Raw evidence and the table generator are in
+  `experiments/vision-catalog-qualification/results/2026-11-10-f16-kv-store/`.
+  These integration results do not establish catalog admission: both LLaVA quantizations
+  still require the complete eight-gate run against the released artifacts, and Q4_K_M
+  must also clear its strongest-reference task-performance gate.
+
+### Release validation
+
+- Vectors remains pinned to 0.1.34. Its only subsequent main-branch change updates the
+  Apple topology probe workflow; no unreleased Vectors runtime change is required here.
+- `backend-cuda` remains opt-in and unchanged. Its last recorded G1 result is exact-token
+  parity on RTX 4090 at 31.26 tok/s; G4 passed at 6.184x against a 3.00x gate. No fresh
+  device measurement is claimed for this release.
+
 ## [0.5.18] - 2026-11-10
 
 ### Added
