@@ -22,6 +22,16 @@ import java.util.Map;
 /** Optional batched GGUF projection implementation injected into the Java transformer pipeline. */
 public interface GgufBatchedMatrixKernel extends AutoCloseable {
 
+  /** Whether this provider binds all arithmetic settings and native code to a portable identity. */
+  default boolean supportsPortablePrefixes() {
+    return false;
+  }
+
+  /** Stable exact implementation/configuration identity, never a display name or native path. */
+  default String portablePrefixFingerprint() throws java.io.IOException {
+    throw new UnsupportedOperationException("kernel does not identify portable prefix arithmetic");
+  }
+
   /** Whether projecting one retained row preserves this batch's accumulation order. */
   default boolean preservesPrunedBatchRow(GgufTensorType type, int batchSize, int rowIndex) {
     return true;
@@ -384,6 +394,16 @@ public interface GgufBatchedMatrixKernel extends AutoCloseable {
 
   enum NoKernel implements GgufBatchedMatrixKernel {
     INSTANCE;
+
+    @Override
+    public boolean supportsPortablePrefixes() {
+      return true;
+    }
+
+    @Override
+    public String portablePrefixFingerprint() {
+      return "vector-api";
+    }
 
     @Override
     public String implementation() {

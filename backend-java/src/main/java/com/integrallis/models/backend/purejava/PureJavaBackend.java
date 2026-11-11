@@ -1400,7 +1400,8 @@ public final class PureJavaBackend
     return decoder instanceof LlamaDecoder
         && Files.isRegularFile(modelPath)
         && !decoder.supportsActivatedBranch()
-        && !"custom".equals(batchedMatrixKernel.implementation());
+        && batchedAttentionKernel == BatchedCausalAttentionKernel.none()
+        && batchedMatrixKernel.supportsPortablePrefixes();
   }
 
   @Override
@@ -1420,7 +1421,7 @@ public final class PureJavaBackend
               + ";settings="
               + new java.util.TreeMap<>(diagnostics.environment())
               + ";matrix="
-              + batchedMatrixKernel.implementation();
+              + batchedMatrixKernel.portablePrefixFingerprint();
       portableFingerprint =
           com.integrallis.models.backend.purejava.cache.PrefixFingerprint.of(
               modelPath,
