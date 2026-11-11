@@ -271,6 +271,43 @@ public final class KvCache {
       }
     }
 
+    /**
+     * Streams only the positions {@code [startToken, endToken)} for every layer as raw big-endian
+     * FP32. The payload is intended to follow a higher-level block descriptor (identity, start,
+     * end, payload length) in the wire format.
+     */
+    public void writeBlockTo(DataOutput output, int startToken, int endToken) throws IOException {
+      if (startToken < 0 || endToken > length || startToken >= endToken) {
+        throw new IllegalArgumentException(
+            "invalid block range [" + startToken + ", " + endToken + ") for length " + length);
+      }
+      byte[] scratch = new byte[64 * 1024];
+      for (int layer = 0; layer < numLayers; layer++) {
+        for (StorageSegment segment : segments) {
+          int overlapStart = Math.max(startToken, segment.firstPosition);
+          int overlapEnd = Math.min(endToken, segment.endPosition());
+          if (overlapStart < overlapEnd) {
+            int keyOffset =
+                layer * segment.storageCapacity * keyDim
+                    + (overlapStart - segment.firstPosition) * keyDim;
+            int keyCount = (overlapEnd - overlapStart) * keyDim;
+            writeFloats(output, segment.keys, keyOffset, keyCount, scratch);
+          }
+        }
+        for (StorageSegment segment : segments) {
+          int overlapStart = Math.max(startToken, segment.firstPosition);
+          int overlapEnd = Math.min(endToken, segment.endPosition());
+          if (overlapStart < overlapEnd) {
+            int valueOffset =
+                layer * segment.storageCapacity * valueDim
+                    + (overlapStart - segment.firstPosition) * valueDim;
+            int valueCount = (overlapEnd - overlapStart) * valueDim;
+            writeFloats(output, segment.values, valueOffset, valueCount, scratch);
+          }
+        }
+      }
+    }
+
     /** Opens an independent suffix that references this exact prefix storage. */
     public KvCache fork() {
       return new KvCache(this);
@@ -511,7 +548,55 @@ public final class KvCache {
     return cache.freezePrefix(tokenCount);
   }
 
-  private static void writeFloats(
+  /**
+   * Creates a mutable cache pre-allocated for exactly {@code tokenCount} positions, ready to
+   * receive block payloads via {@link #readBlock}. Callers must populate every position and
+   * then invoke {@link #freezePrefix}.
+   */
+  public static KvCache createForAssembly(
+      int layers, int context, int keyWidth, int valueWidth, int tokenCount) {
+    var cache = new KvCache(layers, context, keyWidth, valueWidth);
+    cache.allocatedSequenceCapacity = tokenCount;
+    cache.keys = new float[Math.multiplyExact(Math.multiplyExact(layers, tokenCount), keyWidth)];
+    cache.values = new float[Math.multiplyExact(Math.multiplyExact(layers, tokenCount), valueWidth)];
+    cache.populated = new boolean[Math.multiplyExact(layers, tokenCount)];
+    return cache;
+  }
+
+  /**
+   * Reads one block payload from {@code input} and copies it into positions
+   * {@code [startToken, endToken)}. The caller must have created this cache via
+   * {@link #createForAssembly}.
+   */
+  public void readBlock(int startToken, int endToken, DataInput input) throws IOException {
+    if (startToken < 0 || endToken > allocatedSequenceCapacity || startToken >= endToken) {
+      throw new IllegalArgumentException(
+          "invalid block range [" + startToken + ", " + endToken + ")");
+    }
+    int count = endToken - startToken;
+    byte[] scratch = new byte[64 * 1024];
+    for (int layer = 0; layer < numLayers; layer++) {
+      readFloats(
+          input,
+          keys,
+          layer * allocatedSequenceCapacity * keyDim + startToken * keyDim,
+          count * keyDim,
+          scratch);
+      readFloats(
+          input,
+          values,
+          layer * allocatedSequenceCapacity * valueDim + startToken * valueDim,
+          count * valueDim,
+          scratch);
+    }
+    for (int layer = 0; layer < numLayers; layer++) {
+      for (int i = startToken; i < endToken; i++) {
+        populated[layer * allocatedSequenceCapacity + i] = true;
+      }
+    }
+  }
+
+  public static void writeFloats(
       DataOutput output, float[] values, int offset, int count, byte[] scratch) throws IOException {
     var buffer = ByteBuffer.wrap(scratch);
     while (count > 0) {
@@ -524,7 +609,7 @@ public final class KvCache {
     }
   }
 
-  private static void readFloats(
+  public static void readFloats(
       DataInput input, float[] values, int offset, int count, byte[] scratch) throws IOException {
     var buffer = ByteBuffer.wrap(scratch);
     while (count > 0) {
