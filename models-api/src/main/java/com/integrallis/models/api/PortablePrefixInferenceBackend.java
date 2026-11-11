@@ -31,13 +31,30 @@ import java.io.IOException;
 public interface PortablePrefixInferenceBackend extends SharedPrefixInferenceBackend {
   boolean supportsPortablePrefixes();
 
+  /**
+   * Describes portability without hashing model files, acquiring the generation lock, or accessing
+   * mutable session state. The default preserves legacy providers' boolean result and leaves their
+   * truncation semantics explicitly unspecified. Implementations should supply a specific reason
+   * when unavailable and keep this result consistent with {@link #supportsPortablePrefixes()}.
+   */
+  default PortablePrefixCapabilities portablePrefixCapabilities() {
+    return supportsPortablePrefixes()
+        ? PortablePrefixCapabilities.supported(PortablePrefixCapabilities.Truncation.UNSPECIFIED)
+        : PortablePrefixCapabilities.unsupported(
+            PortablePrefixCapabilities.Status.BACKEND_UNSUPPORTED);
+  }
+
   /** Stable digest binding exact weights/tokenizer, cache ABI and effective execution settings. */
   String portablePrefixFingerprint() throws IOException;
 
   /** Exact serialized backend payload bytes, including identity and dimensions. */
   long portablePrefixBytes(int tokenCount);
 
-  /** Returns a shorter immutable view, retaining its original token positions and storage. */
+  /**
+   * Returns a shorter immutable view, retaining its original token positions and storage. Supported
+   * boundaries follow {@link #portablePrefixCapabilities()}; recurrent state at the end of a prefix
+   * cannot be reused as state at an earlier boundary. Unavailable boundaries must be rejected.
+   */
   SharedInferencePrefix truncatePrefix(SharedInferencePrefix prefix, int tokenCount);
 
   /** Writes a bounded-length prefix in the backend's versioned wire format. */

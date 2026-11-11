@@ -180,6 +180,63 @@ the actual K/V activations has been established. Conversation affinity can
 avoid unnecessary switches, while each model-specific session reports the
 prefix tokens it reused and wrote.
 
+== Discover Portable Prefix Support
+
+The portable-prefix API exchanges immutable computed prompt state between backends with
+the same exact execution identity. Before arranging a transfer, inspect the loaded configuration:
+
+[source,java]
+----
+var capabilities = pipeline.portablePromptPrefixCapabilities();
+if (!capabilities.supported()) {
+    System.out.println("Prefix transfer unavailable: " + capabilities.status());
+} else {
+    System.out.println("Shorter boundaries: " + capabilities.truncation());
+}
+----
+
+This metadata query does not hash the model, open a generation session, or take the
+donor's generation lock. `supportsPortablePromptPrefixes()` remains available for existing
+callers. The backend SPI adds a default `portablePrefixCapabilities()` method, so existing
+providers retain their boolean result. A legacy provider reports `UNSPECIFIED` truncation;
+callers must not infer support for arbitrary shorter prefixes from that result.
+
+The current Llama decoder route reports `ANY_PREFIX`: any nonempty prefix up to the captured
+length can be retained without recomputation. The first blocking condition is reported for
+other configurations: unsupported decoder state, unavailable model identity, activated-adapter
+state, attention-kernel state, or a matrix kernel that has not opted in for its current state
+and arithmetic. Rust/FFM also requires an identified native library. A backend without the
+portable SPI reports `BACKEND_UNSUPPORTED`. These are capability reports, not peer-compatibility
+decisions or model qualification verdicts. The current codec and eligibility limits are unchanged.
+
+=== Complete Checkpoint Contract
+
+Architecture extensions must preserve all state needed to continue at the captured token
+boundary with the same logits and greedy tokens as local prefill. That includes exact token
+IDs and positions, attention KV, recurrent convolution and Gated DeltaNet state where present,
+and any additional persistent branch or memory-bank state. An end-of-prefix recurrent state
+cannot stand in for an earlier boundary just because the attention KV can be shortened.
+
+`RETAINED_CHECKPOINTS` describes a future provider that can shorten only to boundaries where
+it retained complete state. It does not promise a checkpoint at every token or introduce a
+checkpoint enumeration API. Such a provider must reject unavailable boundaries; the caller
+can choose a retained boundary or recompute. Current built-in portable prefixes use
+`ANY_PREFIX`; this release work does not yet enable Qwen3.5 hybrid checkpoints.
+
+Compatibility must bind exact weights, tokenizer, cache layout/ABI and effective arithmetic,
+including kernel binaries and relevant settings. Multimodal extensions must additionally bind
+image content, projector and preprocessing identity; activated branches and memory anchors
+must bind their configuration and complete persistent state. A matching architecture name
+or token count is insufficient.
+
+Frozen prefixes must remain immutable and detached from mutable donor sessions. Import must
+validate compatibility and bounded lengths before allocating tensors and must produce new
+owned state without changing an existing receiver session. Forks may share immutable storage;
+mutable suffixes must stay isolated. Failure or closure must release owned resources without
+invalidating other owners' retained state. Portable prompt state does not include sampler state,
+next-token logits, or an entire conversation. Authentication, tenant isolation, transport,
+placement and transfer-versus-recompute decisions remain the caller's responsibility.
+
 == Use Auxiliary Heads
 
 Architectures may carry trained heads in addition to token generation. Needle

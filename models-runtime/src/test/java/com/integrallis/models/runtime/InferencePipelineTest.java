@@ -46,6 +46,20 @@ import org.junit.jupiter.api.Test;
 class InferencePipelineTest {
 
   @Test
+  void reportsUnavailablePortabilityAndRejectsQueriesAfterClose() {
+    var pipeline = new InferencePipeline(new StubBackend());
+    try (pipeline) {
+      assertThat(pipeline.supportsPortablePromptPrefixes()).isFalse();
+      assertThat(pipeline.portablePromptPrefixCapabilities())
+          .isEqualTo(
+              com.integrallis.models.api.PortablePrefixCapabilities.unsupported(
+                  com.integrallis.models.api.PortablePrefixCapabilities.Status
+                      .BACKEND_UNSUPPORTED));
+    }
+    assertThatIllegalStateException().isThrownBy(pipeline::portablePromptPrefixCapabilities);
+  }
+
+  @Test
   void exposesTheMostRecentRuntimeGenerationMetrics() {
     try (InferencePipeline pipeline = new InferencePipeline(new StubBackend())) {
       pipeline.generate("hello", SamplingOptions.builder().temperature(0).maxTokens(1).build());

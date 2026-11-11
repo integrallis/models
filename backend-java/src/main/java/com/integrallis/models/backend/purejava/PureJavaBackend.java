@@ -26,6 +26,7 @@ import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
+import com.integrallis.models.api.PortablePrefixCapabilities;
 import com.integrallis.models.api.PortablePrefixInferenceBackend;
 import com.integrallis.models.api.ResumableInferenceBackend;
 import com.integrallis.models.api.SharedInferencePrefix;
@@ -1397,12 +1398,28 @@ public final class PureJavaBackend
 
   @Override
   public boolean supportsPortablePrefixes() {
+    return portablePrefixCapabilities().supported();
+  }
+
+  @Override
+  public PortablePrefixCapabilities portablePrefixCapabilities() {
     checkOpen();
-    return decoder instanceof LlamaDecoder
-        && Files.isRegularFile(modelPath)
-        && !decoder.supportsActivatedBranch()
-        && batchedAttentionKernel == BatchedCausalAttentionKernel.none()
-        && batchedMatrixKernel.supportsPortablePrefixes();
+    if (!(decoder instanceof LlamaDecoder))
+      return PortablePrefixCapabilities.unsupported(
+          PortablePrefixCapabilities.Status.DECODER_STATE_UNSUPPORTED);
+    if (!Files.isRegularFile(modelPath))
+      return PortablePrefixCapabilities.unsupported(
+          PortablePrefixCapabilities.Status.MODEL_IDENTITY_UNAVAILABLE);
+    if (decoder.supportsActivatedBranch())
+      return PortablePrefixCapabilities.unsupported(
+          PortablePrefixCapabilities.Status.ACTIVATED_STATE_UNSUPPORTED);
+    if (batchedAttentionKernel != BatchedCausalAttentionKernel.none())
+      return PortablePrefixCapabilities.unsupported(
+          PortablePrefixCapabilities.Status.ATTENTION_STATE_UNSUPPORTED);
+    if (!batchedMatrixKernel.supportsPortablePrefixes())
+      return PortablePrefixCapabilities.unsupported(
+          PortablePrefixCapabilities.Status.MATRIX_KERNEL_UNSUPPORTED);
+    return PortablePrefixCapabilities.supported(PortablePrefixCapabilities.Truncation.ANY_PREFIX);
   }
 
   @Override

@@ -431,6 +431,12 @@ class PureJavaBackendTest {
               PureJavaBackend.loadActivatedAdapter(modelPath, adapterDirectory);
           PureJavaBackend baseline = PureJavaBackend.load(modelPath)) {
         assertThat(activated.supportsActivatedBranch()).isTrue();
+        assertThat(activated.supportsPortablePrefixes()).isFalse();
+        assertThat(activated.portablePrefixCapabilities())
+            .isEqualTo(
+                com.integrallis.models.api.PortablePrefixCapabilities.unsupported(
+                    com.integrallis.models.api.PortablePrefixCapabilities.Status
+                        .ACTIVATED_STATE_UNSUPPORTED));
         assertThat(activated.activatedAdapter())
             .hasValueSatisfying(
                 adapter -> {
