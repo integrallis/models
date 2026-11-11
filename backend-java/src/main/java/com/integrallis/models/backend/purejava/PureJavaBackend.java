@@ -1413,6 +1413,8 @@ public final class PureJavaBackend
     if (decoder.supportsActivatedBranch())
       return PortablePrefixCapabilities.unsupported(
           PortablePrefixCapabilities.Status.ACTIVATED_STATE_UNSUPPORTED);
+    // #425: serialization exists but full continuation path is not yet independently tested.
+    // Remove this block after exact-donor/receiver tests pass for native attention prefixes.
     if (batchedAttentionKernel != BatchedCausalAttentionKernel.none())
       return PortablePrefixCapabilities.unsupported(
           PortablePrefixCapabilities.Status.ATTENTION_STATE_UNSUPPORTED);
@@ -1439,7 +1441,9 @@ public final class PureJavaBackend
               + ";settings="
               + new java.util.TreeMap<>(diagnostics.environment())
               + ";matrix="
-              + batchedMatrixKernel.portablePrefixFingerprint();
+              + batchedMatrixKernel.portablePrefixFingerprint()
+              + ";attention="
+              + batchedAttentionKernel.getClass().getName();
       portableFingerprint =
           com.integrallis.models.backend.purejava.cache.PrefixFingerprint.of(
               modelPath,
@@ -1447,7 +1451,8 @@ public final class PureJavaBackend
               LlamaForwardPass.class,
               KvCache.class,
               com.integrallis.vectors.core.VectorUtil.class,
-              batchedMatrixKernel.getClass());
+              batchedMatrixKernel.getClass(),
+              batchedAttentionKernel.getClass());
     }
     return portableFingerprint;
   }
@@ -1457,7 +1462,12 @@ public final class PureJavaBackend
     checkOpen();
     if (!supportsPortablePrefixes())
       throw new UnsupportedOperationException("model cannot transfer KV prefixes");
-    return Math.addExact(32L, decoder.portablePrefixBytes(tokenCount));
+    long bytes = Math.addExact(32L, decoder.portablePrefixBytes(tokenCount));
+    if (batchedAttentionKernel.supportsPortableState()) {
+      bytes = Math.addExact(bytes, Integer.BYTES);
+      bytes = Math.addExact(bytes, batchedAttentionKernel.retainedStateBytes());
+    }
+    return bytes;
   }
 
   @Override
@@ -1473,20 +1483,39 @@ public final class PureJavaBackend
     var owned = requirePrefix(prefix);
     // Fixed-size identity avoids peer-controlled string allocation on import.
     output.write(java.util.HexFormat.of().parseHex(portablePrefixFingerprint()));
+    // Native attention state length (0 when absent) precedes optional retained state.
+    if (batchedAttentionKernel.supportsPortableState()) {
+      // Reserve space for the length field, then write the actual state.
+      long stateBytes = batchedAttentionKernel.retainedStateBytes();
+      if (stateBytes > Integer.MAX_VALUE)
+        throw new IOException("native attention state exceeds transfer limit");
+      output.writeInt((int) stateBytes);
+      if (stateBytes > 0) batchedAttentionKernel.writeRetainedState(output);
+    } else {
+      output.writeInt(0);
+    }
     decoder.writePrefix(owned.delegate, tokenCount, output);
   }
 
   @Override
   public SharedInferencePrefix readPrefix(java.io.DataInput input, int tokenCount, long maxBytes)
       throws IOException {
-    if (maxBytes < 52) throw new IOException("prefix exceeds import budget");
+    // 32 (fingerprint) + 4 (attention length) + 20 (decoder header) = 56 minimum
+    if (maxBytes < 56) throw new IOException("prefix exceeds import budget");
     byte[] identity = new byte[32];
     input.readFully(identity);
     if (!java.security.MessageDigest.isEqual(
         identity, java.util.HexFormat.of().parseHex(portablePrefixFingerprint()))) {
       throw new IOException("incompatible model or KV execution identity");
     }
-    return new PureJavaSharedPrefix(this, decoder.readPrefix(input, tokenCount, maxBytes - 32));
+    int attentionLength = input.readInt();
+    if (attentionLength < 0) throw new IOException("invalid native attention state length");
+    if (batchedAttentionKernel.supportsPortableState()) {
+      if (attentionLength > 0) batchedAttentionKernel.readRetainedState(input);
+    } else if (attentionLength > 0) {
+      throw new IOException("unexpected native attention state for non-native backend");
+    }
+    return new PureJavaSharedPrefix(this, decoder.readPrefix(input, tokenCount, maxBytes - 36));
   }
 
   @Override

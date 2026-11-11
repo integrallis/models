@@ -259,6 +259,68 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
   }
 
   @Override
+  public boolean supportsPortableState() {
+    return true;
+  }
+
+  @Override
+  public long retainedStateBytes() {
+    long bytes = Integer.BYTES; // layer count
+    for (Map.Entry<Integer, HeadMajorKvStore> e : layers.entrySet()) {
+      HeadMajorKvStore layer = e.getValue();
+      bytes = Math.addExact(bytes, Integer.BYTES * 6L); // metadata
+      bytes = Math.addExact(bytes, Integer.BYTES * 2L); // keys.length + values.length
+      long dataBytes = (long) layer.keys().length * Short.BYTES;
+      bytes = Math.addExact(bytes, Math.addExact(dataBytes, dataBytes)); // keys + values
+    }
+    return bytes;
+  }
+
+  @Override
+  public void writeRetainedState(java.io.DataOutput output) throws java.io.IOException {
+    if (closed) throw new IllegalStateException("Native attention is closed");
+    output.writeInt(layers.size());
+    for (Map.Entry<Integer, HeadMajorKvStore> e : layers.entrySet()) {
+      HeadMajorKvStore layer = e.getValue();
+      output.writeInt(e.getKey());
+      output.writeInt(layer.heads());
+      output.writeInt(layer.dimension() / layer.heads()); // width
+      output.writeInt(layer.ceiling());
+      output.writeInt(layer.positions);
+      output.writeInt(layer.stride());
+      short[] keys = layer.keys();
+      short[] values = layer.values();
+      output.writeInt(keys.length);
+      for (short s : keys) output.writeShort(s);
+      output.writeInt(values.length);
+      for (short s : values) output.writeShort(s);
+    }
+  }
+
+  @Override
+  public void readRetainedState(java.io.DataInput input) throws java.io.IOException {
+    if (closed) throw new IllegalStateException("Native attention is closed");
+    layers.clear();
+    int layerCount = input.readInt();
+    for (int i = 0; i < layerCount; i++) {
+      int layerIndex = input.readInt();
+      int heads = input.readInt();
+      int width = input.readInt();
+      int ceiling = input.readInt();
+      int positions = input.readInt();
+      int stride = input.readInt();
+      int keyLength = input.readInt();
+      short[] keys = new short[keyLength];
+      for (int k = 0; k < keyLength; k++) keys[k] = (short) input.readUnsignedShort();
+      int valueLength = input.readInt();
+      short[] values = new short[valueLength];
+      for (int v = 0; v < valueLength; v++) values[v] = (short) input.readUnsignedShort();
+      HeadMajorKvStore store = HeadMajorKvStore.restore(heads, width, ceiling, positions, stride, keys, values);
+      layers.put(layerIndex, store);
+    }
+  }
+
+  @Override
   public void reset() {
     layers.values().forEach(layer -> layer.positions = 0);
   }
