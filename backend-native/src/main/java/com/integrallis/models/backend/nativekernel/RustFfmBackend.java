@@ -17,14 +17,15 @@ package com.integrallis.models.backend.nativekernel;
 
 import com.integrallis.models.api.BackendConfiguration;
 import com.integrallis.models.api.BackendDiagnostics;
-import com.integrallis.models.api.BatchInferenceBackend;
 import com.integrallis.models.api.GroupedDecisionBackend;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
+import com.integrallis.models.api.PortablePrefixInferenceBackend;
 import com.integrallis.models.api.ResumableInferenceBackend;
+import com.integrallis.models.api.SharedInferencePrefix;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.PureJavaBackend;
@@ -46,7 +47,7 @@ public final class RustFfmBackend
     implements GroupedDecisionBackend,
         ResumableInferenceBackend,
         SpeculativeInferenceBackend,
-        BatchInferenceBackend {
+        PortablePrefixInferenceBackend {
   public static final String LIBRARY_PATH_PROPERTY = "models.native.kernels.library";
   public static final String LIBRARY_PATH_ENV = "MODELS_NATIVE_KERNELS_LIBRARY";
   public static final String PLAN_VERSION = "rust-ffm-v14";
@@ -56,10 +57,17 @@ public final class RustFfmBackend
 
   private final PureJavaBackend delegate;
   private final BackendDiagnostics diagnostics;
+  private final Path portableLibrary;
+  private volatile String portableIdentity;
 
   RustFfmBackend(PureJavaBackend delegate, BackendDiagnostics diagnostics) {
+    this(delegate, diagnostics, null);
+  }
+
+  private RustFfmBackend(PureJavaBackend delegate, BackendDiagnostics diagnostics, Path library) {
     this.delegate = Objects.requireNonNull(delegate, "delegate");
     this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
+    this.portableLibrary = library;
   }
 
   /** Loads a model using the native library configured by a system property or environment. */
@@ -96,7 +104,9 @@ public final class RustFfmBackend
     PureJavaBackend engine = PureJavaBackend.load(modelPath, backendConfiguration, kernel);
     try {
       return new RustFfmBackend(
-          engine, diagnostics(engine.diagnostics(), kernel, settings.ignoredRemovedSettings()));
+          engine,
+          diagnostics(engine.diagnostics(), kernel, settings.ignoredRemovedSettings()),
+          libraryPath);
     } catch (RuntimeException | Error failure) {
       try {
         engine.close();
@@ -204,6 +214,82 @@ public final class RustFfmBackend
   @Override
   public InferenceSession openSession() {
     return delegate.openSession();
+  }
+
+  @Override
+  public boolean supportsSharedPrefixes() {
+    return delegate.supportsSharedPrefixes();
+  }
+
+  @Override
+  public boolean supportsPortablePrefixes() {
+    return portableLibrary != null && delegate.supportsPortablePrefixes();
+  }
+
+  @Override
+  public boolean supportsActivatedBranch() {
+    return delegate.supportsActivatedBranch();
+  }
+
+  @Override
+  public SharedInferencePrefix freezePrefix(InferenceSession source) {
+    return delegate.freezePrefix(source);
+  }
+
+  @Override
+  public InferenceSession fork(SharedInferencePrefix prefix, Branch branch) {
+    return delegate.fork(prefix, branch);
+  }
+
+  @Override
+  public boolean sharesPrefixStorage(InferenceSession a, InferenceSession b) {
+    return delegate.sharesPrefixStorage(a, b);
+  }
+
+  @Override
+  public String portablePrefixFingerprint() throws java.io.IOException {
+    if (!supportsPortablePrefixes())
+      throw new UnsupportedOperationException("Native library identity is unavailable");
+    if (portableIdentity == null)
+      portableIdentity =
+          com.integrallis.models.backend.purejava.cache.PrefixFingerprint.of(
+              portableLibrary,
+              delegate.portablePrefixFingerprint()
+                  + ";"
+                  + diagnostics.planVersion()
+                  + ";"
+                  + new java.util.TreeMap<>(diagnostics.environment()),
+              RustFfmBackend.class);
+    return portableIdentity;
+  }
+
+  @Override
+  public long portablePrefixBytes(int tokens) {
+    return Math.addExact(32L, delegate.portablePrefixBytes(tokens));
+  }
+
+  @Override
+  public SharedInferencePrefix truncatePrefix(SharedInferencePrefix prefix, int tokens) {
+    return delegate.truncatePrefix(prefix, tokens);
+  }
+
+  @Override
+  public void writePrefix(SharedInferencePrefix prefix, int tokens, java.io.DataOutput output)
+      throws java.io.IOException {
+    output.write(java.util.HexFormat.of().parseHex(portablePrefixFingerprint()));
+    delegate.writePrefix(prefix, tokens, output);
+  }
+
+  @Override
+  public SharedInferencePrefix readPrefix(java.io.DataInput input, int tokens, long maxBytes)
+      throws java.io.IOException {
+    if (maxBytes < 84) throw new java.io.IOException("Native prefix exceeds import budget");
+    byte[] identity = new byte[32];
+    input.readFully(identity);
+    if (!java.security.MessageDigest.isEqual(
+        identity, java.util.HexFormat.of().parseHex(portablePrefixFingerprint())))
+      throw new java.io.IOException("Native KV execution identity differs");
+    return delegate.readPrefix(input, tokens, maxBytes - 32);
   }
 
   @Override

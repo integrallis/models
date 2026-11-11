@@ -17,6 +17,10 @@ package com.integrallis.models.backend.purejava.cache;
 
 import com.integrallis.models.backend.purejava.ops.GroupedQueryAttentionKernel;
 import com.integrallis.vectors.core.VectorUtil;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -230,6 +234,43 @@ public final class KvCache {
       return length;
     }
 
+    /** Returns a shorter immutable view without copying tensor storage. */
+    public SharedPrefix truncate(int tokenCount) {
+      if (tokenCount <= 0 || tokenCount > length) {
+        throw new IllegalArgumentException("invalid prefix length: " + tokenCount);
+      }
+      return tokenCount == length ? this : new SharedPrefix(fork(), tokenCount);
+    }
+
+    /** Streams canonical big-endian FP32 rows, retaining raw float bits and token positions. */
+    public void writeTo(DataOutput output, int tokenCount) throws IOException {
+      SharedPrefix prefix = truncate(tokenCount);
+      output.writeInt(0x4b563031); // KV01: layer-major K rows, then V rows, for each layer.
+      output.writeInt(numLayers);
+      output.writeInt(tokenCount);
+      output.writeInt(keyDim);
+      output.writeInt(valueDim);
+      byte[] scratch = new byte[64 * 1024];
+      for (int layer = 0; layer < numLayers; layer++) {
+        for (StorageSegment segment : prefix.segments) {
+          writeFloats(
+              output,
+              segment.keys,
+              layer * segment.storageCapacity * keyDim,
+              segment.positionCount * keyDim,
+              scratch);
+        }
+        for (StorageSegment segment : prefix.segments) {
+          writeFloats(
+              output,
+              segment.values,
+              layer * segment.storageCapacity * valueDim,
+              segment.positionCount * valueDim,
+              scratch);
+        }
+      }
+    }
+
     /** Opens an independent suffix that references this exact prefix storage. */
     public KvCache fork() {
       return new KvCache(this);
@@ -411,6 +452,89 @@ public final class KvCache {
     }
     frozen = true;
     return new SharedPrefix(this, prefixLength);
+  }
+
+  /**
+   * Reads a detached immutable prefix. Dimensions come from the receiving model, never the peer. No
+   * existing session is mutated, including when validation or input fails.
+   */
+  public static SharedPrefix readPrefix(
+      DataInput input,
+      int layers,
+      int context,
+      int keyWidth,
+      int valueWidth,
+      int tokenCount,
+      long maxBytes)
+      throws IOException {
+    if (layers <= 0
+        || keyWidth <= 0
+        || valueWidth <= 0
+        || tokenCount <= 0
+        || tokenCount > context) {
+      throw new IOException("invalid KV dimensions or context length");
+    }
+    long keyElements;
+    long valueElements;
+    long bytes;
+    try {
+      keyElements = Math.multiplyExact(Math.multiplyExact((long) layers, tokenCount), keyWidth);
+      valueElements = Math.multiplyExact(Math.multiplyExact((long) layers, tokenCount), valueWidth);
+      bytes = Math.addExact(20L, Math.multiplyExact(4L, Math.addExact(keyElements, valueElements)));
+    } catch (ArithmeticException invalid) {
+      throw new IOException("KV size overflow", invalid);
+    }
+    if (bytes > maxBytes
+        || keyElements > Integer.MAX_VALUE - 8
+        || valueElements > Integer.MAX_VALUE - 8) {
+      throw new IOException("KV prefix exceeds import budget");
+    }
+    if (input.readInt() != 0x4b563031
+        || input.readInt() != layers
+        || input.readInt() != tokenCount
+        || input.readInt() != keyWidth
+        || input.readInt() != valueWidth) {
+      throw new IOException("incompatible KV format or dimensions");
+    }
+    var cache = new KvCache(layers, context, keyWidth, valueWidth);
+    cache.allocatedSequenceCapacity = tokenCount;
+    cache.keys = new float[(int) keyElements];
+    cache.values = new float[(int) valueElements];
+    cache.populated = new boolean[Math.multiplyExact(layers, tokenCount)];
+    byte[] scratch = new byte[64 * 1024];
+    for (int layer = 0; layer < layers; layer++) {
+      readFloats(input, cache.keys, layer * tokenCount * keyWidth, tokenCount * keyWidth, scratch);
+      readFloats(
+          input, cache.values, layer * tokenCount * valueWidth, tokenCount * valueWidth, scratch);
+    }
+    Arrays.fill(cache.populated, true);
+    return cache.freezePrefix(tokenCount);
+  }
+
+  private static void writeFloats(
+      DataOutput output, float[] values, int offset, int count, byte[] scratch) throws IOException {
+    var buffer = ByteBuffer.wrap(scratch);
+    while (count > 0) {
+      int n = Math.min(count, scratch.length / Float.BYTES);
+      buffer.clear();
+      for (int i = 0; i < n; i++) buffer.putInt(Float.floatToRawIntBits(values[offset + i]));
+      output.write(scratch, 0, n * Float.BYTES);
+      offset += n;
+      count -= n;
+    }
+  }
+
+  private static void readFloats(
+      DataInput input, float[] values, int offset, int count, byte[] scratch) throws IOException {
+    var buffer = ByteBuffer.wrap(scratch);
+    while (count > 0) {
+      int n = Math.min(count, scratch.length / Float.BYTES);
+      input.readFully(scratch, 0, n * Float.BYTES);
+      buffer.clear();
+      for (int i = 0; i < n; i++) values[offset + i] = Float.intBitsToFloat(buffer.getInt());
+      offset += n;
+      count -= n;
+    }
   }
 
   /** Returns a zero-copy view over a populated half-open attention range. */
