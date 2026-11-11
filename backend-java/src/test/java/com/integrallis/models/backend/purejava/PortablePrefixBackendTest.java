@@ -17,6 +17,9 @@ package com.integrallis.models.backend.purejava;
 
 import static org.assertj.core.api.Assertions.*;
 
+import com.integrallis.models.api.PortablePrefixCapabilities;
+import com.integrallis.models.api.PortablePrefixCapabilities.Status;
+import com.integrallis.models.api.PortablePrefixCapabilities.Truncation;
 import java.io.*;
 import java.nio.file.*;
 import java.util.Random;
@@ -46,8 +49,61 @@ class PortablePrefixBackendTest {
     try (var backend = PureJavaBackend.load(file, kernel)) {
       assertThat(backend.supportsSharedPrefixes()).isTrue();
       assertThat(backend.supportsPortablePrefixes()).isFalse();
+      assertThat(backend.portablePrefixCapabilities())
+          .isEqualTo(PortablePrefixCapabilities.unsupported(Status.MATRIX_KERNEL_UNSUPPORTED));
       assertThatThrownBy(backend::portablePrefixFingerprint)
           .isInstanceOf(UnsupportedOperationException.class);
+    }
+  }
+
+  @Test
+  void injectedAttentionStateCannotBeAdvertisedAsPortable(@TempDir Path dir) throws Exception {
+    var attention =
+        org.mockito.Mockito.mock(
+            com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel.class);
+    var file = PureJavaBackendTest.buildNanoModelFile(dir, new Random(42));
+    try (var backend =
+        PureJavaBackend.load(
+            file,
+            com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel.none(),
+            attention)) {
+      assertThat(backend.supportsPortablePrefixes()).isFalse();
+      assertThat(backend.portablePrefixCapabilities())
+          .isEqualTo(PortablePrefixCapabilities.unsupported(Status.ATTENTION_STATE_UNSUPPORTED));
+    }
+  }
+
+  @Test
+  void aMissingModelIdentityIsReportedBeforeFingerprinting(@TempDir Path dir) throws Exception {
+    var file = PureJavaBackendTest.buildNanoModelFile(dir, new Random(42));
+    try (var backend = PureJavaBackend.load(file)) {
+      Files.move(file, dir.resolve("moved.gguf"));
+      assertThat(backend.supportsPortablePrefixes()).isFalse();
+      assertThat(backend.portablePrefixCapabilities())
+          .isEqualTo(PortablePrefixCapabilities.unsupported(Status.MODEL_IDENTITY_UNAVAILABLE));
+    }
+  }
+
+  @Test
+  void capabilityDiscoveryDoesNotWaitForInferenceOrComputeAnIdentity(@TempDir Path dir)
+      throws Exception {
+    var file = PureJavaBackendTest.buildNanoModelFile(dir, new Random(42));
+    var kernel =
+        org.mockito.Mockito.mock(
+            com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel.class,
+            org.mockito.Mockito.CALLS_REAL_METHODS);
+    org.mockito.Mockito.when(kernel.supportsPortablePrefixes()).thenReturn(true);
+    var backend = PureJavaBackend.load(file, kernel);
+    try (var pipeline = new com.integrallis.models.runtime.InferencePipeline(backend);
+        var workers = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+      synchronized (backend) {
+        var report = workers.submit(pipeline::portablePromptPrefixCapabilities);
+        assertThat(report.get(2, java.util.concurrent.TimeUnit.SECONDS))
+            .isEqualTo(PortablePrefixCapabilities.supported(Truncation.ANY_PREFIX));
+      }
+      assertThat(pipeline.portablePromptPrefixCapabilities().supported())
+          .isEqualTo(pipeline.supportsPortablePromptPrefixes());
+      org.mockito.Mockito.verify(kernel, org.mockito.Mockito.never()).portablePrefixFingerprint();
     }
   }
 
@@ -98,6 +154,9 @@ class PortablePrefixBackendTest {
             new com.integrallis.models.runtime.InferencePipeline(PureJavaBackend.load(file));
         var receiver =
             new com.integrallis.models.runtime.InferencePipeline(PureJavaBackend.load(file))) {
+      assertThat(donor.portablePromptPrefixCapabilities())
+          .isEqualTo(PortablePrefixCapabilities.supported(Truncation.ANY_PREFIX));
+      assertThat(donor.supportsPortablePromptPrefixes()).isTrue();
       var prefix = donor.prepareSharedTokenPrefix(new int[] {2, 3, 4, 5});
       var bytes = new ByteArrayOutputStream();
       donor.writeSharedPromptPrefix(prefix, 3, bytes);

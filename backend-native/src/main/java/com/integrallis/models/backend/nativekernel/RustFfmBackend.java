@@ -23,6 +23,7 @@ import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
+import com.integrallis.models.api.PortablePrefixCapabilities;
 import com.integrallis.models.api.PortablePrefixInferenceBackend;
 import com.integrallis.models.api.ResumableInferenceBackend;
 import com.integrallis.models.api.SharedInferencePrefix;
@@ -223,7 +224,15 @@ public final class RustFfmBackend
 
   @Override
   public boolean supportsPortablePrefixes() {
-    return portableLibrary != null && delegate.supportsPortablePrefixes();
+    return portablePrefixCapabilities().supported();
+  }
+
+  @Override
+  public PortablePrefixCapabilities portablePrefixCapabilities() {
+    return portableLibrary == null
+        ? PortablePrefixCapabilities.unsupported(
+            PortablePrefixCapabilities.Status.NATIVE_IDENTITY_UNAVAILABLE)
+        : delegate.portablePrefixCapabilities();
   }
 
   @Override

@@ -252,6 +252,18 @@ public final class InferencePipeline
     }
   }
 
+  /**
+   * Describes portable-prefix support and shorter checkpoint boundaries without taking the donor's
+   * generation lock or computing its model fingerprint. This does not establish peer compatibility.
+   */
+  public com.integrallis.models.api.PortablePrefixCapabilities portablePromptPrefixCapabilities() {
+    requireOpen();
+    return backend instanceof com.integrallis.models.api.PortablePrefixInferenceBackend portable
+        ? portable.portablePrefixCapabilities()
+        : com.integrallis.models.api.PortablePrefixCapabilities.unsupported(
+            com.integrallis.models.api.PortablePrefixCapabilities.Status.BACKEND_UNSUPPORTED);
+  }
+
   /** Exact model, tokenizer, cache ABI and execution identity used for peer discovery. */
   public String portablePrefixFingerprint() throws java.io.IOException {
     synchronized (backend) {

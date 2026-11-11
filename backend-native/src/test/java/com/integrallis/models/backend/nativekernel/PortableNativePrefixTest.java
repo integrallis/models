@@ -39,8 +39,28 @@ class PortableNativePrefixTest {
     var decoder = mock(PureJavaBackend.class);
     when(decoder.supportsSharedPrefixes()).thenReturn(true);
     when(decoder.supportsPortablePrefixes()).thenReturn(true);
+    when(decoder.portablePrefixCapabilities())
+        .thenReturn(
+            PortablePrefixCapabilities.supported(PortablePrefixCapabilities.Truncation.ANY_PREFIX));
     when(decoder.portablePrefixFingerprint()).thenReturn("a".repeat(64));
     return decoder;
+  }
+
+  @Test
+  void identifiedNativeBackendPreservesTheDelegatesBlockingReason(@TempDir Path dir)
+      throws Exception {
+    var decoder = decoder();
+    var unsupported =
+        PortablePrefixCapabilities.unsupported(
+            PortablePrefixCapabilities.Status.ATTENTION_STATE_UNSUPPORTED);
+    when(decoder.portablePrefixCapabilities()).thenReturn(unsupported);
+    when(decoder.supportsPortablePrefixes()).thenReturn(false);
+    Path binary = Files.writeString(dir.resolve("kernel.bin"), "identified-native-binary");
+    try (var backend = new RustFfmBackend(decoder, DIAGNOSTICS, binary)) {
+      assertThat(backend.supportsPortablePrefixes()).isFalse();
+      assertThat(backend.portablePrefixCapabilities()).isEqualTo(unsupported);
+      verify(decoder, never()).portablePrefixFingerprint();
+    }
   }
 
   @Test
@@ -92,6 +112,9 @@ class PortableNativePrefixTest {
         var receiver = new RustFfmBackend(receiverDecoder, DIAGNOSTICS, sameBinary);
         var wrong = new RustFfmBackend(wrongDecoder, DIAGNOSTICS, wrongBinary)) {
       assertThat(donor.supportsPortablePrefixes()).isTrue();
+      assertThat(donor.portablePrefixCapabilities())
+          .isEqualTo(donorDecoder.portablePrefixCapabilities());
+      verify(donorDecoder, never()).portablePrefixFingerprint();
       assertThat(donor.portablePrefixFingerprint()).isEqualTo(receiver.portablePrefixFingerprint());
       assertThat(donor.portablePrefixFingerprint()).isNotEqualTo(wrong.portablePrefixFingerprint());
       verify(donorDecoder, times(1)).portablePrefixFingerprint();
@@ -130,6 +153,10 @@ class PortableNativePrefixTest {
     when(decoder.supportsActivatedBranch()).thenReturn(true);
     try (var backend = new RustFfmBackend(decoder, DIAGNOSTICS)) {
       assertThat(backend.supportsPortablePrefixes()).isFalse();
+      assertThat(backend.portablePrefixCapabilities())
+          .isEqualTo(
+              PortablePrefixCapabilities.unsupported(
+                  PortablePrefixCapabilities.Status.NATIVE_IDENTITY_UNAVAILABLE));
       assertThatThrownBy(backend::portablePrefixFingerprint)
           .isInstanceOf(UnsupportedOperationException.class);
       assertThat(backend.supportsSharedPrefixes()).isTrue();

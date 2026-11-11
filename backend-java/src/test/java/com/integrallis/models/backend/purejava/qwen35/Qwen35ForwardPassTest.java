@@ -58,6 +58,20 @@ class Qwen35ForwardPassTest {
   private static final int VOCABULARY_SIZE = 8;
 
   @Test
+  void hybridStateRequiresACompletePortableCheckpoint(@TempDir Path dir) throws Exception {
+    try (var backend = PureJavaBackend.load(writeToyModel(dir))) {
+      assertThat(backend.supportsPortablePrefixes()).isFalse();
+      assertThat(backend.portablePrefixCapabilities())
+          .isEqualTo(
+              com.integrallis.models.api.PortablePrefixCapabilities.unsupported(
+                  com.integrallis.models.api.PortablePrefixCapabilities.Status
+                      .DECODER_STATE_UNSUPPORTED));
+      assertThatThrownBy(backend::portablePrefixFingerprint)
+          .isInstanceOf(UnsupportedOperationException.class);
+    }
+  }
+
+  @Test
   void transposesChannelMajorConvolutionWeightsForVectorizedExecution() {
     float[] channelMajor = {
       1.0f, 2.0f, 3.0f,
