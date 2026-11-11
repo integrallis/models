@@ -126,6 +126,38 @@ public interface BatchedCausalAttentionKernel extends AutoCloseable {
     return 0L;
   }
 
+  /**
+   * Whether this kernel can export and import its retained sequence state as a portable prefix
+   * component. The default is {@code false}; implementations that retain their own state must opt
+   * in after validating exact continuation and identity binding.
+   */
+  default boolean supportsPortableState() {
+    return false;
+  }
+
+  /**
+   * Writes all retained sequence state required for exact continuation. Callers must precede this
+   * with a compatibility check ({@link #supportsPortableState()} and matching identity). The
+   * default throws {@link UnsupportedOperationException}.
+   */
+  default void writeRetainedState(java.io.DataOutput output) throws java.io.IOException {
+    throw new UnsupportedOperationException("retained state export is not supported");
+  }
+
+  /**
+   * Reads and restores retained sequence state from a matching donor. The default throws {@link
+   * UnsupportedOperationException}. Implementations must validate layer identity and shape before
+   * allocating.
+   */
+  default void readRetainedState(java.io.DataInput input) throws java.io.IOException {
+    throw new UnsupportedOperationException("retained state import is not supported");
+  }
+
+  /** Exact bytes {@link #writeRetainedState} would emit for the current retained positions. */
+  default long retainedStateBytes() {
+    return 0L;
+  }
+
   /** Notifies retained device state that speculative positions were discarded. */
   default void rewind(int checkpoint) {}
 
@@ -173,6 +205,26 @@ public interface BatchedCausalAttentionKernel extends AutoCloseable {
         int maxSequenceLength,
         int slidingWindow) {
       throw new UnsupportedOperationException("no batched causal-attention kernel is configured");
+    }
+
+    @Override
+    public boolean supportsPortableState() {
+      return true;
+    }
+
+    @Override
+    public void writeRetainedState(java.io.DataOutput output) throws java.io.IOException {
+      // No retained state to export.
+    }
+
+    @Override
+    public void readRetainedState(java.io.DataInput input) throws java.io.IOException {
+      // No retained state to import.
+    }
+
+    @Override
+    public long retainedStateBytes() {
+      return 0L;
     }
   }
 }

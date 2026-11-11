@@ -292,7 +292,8 @@ public final class RustFfmBackend
   @Override
   public SharedInferencePrefix readPrefix(java.io.DataInput input, int tokens, long maxBytes)
       throws java.io.IOException {
-    if (maxBytes < 84) throw new java.io.IOException("Native prefix exceeds import budget");
+    // 32 (Rust identity) + 32 (Java identity) + 4 (attention length) + 20 (decoder header) = 88
+    if (maxBytes < 88) throw new java.io.IOException("Native prefix exceeds import budget");
     byte[] identity = new byte[32];
     input.readFully(identity);
     if (!java.security.MessageDigest.isEqual(
