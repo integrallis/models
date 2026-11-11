@@ -27,6 +27,45 @@ import org.junit.jupiter.api.io.TempDir;
 @Tag("unit")
 class PortablePrefixBackendTest {
   @Test
+  void immutableExportDoesNotWaitForTheInferenceExecutionLock(@TempDir Path dir) throws Exception {
+    var file = PureJavaBackendTest.buildNanoModelFile(dir, new Random(42));
+    var backend = PureJavaBackend.load(file);
+    try (var pipeline = new com.integrallis.models.runtime.InferencePipeline(backend);
+        var workers = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+      var prefix = pipeline.prepareSharedTokenPrefix(new int[] {2, 3, 4});
+      pipeline.portablePrefixFingerprint();
+      var locked = new java.util.concurrent.CountDownLatch(1);
+      var release = new java.util.concurrent.CountDownLatch(1);
+      var inference =
+          workers.submit(
+              () -> {
+                synchronized (backend) {
+                  locked.countDown();
+                  try {
+                    release.await();
+                  } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                  }
+                }
+              });
+      try {
+        assertThat(locked.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        var export =
+            workers.submit(
+                () -> {
+                  var output = new ByteArrayOutputStream();
+                  pipeline.writeSharedPromptPrefix(prefix, 3, output);
+                  return output.size();
+                });
+        assertThat(export.get(2, java.util.concurrent.TimeUnit.SECONDS)).isPositive();
+      } finally {
+        release.countDown();
+        inference.get();
+      }
+    }
+  }
+
+  @Test
   void runtimeChecksIntegrityTokensAndContinuesWithoutPrefillingImportedTokens(@TempDir Path dir)
       throws Exception {
     var file = PureJavaBackendTest.buildNanoModelFile(dir, new Random(42));

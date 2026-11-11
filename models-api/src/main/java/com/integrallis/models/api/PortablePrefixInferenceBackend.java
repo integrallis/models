@@ -25,6 +25,8 @@ import java.io.IOException;
  * <p>Callers provide authenticated, bounded transport and isolation. Implementations must validate
  * compatibility before allocating tensors and must not modify an existing session during import.
  * This transfers computed KV state, not sampler state, next-token logits or a whole conversation.
+ * Identity, byte-size queries and immutable-prefix export must be safe alongside inference; they
+ * must not acquire the model's generation lock or read mutable sequence buffers.
  */
 public interface PortablePrefixInferenceBackend extends SharedPrefixInferenceBackend {
   boolean supportsPortablePrefixes();

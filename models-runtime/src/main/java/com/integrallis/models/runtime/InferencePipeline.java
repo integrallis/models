@@ -262,11 +262,8 @@ public final class InferencePipeline
 
   /** Exact wire length for a prefix, including tokens, identity, tensor dimensions and checksum. */
   public long portablePrefixBytes(int tokenCount) {
-    synchronized (backend) {
-      requireOpen();
-      return Math.addExact(
-          40L + 4L * tokenCount, portableBackend().portablePrefixBytes(tokenCount));
-    }
+    requireOpen();
+    return Math.addExact(40L + 4L * tokenCount, portableBackend().portablePrefixBytes(tokenCount));
   }
 
   /** Returns an immutable shorter view without copying or recomputing tensors. */
@@ -289,11 +286,8 @@ public final class InferencePipeline
   public void writeSharedPromptPrefix(
       SharedPromptPrefix prefix, int tokenCount, java.io.OutputStream output)
       throws java.io.IOException {
-    com.integrallis.models.api.PortablePrefixInferenceBackend portable;
-    synchronized (backend) {
-      requireOwnedPrefix(prefix);
-      portable = portableBackend();
-    }
+    requireOwnedPrefix(prefix);
+    var portable = portableBackend();
     // Immutable heap-backed prefix serialization does not hold the inference execution lock.
     PortablePromptPrefixes.write(
         portable, prefix, tokenCount, java.util.Objects.requireNonNull(output));
