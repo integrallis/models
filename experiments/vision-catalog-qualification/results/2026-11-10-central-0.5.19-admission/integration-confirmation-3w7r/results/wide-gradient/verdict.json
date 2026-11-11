@@ -1,0 +1,73 @@
+{
+  "candidate": {
+    "schema": "vision-integration-v1",
+    "arm": "models-java",
+    "java": "25.0.5+8-LTS",
+    "os": "Linux amd64",
+    "host": "ip-172-31-9-66",
+    "threads": 8,
+    "mmprojSha256": "50da4e5b0a011615f77686f9b02613571e65d23083c225e107c08c3b1775d9b1",
+    "imageSha256": "ae486a1ba1ebdb2cec0c1bdb5197a9bb42c22dbf8da32808a235583dccec09b1",
+    "warmups": 3,
+    "repetitions": 7,
+    "candidateRevision": "214d53f928923d21514cf2d8bca6e02712d4dd51",
+    "loadMs": 1938.711501,
+    "visionKernel": "rust-matrixmultiply",
+    "preprocessMs": 36.501095,
+    "imageSize": 336,
+    "tokens": 576,
+    "dimension": 4096,
+    "encoderProjectorMs": [
+      832.785219,
+      827.912285,
+      888.803047,
+      832.792138,
+      834.770548,
+      878.090491,
+      906.615211
+    ]
+  },
+  "oracle": {
+    "schema": "vision-integration-v1",
+    "arm": "transformers-pytorch",
+    "host": "ip-172-31-9-66",
+    "torch": "2.9.0+cpu",
+    "transformers": "4.57.1",
+    "mmprojSha256": "50da4e5b0a011615f77686f9b02613571e65d23083c225e107c08c3b1775d9b1",
+    "imageSha256": "ae486a1ba1ebdb2cec0c1bdb5197a9bb42c22dbf8da32808a235583dccec09b1",
+    "threads": 8,
+    "warmups": 3,
+    "repetitions": 7,
+    "loadMs": 3445.5274470019503,
+    "preprocessMs": 6.392776995198801,
+    "encoderProjectorMs": [
+      922.4023749993648,
+      873.5889960007626,
+      918.3147880030447,
+      833.1194920028793,
+      684.6402839946677,
+      866.501504999178,
+      924.2913920024876
+    ],
+    "imageSize": 336,
+    "tokens": 576,
+    "dimension": 4096
+  },
+  "pixels": {
+    "maxAbs": 0.0,
+    "cosine": 1.0,
+    "normalizedRmse": 0.0
+  },
+  "embeddings": {
+    "maxAbs": 0.0,
+    "cosine": 1.0000000000000002,
+    "normalizedRmse": 0.0
+  },
+  "candidateMedianMs": 834.770548,
+  "oracleMedianMs": 873.5889960007626,
+  "candidateToOracleLatencyRatio": 0.9555644036515214,
+  "numericalPass": true,
+  "catalogQualified": false,
+  "performancePass": true,
+  "maximumLatencyRatio": 1.1
+}
