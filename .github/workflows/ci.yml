@@ -199,11 +199,7 @@ jobs:
 
       - name: Build JJava notebook image
         working-directory: models/notebooks
-        # Use the runner's resolver for package downloads. Grant this explicitly to BuildKit;
-        # Compose's Bake wrapper does not forward network.host on all runner versions.
-        run: >-
-          docker buildx build --network=host --allow=network.host --load
-          --tag models-jjava:latest --file jupyter/Dockerfile .
+        run: ./docker-compose.sh build
 
       - name: Execute and validate all notebooks
         working-directory: models/notebooks
