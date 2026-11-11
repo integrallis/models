@@ -1404,7 +1404,8 @@ public final class PureJavaBackend
   @Override
   public PortablePrefixCapabilities portablePrefixCapabilities() {
     checkOpen();
-    if (!(decoder instanceof LlamaDecoder))
+    var truncation = decoder.portablePrefixTruncation();
+    if (truncation == PortablePrefixCapabilities.Truncation.UNSUPPORTED)
       return PortablePrefixCapabilities.unsupported(
           PortablePrefixCapabilities.Status.DECODER_STATE_UNSUPPORTED);
     if (!Files.isRegularFile(modelPath))
@@ -1419,7 +1420,7 @@ public final class PureJavaBackend
     if (!batchedMatrixKernel.supportsPortablePrefixes())
       return PortablePrefixCapabilities.unsupported(
           PortablePrefixCapabilities.Status.MATRIX_KERNEL_UNSUPPORTED);
-    return PortablePrefixCapabilities.supported(PortablePrefixCapabilities.Truncation.ANY_PREFIX);
+    return PortablePrefixCapabilities.supported(truncation);
   }
 
   @Override
@@ -1444,10 +1445,12 @@ public final class PureJavaBackend
           com.integrallis.models.backend.purejava.cache.PrefixFingerprint.of(
               modelPath,
               settings,
-              LlamaForwardPass.class,
-              KvCache.class,
-              com.integrallis.vectors.core.VectorUtil.class,
-              batchedMatrixKernel.getClass());
+              java.util.stream.Stream.concat(
+                      java.util.Arrays.stream(decoder.portablePrefixImplementations()),
+                      java.util.stream.Stream.of(
+                          com.integrallis.vectors.core.VectorUtil.class,
+                          batchedMatrixKernel.getClass()))
+                  .toArray(Class<?>[]::new));
     }
     return portableFingerprint;
   }
@@ -1487,6 +1490,11 @@ public final class PureJavaBackend
       throw new IOException("incompatible model or KV execution identity");
     }
     return new PureJavaSharedPrefix(this, decoder.readPrefix(input, tokenCount, maxBytes - 32));
+  }
+
+  @Override
+  public void validatePrefixTokens(SharedInferencePrefix prefix, int[] tokens) throws IOException {
+    decoder.validatePrefixTokens(requirePrefix(prefix).delegate, tokens);
   }
 
   @Override

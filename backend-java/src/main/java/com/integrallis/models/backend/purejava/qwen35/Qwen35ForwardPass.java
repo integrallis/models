@@ -55,6 +55,7 @@ public final class Qwen35ForwardPass {
     private int[] tokenHistory;
     private SessionState state;
     private int checkpoint;
+    private boolean consumed;
 
     private Session(Qwen35ForwardPass owner, int capacity) {
       if (capacity <= 0 || capacity > owner.config.contextLength()) {
@@ -91,7 +92,7 @@ public final class Qwen35ForwardPass {
      * only way to assert it no longer does is to be able to read what it holds.
      */
     public long allocatedCacheBytes() {
-      return state.allocatedCacheBytes();
+      return owner.requireSession(this).state.allocatedCacheBytes();
     }
 
     /** The ceiling this session may grow to: the context it was opened for. */
@@ -118,6 +119,126 @@ public final class Qwen35ForwardPass {
       }
       tokenHistory[position] = token;
     }
+  }
+
+  /** Complete immutable checkpoint at one retained boundary, owned by this graph. */
+  public static final class SessionPrefix {
+    private final Qwen35ForwardPass owner;
+    private final Qwen35Checkpoint state;
+    private final int capacity;
+
+    private SessionPrefix(Qwen35ForwardPass owner, Qwen35Checkpoint state, int capacity) {
+      this.owner = owner;
+      this.state = state;
+      this.capacity = capacity;
+    }
+
+    public int checkpoint() {
+      return state.tokens.length;
+    }
+
+    public long sharedBytes() {
+      return Qwen35Checkpoint.serializedBytes(owner.config, checkpoint())
+          - 24L
+          - owner.config.numLayers();
+    }
+
+    public SessionPrefix truncate(int count) {
+      state.requireBoundary(count);
+      return this;
+    }
+
+    public void validateTokens(int[] tokens) throws java.io.IOException {
+      if (!Arrays.equals(state.tokens, tokens))
+        throw new java.io.IOException("prompt tokens differ from hybrid checkpoint history");
+    }
+
+    public void writeTo(java.io.DataOutput output, int count) throws java.io.IOException {
+      state.write(output, owner.config, count);
+    }
+  }
+
+  /** Only standard dense Qwen3.5 state is covered by the complete checkpoint contract. */
+  public boolean supportsSharedPrefixes() {
+    return memory == null
+        && config.architecture().equals("qwen35")
+        && !config.usesMixtureOfExperts();
+  }
+
+  public String portablePrefixConfiguration() {
+    return "qwen35-complete-f32-v1;"
+        + com.integrallis.models.backend.purejava.cache.PrefixFingerprint.configuration(config)
+        + ";prefillBatch="
+        + prefillBatchSize;
+  }
+
+  public static Class<?>[] portablePrefixImplementations() {
+    return new Class<?>[] {
+      Qwen35ForwardPass.class,
+      SessionState.class,
+      Qwen35Checkpoint.class,
+      Qwen35Weights.class,
+      TensorOps.class,
+      RotaryTable.class
+    };
+  }
+
+  public long portablePrefixBytes(int count) {
+    requirePortableState();
+    return Qwen35Checkpoint.serializedBytes(config, count);
+  }
+
+  public SessionPrefix freezePrefix(Session source) {
+    requirePortableState();
+    Session checked = requireSession(source);
+    if (checked.checkpoint == 0)
+      throw new IllegalArgumentException("cannot freeze an empty session");
+    SessionState state = checked.state;
+    var captured =
+        Qwen35Checkpoint.capture(
+            config,
+            checked.tokenHistory,
+            checked.checkpoint,
+            state.prefix,
+            state.keys,
+            state.values,
+            state.convolutionHistory,
+            state.recurrentState);
+    checked.consumed = true;
+    checked.state = null;
+    checked.tokenHistory = null;
+    return new SessionPrefix(this, captured, checked.capacity);
+  }
+
+  public SessionPrefix readPrefix(java.io.DataInput input, int count, long maxBytes, int capacity)
+      throws java.io.IOException {
+    requirePortableState();
+    if (count <= 0 || count > capacity || capacity > config.contextLength())
+      throw new java.io.IOException("checkpoint exceeds session capacity");
+    return new SessionPrefix(this, Qwen35Checkpoint.read(input, config, count, maxBytes), capacity);
+  }
+
+  public Session fork(SessionPrefix prefix) {
+    requirePortableState();
+    if (Objects.requireNonNull(prefix).owner != this)
+      throw new IllegalArgumentException("prefix belongs to a different Qwen3.5 graph");
+    Session session = new Session(this, prefix.capacity);
+    session.state.prefix = prefix.state;
+    session.state.restorePrefix();
+    session.tokenHistory = prefix.state.tokens.clone();
+    session.checkpoint = prefix.checkpoint();
+    return session;
+  }
+
+  public boolean sharesPrefixStorage(Session first, Session second) {
+    var prefix = requireSession(first).state.prefix;
+    return prefix != null && prefix.sharesAttention(requireSession(second).state.prefix);
+  }
+
+  private void requirePortableState() {
+    if (!supportsSharedPrefixes())
+      throw new UnsupportedOperationException(
+          "complete portable checkpoints are unavailable for " + config.architecture());
   }
 
   /** Immutable copy of one session's convolution and recurrent state at a retained prefix. */
@@ -394,14 +515,15 @@ public final class Qwen35ForwardPass {
   /** Reconstructs sequence state at an earlier checkpoint from its retained token prefix. */
   public void rewind(Session session, int checkpoint) {
     Session checked = requireSession(session);
-    if (checkpoint < 0 || checkpoint > checked.checkpoint) {
+    int base = checked.state.prefixLength();
+    if (checkpoint < base || checkpoint > checked.checkpoint) {
       throw new IllegalArgumentException(
-          "checkpoint must be between 0 and " + checked.checkpoint + ": " + checkpoint);
+          "checkpoint must be between " + base + " and " + checked.checkpoint + ": " + checkpoint);
     }
-    int[] retained = Arrays.copyOf(checked.tokenHistory, checkpoint);
+    int[] retained = Arrays.copyOfRange(checked.tokenHistory, base, checkpoint);
     checked.state.clear();
-    checked.checkpoint = 0;
-    if (checkpoint == 0) {
+    checked.checkpoint = base;
+    if (checkpoint == base) {
       return;
     }
     // Replay through the batched prefill path, not one token at a time. A Gated DeltaNet state
@@ -409,14 +531,14 @@ public final class Qwen35ForwardPass {
     // -- and re-running it at decode rate cost more than prefilling the whole prompt outright,
     // which made a cached prefix the slowest way to answer. Measured on a 171-token RAG prompt
     // with a 150-token reusable prefix: p95 TTFT 6371 ms token-by-token.
-    prefill(checked, retained, 0);
+    prefill(checked, retained, base);
   }
 
   /** Clears all sequence state. */
   public void reset(Session session) {
     Session checked = requireSession(session);
     checked.state.clear();
-    checked.checkpoint = 0;
+    checked.checkpoint = checked.state.prefixLength();
   }
 
   /** Captures the Gated DeltaNet state needed to resume this session's retained token prefix. */
@@ -610,7 +732,8 @@ public final class Qwen35ForwardPass {
           state.keys,
           state.values,
           prefixLength,
-          config.attentionKeyDim());
+          config.attentionKeyDim(),
+          state.prefix);
     }
 
     float[][] logits = new float[count][];
@@ -1015,6 +1138,7 @@ public final class Qwen35ForwardPass {
     if (session.owner != this) {
       throw new IllegalArgumentException("session belongs to a different Qwen3.5 graph");
     }
+    if (session.consumed) throw new IllegalStateException("session was consumed by freezePrefix");
     return session;
   }
 
@@ -1087,8 +1211,8 @@ public final class Qwen35ForwardPass {
             normalized,
             layer.fullAttention(),
             position,
-            session.keys[layerIndex],
-            session.values[layerIndex],
+            session,
+            layerIndex,
             session.scratch);
         if (memory != null) {
           // Two details the tensor names do not show, both taken from the reference decoder.
@@ -1442,9 +1566,17 @@ public final class Qwen35ForwardPass {
       }
       int position = startPosition + token;
       System.arraycopy(
-          batch.key, keyBase, session.keys[layer], position * keyDimension, keyDimension);
+          batch.key,
+          keyBase,
+          session.keys[layer],
+          (position - session.prefixLength()) * keyDimension,
+          keyDimension);
       System.arraycopy(
-          batch.value, keyBase, session.values[layer], position * keyDimension, keyDimension);
+          batch.value,
+          keyBase,
+          session.values[layer],
+          (position - session.prefixLength()) * keyDimension,
+          keyDimension);
     }
 
     int queriesPerKvHead = queryHeads / kvHeads;
@@ -1462,17 +1594,15 @@ public final class Qwen35ForwardPass {
         int kvHead = head / queriesPerKvHead;
         int queryOffset = queryBase + head * headDimension;
         int gate = queryGateBase + head * 2 * headDimension + headDimension;
-        attendHead(
+        attendSessionHead(
             batch.attended,
             queryOffset,
             batch.query,
             queryOffset,
-            session.keys[layer],
-            kvHead * headDimension + firstVisible * keyDimension,
-            keyDimension,
-            session.values[layer],
-            kvHead * headDimension + firstVisible * keyDimension,
-            keyDimension,
+            session,
+            layer,
+            kvHead * headDimension,
+            firstVisible,
             batch.queryGate,
             gate,
             batch.attentionScores,
@@ -1628,8 +1758,8 @@ public final class Qwen35ForwardPass {
       float[] input,
       FullAttention weights,
       int position,
-      float[] keyCache,
-      float[] valueCache,
+      SessionState session,
+      int layer,
       ProjectionScratch scratch) {
     int headDimension = config.attentionHeadDim();
     int queryHeads = config.numHeads();
@@ -1675,8 +1805,14 @@ public final class Qwen35ForwardPass {
     for (int head = 0; head < kvHeads; head++) {
       rotary.apply(key, head * headDimension, true);
     }
-    System.arraycopy(key, 0, keyCache, position * key.length, key.length);
-    System.arraycopy(value, 0, valueCache, position * value.length, value.length);
+    System.arraycopy(
+        key, 0, session.keys[layer], (position - session.prefixLength()) * key.length, key.length);
+    System.arraycopy(
+        value,
+        0,
+        session.values[layer],
+        (position - session.prefixLength()) * value.length,
+        value.length);
 
     int queriesPerKvHead = queryHeads / kvHeads;
     float scale = (float) (1.0 / Math.sqrt(headDimension));
@@ -1692,17 +1828,15 @@ public final class Qwen35ForwardPass {
       int queryOffset = head * headDimension;
       int destination = head * headDimension;
       int gate = head * 2 * headDimension + headDimension;
-      attendHead(
+      attendSessionHead(
           attended,
           destination,
           query,
           queryOffset,
-          keyCache,
-          kvHead * headDimension + firstVisible * key.length,
-          key.length,
-          valueCache,
-          kvHead * headDimension + firstVisible * value.length,
-          value.length,
+          session,
+          layer,
+          kvHead * headDimension,
+          firstVisible,
           queryGate,
           gate,
           scores,
@@ -1748,24 +1882,120 @@ public final class Qwen35ForwardPass {
       int visiblePositions,
       int headDimension,
       float scale) {
+    attendHead(
+        output,
+        outputOffset,
+        query,
+        queryOffset,
+        keyCache,
+        firstKeyOffset,
+        keyStride,
+        valueCache,
+        firstValueOffset,
+        valueStride,
+        gate,
+        gateOffset,
+        scores,
+        visiblePositions,
+        headDimension,
+        scale,
+        null,
+        0,
+        0,
+        0,
+        0);
+  }
+
+  private static void attendSessionHead(
+      float[] output,
+      int outputOffset,
+      float[] query,
+      int queryOffset,
+      SessionState session,
+      int layer,
+      int headOffset,
+      int firstVisible,
+      float[] gate,
+      int gateOffset,
+      float[] scores,
+      int visiblePositions,
+      int headDimension,
+      float scale) {
+    int base = session.prefixLength();
+    int sharedPositions = Math.min(visiblePositions, Math.max(0, base - firstVisible));
+    int stride = session.config.attentionKeyDim();
+    int suffixOffset = headOffset + Math.max(0, firstVisible - base) * stride;
+    attendHead(
+        output,
+        outputOffset,
+        query,
+        queryOffset,
+        session.keys[layer],
+        suffixOffset,
+        stride,
+        session.values[layer],
+        suffixOffset,
+        stride,
+        gate,
+        gateOffset,
+        scores,
+        visiblePositions,
+        headDimension,
+        scale,
+        session.prefix,
+        layer,
+        headOffset,
+        firstVisible,
+        sharedPositions);
+  }
+
+  private static void attendHead(
+      float[] output,
+      int outputOffset,
+      float[] query,
+      int queryOffset,
+      float[] keyCache,
+      int firstKeyOffset,
+      int keyStride,
+      float[] valueCache,
+      int firstValueOffset,
+      int valueStride,
+      float[] gate,
+      int gateOffset,
+      float[] scores,
+      int visiblePositions,
+      int headDimension,
+      float scale,
+      Qwen35Checkpoint prefix,
+      int layer,
+      int headOffset,
+      int firstVisible,
+      int sharedPositions) {
     for (int position = 0; position < visiblePositions; position++) {
+      int segment = position < sharedPositions ? prefix.segmentAt(firstVisible + position) : -1;
       scores[position] =
           VectorUtil.dotProduct(
                   query,
                   queryOffset,
-                  keyCache,
-                  firstKeyOffset + position * keyStride,
+                  segment >= 0 ? prefix.keys(segment, layer) : keyCache,
+                  segment >= 0
+                      ? headOffset
+                          + (firstVisible + position - prefix.segmentStart(segment)) * keyStride
+                      : firstKeyOffset + (position - sharedPositions) * keyStride,
                   headDimension)
               * scale;
     }
     TensorOps.softmax(scores, 0, visiblePositions);
     Arrays.fill(output, outputOffset, outputOffset + headDimension, 0.0f);
     for (int position = 0; position < visiblePositions; position++) {
+      int segment = position < sharedPositions ? prefix.segmentAt(firstVisible + position) : -1;
       VectorUtil.addScaledInPlace(
           output,
           outputOffset,
-          valueCache,
-          firstValueOffset + position * valueStride,
+          segment >= 0 ? prefix.values(segment, layer) : valueCache,
+          segment >= 0
+              ? headOffset + (firstVisible + position - prefix.segmentStart(segment)) * valueStride
+              : firstValueOffset + (position - sharedPositions) * valueStride,
           headDimension,
           scores[position]);
     }
@@ -2183,6 +2413,7 @@ public final class Qwen35ForwardPass {
 
     private final int maxCapacity;
     private int allocatedCapacity;
+    private Qwen35Checkpoint prefix;
     private final float[][] keys;
     private final float[][] values;
 
@@ -2254,18 +2485,34 @@ public final class Qwen35ForwardPass {
      * made a repeated decision slower than the decision itself.
      */
     private long allocatedCacheBytes() {
-      return Math.addExact(linearStateBytes(keys), linearStateBytes(values));
+      long shared = prefix == null ? 0 : prefix.attentionBytes();
+      return Math.addExact(shared, Math.addExact(linearStateBytes(keys), linearStateBytes(values)));
+    }
+
+    private int prefixLength() {
+      return prefix == null ? 0 : prefix.tokens.length;
+    }
+
+    private void restorePrefix() {
+      if (prefix != null) {
+        copyLinearState(prefix.convolution, convolutionHistory);
+        copyLinearState(prefix.recurrent, recurrentState);
+      }
     }
 
     private void ensureCapacity(int positions) {
-      if (positions <= allocatedCapacity) {
+      int suffixPositions = positions - prefixLength();
+      if (suffixPositions <= allocatedCapacity) {
+        batchScratch.ensureScores(positions);
         return;
       }
       if (positions > maxCapacity) {
         throw new IllegalArgumentException(
             "positions exceed session capacity " + maxCapacity + ": " + positions);
       }
-      int grown = SequenceGrowth.nextCapacity(allocatedCapacity, positions, maxCapacity);
+      int grown =
+          SequenceGrowth.nextCapacity(
+              allocatedCapacity, suffixPositions, maxCapacity - prefixLength());
       int keyDimension = config.attentionKeyDim();
       for (int layer = 0; layer < config.numLayers(); layer++) {
         if (config.usesFullAttention(layer)) {
@@ -2273,7 +2520,7 @@ public final class Qwen35ForwardPass {
           values[layer] = growRows(values[layer], grown, keyDimension);
         }
       }
-      batchScratch.ensureScores(grown);
+      batchScratch.ensureScores(prefixLength() + grown);
       allocatedCapacity = grown;
     }
 
@@ -2317,6 +2564,7 @@ public final class Qwen35ForwardPass {
           }
         }
       }
+      restorePrefix();
     }
   }
 

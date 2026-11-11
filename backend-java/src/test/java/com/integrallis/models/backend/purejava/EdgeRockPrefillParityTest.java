@@ -61,6 +61,9 @@ class EdgeRockPrefillParityTest {
       GgufFile file = GgufParser.parse(model, arena);
       Qwen35ForwardPass graph = Qwen35ForwardPass.fromGgufFile(file);
       assertThat(graph.config().usesMemoryAnchors()).isTrue();
+      assertThat(graph.supportsSharedPrefixes()).isFalse();
+      org.assertj.core.api.Assertions.assertThatThrownBy(() -> graph.portablePrefixBytes(1))
+          .isInstanceOf(UnsupportedOperationException.class);
       assertThat(graph.config().attentionWindow()).isEqualTo(1_024);
 
       int[] prompt = new int[TOKENS];

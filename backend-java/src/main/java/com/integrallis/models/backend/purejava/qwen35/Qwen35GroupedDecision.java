@@ -87,13 +87,31 @@ final class Qwen35GroupedDecision {
         float[][] evidenceKeys,
         float[][] evidenceValues,
         int prefixLength,
-        int attentionKeyDim) {
+        int attentionKeyDim,
+        Qwen35Checkpoint shared) {
       copyEach(evidenceConvolution, convolutionHistory);
       int prefixEntries = Math.multiplyExact(prefixLength, attentionKeyDim);
+      int sharedEntries =
+          shared == null ? 0 : Math.multiplyExact(shared.tokens.length, attentionKeyDim);
       for (int layer = 0; layer < evidenceKeys.length; layer++) {
-        if (evidenceKeys[layer] != null && suffixKeys[layer] != null) {
-          System.arraycopy(evidenceKeys[layer], 0, suffixKeys[layer], 0, prefixEntries);
-          System.arraycopy(evidenceValues[layer], 0, suffixValues[layer], 0, prefixEntries);
+        if (suffixKeys[layer] != null) {
+          if (sharedEntries > 0) {
+            shared.copyAttention(layer, suffixKeys[layer], suffixValues[layer]);
+          }
+          if (prefixEntries > sharedEntries) {
+            System.arraycopy(
+                evidenceKeys[layer],
+                0,
+                suffixKeys[layer],
+                sharedEntries,
+                prefixEntries - sharedEntries);
+            System.arraycopy(
+                evidenceValues[layer],
+                0,
+                suffixValues[layer],
+                sharedEntries,
+                prefixEntries - sharedEntries);
+          }
         }
       }
     }
@@ -171,6 +189,26 @@ final class Qwen35GroupedDecision {
       float[][] evidenceValues,
       int prefixLength,
       int attentionKeyDim) {
+    forkBranch(
+        index,
+        evidenceRecurrent,
+        evidenceConvolution,
+        evidenceKeys,
+        evidenceValues,
+        prefixLength,
+        attentionKeyDim,
+        null);
+  }
+
+  void forkBranch(
+      int index,
+      float[][] evidenceRecurrent,
+      float[][] evidenceConvolution,
+      float[][] evidenceKeys,
+      float[][] evidenceValues,
+      int prefixLength,
+      int attentionKeyDim,
+      Qwen35Checkpoint shared) {
     for (int layer = 0; layer < recurrentState.length; layer++) {
       if (recurrentState[layer] != null && evidenceRecurrent[layer] != null) {
         System.arraycopy(
@@ -182,7 +220,7 @@ final class Qwen35GroupedDecision {
       }
     }
     branches[index].forkFrom(
-        evidenceConvolution, evidenceKeys, evidenceValues, prefixLength, attentionKeyDim);
+        evidenceConvolution, evidenceKeys, evidenceValues, prefixLength, attentionKeyDim, shared);
   }
 
   int groupSize() {

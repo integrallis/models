@@ -201,13 +201,48 @@ callers. The backend SPI adds a default `portablePrefixCapabilities()` method, s
 providers retain their boolean result. A legacy provider reports `UNSPECIFIED` truncation;
 callers must not infer support for arbitrary shorter prefixes from that result.
 
-The current Llama decoder route reports `ANY_PREFIX`: any nonempty prefix up to the captured
-length can be retained without recomputation. The first blocking condition is reported for
+The Llama decoder route reports `ANY_PREFIX`: any nonempty prefix up to the captured
+length can be retained without recomputation. Dense `qwen35` graphs without memory anchors
+report `RETAINED_CHECKPOINTS`. Each Qwen checkpoint retains its captured boundary only;
+requesting a shorter length fails explicitly. The first blocking condition is reported for
 other configurations: unsupported decoder state, unavailable model identity, activated-adapter
 state, attention-kernel state, or a matrix kernel that has not opted in for its current state
 and arithmetic. Rust/FFM also requires an identified native library. A backend without the
 portable SPI reports `BACKEND_UNSUPPORTED`. These are capability reports, not peer-compatibility
-decisions or model qualification verdicts. The current codec and eligibility limits are unchanged.
+decisions or model qualification verdicts. Qwen mixture-of-experts, Qwen3-Next, activated-adapter
+and memory-anchor variants remain outside this portable checkpoint implementation.
+
+=== Transfer A Complete Qwen3.5 Checkpoint
+
+Capture the reusable boundary before evaluating a private suffix:
+
+[source,java]
+----
+var prefix = donor.prepareSharedTokenPrefix(commonTokens);
+donor.writeSharedPromptPrefix(prefix, prefix.tokenCount(), output);
+var imported = receiver.readSharedPromptPrefix(input, byteBudget);
+try (var branch = receiver.openGenerationSession(imported)) {
+    // completePrompt must include a suffix after the exact retained token prefix.
+    String answer = branch.generate(completePrompt, options);
+}
+----
+
+The Qwen payload includes attention KV, convolution history, recurrent state and exact token
+history. Imports validate identity, layout, size, checksum and agreement with the envelope's
+token history before publication. The existing Llama wire format is unchanged.
+
+Forks physically share immutable attention blocks; each fork has private convolution/recurrent
+state and lazily growing attention suffix storage. Extending and freezing a branch retains earlier
+attention blocks in place. Reset restores the captured checkpoint without replaying it. Rewind
+may replay the private suffix but cannot move before the immutable checkpoint. Closing the donor
+does not invalidate a separately imported receiver prefix.
+
+A cache service must inspect truncation capabilities before offering a partial match. For
+`RETAINED_CHECKPOINTS`, offer only an actually captured boundary; a longer checkpoint is not
+permission to shorten its recurrent state. Capturing a known reusable boundary up front also
+has a preparation and storage cost. Measure that cost, transfer/import, and recomputation on
+the intended runtime and hosts before choosing placement. This API does not itself qualify
+an artifact or establish a network speedup.
 
 === Complete Checkpoint Contract
 
@@ -217,11 +252,11 @@ IDs and positions, attention KV, recurrent convolution and Gated DeltaNet state 
 and any additional persistent branch or memory-bank state. An end-of-prefix recurrent state
 cannot stand in for an earlier boundary just because the attention KV can be shortened.
 
-`RETAINED_CHECKPOINTS` describes a future provider that can shorten only to boundaries where
+`RETAINED_CHECKPOINTS` describes a provider that can shorten only to boundaries where
 it retained complete state. It does not promise a checkpoint at every token or introduce a
 checkpoint enumeration API. Such a provider must reject unavailable boundaries; the caller
-can choose a retained boundary or recompute. Current built-in portable prefixes use
-`ANY_PREFIX`; this release work does not yet enable Qwen3.5 hybrid checkpoints.
+can choose a retained boundary or recompute. Qwen checkpoints currently retain only their
+captured endpoint; earlier complete checkpoints must be captured and kept separately.
 
 Compatibility must bind exact weights, tokenizer, cache layout/ABI and effective arithmetic,
 including kernel binaries and relevant settings. Multimodal extensions must additionally bind

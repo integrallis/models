@@ -439,7 +439,7 @@ tasks.register<Test>("qwen38BNativeSlowTest") {
 }
 
 tasks.named("check") {
-    dependsOn(cargoTest, cargoClippy, verifyNativePlatformJar)
+    dependsOn(cargoTest, cargoClippy, verifyNativePlatformJar, ":backend-java:portableNativePrefixTest")
 }
 
 val githubPackagesEnabled =
