@@ -144,6 +144,33 @@ final class LlamaDecoder implements PureJavaDecoder {
   }
 
   @Override
+  public String portablePrefixConfiguration() {
+    return forwardPass.portablePrefixConfiguration();
+  }
+
+  @Override
+  public long portablePrefixBytes(int tokenCount) {
+    return forwardPass.portablePrefixBytes(tokenCount);
+  }
+
+  @Override
+  public SharedPrefix truncatePrefix(SharedPrefix prefix, int tokenCount) {
+    return new LlamaPrefix(requirePrefix(prefix).truncate(tokenCount));
+  }
+
+  @Override
+  public void writePrefix(SharedPrefix prefix, int tokenCount, java.io.DataOutput output)
+      throws java.io.IOException {
+    requirePrefix(prefix).writeTo(output, tokenCount);
+  }
+
+  @Override
+  public SharedPrefix readPrefix(java.io.DataInput input, int tokenCount, long maxBytes)
+      throws java.io.IOException {
+    return new LlamaPrefix(forwardPass.readPrefix(input, tokenCount, maxBytes));
+  }
+
+  @Override
   public Session fork(SharedPrefix prefix, boolean activated) {
     LlamaForwardPass.SessionPrefix llamaPrefix = requirePrefix(prefix);
     return new LlamaSession(activated ? llamaPrefix.forkActivated() : llamaPrefix.fork());

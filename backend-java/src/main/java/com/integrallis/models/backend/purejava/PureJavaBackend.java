@@ -26,9 +26,9 @@ import com.integrallis.models.api.LogitBatch;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.OptimizationDecision;
 import com.integrallis.models.api.OptimizationStatus;
+import com.integrallis.models.api.PortablePrefixInferenceBackend;
 import com.integrallis.models.api.ResumableInferenceBackend;
 import com.integrallis.models.api.SharedInferencePrefix;
-import com.integrallis.models.api.SharedPrefixInferenceBackend;
 import com.integrallis.models.api.SpeculativeInferenceBackend;
 import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.backend.purejava.bert.BertConfig;
@@ -113,13 +113,15 @@ public final class PureJavaBackend
         SpeculativeInferenceBackend,
         AuxiliaryInferenceBackend,
         HiddenStateInferenceBackend,
-        SharedPrefixInferenceBackend {
+        PortablePrefixInferenceBackend {
 
   public static final String MAX_CONTEXT_LENGTH_PROPERTY = "models.purejava.maxContextLength";
 
   private static final System.Logger LOGGER = System.getLogger(PureJavaBackend.class.getName());
 
   private final ModelMemoryArena arenaOwner;
+  private final Path modelPath;
+  private volatile String portableFingerprint;
   private final Tokenizer tokenizer;
   private final PureJavaDecoder decoder;
   private final ModelMetadata modelMetadata;
@@ -195,6 +197,7 @@ public final class PureJavaBackend
   }
 
   private PureJavaBackend(
+      Path modelPath,
       ModelMemoryArena arenaOwner,
       Tokenizer tokenizer,
       PureJavaDecoder decoder,
@@ -204,6 +207,7 @@ public final class PureJavaBackend
       BackendDiagnostics diagnostics,
       GgufBatchedMatrixKernel batchedMatrixKernel,
       BatchedCausalAttentionKernel batchedAttentionKernel) {
+    this.modelPath = modelPath;
     this.arenaOwner = arenaOwner;
     this.tokenizer = tokenizer;
     this.decoder = decoder;
@@ -571,6 +575,7 @@ public final class PureJavaBackend
               tokenizer);
 
       return new PureJavaBackend(
+          modelPath,
           arenaOwner,
           tokenizer,
           loaded.decoder(),
@@ -1390,6 +1395,82 @@ public final class PureJavaBackend
   }
 
   @Override
+  public boolean supportsPortablePrefixes() {
+    checkOpen();
+    return decoder instanceof LlamaDecoder
+        && Files.isRegularFile(modelPath)
+        && !decoder.supportsActivatedBranch()
+        && !"custom".equals(batchedMatrixKernel.implementation());
+  }
+
+  @Override
+  public String portablePrefixFingerprint() throws IOException {
+    checkOpen();
+    if (!supportsPortablePrefixes())
+      throw new UnsupportedOperationException("model cannot transfer KV prefixes");
+    if (portableFingerprint == null) {
+      String settings =
+          decoder.portablePrefixConfiguration()
+              + ";context="
+              + contextCapacity
+              + ";runtime="
+              + executionPlan.runtime()
+              + ";plan="
+              + diagnostics.planVersion()
+              + ";settings="
+              + new java.util.TreeMap<>(diagnostics.environment())
+              + ";matrix="
+              + batchedMatrixKernel.implementation();
+      portableFingerprint =
+          com.integrallis.models.backend.purejava.cache.PrefixFingerprint.of(
+              modelPath,
+              settings,
+              LlamaForwardPass.class,
+              KvCache.class,
+              com.integrallis.vectors.core.VectorUtil.class,
+              batchedMatrixKernel.getClass());
+    }
+    return portableFingerprint;
+  }
+
+  @Override
+  public long portablePrefixBytes(int tokenCount) {
+    checkOpen();
+    if (!supportsPortablePrefixes())
+      throw new UnsupportedOperationException("model cannot transfer KV prefixes");
+    return Math.addExact(32L, decoder.portablePrefixBytes(tokenCount));
+  }
+
+  @Override
+  public SharedInferencePrefix truncatePrefix(SharedInferencePrefix prefix, int tokenCount) {
+    checkOpen();
+    return new PureJavaSharedPrefix(
+        this, decoder.truncatePrefix(requirePrefix(prefix).delegate, tokenCount));
+  }
+
+  @Override
+  public void writePrefix(SharedInferencePrefix prefix, int tokenCount, java.io.DataOutput output)
+      throws IOException {
+    var owned = requirePrefix(prefix);
+    // Fixed-size identity avoids peer-controlled string allocation on import.
+    output.write(java.util.HexFormat.of().parseHex(portablePrefixFingerprint()));
+    decoder.writePrefix(owned.delegate, tokenCount, output);
+  }
+
+  @Override
+  public SharedInferencePrefix readPrefix(java.io.DataInput input, int tokenCount, long maxBytes)
+      throws IOException {
+    if (maxBytes < 52) throw new IOException("prefix exceeds import budget");
+    byte[] identity = new byte[32];
+    input.readFully(identity);
+    if (!java.security.MessageDigest.isEqual(
+        identity, java.util.HexFormat.of().parseHex(portablePrefixFingerprint()))) {
+      throw new IOException("incompatible model or KV execution identity");
+    }
+    return new PureJavaSharedPrefix(this, decoder.readPrefix(input, tokenCount, maxBytes - 32));
+  }
+
+  @Override
   public InferenceSession fork(SharedInferencePrefix prefix, Branch branch) {
     checkOpen();
     Objects.requireNonNull(branch, "branch");
@@ -1454,7 +1535,7 @@ public final class PureJavaBackend
   @Override
   public LogitBatch prefillBatch(InferenceSession[] sessions, int[][] tokenBatches) {
     if (!decoder.supportsRaggedPrefillBatch()) {
-      return SharedPrefixInferenceBackend.super.prefillBatch(sessions, tokenBatches);
+      return PortablePrefixInferenceBackend.super.prefillBatch(sessions, tokenBatches);
     }
     return decoder.prefillBatch(unwrapSessions(sessions), tokenBatches);
   }
@@ -1500,7 +1581,7 @@ public final class PureJavaBackend
   @Override
   public LogitBatch prefillBatchTransient(InferenceSession[] sessions, int[][] tokenBatches) {
     if (!decoder.supportsRaggedPrefillBatch()) {
-      return SharedPrefixInferenceBackend.super.prefillBatchTransient(sessions, tokenBatches);
+      return PortablePrefixInferenceBackend.super.prefillBatchTransient(sessions, tokenBatches);
     }
     return decoder.prefillBatchTransient(unwrapSessions(sessions), tokenBatches);
   }

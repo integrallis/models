@@ -137,6 +137,14 @@ public final class LlamaForwardPass {
     public long sharedBytes() {
       return cachePrefix.allocatedBytes();
     }
+
+    public SessionPrefix truncate(int tokenCount) {
+      return new SessionPrefix(owner, cachePrefix.truncate(tokenCount));
+    }
+
+    public void writeTo(java.io.DataOutput output, int tokenCount) throws java.io.IOException {
+      cachePrefix.writeTo(output, tokenCount);
+    }
   }
 
   /** Vocabulary logits and the normalized hidden state that produced them. */
@@ -927,6 +935,36 @@ public final class LlamaForwardPass {
       throw new IllegalArgumentException("cannot freeze an empty session prefix");
     }
     return new SessionPrefix(this, session.cache.freezePrefix(session.nextPosition));
+  }
+
+  public String portablePrefixConfiguration() {
+    return com.integrallis.models.backend.purejava.cache.PrefixFingerprint.configuration(config)
+        + ";rotaryFloat="
+        + batchedAttentionKernel.usesFloatRotaryRecurrence();
+  }
+
+  public long portablePrefixBytes(int tokenCount) {
+    if (tokenCount <= 0 || tokenCount > cache.maxSeqLen())
+      throw new IllegalArgumentException("invalid prefix length");
+    return Math.addExact(
+        20L,
+        Math.multiplyExact(
+            4L * config.numLayers() * tokenCount,
+            Math.addExact((long) config.keyDim(), config.valueDim())));
+  }
+
+  public SessionPrefix readPrefix(java.io.DataInput input, int tokenCount, long maxBytes)
+      throws java.io.IOException {
+    return new SessionPrefix(
+        this,
+        KvCache.readPrefix(
+            input,
+            config.numLayers(),
+            cache.maxSeqLen(),
+            config.keyDim(),
+            config.valueDim(),
+            tokenCount,
+            maxBytes));
   }
 
   /** Returns whether two sessions reference the same immutable KV-cache prefix storage. */

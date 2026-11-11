@@ -45,6 +45,21 @@ public final class SharedPromptPrefix {
     return promptTokens.length;
   }
 
+  /** Returns a defensive copy of the exact token sequence represented by this prefix. */
+  public int[] tokens() {
+    return promptTokens.clone();
+  }
+
+  /** Counts matching tokens from position zero; token spelling is never used as cache identity. */
+  public int commonPrefixLength(int[] tokens) {
+    java.util.Objects.requireNonNull(tokens, "tokens");
+    int count = 0;
+    while (count < promptTokens.length
+        && count < tokens.length
+        && promptTokens[count] == tokens[count]) count++;
+    return count;
+  }
+
   /** Returns the key/value and bookkeeping bytes physically shared by every fork. */
   public long sharedBytes() {
     return sharedBytes;

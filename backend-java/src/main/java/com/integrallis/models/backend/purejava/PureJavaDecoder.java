@@ -162,6 +162,28 @@ interface PureJavaDecoder extends AutoCloseable {
     throw new UnsupportedOperationException("this decoder cannot share KV-cache prefixes");
   }
 
+  default String portablePrefixConfiguration() {
+    throw new UnsupportedOperationException("decoder cannot transfer KV prefixes");
+  }
+
+  default long portablePrefixBytes(int tokenCount) {
+    throw new UnsupportedOperationException("decoder cannot transfer KV prefixes");
+  }
+
+  default SharedPrefix truncatePrefix(SharedPrefix prefix, int tokenCount) {
+    throw new UnsupportedOperationException("decoder cannot transfer KV prefixes");
+  }
+
+  default void writePrefix(SharedPrefix prefix, int tokenCount, java.io.DataOutput output)
+      throws java.io.IOException {
+    throw new UnsupportedOperationException("decoder cannot transfer KV prefixes");
+  }
+
+  default SharedPrefix readPrefix(java.io.DataInput input, int tokenCount, long maxBytes)
+      throws java.io.IOException {
+    throw new UnsupportedOperationException("decoder cannot transfer KV prefixes");
+  }
+
   default Session fork(SharedPrefix prefix, boolean activated) {
     throw new UnsupportedOperationException("this decoder cannot share KV-cache prefixes");
   }

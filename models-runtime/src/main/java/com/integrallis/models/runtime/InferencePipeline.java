@@ -243,6 +243,92 @@ public final class InferencePipeline
     }
   }
 
+  /** Returns whether this loaded graph can exchange exact immutable prompt/KV prefixes. */
+  public boolean supportsPortablePromptPrefixes() {
+    synchronized (backend) {
+      requireOpen();
+      return backend instanceof com.integrallis.models.api.PortablePrefixInferenceBackend portable
+          && portable.supportsPortablePrefixes();
+    }
+  }
+
+  /** Exact model, tokenizer, cache ABI and execution identity used for peer discovery. */
+  public String portablePrefixFingerprint() throws java.io.IOException {
+    synchronized (backend) {
+      requireOpen();
+      return portableBackend().portablePrefixFingerprint();
+    }
+  }
+
+  /** Exact wire length for a prefix, including tokens, identity, tensor dimensions and checksum. */
+  public long portablePrefixBytes(int tokenCount) {
+    synchronized (backend) {
+      requireOpen();
+      return Math.addExact(
+          40L + 4L * tokenCount, portableBackend().portablePrefixBytes(tokenCount));
+    }
+  }
+
+  /** Returns an immutable shorter view without copying or recomputing tensors. */
+  public SharedPromptPrefix truncateSharedPromptPrefix(SharedPromptPrefix prefix, int tokenCount) {
+    synchronized (backend) {
+      requireOwnedPrefix(prefix);
+      var state = portableBackend().truncatePrefix(prefix.backendPrefix, tokenCount);
+      return new SharedPromptPrefix(
+          this,
+          state,
+          java.util.Arrays.copyOf(prefix.promptTokens, tokenCount),
+          state.sharedBytes());
+    }
+  }
+
+  /**
+   * Streams exact tokens and KV bytes with a version and checksum; does not close the caller's
+   * stream.
+   */
+  public void writeSharedPromptPrefix(
+      SharedPromptPrefix prefix, int tokenCount, java.io.OutputStream output)
+      throws java.io.IOException {
+    com.integrallis.models.api.PortablePrefixInferenceBackend portable;
+    synchronized (backend) {
+      requireOwnedPrefix(prefix);
+      portable = portableBackend();
+    }
+    // Immutable heap-backed prefix serialization does not hold the inference execution lock.
+    PortablePromptPrefixes.write(
+        portable, prefix, tokenCount, java.util.Objects.requireNonNull(output));
+  }
+
+  /** Stages and verifies a detached prefix without changing any live generation session. */
+  public SharedPromptPrefix readSharedPromptPrefix(java.io.InputStream input, long maxBytes)
+      throws java.io.IOException {
+    com.integrallis.models.api.PortablePrefixInferenceBackend portable;
+    synchronized (backend) {
+      requireOpen();
+      portable = portableBackend();
+    }
+    var imported =
+        PortablePromptPrefixes.read(portable, java.util.Objects.requireNonNull(input), maxBytes);
+    synchronized (backend) {
+      requireOpen();
+      return new SharedPromptPrefix(
+          this, imported.prefix(), imported.tokens(), imported.prefix().sharedBytes());
+    }
+  }
+
+  private void requireOwnedPrefix(SharedPromptPrefix prefix) {
+    requireOpen();
+    if (java.util.Objects.requireNonNull(prefix).owner != this)
+      throw new IllegalArgumentException("prefix belongs to a different pipeline");
+  }
+
+  private com.integrallis.models.api.PortablePrefixInferenceBackend portableBackend() {
+    if (!(backend instanceof com.integrallis.models.api.PortablePrefixInferenceBackend portable)
+        || !portable.supportsPortablePrefixes())
+      throw new UnsupportedOperationException("backend cannot transfer prompt prefixes");
+    return portable;
+  }
+
   /**
    * Tokenizes and evaluates one nonempty prompt into immutable, physically shared KV storage.
    *
