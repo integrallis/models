@@ -58,16 +58,14 @@ class Qwen35ForwardPassTest {
   private static final int VOCABULARY_SIZE = 8;
 
   @Test
-  void hybridStateRequiresACompletePortableCheckpoint(@TempDir Path dir) throws Exception {
+  void standardHybridStateReportsRetainedCheckpointBoundaries(@TempDir Path dir) throws Exception {
     try (var backend = PureJavaBackend.load(writeToyModel(dir))) {
-      assertThat(backend.supportsPortablePrefixes()).isFalse();
+      assertThat(backend.supportsPortablePrefixes()).isTrue();
       assertThat(backend.portablePrefixCapabilities())
           .isEqualTo(
-              com.integrallis.models.api.PortablePrefixCapabilities.unsupported(
-                  com.integrallis.models.api.PortablePrefixCapabilities.Status
-                      .DECODER_STATE_UNSUPPORTED));
-      assertThatThrownBy(backend::portablePrefixFingerprint)
-          .isInstanceOf(UnsupportedOperationException.class);
+              com.integrallis.models.api.PortablePrefixCapabilities.supported(
+                  com.integrallis.models.api.PortablePrefixCapabilities.Truncation
+                      .RETAINED_CHECKPOINTS));
     }
   }
 
@@ -962,11 +960,16 @@ class Qwen35ForwardPassTest {
     }
   }
 
-  private static Path writeToyModel(Path directory) throws Exception {
+  static Path writeToyModel(Path directory) throws Exception {
     return writeToyModel(directory, false);
   }
 
   private static Path writeToyModel(Path directory, boolean bfloat16Gates) throws Exception {
+    return writeToyModel(directory, bfloat16Gates, 8);
+  }
+
+  static Path writeToyModel(Path directory, boolean bfloat16Gates, int contextLength)
+      throws Exception {
     Random random = new Random(35);
     SyntheticGgufBuilder builder =
         new SyntheticGgufBuilder()
@@ -978,7 +981,7 @@ class Qwen35ForwardPassTest {
             .addUint32("qwen35.attention.head_count_kv", 1)
             .addUint32("qwen35.attention.key_length", HEAD_DIMENSION)
             .addUint32("qwen35.vocab_size", VOCABULARY_SIZE)
-            .addUint32("qwen35.context_length", 8)
+            .addUint32("qwen35.context_length", contextLength)
             .addUint32("qwen35.feed_forward_length", HIDDEN_DIMENSION)
             .addFloat32("qwen35.rope.freq_base", 10_000.0f)
             .addUint32("qwen35.rope.dimension_count", HEAD_DIMENSION)

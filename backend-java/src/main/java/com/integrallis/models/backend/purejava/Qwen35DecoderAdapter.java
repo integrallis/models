@@ -23,11 +23,31 @@ import java.util.Objects;
 final class Qwen35DecoderAdapter implements PureJavaDecoder {
 
   private final class Qwen35Session implements Session {
-    private final Qwen35ForwardPass.Session delegate = forwardPass.openSession(capacity);
+    private final Qwen35ForwardPass.Session delegate;
+
+    private Qwen35Session() {
+      this(forwardPass.openSession(capacity));
+    }
+
+    private Qwen35Session(Qwen35ForwardPass.Session delegate) {
+      this.delegate = delegate;
+    }
 
     @Override
     public int checkpoint() {
       return delegate.checkpoint();
+    }
+  }
+
+  private record Qwen35Prefix(Qwen35ForwardPass.SessionPrefix delegate) implements SharedPrefix {
+    @Override
+    public int checkpoint() {
+      return delegate.checkpoint();
+    }
+
+    @Override
+    public long sharedBytes() {
+      return delegate.sharedBytes();
     }
   }
 
@@ -64,6 +84,80 @@ final class Qwen35DecoderAdapter implements PureJavaDecoder {
   @Override
   public Session openSession() {
     return new Qwen35Session();
+  }
+
+  @Override
+  public boolean supportsSharedPrefixes() {
+    return forwardPass.supportsSharedPrefixes();
+  }
+
+  @Override
+  public com.integrallis.models.api.PortablePrefixCapabilities.Truncation
+      portablePrefixTruncation() {
+    return supportsSharedPrefixes()
+        ? com.integrallis.models.api.PortablePrefixCapabilities.Truncation.RETAINED_CHECKPOINTS
+        : com.integrallis.models.api.PortablePrefixCapabilities.Truncation.UNSUPPORTED;
+  }
+
+  @Override
+  public String portablePrefixConfiguration() {
+    return forwardPass.portablePrefixConfiguration();
+  }
+
+  @Override
+  public Class<?>[] portablePrefixImplementations() {
+    return Qwen35ForwardPass.portablePrefixImplementations();
+  }
+
+  @Override
+  public long portablePrefixBytes(int count) {
+    if (count > capacity) throw new IllegalArgumentException("prefix exceeds session capacity");
+    return forwardPass.portablePrefixBytes(count);
+  }
+
+  @Override
+  public SharedPrefix freezePrefix(Session source) {
+    return new Qwen35Prefix(forwardPass.freezePrefix(requireSession(source).delegate));
+  }
+
+  @Override
+  public SharedPrefix truncatePrefix(SharedPrefix prefix, int count) {
+    return new Qwen35Prefix(requirePrefix(prefix).truncate(count));
+  }
+
+  @Override
+  public void validatePrefixTokens(SharedPrefix prefix, int[] tokens) throws java.io.IOException {
+    requirePrefix(prefix).validateTokens(tokens);
+  }
+
+  @Override
+  public void writePrefix(SharedPrefix prefix, int count, java.io.DataOutput output)
+      throws java.io.IOException {
+    requirePrefix(prefix).writeTo(output, count);
+  }
+
+  @Override
+  public SharedPrefix readPrefix(java.io.DataInput input, int count, long maxBytes)
+      throws java.io.IOException {
+    return new Qwen35Prefix(forwardPass.readPrefix(input, count, maxBytes, capacity));
+  }
+
+  @Override
+  public Session fork(SharedPrefix prefix, boolean activated) {
+    if (activated) throw new UnsupportedOperationException("hybrid activated state is unavailable");
+    return new Qwen35Session(forwardPass.fork(requirePrefix(prefix)));
+  }
+
+  @Override
+  public boolean sharesPrefixStorage(Session first, Session second) {
+    return forwardPass.sharesPrefixStorage(
+        requireSession(first).delegate, requireSession(second).delegate);
+  }
+
+  private Qwen35ForwardPass.SessionPrefix requirePrefix(SharedPrefix prefix) {
+    if (!(prefix instanceof Qwen35Prefix qwen))
+      throw new IllegalArgumentException("prefix belongs to a different decoder");
+    return qwen.delegate();
   }
 
   @Override

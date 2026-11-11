@@ -73,6 +73,7 @@ final class PortablePromptPrefixes {
     if (!MessageDigest.isEqual(digest.digest(), checksum))
       throw new IOException("prefix checksum mismatch");
     if (input.read() != -1) throw new IOException("trailing prefix data");
+    backend.validatePrefixTokens(prefix, tokens);
     return new Imported(prefix, tokens);
   }
 

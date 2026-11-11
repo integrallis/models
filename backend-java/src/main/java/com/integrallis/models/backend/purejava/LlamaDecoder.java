@@ -149,6 +149,12 @@ final class LlamaDecoder implements PureJavaDecoder {
   }
 
   @Override
+  public com.integrallis.models.api.PortablePrefixCapabilities.Truncation
+      portablePrefixTruncation() {
+    return com.integrallis.models.api.PortablePrefixCapabilities.Truncation.ANY_PREFIX;
+  }
+
+  @Override
   public long portablePrefixBytes(int tokenCount) {
     return forwardPass.portablePrefixBytes(tokenCount);
   }

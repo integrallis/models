@@ -64,4 +64,12 @@ public interface PortablePrefixInferenceBackend extends SharedPrefixInferenceBac
   /** Reads a new detached prefix after validating this backend's identity and shape. */
   SharedInferencePrefix readPrefix(DataInput input, int tokenCount, long maxBytes)
       throws IOException;
+
+  /**
+   * Checks that an imported checkpoint's retained token history agrees with the envelope before
+   * publication. Attention-only providers without retained history need no additional check.
+   * Implementations must not mutate the prefix or retain the caller's array.
+   */
+  default void validatePrefixTokens(SharedInferencePrefix prefix, int[] tokens)
+      throws IOException {}
 }

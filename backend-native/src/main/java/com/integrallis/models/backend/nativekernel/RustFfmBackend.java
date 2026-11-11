@@ -241,6 +241,12 @@ public final class RustFfmBackend
   }
 
   @Override
+  public void validatePrefixTokens(SharedInferencePrefix prefix, int[] tokens)
+      throws java.io.IOException {
+    delegate.validatePrefixTokens(prefix, tokens);
+  }
+
+  @Override
   public SharedInferencePrefix freezePrefix(InferenceSession source) {
     return delegate.freezePrefix(source);
   }

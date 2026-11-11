@@ -6,6 +6,46 @@ import org.gradle.testing.jacoco.tasks.JacocoReport
 
 // backend-java - GGUF parser, vectors-backed inference kernels, and KV cache
 
+// Keep the synthetic hybrid checkpoint probe in the decoder's fixture package, and run it against
+// the actual host library in every native platform check. No model downloads are needed.
+val portableNativePrefixTest = tasks.register<Test>("portableNativePrefixTest") {
+    group = "verification"
+    description = "Verify complete Qwen3.5 checkpoints through the host native wrapper"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform { includeTags("integration"); excludeTags("model-fixture") }
+    filter { includeTestsMatching("*.PortableQwen35NativeTest") }
+    dependsOn(":backend-native:cargoBuildRelease")
+    inputs.files(provider { project(":backend-native").tasks.named("cargoBuildRelease").get().outputs.files })
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    doFirst {
+        systemProperty("models.native.kernels.library",
+            project(":backend-native").tasks.named("cargoBuildRelease").get().outputs.files.singleFile.absolutePath)
+    }
+}
+
+tasks.register<Test>("portableQwen35ModelTest") {
+    group = "verification"
+    description = "Verify portable checkpoints against the pinned Qwen3.5 4B artifact"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform { includeTags("model-fixture") }
+    filter { includeTestsMatching("*.PortableQwen35NativeTest") }
+    dependsOn(":backend-native:cargoBuildRelease")
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+    jvmArgs("--enable-native-access=ALL-UNNAMED", "-XX:ActiveProcessorCount=4")
+    extensions.configure<JacocoTaskExtension> { isEnabled = false }
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("models.native.kernels.library",
+            project(":backend-native").tasks.named("cargoBuildRelease").get().outputs.files.singleFile.absolutePath)
+        systemProperty("models.qwen35.portable.model", providers.systemProperty("models.qwen35.portable.model").get())
+    }
+}
+
+tasks.named("check") { dependsOn(portableNativePrefixTest) }
+
 // These loaders and forward passes require real model artifacts. They are covered by pinned
 // real-model integration and qualification gates, not by the ordinary unit-test task whose
 // execution data feeds the 80% JaCoCo gate.

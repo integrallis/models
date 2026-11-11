@@ -166,6 +166,21 @@ interface PureJavaDecoder extends AutoCloseable {
     throw new UnsupportedOperationException("decoder cannot transfer KV prefixes");
   }
 
+  default com.integrallis.models.api.PortablePrefixCapabilities.Truncation
+      portablePrefixTruncation() {
+    return com.integrallis.models.api.PortablePrefixCapabilities.Truncation.UNSUPPORTED;
+  }
+
+  default Class<?>[] portablePrefixImplementations() {
+    return new Class<?>[] {
+      com.integrallis.models.backend.purejava.llama.LlamaForwardPass.class,
+      com.integrallis.models.backend.purejava.cache.KvCache.class
+    };
+  }
+
+  /** Check a checkpoint's own token history when it retains one for recurrent rewind. */
+  default void validatePrefixTokens(SharedPrefix prefix, int[] tokens) throws IOException {}
+
   default long portablePrefixBytes(int tokenCount) {
     throw new UnsupportedOperationException("decoder cannot transfer KV prefixes");
   }
