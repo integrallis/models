@@ -64,7 +64,7 @@ public final class RustFfmBackend
     this(delegate, diagnostics, null);
   }
 
-  private RustFfmBackend(PureJavaBackend delegate, BackendDiagnostics diagnostics, Path library) {
+  RustFfmBackend(PureJavaBackend delegate, BackendDiagnostics diagnostics, Path library) {
     this.delegate = Objects.requireNonNull(delegate, "delegate");
     this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
     this.portableLibrary = library;
