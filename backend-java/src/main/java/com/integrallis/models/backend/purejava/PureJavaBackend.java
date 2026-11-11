@@ -133,7 +133,8 @@ public final class PureJavaBackend
   private final Set<PureJavaInferenceSession> activeSessions =
       Collections.newSetFromMap(new IdentityHashMap<>());
   private PureJavaDecoder.Session[] sessionBatch = new PureJavaDecoder.Session[0];
-  private boolean closed;
+  // Immutable prefixes may be exported on a transfer thread independently of inference.
+  private volatile boolean closed;
 
   private record LoadedDecoder(
       PureJavaDecoder decoder,
