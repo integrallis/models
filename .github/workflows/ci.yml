@@ -199,6 +199,9 @@ jobs:
 
       - name: Build JJava notebook image
         working-directory: models/notebooks
+        env:
+          # Use the Linux runner's resolver for package downloads during image construction.
+          MODELS_NOTEBOOK_BUILD_NETWORK: host
         run: ./docker-compose.sh build
 
       - name: Execute and validate all notebooks

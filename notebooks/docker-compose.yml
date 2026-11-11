@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: jupyter/Dockerfile
+      network: ${MODELS_NOTEBOOK_BUILD_NETWORK:-default}
     image: models-jjava:latest
     container_name: models-jjava
     ports:
