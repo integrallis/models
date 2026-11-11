@@ -42,6 +42,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
           "false");
 
   private final NativeKernelLibrary library;
+  private final Path portableLibrary;
 
   /**
    * Whether a Q8_0 projection keeps its activations in F32.
@@ -75,17 +76,15 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
 
   /** Opens the bundled kernel in the mode that keeps Q8_0 activations in F32. */
   public static RustGgufBatchedMatrixKernel openBundledExactActivations(int recommendedThreads) {
-    NativeKernelLibrary library =
-        NativeKernelLibrary.open(BundledNativeKernelLibrary.resolve(), recommendedThreads);
+    Path path = BundledNativeKernelLibrary.resolve();
+    NativeKernelLibrary library = NativeKernelLibrary.open(path, recommendedThreads);
     parkJavaExecutor();
-    return new RustGgufBatchedMatrixKernel(library, true);
+    return new RustGgufBatchedMatrixKernel(library, true, path);
   }
 
-  private RustGgufBatchedMatrixKernel(NativeKernelLibrary library) {
-    this(library, false);
-  }
-
-  private RustGgufBatchedMatrixKernel(NativeKernelLibrary library, boolean exactActivations) {
+  private RustGgufBatchedMatrixKernel(
+      NativeKernelLibrary library, boolean exactActivations, Path portableLibrary) {
+    this.portableLibrary = Objects.requireNonNull(portableLibrary, "portableLibrary");
     this.exactActivations = exactActivations;
     this.library = Objects.requireNonNull(library, "library");
     // Runtime arithmetic capabilities and the loaded native ABI are immutable for this provider.
@@ -116,7 +115,7 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
       Path libraryPath, int recommendedThreads) {
     NativeKernelLibrary library = NativeKernelLibrary.open(libraryPath, recommendedThreads);
     parkJavaExecutor();
-    return new RustGgufBatchedMatrixKernel(library, true);
+    return new RustGgufBatchedMatrixKernel(library, true, libraryPath);
   }
 
   /** Opens an explicit platform library with a model-specific worker recommendation. */
@@ -142,7 +141,30 @@ public final class RustGgufBatchedMatrixKernel implements GgufBatchedMatrixKerne
     Objects.requireNonNull(settings, "settings");
     NativeKernelLibrary library = NativeKernelLibrary.open(libraryPath, settings.threadCount());
     parkJavaExecutor();
-    return new RustGgufBatchedMatrixKernel(library);
+    return new RustGgufBatchedMatrixKernel(library, false, libraryPath);
+  }
+
+  @Override
+  public boolean supportsPortablePrefixes() {
+    return !imagePrefill && !sequentialQ4KReduction;
+  }
+
+  @Override
+  public String portablePrefixFingerprint() throws java.io.IOException {
+    if (!supportsPortablePrefixes())
+      throw new UnsupportedOperationException("vision kernel cache transfer is not qualified");
+    return com.integrallis.models.backend.purejava.cache.PrefixFingerprint.of(
+        portableLibrary,
+        implementation()
+            + ";exactActivations="
+            + exactActivations
+            + ";threads="
+            + threadCount()
+            + ";decodeThreads="
+            + decodeThreadCount()
+            + ";poll="
+            + pollMillis(),
+        getClass());
   }
 
   /**

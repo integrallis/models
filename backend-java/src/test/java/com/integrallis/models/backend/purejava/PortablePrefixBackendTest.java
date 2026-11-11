@@ -27,6 +27,31 @@ import org.junit.jupiter.api.io.TempDir;
 @Tag("unit")
 class PortablePrefixBackendTest {
   @Test
+  void aNamedInjectedKernelMustExplicitlySupplyItsPortableIdentity(@TempDir Path dir)
+      throws Exception {
+    var type = com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel.class;
+    var kernel =
+        (com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel)
+            java.lang.reflect.Proxy.newProxyInstance(
+                type.getClassLoader(),
+                new Class<?>[] {type},
+                (proxy, method, args) -> {
+                  if (method.getName().equals("implementation")) return "cuda-ptx";
+                  if (method.getName().equals("supports")) return false;
+                  if (method.isDefault())
+                    return java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args);
+                  throw new UnsupportedOperationException(method.getName());
+                });
+    var file = PureJavaBackendTest.buildNanoModelFile(dir, new Random(42));
+    try (var backend = PureJavaBackend.load(file, kernel)) {
+      assertThat(backend.supportsSharedPrefixes()).isTrue();
+      assertThat(backend.supportsPortablePrefixes()).isFalse();
+      assertThatThrownBy(backend::portablePrefixFingerprint)
+          .isInstanceOf(UnsupportedOperationException.class);
+    }
+  }
+
+  @Test
   void immutableExportDoesNotWaitForTheInferenceExecutionLock(@TempDir Path dir) throws Exception {
     var file = PureJavaBackendTest.buildNanoModelFile(dir, new Random(42));
     var backend = PureJavaBackend.load(file);
