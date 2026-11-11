@@ -125,11 +125,75 @@ public final class GgufEmbeddingBackend implements EmbeddingBackend {
   @Override
   public float[][] embedAll(List<String> texts) {
     Objects.requireNonNull(texts, "texts");
+    if (texts.isEmpty()) {
+      return new float[0][];
+    }
+    // Fast path: batched hidden-state prefill for LAST_TOKEN pooling when the backend supports it
+    // and the batch fits within the backend's session capacity.
+    if (!modelOwnsPooling
+        && pooling == Pooling.LAST_TOKEN
+        && backend.supportsBatchedHiddenStates()
+        && texts.size() > 1
+        && texts.size() <= backend.maxBatchSize()) {
+      return batchedEmbedLastToken(texts);
+    }
+    // Fallback: sequential per-document embedding.
     float[][] rows = new float[texts.size()][];
     for (int index = 0; index < texts.size(); index++) {
       rows[index] = embed(Objects.requireNonNull(texts.get(index), "texts must not contain null"));
     }
     return rows;
+  }
+
+  /**
+   * Batched LAST_TOKEN embedding using independent backend sessions and {@link
+   * PureJavaBackend#prefillBatchHiddenStates}.
+   *
+   * <p>Each document gets its own session so attention is isolated. The batched prefill amortises
+   * per-call setup and uses batched matrix kernels when available.
+   */
+  private float[][] batchedEmbedLastToken(List<String> texts) {
+    int count = texts.size();
+    com.integrallis.models.api.InferenceSession[] sessions =
+        new com.integrallis.models.api.InferenceSession[count];
+    int[][] tokenBatches = new int[count][];
+    int[] startPositions = new int[count];
+    boolean failed = false;
+    try {
+      for (int i = 0; i < count; i++) {
+        sessions[i] = backend.openSession();
+        tokenBatches[i] = tokenize(texts.get(i));
+        startPositions[i] = 0;
+      }
+      float[][] hiddenStates =
+          backend.prefillBatchHiddenStates(sessions, tokenBatches, startPositions);
+      float[][] rows = new float[count][];
+      for (int i = 0; i < count; i++) {
+        float[] pooled = hiddenStates[i];
+        if (dimension != pooled.length) {
+          pooled = java.util.Arrays.copyOf(pooled, dimension);
+        }
+        if (normalize) {
+          l2Normalize(pooled);
+        }
+        rows[i] = pooled;
+      }
+      return rows;
+    } catch (RuntimeException e) {
+      failed = true;
+      throw e;
+    } finally {
+      for (com.integrallis.models.api.InferenceSession session : sessions) {
+        if (session != null) {
+          try {
+            session.close();
+          } catch (RuntimeException e) {
+            if (!failed) throw e;
+            // If already failing, suppress secondary close errors.
+          }
+        }
+      }
+    }
   }
 
   @Override

@@ -169,6 +169,57 @@ class GgufEmbeddingBackendTest {
   }
 
   @Nested
+  static class Batching {
+
+    @Test
+    void batchedEmbedAllMatchesSequentialForLastTokenPooling() {
+      try (GgufEmbeddingBackend batched = embedding(Pooling.LAST_TOKEN, true);
+          GgufEmbeddingBackend sequential = embedding(Pooling.LAST_TOKEN, true)) {
+        List<String> texts = List.of(TEXT, OTHER_TEXT, TEXT, OTHER_TEXT);
+        float[][] batchedRows = batched.embedAll(texts);
+        float[][] sequentialRows = sequential.embedAll(texts);
+
+        assertThat(batchedRows).hasDimensions(texts.size(), batched.dimension());
+        for (int i = 0; i < texts.size(); i++) {
+          assertThat(batchedRows[i])
+              .containsExactly(sequentialRows[i], within(FLOAT_REDUCTION_TOLERANCE));
+        }
+      }
+    }
+
+    @Test
+    void batchedEmbedAllIsIsolatedBetweenDocuments() {
+      try (GgufEmbeddingBackend embed = embedding(Pooling.LAST_TOKEN, true)) {
+        // Process in two different orders; results must not depend on batch composition.
+        List<String> orderA = List.of(TEXT, OTHER_TEXT);
+        List<String> orderB = List.of(OTHER_TEXT, TEXT);
+        float[][] rowsA = embed.embedAll(orderA);
+        float[][] rowsB = embed.embedAll(orderB);
+
+        assertThat(rowsA[0]).containsExactly(rowsB[1], within(FLOAT_REDUCTION_TOLERANCE));
+        assertThat(rowsA[1]).containsExactly(rowsB[0], within(FLOAT_REDUCTION_TOLERANCE));
+      }
+    }
+
+    @Test
+    void singleTextFallsBackToSequentialWithoutError() {
+      try (GgufEmbeddingBackend embed = embedding(Pooling.LAST_TOKEN, true)) {
+        float[][] rows = embed.embedAll(List.of(TEXT));
+        assertThat(rows).hasDimensions(1, embed.dimension());
+        assertThat(rows[0]).containsExactly(embed.embed(TEXT), within(FLOAT_REDUCTION_TOLERANCE));
+      }
+    }
+
+    @Test
+    void emptyListReturnsEmptyMatrix() {
+      try (GgufEmbeddingBackend embed = embedding(Pooling.LAST_TOKEN, true)) {
+        float[][] rows = embed.embedAll(List.of());
+        assertThat(rows).isEmpty();
+      }
+    }
+  }
+
+  @Nested
   static class Contract {
 
     @Test
