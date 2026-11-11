@@ -145,6 +145,11 @@ public final class LlamaForwardPass {
     public void writeTo(java.io.DataOutput output, int tokenCount) throws java.io.IOException {
       cachePrefix.writeTo(output, tokenCount);
     }
+
+    public void writeBlockTo(java.io.DataOutput output, int startToken, int endToken)
+        throws java.io.IOException {
+      cachePrefix.writeBlockTo(output, startToken, endToken);
+    }
   }
 
   /** Vocabulary logits and the normalized hidden state that produced them. */

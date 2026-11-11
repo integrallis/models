@@ -149,6 +149,26 @@ final class LlamaDecoder implements PureJavaDecoder {
   }
 
   @Override
+  public int numLayers() {
+    return forwardPass.config().numLayers();
+  }
+
+  @Override
+  public int contextCapacity() {
+    return forwardPass.config().contextLength();
+  }
+
+  @Override
+  public int keyDim() {
+    return forwardPass.config().keyDim();
+  }
+
+  @Override
+  public int valueDim() {
+    return forwardPass.config().valueDim();
+  }
+
+  @Override
   public long portablePrefixBytes(int tokenCount) {
     return forwardPass.portablePrefixBytes(tokenCount);
   }
@@ -162,6 +182,12 @@ final class LlamaDecoder implements PureJavaDecoder {
   public void writePrefix(SharedPrefix prefix, int tokenCount, java.io.DataOutput output)
       throws java.io.IOException {
     requirePrefix(prefix).writeTo(output, tokenCount);
+  }
+
+  @Override
+  public void writePrefixBlock(SharedPrefix prefix, int startToken, int endToken,
+      java.io.DataOutput output) throws java.io.IOException {
+    requirePrefix(prefix).writeBlockTo(output, startToken, endToken);
   }
 
   @Override

@@ -86,6 +86,10 @@ import com.integrallis.models.backend.purejava.spi.PureJavaBackendProvider;
 import com.integrallis.models.backend.purejava.tensor.SafetensorsTensorSource;
 import com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer;
 import com.integrallis.models.backend.purejava.tokenizer.HuggingFaceTokenizer;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.foreign.Arena;
@@ -197,6 +201,9 @@ public final class PureJavaBackend
       return delegate.sharedBytes();
     }
   }
+
+  /** Adapts a {@link KvCache.SharedPrefix} to the {@link PureJavaDecoder.SharedPrefix} contract. */
+
 
   private PureJavaBackend(
       Path modelPath,
@@ -1516,6 +1523,114 @@ public final class PureJavaBackend
       throw new IOException("unexpected native attention state for non-native backend");
     }
     return new PureJavaSharedPrefix(this, decoder.readPrefix(input, tokenCount, maxBytes - 36));
+  }
+
+  @Override
+  public void writePrefixBlock(
+      SharedInferencePrefix prefix, int startToken, int endToken, java.io.DataOutput output)
+      throws IOException {
+    checkOpen();
+    var owned = requirePrefix(prefix);
+    if (startToken < 0 || endToken > owned.delegate.checkpoint() || startToken >= endToken) {
+      throw new IllegalArgumentException(
+          "invalid block range [" + startToken + ", " + endToken + ")");
+    }
+    output.write(java.util.HexFormat.of().parseHex(portablePrefixFingerprint()));
+    output.writeInt(1); // block count in this self-contained unit
+    output.writeInt(startToken);
+    output.writeInt(endToken);
+    decoder.writePrefixBlock(owned.delegate, startToken, endToken, output);
+  }
+
+  @Override
+  public SharedInferencePrefix readPrefixBlocks(
+      java.io.DataInput input, int tokenCount, long maxBytes) throws IOException {
+    checkOpen();
+    if (maxBytes < 44)
+      throw new IOException("assembled prefix exceeds import budget"); // 32 + 4 + 4 + 4 minimum
+
+    byte[] expectedIdentity = java.util.HexFormat.of().parseHex(portablePrefixFingerprint());
+    byte[] identity = new byte[32];
+    input.readFully(identity);
+    if (!java.security.MessageDigest.isEqual(identity, expectedIdentity)) {
+      throw new IOException("incompatible model or KV execution identity");
+    }
+
+    boolean[] covered = new boolean[tokenCount];
+    var cache =
+        com.integrallis.models.backend.purejava.cache.KvCache.createForAssembly(
+            decoder.numLayers(), decoder.contextCapacity(), decoder.keyDim(), decoder.valueDim(), tokenCount);
+
+    boolean firstUnit = true;
+    while (true) {
+      int blockCount;
+      try {
+        blockCount = input.readInt();
+      } catch (java.io.EOFException e) {
+        if (firstUnit) throw new IOException("no blocks found in assembled prefix");
+        break;
+      }
+      if (blockCount < 0) throw new IOException("invalid block count");
+
+      for (int b = 0; b < blockCount; b++) {
+        int start, end;
+        try {
+          start = input.readInt();
+          end = input.readInt();
+        } catch (java.io.EOFException e) {
+          throw new IOException("truncated block metadata");
+        }
+        if (start < 0 || end > tokenCount || start >= end)
+          throw new IOException("invalid block range [" + start + ", " + end + ")");
+
+        cache.readBlock(start, end, input);
+        for (int i = start; i < end; i++) {
+          if (covered[i]) throw new IOException("overlapping block at position " + i);
+          covered[i] = true;
+        }
+      }
+
+      boolean complete = true;
+      for (int i = 0; i < tokenCount; i++) {
+        if (!covered[i]) {
+          complete = false;
+          break;
+        }
+      }
+      if (complete) break;
+
+      // Need more blocks. Check if another unit is available.
+      firstUnit = false;
+      boolean moreAvailable = false;
+      if (input instanceof java.io.DataInputStream dis) {
+        moreAvailable = dis.available() >= 32;
+      }
+      if (!moreAvailable) {
+        // Best-effort: try to read next identity. If EOF, we know we're done.
+        try {
+          input.readFully(identity);
+        } catch (java.io.EOFException e) {
+          throw new IOException("incomplete block coverage: missing ranges");
+        }
+      } else {
+        input.readFully(identity);
+      }
+      if (!java.security.MessageDigest.isEqual(identity, expectedIdentity)) {
+        throw new IOException("inconsistent identity in assembled prefix");
+      }
+    }
+
+    // Verify coverage one last time
+    for (int i = 0; i < tokenCount; i++) {
+      if (!covered[i]) throw new IOException("incomplete block coverage at position " + i);
+    }
+
+    // Round-trip through the decoder so the returned prefix has the correct runtime type.
+    var assembled = new ByteArrayOutputStream();
+    cache.freezePrefix(tokenCount).writeTo(new DataOutputStream(assembled), tokenCount);
+    byte[] bytes = assembled.toByteArray();
+    return new PureJavaSharedPrefix(
+        this, decoder.readPrefix(new DataInputStream(new ByteArrayInputStream(bytes)), tokenCount, bytes.length));
   }
 
   @Override
