@@ -4,6 +4,44 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.20] - 2026-11-12
+
+### Added
+
+- **Portable-prefix serialization for native attention kernels (#425).**
+  `BatchedCausalAttentionKernel` gains `supportsPortableState()`, `retainedStateBytes()`,
+  `writeRetainedState()` and `readRetainedState()`. `NativeCausalAttention` implements full
+  F16 bit-pattern round-trip through `HeadMajorKvStore`; the native KV store supports
+  `restore()` in both F32 and F16 layouts. The `ATTENTION_STATE_UNSUPPORTED` guard in
+  `PureJavaBackend.portablePrefixCapabilities()` is removed and replaced by a granular
+  capability check: any kernel that advertises portable state is accepted. An end-to-end
+  integration test (MHA synthetic model, donor native-attention → export → receiver
+  native-attention) verifies exact continuation parity.
+
+- **Atomic block-range assembly for portable prefix transfer (#428).**
+  `PortablePrefixBlock` records and `PortablePrefixInferenceBackend.writePrefixBlock` /
+  `readPrefixBlocks` support exporting arbitrary, possibly overlapping token ranges and
+  assembling them into a single prefix. The assembly path in `PureJavaBackend` reconstructs
+  the KV cache from supplied blocks, detects gaps and duplicates, enforces the advertised
+  budget, and re-exports the assembled prefix so the returned `SharedPrefix` has the
+  correct runtime type. Edge-case coverage: exact continuation, overlap, missing head,
+  reordered blocks, duplicate blocks, wrong identity, budget too small, negative start,
+  end beyond token count, and invalid export range.
+
+- **Batched multi-document embedding with LAST_TOKEN pooling (#390).**
+  `GgufEmbeddingBackend.embedAll` now uses `prefillBatchHiddenStates` when the backend
+  supports batch prefill, the model uses LAST_TOKEN pooling, and the document count fits
+  within the backend's `maxBatchSize()`. Each document receives an isolated session; hidden
+  states are extracted per document and cleaned up. Fallback to sequential `embed()` is
+  preserved for MEAN/CLS pooling, backends without batch support, single documents, and
+  batches exceeding capacity.
+
+### Release validation
+
+- Vectors remains pinned to 0.1.34. No unreleased Vectors runtime change is required.
+- `backend-cuda` remains opt-in and unchanged. Its last recorded G1 result is exact-token
+  parity on RTX 4090 at 31.26 tok/s; G4 passed at 6.184x against a 3.00x gate.
+
 ## [0.5.19] - 2026-11-10
 
 ### Changed
