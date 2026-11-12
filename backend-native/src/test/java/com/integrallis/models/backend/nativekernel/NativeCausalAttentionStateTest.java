@@ -29,8 +29,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Native attention retained-state serialization round-trip.
  *
- * <p>Exported state must restore exact layer identity and F16 bit patterns so a receiver
- * continues from the same positions without recompute.
+ * <p>Exported state must restore exact layer identity and F16 bit patterns so a receiver continues
+ * from the same positions without recompute.
  */
 class NativeCausalAttentionStateTest {
 
@@ -66,8 +66,7 @@ class NativeCausalAttentionStateTest {
   }
 
   /** Perform an attend on the given layer starting at position 0 with {@code batch} tokens. */
-  private static void attendInitial(
-      NativeCausalAttention attention, int layer, int batch) {
+  private static void attendInitial(NativeCausalAttention attention, int layer, int batch) {
     float[] q = new float[batch * DIMENSION];
     float[] k = new float[batch * DIMENSION];
     float[] v = new float[batch * DIMENSION];
@@ -120,11 +119,9 @@ class NativeCausalAttentionStateTest {
       receiver.readRetainedState(new DataInputStream(new ByteArrayInputStream(export(donor))));
 
       // Post-condition: receiver must accept continuation at position 4 (where donor stopped).
-      assertThat(receiver.isEligible(0, 4, 2, HEADS, HEADS, WIDTH, WIDTH, CAPACITY, 0))
-          .isTrue();
+      assertThat(receiver.isEligible(0, 4, 2, HEADS, HEADS, WIDTH, WIDTH, CAPACITY, 0)).isTrue();
       // Sanity: donor must still accept the same continuation.
-      assertThat(donor.isEligible(0, 4, 2, HEADS, HEADS, WIDTH, WIDTH, CAPACITY, 0))
-          .isTrue();
+      assertThat(donor.isEligible(0, 4, 2, HEADS, HEADS, WIDTH, WIDTH, CAPACITY, 0)).isTrue();
     }
   }
 
@@ -145,7 +142,20 @@ class NativeCausalAttentionStateTest {
       float[] out1 = new float[4 * DIMENSION];
       populate(k1, v1, 1.0f, -1.0f, 0.01f);
       donorFirst.attend(out1, q1, k1, v1, 0, 0, 4, HEADS, HEADS, WIDTH, WIDTH, CAPACITY, 0);
-      donorContinue.attend(out1.clone(), q1.clone(), k1.clone(), v1.clone(), 0, 0, 4, HEADS, HEADS, WIDTH, WIDTH, CAPACITY, 0);
+      donorContinue.attend(
+          out1.clone(),
+          q1.clone(),
+          k1.clone(),
+          v1.clone(),
+          0,
+          0,
+          4,
+          HEADS,
+          HEADS,
+          WIDTH,
+          WIDTH,
+          CAPACITY,
+          0);
 
       // Phase 2: export donorFirst's state after the prefix.
       byte[] serialized = export(donorFirst);
@@ -161,7 +171,20 @@ class NativeCausalAttentionStateTest {
       // Phase 3b: receiver imports prefix state, then continues with the same 2 tokens.
       receiver.readRetainedState(new DataInputStream(new ByteArrayInputStream(serialized)));
       float[] recvOut = new float[2 * DIMENSION];
-      receiver.attend(recvOut, q2.clone(), k2.clone(), v2.clone(), 0, 4, 2, HEADS, HEADS, WIDTH, WIDTH, CAPACITY, 0);
+      receiver.attend(
+          recvOut,
+          q2.clone(),
+          k2.clone(),
+          v2.clone(),
+          0,
+          4,
+          2,
+          HEADS,
+          HEADS,
+          WIDTH,
+          WIDTH,
+          CAPACITY,
+          0);
 
       // Phase 4: exact-token continuation must produce identical F16-rounded outputs.
       assertThat(recvOut).containsExactly(donorOut);

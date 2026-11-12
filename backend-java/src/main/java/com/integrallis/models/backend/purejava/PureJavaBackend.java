@@ -203,8 +203,6 @@ public final class PureJavaBackend
   }
 
   /** Adapts a {@link KvCache.SharedPrefix} to the {@link PureJavaDecoder.SharedPrefix} contract. */
-
-
   private PureJavaBackend(
       Path modelPath,
       ModelMemoryArena arenaOwner,
@@ -1559,7 +1557,11 @@ public final class PureJavaBackend
     boolean[] covered = new boolean[tokenCount];
     var cache =
         com.integrallis.models.backend.purejava.cache.KvCache.createForAssembly(
-            decoder.numLayers(), decoder.contextCapacity(), decoder.keyDim(), decoder.valueDim(), tokenCount);
+            decoder.numLayers(),
+            decoder.contextCapacity(),
+            decoder.keyDim(),
+            decoder.valueDim(),
+            tokenCount);
 
     boolean firstUnit = true;
     while (true) {
@@ -1630,7 +1632,9 @@ public final class PureJavaBackend
     cache.freezePrefix(tokenCount).writeTo(new DataOutputStream(assembled), tokenCount);
     byte[] bytes = assembled.toByteArray();
     return new PureJavaSharedPrefix(
-        this, decoder.readPrefix(new DataInputStream(new ByteArrayInputStream(bytes)), tokenCount, bytes.length));
+        this,
+        decoder.readPrefix(
+            new DataInputStream(new ByteArrayInputStream(bytes)), tokenCount, bytes.length));
   }
 
   @Override

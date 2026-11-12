@@ -53,8 +53,7 @@ class PortablePrefixBlockAssemblyTest {
       donor.writePrefix(prefix, 5, new DataOutputStream(whole));
       var importedWhole =
           receiver.readPrefix(
-              new DataInputStream(new ByteArrayInputStream(whole.toByteArray())), 5,
-              whole.size());
+              new DataInputStream(new ByteArrayInputStream(whole.toByteArray())), 5, whole.size());
 
       // Export the same prefix in two blocks: [0,2) and [2,5).
       var block1 = new ByteArrayOutputStream();
@@ -68,7 +67,8 @@ class PortablePrefixBlockAssemblyTest {
       assembled.write(block2.toByteArray());
       var importedBlocks =
           receiver.readPrefixBlocks(
-              new DataInputStream(new ByteArrayInputStream(assembled.toByteArray())), 5,
+              new DataInputStream(new ByteArrayInputStream(assembled.toByteArray())),
+              5,
               assembled.size());
 
       // Both imports must yield the same checkpoint and continuation logits.
@@ -105,7 +105,8 @@ class PortablePrefixBlockAssemblyTest {
               () ->
                   receiver.readPrefixBlocks(
                       new DataInputStream(new ByteArrayInputStream(assembled.toByteArray())),
-                      5, assembled.size()))
+                      5,
+                      assembled.size()))
           .isInstanceOf(java.io.IOException.class)
           .hasMessageContaining("overlap");
     }
@@ -128,7 +129,8 @@ class PortablePrefixBlockAssemblyTest {
               () ->
                   receiver.readPrefixBlocks(
                       new DataInputStream(new ByteArrayInputStream(block.toByteArray())),
-                      5, block.size()))
+                      5,
+                      block.size()))
           .isInstanceOf(java.io.IOException.class)
           .hasMessageContaining("missing");
     }
@@ -156,7 +158,8 @@ class PortablePrefixBlockAssemblyTest {
       // Receiver must assemble correctly regardless of order.
       var imported =
           receiver.readPrefixBlocks(
-              new DataInputStream(new ByteArrayInputStream(assembled.toByteArray())), 5,
+              new DataInputStream(new ByteArrayInputStream(assembled.toByteArray())),
+              5,
               assembled.size());
       assertThat(imported.checkpoint()).isEqualTo(5);
       try (var fork = receiver.fork(imported)) {
@@ -186,7 +189,8 @@ class PortablePrefixBlockAssemblyTest {
               () ->
                   receiver.readPrefixBlocks(
                       new DataInputStream(new ByteArrayInputStream(assembled.toByteArray())),
-                      5, assembled.size()))
+                      5,
+                      assembled.size()))
           .isInstanceOf(java.io.IOException.class)
           .hasMessageContaining("overlap");
     }
@@ -211,7 +215,8 @@ class PortablePrefixBlockAssemblyTest {
               () ->
                   receiver.readPrefixBlocks(
                       new DataInputStream(new ByteArrayInputStream(block.toByteArray())),
-                      5, block.size()))
+                      5,
+                      block.size()))
           .isInstanceOf(java.io.IOException.class)
           .hasMessageContaining("identity");
     }
@@ -233,7 +238,8 @@ class PortablePrefixBlockAssemblyTest {
               () ->
                   receiver.readPrefixBlocks(
                       new DataInputStream(new ByteArrayInputStream(block.toByteArray())),
-                      5, 10)) // way below the minimum 44
+                      5,
+                      10)) // way below the minimum 44
           .isInstanceOf(java.io.IOException.class)
           .hasMessageContaining("budget");
     }
@@ -260,7 +266,8 @@ class PortablePrefixBlockAssemblyTest {
               () ->
                   receiver.readPrefixBlocks(
                       new DataInputStream(new ByteArrayInputStream(crafted.toByteArray())),
-                      5, crafted.size()))
+                      5,
+                      crafted.size()))
           .isInstanceOf(java.io.IOException.class)
           .hasMessageContaining("invalid");
     }
@@ -286,7 +293,8 @@ class PortablePrefixBlockAssemblyTest {
               () ->
                   receiver.readPrefixBlocks(
                       new DataInputStream(new ByteArrayInputStream(crafted.toByteArray())),
-                      5, crafted.size()))
+                      5,
+                      crafted.size()))
           .isInstanceOf(java.io.IOException.class)
           .hasMessageContaining("invalid");
     }
@@ -301,15 +309,21 @@ class PortablePrefixBlockAssemblyTest {
       var prefix = donor.freezePrefix(session);
 
       assertThatThrownBy(
-              () -> donor.writePrefixBlock(prefix, -1, 3, new DataOutputStream(new ByteArrayOutputStream())))
+              () ->
+                  donor.writePrefixBlock(
+                      prefix, -1, 3, new DataOutputStream(new ByteArrayOutputStream())))
           .isInstanceOf(IllegalArgumentException.class);
 
       assertThatThrownBy(
-              () -> donor.writePrefixBlock(prefix, 3, 2, new DataOutputStream(new ByteArrayOutputStream())))
+              () ->
+                  donor.writePrefixBlock(
+                      prefix, 3, 2, new DataOutputStream(new ByteArrayOutputStream())))
           .isInstanceOf(IllegalArgumentException.class);
 
       assertThatThrownBy(
-              () -> donor.writePrefixBlock(prefix, 0, 10, new DataOutputStream(new ByteArrayOutputStream())))
+              () ->
+                  donor.writePrefixBlock(
+                      prefix, 0, 10, new DataOutputStream(new ByteArrayOutputStream())))
           .isInstanceOf(IllegalArgumentException.class);
     }
   }

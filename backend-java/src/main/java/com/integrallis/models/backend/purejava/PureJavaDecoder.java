@@ -179,8 +179,9 @@ interface PureJavaDecoder extends AutoCloseable {
     throw new UnsupportedOperationException("decoder cannot transfer KV prefixes");
   }
 
-  default void writePrefixBlock(SharedPrefix prefix, int startToken, int endToken,
-      java.io.DataOutput output) throws java.io.IOException {
+  default void writePrefixBlock(
+      SharedPrefix prefix, int startToken, int endToken, java.io.DataOutput output)
+      throws java.io.IOException {
     throw new UnsupportedOperationException("decoder cannot transfer KV block ranges");
   }
 

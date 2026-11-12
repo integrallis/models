@@ -550,23 +550,23 @@ public final class KvCache {
 
   /**
    * Creates a mutable cache pre-allocated for exactly {@code tokenCount} positions, ready to
-   * receive block payloads via {@link #readBlock}. Callers must populate every position and
-   * then invoke {@link #freezePrefix}.
+   * receive block payloads via {@link #readBlock}. Callers must populate every position and then
+   * invoke {@link #freezePrefix}.
    */
   public static KvCache createForAssembly(
       int layers, int context, int keyWidth, int valueWidth, int tokenCount) {
     var cache = new KvCache(layers, context, keyWidth, valueWidth);
     cache.allocatedSequenceCapacity = tokenCount;
     cache.keys = new float[Math.multiplyExact(Math.multiplyExact(layers, tokenCount), keyWidth)];
-    cache.values = new float[Math.multiplyExact(Math.multiplyExact(layers, tokenCount), valueWidth)];
+    cache.values =
+        new float[Math.multiplyExact(Math.multiplyExact(layers, tokenCount), valueWidth)];
     cache.populated = new boolean[Math.multiplyExact(layers, tokenCount)];
     return cache;
   }
 
   /**
-   * Reads one block payload from {@code input} and copies it into positions
-   * {@code [startToken, endToken)}. The caller must have created this cache via
-   * {@link #createForAssembly}.
+   * Reads one block payload from {@code input} and copies it into positions {@code [startToken,
+   * endToken)}. The caller must have created this cache via {@link #createForAssembly}.
    */
   public void readBlock(int startToken, int endToken, DataInput input) throws IOException {
     if (startToken < 0 || endToken > allocatedSequenceCapacity || startToken >= endToken) {

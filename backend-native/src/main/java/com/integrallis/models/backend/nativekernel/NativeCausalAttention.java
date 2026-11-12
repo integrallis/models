@@ -315,7 +315,8 @@ final class NativeCausalAttention implements BatchedCausalAttentionKernel {
       int valueLength = input.readInt();
       short[] values = new short[valueLength];
       for (int v = 0; v < valueLength; v++) values[v] = (short) input.readUnsignedShort();
-      HeadMajorKvStore store = HeadMajorKvStore.restore(heads, width, ceiling, positions, stride, keys, values);
+      HeadMajorKvStore store =
+          HeadMajorKvStore.restore(heads, width, ceiling, positions, stride, keys, values);
       layers.put(layerIndex, store);
     }
   }

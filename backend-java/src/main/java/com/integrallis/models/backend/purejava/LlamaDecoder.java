@@ -185,8 +185,9 @@ final class LlamaDecoder implements PureJavaDecoder {
   }
 
   @Override
-  public void writePrefixBlock(SharedPrefix prefix, int startToken, int endToken,
-      java.io.DataOutput output) throws java.io.IOException {
+  public void writePrefixBlock(
+      SharedPrefix prefix, int startToken, int endToken, java.io.DataOutput output)
+      throws java.io.IOException {
     requirePrefix(prefix).writeBlockTo(output, startToken, endToken);
   }
 
