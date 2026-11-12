@@ -48,6 +48,18 @@ static void embed(Path gguf) {
 `EmbeddingBackend` lives in `models-api`, so a backend implements it without
 inheriting a dependency on Vectors storage.
 
+== Internal Batching
+
+`embedAll` may use a batched prefill internally when the configured backend
+supports `prefillBatchHiddenStates()`, the model uses `LAST_TOKEN` pooling,
+and the document count fits within the backend's `maxBatchSize()`. Each
+document receives an isolated session so attention is isolated; the batch
+amortises per-call setup and uses native matrix kernels when available. When
+these conditions are not met --- `MEAN` or `CLS` pooling, a single document,
+a backend without batch prefill, or a list larger than `maxBatchSize()` ---
+the call falls back to sequential `embed()`. The caller sees the same vectors
+either way; the optimization is transparent.
+
 Resolve the artifact through its marker JAR:
 
 [source,java]

@@ -204,10 +204,18 @@ callers must not infer support for arbitrary shorter prefixes from that result.
 The current Llama decoder route reports `ANY_PREFIX`: any nonempty prefix up to the captured
 length can be retained without recomputation. The first blocking condition is reported for
 other configurations: unsupported decoder state, unavailable model identity, activated-adapter
-state, attention-kernel state, or a matrix kernel that has not opted in for its current state
-and arithmetic. Rust/FFM also requires an identified native library. A backend without the
-portable SPI reports `BACKEND_UNSUPPORTED`. These are capability reports, not peer-compatibility
-decisions or model qualification verdicts. The current codec and eligibility limits are unchanged.
+state, attention-kernel state that does not support portable serialization, or a matrix kernel
+that has not opted in for its current state and arithmetic.
+
+Attention kernels that implement `BatchedCausalAttentionKernel` and advertise
+`supportsPortableState()` now serialize and restore their retained KV store
+through the same wire format. `NativeCausalAttention` supports this for
+models with multi-head attention (heads == kv_heads); grouped-query attention
+remains unsupported for the native attention path. Rust/FFM also requires an
+identified native library. A backend without the portable SPI reports
+`BACKEND_UNSUPPORTED`. These are capability reports, not peer-compatibility
+decisions or model qualification verdicts. The current codec and eligibility
+limits are unchanged.
 
 === Complete Checkpoint Contract
 
@@ -236,6 +244,89 @@ mutable suffixes must stay isolated. Failure or closure must release owned resou
 invalidating other owners' retained state. Portable prompt state does not include sampler state,
 next-token logits, or an entire conversation. Authentication, tenant isolation, transport,
 placement and transfer-versus-recompute decisions remain the caller's responsibility.
+
+=== Transfer a Complete Prefix
+
+A session prefill produces mutable state; `freezePrefix` captures an immutable
+view that can be exported, imported on another backend, and forked into a new
+session:
+
+[source,java]
+----
+import com.integrallis.models.api.SharedInferencePrefix;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+
+// Donor side
+var session = pipeline.openGenerationSession();
+pipeline.prefill(session, systemTokens, 0);
+pipeline.prefill(session, userTokens, systemTokens.length);
+SharedInferencePrefix prefix = pipeline.freezePrefix(session);
+int checkpoint = prefix.checkpoint(); // total tokens captured
+
+// Export
+var output = new ByteArrayOutputStream();
+pipeline.writePrefix(prefix, checkpoint, new DataOutputStream(output));
+byte[] bytes = output.toByteArray();
+
+// Receiver side (same model on another host)
+try (var receiver = new InferencePipeline(PureJavaBackend.load(gguf))) {
+    SharedInferencePrefix imported = receiver.readPrefix(
+        new DataInputStream(new ByteArrayInputStream(bytes)),
+        checkpoint,
+        bytes.length);
+
+    // Continue generation from the imported boundary
+    try (var fork = receiver.forkGenerationSession(imported)) {
+        int next = receiver.sample(fork, 0.8f);
+    }
+}
+----
+
+`writePrefix` emits a versioned wire format that includes the backend identity,
+dimensions and the decoder payload. If the attention kernel supports portable
+state, a 4-byte length field precedes the kernel payload so the receiver can
+delegate deserialization back to the same kernel class. The `NoKernel` path
+emits a zero length to keep the format uniform.
+
+`readPrefix` validates the identity fingerprint and shape before allocating any
+tensors, then reconstructs the prefix into receiver-owned state. The imported
+prefix is detached from the donor; closing the donor does not invalidate it.
+
+=== Transfer a Partial Range with Block Assembly
+
+Complete-prefix export requires contiguous tokens starting from zero. For
+scenarios that need a middle slice or independently verified fragments, the
+block API exports arbitrary ranges and assembles them atomically on the
+receiver:
+
+[source,java]
+----
+import com.integrallis.models.api.PortablePrefixBlock;
+
+// Donor: export two overlapping ranges independently
+var blockOut = new ByteArrayOutputStream();
+var dataOut = new DataOutputStream(blockOut);
+
+// First block covers tokens [0, 50)
+pipeline.writePrefixBlock(prefix, 0, 50, dataOut);
+// Second block covers tokens [30, 100)
+pipeline.writePrefixBlock(prefix, 30, 100, dataOut);
+
+byte[] blocks = blockOut.toByteArray();
+
+// Receiver: read the identity header, then assemble
+var blockIn = new DataInputStream(new ByteArrayInputStream(blocks));
+SharedInferencePrefix assembled = receiver.readPrefixBlocks(
+    blockIn, 100, blocks.length);
+----
+
+`readPrefixBlocks` validates every block's identity and range before
+allocating tensors. Overlapping ranges must agree exactly; missing ranges or
+duplicate blocks are rejected. The returned prefix behaves like one produced by
+`readPrefix`: immutable, detached, and forkable into a new generation session.
 
 == Use Auxiliary Heads
 
