@@ -15,19 +15,18 @@
  */
 package com.integrallis.models.api;
 
-import java.util.Objects;
-
 /**
  * Immutable description of one exported portable-prefix block (a contiguous token range).
  *
- * <p>A complete prefix may be assembled from independently verified blocks. Each block carries
- * its own start/end positions and payload identity so the receiver can validate coverage
- * before allocating mutable tensors.
+ * <p>A complete prefix may be assembled from independently verified blocks. Each block carries its
+ * own start/end positions and payload identity so the receiver can validate coverage before
+ * allocating mutable tensors.
  */
 public record PortablePrefixBlock(int startToken, int endToken, int payloadBytes) {
 
   public PortablePrefixBlock {
-    if (startToken < 0) throw new IllegalArgumentException("startToken must be >= 0: " + startToken);
+    if (startToken < 0)
+      throw new IllegalArgumentException("startToken must be >= 0: " + startToken);
     if (endToken <= startToken)
       throw new IllegalArgumentException(
           "endToken must be > startToken: " + endToken + " <= " + startToken);

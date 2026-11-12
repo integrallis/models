@@ -42,8 +42,7 @@ class HeadMajorKvStoreStateTest {
     assertThat(store.keys()).containsExactly(keys);
     assertThat(store.values()).containsExactly(values);
     // allocatedBytes includes the whole stride, not just used positions
-    assertThat(store.allocatedBytes())
-        .isEqualTo(keys.length * 2L + values.length * 2L);
+    assertThat(store.allocatedBytes()).isEqualTo(keys.length * 2L + values.length * 2L);
   }
 
   @Test

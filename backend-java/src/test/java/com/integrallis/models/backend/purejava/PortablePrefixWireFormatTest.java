@@ -18,7 +18,6 @@ package com.integrallis.models.backend.purejava;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.integrallis.models.api.PortablePrefixCapabilities;
 import com.integrallis.models.backend.purejava.spi.BatchedCausalAttentionKernel;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -57,8 +56,7 @@ class PortablePrefixWireFormatTest {
       byte[] bytes = output.toByteArray();
 
       // Identity (32) + attention-length (4, value = 0) + decoder payload
-      assertThat(bytes.length)
-          .isGreaterThan(IDENTITY_BYTES + ATTENTION_LENGTH_BYTES);
+      assertThat(bytes.length).isGreaterThan(IDENTITY_BYTES + ATTENTION_LENGTH_BYTES);
 
       // The attention-length uint32 at offset 32 must be zero for NoKernel
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
@@ -69,60 +67,87 @@ class PortablePrefixWireFormatTest {
   }
 
   /**
-   * When #425 removes the attention-state guard, this test should be runnable:
-   * it injects a kernel that advertises portable state and verifies the payload
-   * appears in the wire format.
+   * When #425 removes the attention-state guard, this test should be runnable: it injects a kernel
+   * that advertises portable state and verifies the payload appears in the wire format.
    */
   @Test
-  void attentionStatePayloadWouldBeIncludedAfterGuardRemoval(@TempDir Path dir)
-      throws Exception {
+  void attentionStatePayloadWouldBeIncludedAfterGuardRemoval(@TempDir Path dir) throws Exception {
     var file = PureJavaBackendTest.buildNanoModelFile(dir, new Random(42));
-    var attention = new BatchedCausalAttentionKernel() {
-      @Override
-      public boolean isEligible(int layer, int start, int batch, int heads, int kvHeads,
-          int keyLength, int valueLength, int capacity, int window) {
-        return false;
-      }
+    var attention =
+        new BatchedCausalAttentionKernel() {
+          @Override
+          public boolean isEligible(
+              int layer,
+              int start,
+              int batch,
+              int heads,
+              int kvHeads,
+              int keyLength,
+              int valueLength,
+              int capacity,
+              int window) {
+            return false;
+          }
 
-      @Override
-      public void attend(float[] output, float[] query, float[] key, float[] value,
-          int layer, int start, int batch, int heads, int kvHeads,
-          int keyLength, int valueLength, int capacity, int window) {
-        throw new UnsupportedOperationException();
-      }
+          @Override
+          public void attend(
+              float[] output,
+              float[] query,
+              float[] key,
+              float[] value,
+              int layer,
+              int start,
+              int batch,
+              int heads,
+              int kvHeads,
+              int keyLength,
+              int valueLength,
+              int capacity,
+              int window) {
+            throw new UnsupportedOperationException();
+          }
 
-      @Override
-      public boolean supportsPortableState() { return true; }
+          @Override
+          public boolean supportsPortableState() {
+            return true;
+          }
 
-      @Override
-      public long retainedStateBytes() { return 12L; }
+          @Override
+          public long retainedStateBytes() {
+            return 12L;
+          }
 
-      @Override
-      public void writeRetainedState(java.io.DataOutput output) throws java.io.IOException {
-        output.write(new byte[] {0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-            0x10, 0x11, 0x12, 0x13, 0x14, 0x15});
-      }
+          @Override
+          public void writeRetainedState(java.io.DataOutput output) throws java.io.IOException {
+            output.write(
+                new byte[] {
+                  0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15
+                });
+          }
 
-      @Override
-      public void readRetainedState(java.io.DataInput input) throws java.io.IOException {
-        byte[] buf = new byte[12];
-        input.readFully(buf);
-      }
-    };
+          @Override
+          public void readRetainedState(java.io.DataInput input) throws java.io.IOException {
+            byte[] buf = new byte[12];
+            input.readFully(buf);
+          }
+        };
 
-    try (var donor = PureJavaBackend.load(
-        file,
-        com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel.none(),
-        attention)) {
+    try (var donor =
+        PureJavaBackend.load(
+            file,
+            com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel.none(),
+            attention)) {
 
       // Guard still blocks advertisement; this is expected until full integration.
       assertThat(donor.portablePrefixCapabilities().status())
           .isEqualTo(
-              com.integrallis.models.api.PortablePrefixCapabilities.Status.ATTENTION_STATE_UNSUPPORTED);
+              com.integrallis.models.api.PortablePrefixCapabilities.Status
+                  .ATTENTION_STATE_UNSUPPORTED);
     }
 
     // When the guard is removed, the wire-format verification is:
-    // 1. writePrefix emits 32-byte identity, then 4-byte attention-length (12), then 12 payload bytes.
+    // 1. writePrefix emits 32-byte identity, then 4-byte attention-length (12), then 12 payload
+    // bytes.
     // 2. readPrefix reads the 4-byte length, then delegates to kernel.readRetainedState.
     // Verified above by NativeCausalAttentionStateTest for real NativeCausalAttention.
   }
@@ -142,8 +167,8 @@ class PortablePrefixWireFormatTest {
       byte[] bytes = output.toByteArray();
 
       // Decode via the receiver: round-trips successfully
-      var imported = receiver.readPrefix(
-          new DataInputStream(new ByteArrayInputStream(bytes)), 3, 1_000_000);
+      var imported =
+          receiver.readPrefix(new DataInputStream(new ByteArrayInputStream(bytes)), 3, 1_000_000);
       assertThat(imported).isNotNull();
 
       // Corrupt the attention-length field to -1 and verify rejection
@@ -151,8 +176,10 @@ class PortablePrefixWireFormatTest {
       bytes[IDENTITY_BYTES + 1] = (byte) 0xFF;
       bytes[IDENTITY_BYTES + 2] = (byte) 0xFF;
       bytes[IDENTITY_BYTES + 3] = (byte) 0xFF;
-      assertThatThrownBy(() -> receiver.readPrefix(
-              new DataInputStream(new ByteArrayInputStream(bytes)), 3, 1_000_000))
+      assertThatThrownBy(
+              () ->
+                  receiver.readPrefix(
+                      new DataInputStream(new ByteArrayInputStream(bytes)), 3, 1_000_000))
           .isInstanceOf(java.io.IOException.class)
           .hasMessageContaining("invalid");
     }

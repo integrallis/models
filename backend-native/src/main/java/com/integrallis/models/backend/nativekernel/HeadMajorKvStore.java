@@ -92,12 +92,13 @@ final class HeadMajorKvStore {
   }
 
   /** Restore a store from previously serialized F16 arrays with the exact layout. */
-  static HeadMajorKvStore restore(int heads, int width, int ceiling, int positions, int stride, short[] keys, short[] values) {
+  static HeadMajorKvStore restore(
+      int heads, int width, int ceiling, int positions, int stride, short[] keys, short[] values) {
     HeadMajorKvStore store = new HeadMajorKvStore(heads, width, ceiling);
     if (stride < positions) throw new IllegalArgumentException("stride < positions");
     int expectedLength = Math.multiplyExact(stride, store.dimension);
     if (keys.length != expectedLength || values.length != expectedLength)
-        throw new IllegalArgumentException("keys/values length mismatch");
+      throw new IllegalArgumentException("keys/values length mismatch");
     store.stride = stride;
     store.positions = positions;
     store.keys = keys;

@@ -68,15 +68,15 @@ public interface PortablePrefixInferenceBackend extends SharedPrefixInferenceBac
   /**
    * Writes a single contiguous token range of an existing prefix as a self-describing block.
    *
-   * <p>The block includes the backend identity, range metadata ({@link PortablePrefixBlock}) and the
-   * payload bytes for that range only. Callers stream multiple blocks independently; assembly is
-   * atomic on the receiving side.
+   * <p>The block includes the backend identity, range metadata ({@link PortablePrefixBlock}) and
+   * the payload bytes for that range only. Callers stream multiple blocks independently; assembly
+   * is atomic on the receiving side.
    *
-   * @param prefix        the shared prefix to export from
-   * @param startToken    first token included in the block (inclusive)
-   * @param endToken      first token after the block (exclusive)
-   * @param output        destination stream; must remain open for the caller
-   * @throws IOException  if the range is unavailable or streaming fails
+   * @param prefix the shared prefix to export from
+   * @param startToken first token included in the block (inclusive)
+   * @param endToken first token after the block (exclusive)
+   * @param output destination stream; must remain open for the caller
+   * @throws IOException if the range is unavailable or streaming fails
    */
   default void writePrefixBlock(
       SharedInferencePrefix prefix, int startToken, int endToken, DataOutput output)
@@ -87,15 +87,16 @@ public interface PortablePrefixInferenceBackend extends SharedPrefixInferenceBac
   /**
    * Reads a sequence of independently verified blocks and assembles a complete prefix.
    *
-   * <p>The input format is the same identity used by {@link #writePrefix}, followed by a count and a
-   * sequence of blocks. The receiver validates every block's range, identity and shape before
+   * <p>The input format is the same identity used by {@link #writePrefix}, followed by a count and
+   * a sequence of blocks. The receiver validates every block's range, identity and shape before
    * allocating tensors. Overlapping or missing ranges are rejected.
    *
-   * @param input       stream containing the identity, block descriptors and payloads
-   * @param tokenCount  total tokens the assembled prefix must cover (sum of block ranges)
-   * @param maxBytes    maximum bytes to read from the stream
+   * @param input stream containing the identity, block descriptors and payloads
+   * @param tokenCount total tokens the assembled prefix must cover (sum of block ranges)
+   * @param maxBytes maximum bytes to read from the stream
    * @return an assembled detached prefix covering exactly {@code tokenCount} tokens
-   * @throws IOException if validation fails, ranges overlap or are missing, or the budget is exceeded
+   * @throws IOException if validation fails, ranges overlap or are missing, or the budget is
+   *     exceeded
    */
   default SharedInferencePrefix readPrefixBlocks(DataInput input, int tokenCount, long maxBytes)
       throws IOException {
