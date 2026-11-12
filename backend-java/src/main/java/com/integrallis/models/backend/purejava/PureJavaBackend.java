@@ -1420,7 +1420,7 @@ public final class PureJavaBackend
           PortablePrefixCapabilities.Status.ACTIVATED_STATE_UNSUPPORTED);
     // #425: serialization exists but full continuation path is not yet independently tested.
     // Remove this block after exact-donor/receiver tests pass for native attention prefixes.
-    if (batchedAttentionKernel != BatchedCausalAttentionKernel.none())
+    if (!batchedAttentionKernel.supportsPortableState())
       return PortablePrefixCapabilities.unsupported(
           PortablePrefixCapabilities.Status.ATTENTION_STATE_UNSUPPORTED);
     if (!batchedMatrixKernel.supportsPortablePrefixes())

@@ -70,6 +70,12 @@ class PureJavaBackendTest {
 
   static Path buildNanoModelFile(Path dir, Random rng, GgufTensorType projectionType)
       throws IOException {
+    return buildNanoModelFile(dir, rng, projectionType, HEADS, KV_HEADS);
+  }
+
+  static Path buildNanoModelFile(
+      Path dir, Random rng, GgufTensorType projectionType, int heads, int kvHeads)
+      throws IOException {
     List<String> tokens = new ArrayList<>();
     for (int i = 0; i < VOCAB_SIZE; i++) {
       tokens.add("t" + i);
@@ -86,8 +92,8 @@ class PureJavaBackendTest {
             .addString("general.architecture", "llama")
             .addUint32("llama.embedding_length", DIM)
             .addUint32("llama.block_count", LAYERS)
-            .addUint32("llama.attention.head_count", HEADS)
-            .addUint32("llama.attention.head_count_kv", KV_HEADS)
+            .addUint32("llama.attention.head_count", heads)
+            .addUint32("llama.attention.head_count_kv", kvHeads)
             .addUint32("llama.vocab_size", VOCAB_SIZE)
             .addUint32("llama.context_length", CONTEXT)
             .addUint32("llama.feed_forward_length", HIDDEN_DIM)
@@ -108,7 +114,7 @@ class PureJavaBackendTest {
         new long[] {DIM, VOCAB_SIZE},
         randomF32(rng, VOCAB_SIZE * DIM));
 
-    int kvDim = KV_HEADS * (DIM / HEADS);
+    int kvDim = kvHeads * (DIM / heads);
     for (int l = 0; l < LAYERS; l++) {
       String prefix = "blk." + l + ".";
       builder.addTensor(

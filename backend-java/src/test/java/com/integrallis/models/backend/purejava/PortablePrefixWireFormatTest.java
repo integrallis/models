@@ -138,11 +138,9 @@ class PortablePrefixWireFormatTest {
             com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel.none(),
             attention)) {
 
-      // Guard still blocks advertisement; this is expected until full integration.
+      // Guard is now granular: kernels that support portable state are accepted.
       assertThat(donor.portablePrefixCapabilities().status())
-          .isEqualTo(
-              com.integrallis.models.api.PortablePrefixCapabilities.Status
-                  .ATTENTION_STATE_UNSUPPORTED);
+          .isEqualTo(com.integrallis.models.api.PortablePrefixCapabilities.Status.SUPPORTED);
     }
 
     // When the guard is removed, the wire-format verification is:
