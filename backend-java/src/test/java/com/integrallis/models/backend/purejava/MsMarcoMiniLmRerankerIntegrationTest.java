@@ -101,4 +101,17 @@ class MsMarcoMiniLmRerankerIntegrationTest {
       assertThat(model.score(DOCUMENTS.get(0), QUERY)).isNotEqualTo(first);
     }
   }
+
+  @Test
+  void batchScoresMatchSequentialScores() {
+    try (GgufRerankingModel model = GgufRerankingModel.load(fixture().localPath().orElseThrow())) {
+      List<Double> sequential = DOCUMENTS.stream().map(d -> model.score(QUERY, d)).toList();
+      List<Double> batched = model.scoreBatch(QUERY, DOCUMENTS);
+
+      assertThat(batched).hasSize(sequential.size());
+      for (int i = 0; i < sequential.size(); i++) {
+        assertThat(batched.get(i)).isCloseTo(sequential.get(i), within(1e-4));
+      }
+    }
+  }
 }

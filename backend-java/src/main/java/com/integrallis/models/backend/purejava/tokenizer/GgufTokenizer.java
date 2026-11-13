@@ -844,39 +844,38 @@ public final class GgufTokenizer implements Tokenizer {
           "maxTokens must leave room for [CLS] and two [SEP] tokens");
     }
 
-    List<Integer> firstTokens = mutableTokens(encodeWordPiece(first));
-    List<Integer> secondTokens = mutableTokens(encodeWordPiece(second));
+    int[] firstTokens = encodeWordPiece(first);
+    int[] secondTokens = encodeWordPiece(second);
     int contentBudget = maxTokens - 3;
-    int dropped = Math.max(0, firstTokens.size() + secondTokens.size() - contentBudget);
-    while (firstTokens.size() + secondTokens.size() > contentBudget) {
-      List<Integer> longer = firstTokens.size() >= secondTokens.size() ? firstTokens : secondTokens;
-      longer.remove(longer.size() - 1);
+    int firstLen = firstTokens.length;
+    int secondLen = secondTokens.length;
+    int total = firstLen + secondLen;
+    int dropped = Math.max(0, total - contentBudget);
+    while (total > contentBudget) {
+      if (firstLen >= secondLen) {
+        firstLen--;
+      } else {
+        secondLen--;
+      }
+      total--;
     }
 
-    int length = firstTokens.size() + secondTokens.size() + 3;
+    int length = firstLen + secondLen + 3;
     int[] tokens = new int[length];
     int[] tokenTypes = new int[length];
     int position = 0;
     tokens[position++] = bosTokenId;
-    for (int token : firstTokens) {
-      tokens[position++] = token;
+    for (int i = 0; i < firstLen; i++) {
+      tokens[position++] = firstTokens[i];
     }
     tokens[position++] = eosTokenId;
-    for (int token : secondTokens) {
-      tokens[position] = token;
+    for (int i = 0; i < secondLen; i++) {
+      tokens[position] = secondTokens[i];
       tokenTypes[position++] = 1;
     }
     tokens[position] = eosTokenId;
     tokenTypes[position] = 1;
     return new TokenizedPair(tokens, tokenTypes, dropped);
-  }
-
-  private static List<Integer> mutableTokens(int[] tokens) {
-    List<Integer> result = new ArrayList<>(tokens.length);
-    for (int token : tokens) {
-      result.add(token);
-    }
-    return result;
   }
 
   private void appendTrustedControl(

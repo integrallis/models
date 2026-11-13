@@ -4,6 +4,29 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Performance
+
+- **Compact F16 KV cache storage for the Java path (#438).**
+  When `models.purejava.halfPrecisionKvCache` is enabled, `KvCache` now stores actual
+  F16 bit patterns in `short[]` instead of rounding through F16 and retaining them in
+  `float[]`. This halves the per-token KV memory footprint while preserving the existing
+  public interface: `key()`, `value()`, `keySlice()`, `valueSlice()`, and attention views
+  all widen on read. The default F32 path is unchanged (bit-identical). Wire format
+  remains big-endian FP32; export widens on the fly and import compresses when compact
+  mode is active. A new package-visible constructor `KvCache(int,int,int,int,boolean)`
+  enables testing compact mode regardless of the global system property.
+
+- **Batched BERT pair scoring for cross-encoder rerankers (#440).**
+  `RerankingModel.scoreAll` now delegates to a new `scoreBatch` default method that
+  implementations can override for batch throughput. `GgufRerankingModel` implements
+  batching: it tokenizes all query-document pairs, pads to the same length, and runs
+  one `BertForwardPass` forward pass over the entire batch. `BertForwardPass` gains
+  `encodeBatchCls` with per-document attention masking so padded positions receive zero
+  weight in softmax. On a synthetic 8-document batch this amortizes weight-cache
+  locality and reduces small-matrix overhead. The default `scoreBatch` fallback loops
+  over `score()` for implementations that do not opt in. Batch parity is verified
+  against sequential `score()` in the MiniLM-L6 integration test.
+
 ## [0.5.20] - 2026-11-12
 
 ### Added

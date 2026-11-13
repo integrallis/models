@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.foreign.Arena;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /** Pure-Java BERT cross-encoder loaded directly from a corrected GGUF artifact. */
@@ -92,6 +94,50 @@ public final class GgufRerankingModel implements RerankingModel {
       droppedTokens.addAndGet(pair.droppedTokens());
     }
     return classifier.score(encoder.encodeCls(pair.tokens(), pair.tokenTypes()));
+  }
+
+  @Override
+  public synchronized List<Double> scoreBatch(String query, List<String> documents) {
+    Objects.requireNonNull(query, "query");
+    Objects.requireNonNull(documents, "documents");
+    checkOpen();
+    if (documents.isEmpty()) {
+      return List.of();
+    }
+    int batchSize = documents.size();
+    GgufTokenizer.TokenizedPair[] pairs = new GgufTokenizer.TokenizedPair[batchSize];
+    int maxLen = 0;
+    for (int i = 0; i < batchSize; i++) {
+      pairs[i] =
+          tokenizer.encodePair(
+              query,
+              Objects.requireNonNull(documents.get(i), "documents must not contain null"),
+              contextLength);
+      if (pairs[i].droppedTokens() > 0) {
+        truncatedPairs.incrementAndGet();
+        droppedTokens.addAndGet(pairs[i].droppedTokens());
+      }
+      maxLen = Math.max(maxLen, pairs[i].tokens().length);
+    }
+    int[][] tokens = new int[batchSize][maxLen];
+    int[][] tokenTypes = new int[batchSize][maxLen];
+    int[] lengths = new int[batchSize];
+    for (int i = 0; i < batchSize; i++) {
+      int len = pairs[i].tokens().length;
+      lengths[i] = len;
+      System.arraycopy(pairs[i].tokens(), 0, tokens[i], 0, len);
+      System.arraycopy(pairs[i].tokenTypes(), 0, tokenTypes[i], 0, len);
+    }
+    float[][] clsVectors = encoder.encodeBatchCls(tokens, tokenTypes, lengths);
+    List<Double> scores = new ArrayList<>(batchSize);
+    for (int i = 0; i < batchSize; i++) {
+      double score = classifier.score(clsVectors[i]);
+      if (!Double.isFinite(score)) {
+        throw new IllegalStateException("reranking model returned a non-finite score: " + score);
+      }
+      scores.add(score);
+    }
+    return List.copyOf(scores);
   }
 
   /**
