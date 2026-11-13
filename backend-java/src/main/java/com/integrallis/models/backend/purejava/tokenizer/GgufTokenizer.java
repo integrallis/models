@@ -56,21 +56,38 @@ public final class GgufTokenizer implements Tokenizer {
       if (droppedTokens < 0) {
         throw new IllegalArgumentException("droppedTokens must be >= 0: " + droppedTokens);
       }
-      tokens = Objects.requireNonNull(tokens, "tokens").clone();
-      tokenTypes = Objects.requireNonNull(tokenTypes, "tokenTypes").clone();
-      if (tokens.length != tokenTypes.length) {
-        throw new IllegalArgumentException("tokens and tokenTypes must have the same length");
+    }
+  }
+
+  /**
+   * Resizable primitive int array to avoid {@code List<Integer>} autoboxing in hot tokenization
+   * paths. Uses the same growth factor as {@code ArrayList} (1.5x) but keeps values unboxed.
+   */
+  private static final class IntArrayBuilder {
+    private int[] data;
+    private int size;
+
+    IntArrayBuilder(int initialCapacity) {
+      this.data = new int[Math.max(initialCapacity, 8)];
+    }
+
+    void add(int value) {
+      if (size == data.length) {
+        data = java.util.Arrays.copyOf(data, data.length + (data.length >>> 1));
       }
+      data[size++] = value;
     }
 
-    @Override
-    public int[] tokens() {
-      return tokens.clone();
+    void removeLast(int count) {
+      size = Math.max(0, size - count);
     }
 
-    @Override
-    public int[] tokenTypes() {
-      return tokenTypes.clone();
+    int size() {
+      return size;
+    }
+
+    int[] toArray() {
+      return java.util.Arrays.copyOf(data, size);
     }
   }
 
@@ -889,7 +906,7 @@ public final class GgufTokenizer implements Tokenizer {
   }
 
   private int[] encodeWordPiece(String text) {
-    List<Integer> encoded = new ArrayList<>();
+    IntArrayBuilder encoded = new IntArrayBuilder(text.length());
     for (String word : wordPieceWords(text)) {
       int before = encoded.size();
       String candidate = "\u2581" + word;
@@ -911,9 +928,7 @@ public final class GgufTokenizer implements Tokenizer {
           }
         }
         if (matchedEnd < 0) {
-          while (encoded.size() > before) {
-            encoded.remove(encoded.size() - 1);
-          }
+          encoded.removeLast(encoded.size() - before);
           encoded.add(unknownTokenId);
           break;
         }
@@ -921,7 +936,7 @@ public final class GgufTokenizer implements Tokenizer {
         start = matchedEnd;
       }
     }
-    return encoded.stream().mapToInt(Integer::intValue).toArray();
+    return encoded.toArray();
   }
 
   private static List<String> wordPieceWords(String text) {
@@ -1229,13 +1244,13 @@ public final class GgufTokenizer implements Tokenizer {
    * bytes_to_unicode to produce a Unicode string that the BPE vocabulary operates on.
    */
   private int[] encodeByteLevelBpe(String text) {
-    List<Integer> tokens = new ArrayList<>();
+    IntArrayBuilder tokens = new IntArrayBuilder(text.length());
     for (String piece : bpePreTokenizer.split(text)) {
       for (int token : encodeByteLevelBpePiece(piece)) {
         tokens.add(token);
       }
     }
-    return tokens.stream().mapToInt(Integer::intValue).toArray();
+    return tokens.toArray();
   }
 
   private int[] encodeByteLevelBpePiece(String text) {
@@ -1256,7 +1271,7 @@ public final class GgufTokenizer implements Tokenizer {
     }
 
     // Initial tokenization: each character is a separate token
-    List<Integer> tokens = new ArrayList<>();
+    IntArrayBuilder tokens = new IntArrayBuilder(unicodeText.length());
     for (int i = 0; i < unicodeText.length(); i++) {
       String ch = unicodeText.substring(i, i + 1);
       Integer id = tokenToId.get(ch);
@@ -1271,10 +1286,10 @@ public final class GgufTokenizer implements Tokenizer {
 
     // Apply BPE merges
     if (!mergeRanks.isEmpty()) {
-      tokens = applyMerges(tokens);
+      return applyMerges(tokens.toArray());
     }
 
-    return tokens.stream().mapToInt(Integer::intValue).toArray();
+    return tokens.toArray();
   }
 
   /**
@@ -1283,7 +1298,7 @@ public final class GgufTokenizer implements Tokenizer {
    */
   private int[] encodePlainBpe(String text) {
     byte[] textBytes = text.getBytes(StandardCharsets.UTF_8);
-    List<Integer> tokens = new ArrayList<>();
+    IntArrayBuilder tokens = new IntArrayBuilder(textBytes.length);
 
     // Try to match longest tokens first (greedy), falling back to byte tokens
     int i = 0;
@@ -1315,21 +1330,21 @@ public final class GgufTokenizer implements Tokenizer {
 
     // Apply BPE merges
     if (!mergeRanks.isEmpty()) {
-      tokens = applyMerges(tokens);
+      return applyMerges(tokens.toArray());
     }
 
-    return tokens.stream().mapToInt(Integer::intValue).toArray();
+    return tokens.toArray();
   }
 
-  private List<Integer> applyMerges(List<Integer> tokens) {
-    if (tokens.size() < 2) {
+  private int[] applyMerges(int[] tokens) {
+    if (tokens.length < 2) {
       return tokens;
     }
 
-    List<BpeSymbol> symbols = new ArrayList<>(tokens.size());
-    for (int index = 0; index < tokens.size(); index++) {
+    List<BpeSymbol> symbols = new ArrayList<>(tokens.length);
+    for (int index = 0; index < tokens.length; index++) {
       symbols.add(
-          new BpeSymbol(tokens.get(index), index - 1, index + 1 < tokens.size() ? index + 1 : -1));
+          new BpeSymbol(tokens[index], index - 1, index + 1 < tokens.length ? index + 1 : -1));
     }
     PriorityQueue<BpeMerge> workQueue =
         new PriorityQueue<>(
@@ -1362,11 +1377,11 @@ public final class GgufTokenizer implements Tokenizer {
       addBpeMerge(workQueue, symbols, merge.left(), left.next);
     }
 
-    List<Integer> result = new ArrayList<>();
+    IntArrayBuilder result = new IntArrayBuilder(tokens.length);
     for (int index = 0; index >= 0; index = symbols.get(index).next) {
       result.add(symbols.get(index).token);
     }
-    return result;
+    return result.toArray();
   }
 
   private void addBpeMerge(
