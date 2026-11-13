@@ -304,7 +304,9 @@ public final class BertForwardPass implements SequenceEncoder {
               : exactHiddenWeightRow);
       return;
     }
-    if (config.usesRotaryPositions() || matrix.type() == GgufTensorType.Q4_1) {
+    if (config.usesRotaryPositions()
+        || matrix.type() == GgufTensorType.F32
+        || matrix.type() == GgufTensorType.Q4_1) {
       TensorOps.ggufExactBatchedMatmul(
           output,
           input,
