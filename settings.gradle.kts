@@ -30,6 +30,7 @@ include("models-spring-boot-starter")
 include("models-langchain4j")
 include("models-quarkus")
 include("models-semantic-kernel")
+include("models-tinystruct")
 
 // --- Bridges ---
 include("models-embedding")

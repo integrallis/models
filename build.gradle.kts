@@ -65,7 +65,8 @@ val publishedModuleNames =
         "models-embedding",
         "models-audio",
         "models-router",
-        "models-decisions"
+        "models-decisions",
+        "models-tinystruct"
     )
 val publishedProjects = libraryProjects.filter { it.name in publishedModuleNames }
 val scaffoldProjects = libraryProjects.filterNot { it.name in publishedModuleNames }
@@ -780,17 +781,23 @@ tasks.register("verifyStagedPublications") {
                 setOf(
                     "models-langchain4j",
                     "models-spring-ai",
-                    "models-spring-boot-starter"
+                    "models-spring-boot-starter",
+                    "models-tinystruct"
                 )
             ) {
-                listOf("dev.langchain4j", "org.springframework.ai", "org.springframework.boot")
+                listOf(
+                    "dev.langchain4j",
+                    "org.springframework.ai",
+                    "org.springframework.boot",
+                    "org.tinystruct"
+                )
                     .forEach { frameworkGroup ->
                         require("<groupId>$frameworkGroup</groupId>" !in pom) {
                             "${proj.name} must let the application own $frameworkGroup versions"
                         }
                     }
             }
-            if (proj.name in setOf("models-langchain4j", "models-spring-ai")) {
+            if (proj.name in setOf("models-langchain4j", "models-spring-ai", "models-tinystruct")) {
                 val runtimeApiDependency =
                     Regex(
                         """<dependency>\s*<groupId>com\.integrallis</groupId>""" +
