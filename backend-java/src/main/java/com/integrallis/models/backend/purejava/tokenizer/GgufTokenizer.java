@@ -63,7 +63,7 @@ public final class GgufTokenizer implements Tokenizer {
    * Resizable primitive int array to avoid {@code List<Integer>} autoboxing in hot tokenization
    * paths. Uses the same growth factor as {@code ArrayList} (1.5x) but keeps values unboxed.
    */
-  private static final class IntArrayBuilder {
+  static final class IntArrayBuilder {
     private int[] data;
     private int size;
 
@@ -88,6 +88,25 @@ public final class GgufTokenizer implements Tokenizer {
 
     int[] toArray() {
       return java.util.Arrays.copyOf(data, size);
+    }
+  }
+
+  /**
+   * Simple character trie for WordPiece longest-prefix matching without O(n²) substring
+   * allocations. Each node maps a single UTF-16 character to its child.
+   */
+  private static final class TrieNode {
+    int tokenId = -1; // -1 means no valid token ends here
+    final java.util.Map<String, TrieNode> children = new java.util.HashMap<>();
+
+    void insert(String token, int id) {
+      TrieNode node = this;
+      int[] cps = token.codePoints().toArray();
+      for (int cp : cps) {
+        String ch = new String(Character.toChars(cp));
+        node = node.children.computeIfAbsent(ch, k -> new TrieNode());
+      }
+      node.tokenId = id;
     }
   }
 
@@ -228,6 +247,7 @@ public final class GgufTokenizer implements Tokenizer {
   private final char[] byteToChar;
   private final int[] charToByte;
   private final boolean normalizeNfc;
+  private final TrieNode wordPieceTrie;
 
   private GgufTokenizer(
       String[] vocab,
@@ -285,6 +305,15 @@ public final class GgufTokenizer implements Tokenizer {
     this.normalizeNfc = normalizeNfc;
     this.byteToChar = buildBytesToUnicode();
     this.charToByte = buildUnicodeToBytes(byteToChar);
+    if (useWordPiece) {
+      TrieNode trie = new TrieNode();
+      for (Map.Entry<String, Integer> entry : tokenToId.entrySet()) {
+        trie.insert(entry.getKey(), entry.getValue());
+      }
+      this.wordPieceTrie = trie;
+    } else {
+      this.wordPieceTrie = null;
+    }
   }
 
   /**
@@ -910,30 +939,32 @@ public final class GgufTokenizer implements Tokenizer {
     for (String word : wordPieceWords(text)) {
       int before = encoded.size();
       String candidate = "\u2581" + word;
-      int[] boundaries =
-          candidate.codePoints().map(codePoint -> Character.charCount(codePoint)).toArray();
-      int[] offsets = new int[boundaries.length + 1];
-      for (int index = 0; index < boundaries.length; index++) {
-        offsets[index + 1] = offsets[index] + boundaries[index];
+      int[] cps = candidate.codePoints().toArray();
+      String[] chars = new String[cps.length];
+      for (int i = 0; i < cps.length; i++) {
+        chars[i] = new String(Character.toChars(cps[i]));
       }
-
-      for (int start = 0; start < boundaries.length; ) {
-        Integer token = null;
-        int matchedEnd = -1;
-        for (int end = boundaries.length; end > start; end--) {
-          token = tokenToId.get(candidate.substring(offsets[start], offsets[end]));
-          if (token != null) {
-            matchedEnd = end;
+      for (int start = 0; start < chars.length; ) {
+        TrieNode node = wordPieceTrie;
+        int bestLen = 0;
+        int bestId = -1;
+        for (int i = start; i < chars.length; i++) {
+          node = node.children.get(chars[i]);
+          if (node == null) {
             break;
           }
+          if (node.tokenId >= 0) {
+            bestLen = i - start + 1;
+            bestId = node.tokenId;
+          }
         }
-        if (matchedEnd < 0) {
+        if (bestId < 0) {
           encoded.removeLast(encoded.size() - before);
           encoded.add(unknownTokenId);
           break;
         }
-        encoded.add(token);
-        start = matchedEnd;
+        encoded.add(bestId);
+        start += bestLen;
       }
     }
     return encoded.toArray();
