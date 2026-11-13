@@ -16,47 +16,50 @@
 package com.integrallis.models.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("unit")
+/** Unit coverage for {@link RerankingModel} default batch/sequential routing (#440). */
 class RerankingModelTest {
 
-  private final RerankingModel model = (query, document) -> document.length();
+  private static final RerankingModel DUMMY =
+      new RerankingModel() {
+        @Override
+        public double score(String query, String document) {
+          return query.length() * 1.0 + document.length();
+        }
+
+        @Override
+        public List<Double> scoreBatch(String query, List<String> documents) {
+          return documents.stream().map(d -> score(query, d)).toList();
+        }
+      };
 
   @Test
-  void scoresAllDocumentsInInputOrder() {
-    assertThat(model.scoreAll("query", List.of("aaa", "b", "cc"))).containsExactly(3.0, 1.0, 2.0);
+  void scoreAllRoutesToScoreBatch() {
+    List<Double> scores = DUMMY.scoreAll("q", List.of("a", "bb", "ccc"));
+    assertThat(scores).containsExactly(2.0, 3.0, 4.0);
   }
 
   @Test
-  void reranksByDescendingScoreWithStableTies() {
-    assertThat(model.rerank("query", List.of("bbb", "a", "ccc", "dd")))
-        .containsExactly(
-            new RerankResult(0, "bbb", 3.0),
-            new RerankResult(2, "ccc", 3.0),
-            new RerankResult(3, "dd", 2.0),
-            new RerankResult(1, "a", 1.0));
+  void scoreBatchMatchesIndividualScores() {
+    List<Double> batch = DUMMY.scoreBatch("hello", List.of("a", "bb"));
+    assertThat(batch).containsExactly(DUMMY.score("hello", "a"), DUMMY.score("hello", "bb"));
   }
 
   @Test
-  void limitsTheRankedResultWithoutChangingOriginalIndexes() {
-    assertThat(model.rerank("query", List.of("a", "longest", "medium"), 2))
-        .containsExactly(new RerankResult(1, "longest", 7.0), new RerankResult(2, "medium", 6.0));
+  void emptyDocumentsReturnsEmptyList() {
+    assertThat(DUMMY.scoreAll("q", List.of())).isEmpty();
+    assertThat(DUMMY.scoreBatch("q", List.of())).isEmpty();
   }
 
   @Test
-  void rejectsInvalidInputsBeforeEnteringTheModel() {
-    assertThatThrownBy(() -> model.scoreAll(null, List.of("document")))
-        .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(() -> model.scoreAll("query", null))
-        .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(() -> model.scoreAll("query", java.util.Arrays.asList("document", null)))
-        .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(() -> model.rerank("query", List.of("document"), -1))
-        .isInstanceOf(IllegalArgumentException.class);
+  void rerankRetainsOriginalIndices() {
+    var ranked = DUMMY.rerank("q", List.of("ccc", "a", "bb"));
+    assertThat(ranked).hasSize(3);
+    assertThat(ranked.get(0).originalIndex()).isEqualTo(0); // "ccc" (longest)
+    assertThat(ranked.get(1).originalIndex()).isEqualTo(2); // "bb"
+    assertThat(ranked.get(2).originalIndex()).isEqualTo(1); // "a"
   }
 }

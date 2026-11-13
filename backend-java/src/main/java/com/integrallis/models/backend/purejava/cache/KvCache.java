@@ -40,15 +40,172 @@ public final class KvCache {
   private static final float[] EMPTY_FLOATS = new float[0];
   private static final boolean[] EMPTY_OCCUPANCY = new boolean[0];
 
+  // ---- Compact F16 storage abstraction (#408) ----
+  private interface KvStorage {
+    void store(int slot, float[] src, int srcOffset, int length);
+
+    float[] read(int slot, int length);
+
+    void copyTo(int fromSlot, KvStorage dst, int dstSlot, int slotCount, int length);
+
+    void writeTo(DataOutput out, int offset, int count, byte[] scratch) throws IOException;
+
+    void readFrom(DataInput in, int offset, int count, byte[] scratch) throws IOException;
+
+    KvStorage grow(int oldSlots, int newSlots, int length);
+
+    int capacity();
+
+    /** Returns the underlying float[] for zero-copy views, or null if compact F16. */
+    float[] rawFloatArray();
+  }
+
+  private static final class F32Store implements KvStorage {
+    private float[] data;
+
+    F32Store(int capacity) {
+      this.data = new float[capacity];
+    }
+
+    @Override
+    public void store(int slot, float[] src, int srcOffset, int length) {
+      System.arraycopy(src, srcOffset, data, slot * length, length);
+    }
+
+    @Override
+    public float[] read(int slot, int length) {
+      return Arrays.copyOfRange(data, slot * length, (slot + 1) * length);
+    }
+
+    @Override
+    public void copyTo(int fromSlot, KvStorage dst, int dstSlot, int slotCount, int length) {
+      F32Store d = (F32Store) dst;
+      System.arraycopy(data, fromSlot * length, d.data, dstSlot * length, slotCount * length);
+    }
+
+    @Override
+    public void writeTo(DataOutput out, int offset, int count, byte[] scratch) throws IOException {
+      writeFloats(out, data, offset, count, scratch);
+    }
+
+    @Override
+    public void readFrom(DataInput in, int offset, int count, byte[] scratch) throws IOException {
+      readFloats(in, data, offset, count, scratch);
+    }
+
+    @Override
+    public KvStorage grow(int oldSlots, int newSlots, int length) {
+      float[] grown = new float[newSlots * length];
+      System.arraycopy(data, 0, grown, 0, oldSlots * length);
+      data = grown;
+      return this;
+    }
+
+    @Override
+    public int capacity() {
+      return data.length;
+    }
+
+    @Override
+    public float[] rawFloatArray() {
+      return data;
+    }
+  }
+
+  private static final class F16Store implements KvStorage {
+    private short[] data;
+
+    F16Store(int capacity) {
+      this.data = new short[capacity];
+    }
+
+    @Override
+    public void store(int slot, float[] src, int srcOffset, int length) {
+      int base = slot * length;
+      for (int i = 0; i < length; i++) data[base + i] = Float.floatToFloat16(src[srcOffset + i]);
+    }
+
+    @Override
+    public float[] read(int slot, int length) {
+      float[] result = new float[length];
+      int base = slot * length;
+      for (int i = 0; i < length; i++) result[i] = Float.float16ToFloat(data[base + i]);
+      return result;
+    }
+
+    @Override
+    public void copyTo(int fromSlot, KvStorage dst, int dstSlot, int slotCount, int length) {
+      F16Store d = (F16Store) dst;
+      System.arraycopy(data, fromSlot * length, d.data, dstSlot * length, slotCount * length);
+    }
+
+    @Override
+    public void writeTo(DataOutput out, int offset, int count, byte[] scratch) throws IOException {
+      int batch = scratch.length / Float.BYTES;
+      float[] buffer = new float[batch];
+      int remaining = count, pos = offset;
+      while (remaining > 0) {
+        int n = Math.min(batch, remaining);
+        for (int i = 0; i < n; i++) buffer[i] = Float.float16ToFloat(data[pos + i]);
+        writeFloats(out, buffer, 0, n, scratch);
+        pos += n;
+        remaining -= n;
+      }
+    }
+
+    @Override
+    public void readFrom(DataInput in, int offset, int count, byte[] scratch) throws IOException {
+      int batch = scratch.length / Float.BYTES;
+      float[] buffer = new float[batch];
+      int remaining = count, pos = offset;
+      while (remaining > 0) {
+        int n = Math.min(batch, remaining);
+        readFloats(in, buffer, 0, n, scratch);
+        for (int i = 0; i < n; i++) data[pos + i] = Float.floatToFloat16(buffer[i]);
+        pos += n;
+        remaining -= n;
+      }
+    }
+
+    @Override
+    public KvStorage grow(int oldSlots, int newSlots, int length) {
+      short[] grown = new short[newSlots * length];
+      System.arraycopy(data, 0, grown, 0, oldSlots * length);
+      data = grown;
+      return this;
+    }
+
+    @Override
+    public int capacity() {
+      return data.length;
+    }
+
+    @Override
+    public float[] rawFloatArray() {
+      return null;
+    }
+  }
+
+  private static KvStorage allocateStore(boolean compact, int slots, int length) {
+    return compact ? new F16Store(slots * length) : new F32Store(slots * length);
+  }
+
+  private static KvStorage emptyStore() {
+    return new F32Store(0);
+  }
+
+  // ---- end compact F16 storage ----
+
   private final int numLayers;
   private final int maxSeqLen;
   private final int keyDim;
   private final int valueDim;
   private final SharedPrefix sharedPrefix;
   private final int localStartPosition;
+  private final boolean compact;
   private int allocatedSequenceCapacity;
-  private float[] keys = EMPTY_FLOATS;
-  private float[] values = EMPTY_FLOATS;
+  private KvStorage keys = emptyStore();
+  private KvStorage values = emptyStore();
   private boolean[] populated = EMPTY_OCCUPANCY;
   private boolean frozen;
 
@@ -151,16 +308,16 @@ public final class KvCache {
     private final int firstPosition;
     private final int positionCount;
     private final int storageCapacity;
-    private final float[] keys;
-    private final float[] values;
+    private final KvStorage keys;
+    private final KvStorage values;
     private final boolean[] populated;
 
     private StorageSegment(
         int firstPosition,
         int positionCount,
         int storageCapacity,
-        float[] keys,
-        float[] values,
+        KvStorage keys,
+        KvStorage values,
         boolean[] populated) {
       this.firstPosition = firstPosition;
       this.positionCount = positionCount;
@@ -191,6 +348,7 @@ public final class KvCache {
     private final int keyDim;
     private final int valueDim;
     private final int length;
+    private final boolean compact;
     private final List<StorageSegment> segments;
 
     private SharedPrefix(KvCache source, int length) {
@@ -199,6 +357,7 @@ public final class KvCache {
       this.keyDim = source.keyDim;
       this.valueDim = source.valueDim;
       this.length = length;
+      this.compact = source.compact;
       List<StorageSegment> collected = new ArrayList<>();
       if (source.sharedPrefix != null) {
         for (StorageSegment segment : source.sharedPrefix.segments) {
@@ -234,6 +393,11 @@ public final class KvCache {
       return length;
     }
 
+    /** Returns whether the underlying storage uses compact F16 instead of F32. */
+    public boolean compact() {
+      return compact;
+    }
+
     /** Returns a shorter immutable view without copying tensor storage. */
     public SharedPrefix truncate(int tokenCount) {
       if (tokenCount <= 0 || tokenCount > length) {
@@ -253,17 +417,15 @@ public final class KvCache {
       byte[] scratch = new byte[64 * 1024];
       for (int layer = 0; layer < numLayers; layer++) {
         for (StorageSegment segment : prefix.segments) {
-          writeFloats(
+          segment.keys.writeTo(
               output,
-              segment.keys,
               layer * segment.storageCapacity * keyDim,
               segment.positionCount * keyDim,
               scratch);
         }
         for (StorageSegment segment : prefix.segments) {
-          writeFloats(
+          segment.values.writeTo(
               output,
-              segment.values,
               layer * segment.storageCapacity * valueDim,
               segment.positionCount * valueDim,
               scratch);
@@ -291,7 +453,7 @@ public final class KvCache {
                 layer * segment.storageCapacity * keyDim
                     + (overlapStart - segment.firstPosition) * keyDim;
             int keyCount = (overlapEnd - overlapStart) * keyDim;
-            writeFloats(output, segment.keys, keyOffset, keyCount, scratch);
+            segment.keys.writeTo(output, keyOffset, keyCount, scratch);
           }
         }
         for (StorageSegment segment : segments) {
@@ -302,7 +464,7 @@ public final class KvCache {
                 layer * segment.storageCapacity * valueDim
                     + (overlapStart - segment.firstPosition) * valueDim;
             int valueCount = (overlapEnd - overlapStart) * valueDim;
-            writeFloats(output, segment.values, valueOffset, valueCount, scratch);
+            segment.values.writeTo(output, valueOffset, valueCount, scratch);
           }
         }
       }
@@ -323,11 +485,18 @@ public final class KvCache {
       long bytes = 0;
       for (StorageSegment segment : segments) {
         if (counted.add(segment.keys)) {
-          bytes = Math.addExact(bytes, Math.multiplyExact((long) segment.keys.length, Float.BYTES));
+          bytes =
+              Math.addExact(
+                  bytes,
+                  (long) segment.keys.capacity()
+                      * (segment.keys instanceof F16Store ? Short.BYTES : Float.BYTES));
         }
         if (counted.add(segment.values)) {
           bytes =
-              Math.addExact(bytes, Math.multiplyExact((long) segment.values.length, Float.BYTES));
+              Math.addExact(
+                  bytes,
+                  (long) segment.values.capacity()
+                      * (segment.values instanceof F16Store ? Short.BYTES : Float.BYTES));
         }
         if (counted.add(segment.populated)) {
           bytes = Math.addExact(bytes, segment.populated.length);
@@ -338,6 +507,11 @@ public final class KvCache {
   }
 
   public KvCache(int numLayers, int maxSeqLen, int keyDim, int valueDim) {
+    this(numLayers, maxSeqLen, keyDim, valueDim, HALF_PRECISION);
+  }
+
+  /** Package-visible constructor for compact-mode testing and cross-backend parity. */
+  KvCache(int numLayers, int maxSeqLen, int keyDim, int valueDim, boolean compact) {
     if (numLayers <= 0) throw new IllegalArgumentException("numLayers must be > 0");
     if (maxSeqLen <= 0) throw new IllegalArgumentException("maxSeqLen must be > 0");
     if (keyDim <= 0) throw new IllegalArgumentException("keyDim must be > 0");
@@ -348,6 +522,7 @@ public final class KvCache {
     this.valueDim = valueDim;
     this.sharedPrefix = null;
     this.localStartPosition = 0;
+    this.compact = compact;
     validateInitialStorageSize(Math.min(maxSeqLen, SequenceGrowth.INITIAL_CAPACITY));
   }
 
@@ -358,6 +533,7 @@ public final class KvCache {
     this.valueDim = prefix.valueDim;
     this.sharedPrefix = prefix;
     this.localStartPosition = prefix.length;
+    this.compact = prefix.compact();
     int remainingPositions = maxSeqLen - localStartPosition;
     validateInitialStorageSize(Math.min(remainingPositions, SequenceGrowth.INITIAL_CAPACITY));
   }
@@ -386,13 +562,8 @@ public final class KvCache {
     checkVectorRange("value", value, valueOffset, valueDim);
     ensureCapacity(position + 1);
     int slot = localSlotIndex(layer, position);
-    if (HALF_PRECISION) {
-      storeHalfPrecision(key, keyOffset, keys, slot * keyDim, keyDim);
-      storeHalfPrecision(value, valueOffset, values, slot * valueDim, valueDim);
-    } else {
-      System.arraycopy(key, keyOffset, keys, slot * keyDim, keyDim);
-      System.arraycopy(value, valueOffset, values, slot * valueDim, valueDim);
-    }
+    keys.store(slot, key, keyOffset, keyDim);
+    values.store(slot, value, valueOffset, valueDim);
     populated[slot] = true;
   }
 
@@ -407,21 +578,6 @@ public final class KvCache {
    */
   private static final boolean HALF_PRECISION =
       Boolean.getBoolean("models.purejava.halfPrecisionKvCache");
-
-  /**
-   * Copies a vector into the cache at half precision.
-   *
-   * <p>llama.cpp holds {@code cache_k} and {@code cache_v} as F16, so attention there reads back
-   * rounded keys and values. Storing F32 made this runtime more precise than the reference rather
-   * than equivalent to it, which the embedding equivalence gate reports as a failure.
-   */
-  private static void storeHalfPrecision(
-      float[] source, int sourceOffset, float[] destination, int destinationOffset, int length) {
-    for (int index = 0; index < length; index++) {
-      destination[destinationOffset + index] =
-          Float.float16ToFloat(Float.floatToFloat16(source[sourceOffset + index]));
-    }
-  }
 
   /**
    * Returns the concatenated key vectors for a layer from fromPos (inclusive) to toPos (exclusive).
@@ -535,14 +691,15 @@ public final class KvCache {
     }
     var cache = new KvCache(layers, context, keyWidth, valueWidth);
     cache.allocatedSequenceCapacity = tokenCount;
-    cache.keys = new float[(int) keyElements];
-    cache.values = new float[(int) valueElements];
+    int slots = Math.multiplyExact(layers, tokenCount);
+    cache.keys = allocateStore(HALF_PRECISION, slots, keyWidth);
+    cache.values = allocateStore(HALF_PRECISION, slots, valueWidth);
     cache.populated = new boolean[Math.multiplyExact(layers, tokenCount)];
     byte[] scratch = new byte[64 * 1024];
     for (int layer = 0; layer < layers; layer++) {
-      readFloats(input, cache.keys, layer * tokenCount * keyWidth, tokenCount * keyWidth, scratch);
-      readFloats(
-          input, cache.values, layer * tokenCount * valueWidth, tokenCount * valueWidth, scratch);
+      cache.keys.readFrom(input, layer * tokenCount * keyWidth, tokenCount * keyWidth, scratch);
+      cache.values.readFrom(
+          input, layer * tokenCount * valueWidth, tokenCount * valueWidth, scratch);
     }
     Arrays.fill(cache.populated, true);
     return cache.freezePrefix(tokenCount);
@@ -557,9 +714,9 @@ public final class KvCache {
       int layers, int context, int keyWidth, int valueWidth, int tokenCount) {
     var cache = new KvCache(layers, context, keyWidth, valueWidth);
     cache.allocatedSequenceCapacity = tokenCount;
-    cache.keys = new float[Math.multiplyExact(Math.multiplyExact(layers, tokenCount), keyWidth)];
-    cache.values =
-        new float[Math.multiplyExact(Math.multiplyExact(layers, tokenCount), valueWidth)];
+    int slots = Math.multiplyExact(layers, tokenCount);
+    cache.keys = allocateStore(HALF_PRECISION, slots, keyWidth);
+    cache.values = allocateStore(HALF_PRECISION, slots, valueWidth);
     cache.populated = new boolean[Math.multiplyExact(layers, tokenCount)];
     return cache;
   }
@@ -576,15 +733,13 @@ public final class KvCache {
     int count = endToken - startToken;
     byte[] scratch = new byte[64 * 1024];
     for (int layer = 0; layer < numLayers; layer++) {
-      readFloats(
+      keys.readFrom(
           input,
-          keys,
           layer * allocatedSequenceCapacity * keyDim + startToken * keyDim,
           count * keyDim,
           scratch);
-      readFloats(
+      values.readFrom(
           input,
-          values,
           layer * allocatedSequenceCapacity * valueDim + startToken * valueDim,
           count * valueDim,
           scratch);
@@ -915,10 +1070,16 @@ public final class KvCache {
     Set<Object> counted = Collections.newSetFromMap(new IdentityHashMap<>());
     long bytes = sharedPrefix == null ? 0L : sharedPrefix.allocatedBytes(counted);
     if (counted.add(keys)) {
-      bytes = Math.addExact(bytes, Math.multiplyExact((long) keys.length, Float.BYTES));
+      bytes =
+          Math.addExact(
+              bytes,
+              (long) keys.capacity() * (keys instanceof F16Store ? Short.BYTES : Float.BYTES));
     }
     if (counted.add(values)) {
-      bytes = Math.addExact(bytes, Math.multiplyExact((long) values.length, Float.BYTES));
+      bytes =
+          Math.addExact(
+              bytes,
+              (long) values.capacity() * (values instanceof F16Store ? Short.BYTES : Float.BYTES));
     }
     if (counted.add(populated)) {
       bytes = Math.addExact(bytes, populated.length);
@@ -940,13 +1101,25 @@ public final class KvCache {
   /** Returns a caller-owned contiguous-storage snapshot for diagnostics and tests. */
   public float[] keyBuffer() {
     requireContiguousOwnedStorage();
-    return keys.clone();
+    int slots = numLayers * allocatedSequenceCapacity;
+    float[] out = new float[slots * keyDim];
+    for (int i = 0; i < slots; i++) {
+      float[] row = keys.read(i, keyDim);
+      System.arraycopy(row, 0, out, i * keyDim, keyDim);
+    }
+    return out;
   }
 
   /** Returns a caller-owned contiguous-storage snapshot for diagnostics and tests. */
   public float[] valueBuffer() {
     requireContiguousOwnedStorage();
-    return values.clone();
+    int slots = numLayers * allocatedSequenceCapacity;
+    float[] out = new float[slots * valueDim];
+    for (int i = 0; i < slots; i++) {
+      float[] row = values.read(i, valueDim);
+      System.arraycopy(row, 0, out, i * valueDim, valueDim);
+    }
+    return out;
   }
 
   /** Returns the starting offset of a cached key vector in the contiguous key buffer. */
@@ -1026,7 +1199,7 @@ public final class KvCache {
     ensureCapacity(requiredSequenceCapacity);
   }
 
-  private float[] slice(float[] store, int dimension, int layer, int fromPos, int toPos) {
+  private float[] slice(KvStorage store, int dimension, int layer, int fromPos, int toPos) {
     if (layer < 0 || layer >= numLayers) {
       throw new IllegalArgumentException("layer out of range: " + layer);
     }
@@ -1060,7 +1233,7 @@ public final class KvCache {
     }
   }
 
-  private float[] vectorOrNull(float[] store, int dimension, int layer, int position) {
+  private float[] vectorOrNull(KvStorage store, int dimension, int layer, int position) {
     return vectorOrNull(
         store,
         dimension,
@@ -1072,7 +1245,7 @@ public final class KvCache {
   }
 
   private static float[] vectorOrNull(
-      float[] store,
+      KvStorage store,
       int dimension,
       int layer,
       int position,
@@ -1087,8 +1260,7 @@ public final class KvCache {
     if (!occupancy[slot]) {
       return null;
     }
-    int offset = slot * dimension;
-    return Arrays.copyOfRange(store, offset, offset + dimension);
+    return store.read(slot, dimension);
   }
 
   private static void checkVector(String name, float[] vector, int dimension) {
@@ -1127,28 +1299,30 @@ public final class KvCache {
     int newCapacity =
         SequenceGrowth.nextCapacity(allocatedSequenceCapacity, requiredLocalCapacity, localLimit);
 
-    float[] grownKeys = allocateStore("key cache", newCapacity, keyDim);
-    float[] grownValues = allocateStore("value cache", newCapacity, valueDim);
+    KvStorage grownKeys = allocateStore(compact, checkedSlots(newCapacity), keyDim);
+    KvStorage grownValues = allocateStore(compact, checkedSlots(newCapacity), valueDim);
     boolean[] grownPopulated = new boolean[checkedSlots(newCapacity)];
-    for (int layer = 0; layer < numLayers; layer++) {
-      System.arraycopy(
-          keys,
-          layer * allocatedSequenceCapacity * keyDim,
-          grownKeys,
-          layer * newCapacity * keyDim,
-          allocatedSequenceCapacity * keyDim);
-      System.arraycopy(
-          values,
-          layer * allocatedSequenceCapacity * valueDim,
-          grownValues,
-          layer * newCapacity * valueDim,
-          allocatedSequenceCapacity * valueDim);
-      System.arraycopy(
-          populated,
-          layer * allocatedSequenceCapacity,
-          grownPopulated,
-          layer * newCapacity,
-          allocatedSequenceCapacity);
+    if (allocatedSequenceCapacity > 0) {
+      for (int layer = 0; layer < numLayers; layer++) {
+        keys.copyTo(
+            layer * allocatedSequenceCapacity,
+            grownKeys,
+            layer * newCapacity,
+            allocatedSequenceCapacity,
+            keyDim);
+        values.copyTo(
+            layer * allocatedSequenceCapacity,
+            grownValues,
+            layer * newCapacity,
+            allocatedSequenceCapacity,
+            valueDim);
+        System.arraycopy(
+            populated,
+            layer * allocatedSequenceCapacity,
+            grownPopulated,
+            layer * newCapacity,
+            allocatedSequenceCapacity);
+      }
     }
 
     allocatedSequenceCapacity = newCapacity;
@@ -1170,10 +1344,6 @@ public final class KvCache {
     int slots = checkedSlots(sequenceCapacity);
     checkedProduct("key cache", slots, keyDim);
     checkedProduct("value cache", slots, valueDim);
-  }
-
-  private float[] allocateStore(String name, int sequenceCapacity, int dimension) {
-    return new float[checkedProduct(name, checkedSlots(sequenceCapacity), dimension)];
   }
 
   private int checkedSlots(int sequenceCapacity) {
@@ -1224,18 +1394,32 @@ public final class KvCache {
       int layer,
       int firstPosition,
       int positionCount,
-      float[] keyStore,
-      float[] valueStore,
+      KvStorage keyStore,
+      KvStorage valueStore,
       int storageCapacity,
       int storageStartPosition) {
     int firstLocalPosition = firstPosition - storageStartPosition;
-    return new AttentionSpan(
-        firstPosition,
-        positionCount,
-        keyStore,
-        (layer * storageCapacity + firstLocalPosition) * keyDim,
-        valueStore,
-        (layer * storageCapacity + firstLocalPosition) * valueDim);
+    float[] rawKeys = keyStore.rawFloatArray();
+    float[] rawValues = valueStore.rawFloatArray();
+    if (rawKeys != null && rawValues != null) {
+      return new AttentionSpan(
+          firstPosition,
+          positionCount,
+          rawKeys,
+          (layer * storageCapacity + firstLocalPosition) * keyDim,
+          rawValues,
+          (layer * storageCapacity + firstLocalPosition) * valueDim);
+    }
+    float[] keyBuf = new float[positionCount * keyDim];
+    float[] valBuf = new float[positionCount * valueDim];
+    for (int p = 0; p < positionCount; p++) {
+      int slot = layer * storageCapacity + firstLocalPosition + p;
+      float[] k = keyStore.read(slot, keyDim);
+      float[] v = valueStore.read(slot, valueDim);
+      System.arraycopy(k, 0, keyBuf, p * keyDim, keyDim);
+      System.arraycopy(v, 0, valBuf, p * valueDim, valueDim);
+    }
+    return new AttentionSpan(firstPosition, positionCount, keyBuf, 0, valBuf, 0);
   }
 
   private StorageSegment sharedSegment(int position) {

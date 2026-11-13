@@ -37,6 +37,21 @@ public interface RerankingModel extends AutoCloseable {
   default List<Double> scoreAll(String query, List<String> documents) {
     Objects.requireNonNull(query, "query");
     Objects.requireNonNull(documents, "documents");
+    if (documents.isEmpty()) {
+      return List.of();
+    }
+    return scoreBatch(query, documents);
+  }
+
+  /**
+   * Scores documents in one batch when the implementation supports it.
+   *
+   * <p>Implementations that do not override this default fall back to sequential {@link
+   * #score(String, String)} calls.
+   */
+  default List<Double> scoreBatch(String query, List<String> documents) {
+    Objects.requireNonNull(query, "query");
+    Objects.requireNonNull(documents, "documents");
     List<Double> scores = new ArrayList<>(documents.size());
     for (String document : documents) {
       double score =
