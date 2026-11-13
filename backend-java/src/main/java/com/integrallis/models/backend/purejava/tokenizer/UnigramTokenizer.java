@@ -19,7 +19,6 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -155,7 +154,7 @@ final class UnigramTokenizer {
       offset = nextCodePoint;
     }
 
-    List<Integer> reversed = new ArrayList<>();
+    GgufTokenizer.IntArrayBuilder reversed = new GgufTokenizer.IntArrayBuilder(length);
     boolean previousWasUnknown = false;
     for (int offset = length; offset > 0; offset = previous[offset]) {
       int token = bestToken[offset];
@@ -165,8 +164,14 @@ final class UnigramTokenizer {
       }
       previousWasUnknown = unknown;
     }
-    Collections.reverse(reversed);
-    return reversed.stream().mapToInt(Integer::intValue).toArray();
+    // Reverse in-place on the int[]
+    int[] result = reversed.toArray();
+    for (int i = 0, j = result.length - 1; i < j; i++, j--) {
+      int tmp = result[i];
+      result[i] = result[j];
+      result[j] = tmp;
+    }
+    return result;
   }
 
   private byte[] normalize(String text) {
