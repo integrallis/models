@@ -234,6 +234,16 @@ final class BertWeights {
       throw new IllegalArgumentException(
           name + " uses unsupported batched projection type " + tensor.type());
     }
+    // #360: pre-dequantize K-quant weights to F32 for the BERT path when no native kernel
+    // is present. On-the-fly Q4_K dequantization in pure Java is slower than F32 dot products
+    // on pre-dequantized weights. Trading memory (4x weight size) for per-token latency.
+    if (tensor.type() == GgufTensorType.Q4_K
+        || tensor.type() == GgufTensorType.Q5_K
+        || tensor.type() == GgufTensorType.Q6_K) {
+      float[] values = GgufTensorValues.toFloatArray(tensor);
+      MemorySegment f32Data = MemorySegment.ofArray(values);
+      return new Matrix(f32Data, GgufTensorType.F32, rows, columns);
+    }
     return new Matrix(tensor.dataSegment(), tensor.type(), rows, columns);
   }
 
