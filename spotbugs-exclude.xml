@@ -54,6 +54,12 @@
         <Class name="com.integrallis.models.backend.purejava.tokenizer.GgufTokenizer"/>
         <Bug pattern="UC_USELESS_CONDITION"/>
     </Match>
+    <!-- TokenizedPair is a transfer record over int[] token output; defensive copies would
+         defeat the zero-copy design and add thousands of allocations per tokenization. -->
+    <Match>
+        <Package name="com.integrallis.models.backend.purejava.tokenizer"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
     <!-- PureJavaBackend.load: metadata getString returning Optional is handled by orElse -->
     <Match>
         <Class name="com.integrallis.models.backend.purejava.PureJavaBackend"/>
