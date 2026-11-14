@@ -14,6 +14,11 @@ All notable changes to models are documented here.
   `ModelsTypesafeRuntime`, with routed variants. This is a **new published artifact** on Maven
   Central, `com.integrallis:models-tinystruct`, alongside the existing integration modules.
 
+- **Portable batched reranking.** `BertForwardPass.encodeBatchCls` accepts ragged rows - documents
+  of different lengths - and `RerankingModel.scoreAll` routes to `scoreBatch` by default, with
+  implementations free to override. `GgufRerankingModel` implements it as described under
+  Performance below.
+
 ### Changed
 
 - **Vectors dependency upgraded to 0.1.35** (from 0.1.34), with every module lockfile updated.
@@ -23,13 +28,48 @@ All notable changes to models are documented here.
   counters with per-route latency histograms, and an actionable error when the
   `jdk.incubator.vector` module is missing.
 
+- **Opt-in compact F16 KV cache storage for the Java path (#438).** When
+  `models.purejava.halfPrecisionKvCache` is enabled, `KvCache` stores F16 bit patterns in
+  `short[]` - two bytes an element rather than four - instead of rounding through F16 and retaining
+  `float[]`; `key()`, `value()`, `keySlice()`, `valueSlice()` and attention views widen on read, and
+  `KvStorage.readInto` (#447) fills caller buffers without a per-slot allocation. The default F32
+  path is unchanged. No speed figure is claimed for this option; none was measured.
+
+- **Reranker `scoreBatch` no longer synchronizes on the model instance (#448).** Only `score()` and
+  `close()` hold the instance lock; the forward pass serializes inside `BertForwardPass`. The
+  `closed` flag is an `AtomicBoolean`. A behavioural change, not a measured one.
+
+- **`GgufTokenizer` builds token ids into an `int[]` instead of boxing them (#435, #437).** The
+  WordPiece trie those issues also introduced on `main` before release is **not** in 0.5.21: its
+  load cost measured +62 ms on every model load and its hot-path benefit was never measured, so the
+  v0.5.20 longest-match returns (see `benchmark-results/2026-11-14-reranker-path-fix`).
+
 ### Fixed
+
+- **`scoreAll` threw on any batch of documents with unequal lengths (#455).** The batched BERT
+  pass masked padded positions as keys and as queries with one condition and then ran softmax over
+  every row, so a padded query row had no finite input. The pinned MS MARCO MiniLM reranker threw
+  on its own integration test's six documents. Bisected to `v0.5.20..main`; fixed in #456 and then
+  made unconstructible by the packed layout below. A unit-tagged test drives the real forward pass
+  with ragged lengths and fails without the fix.
 
 - **Tokenizer no longer exposes its internal arrays (#436).** `GgufTokenizer` returned references
   to internal state (SpotBugs `EI_EXPOSE_REP`), letting a caller mutate a tokenizer's data through
   a returned array. Also corrects the BERT F32 projection path.
 
 ### Performance
+
+- **Batched reranking packs documents end to end instead of padding (#457).**
+  `BertForwardPass.encodeBatchCls` lays the batch out with no padding: projections run over exactly
+  the real tokens, each weight block dequantized once for every token of every document, and
+  attention runs per document over its own tokens with the same operations as the single-sequence
+  pass. Measured on the registered host class against released 0.5.20 with the pinned MS MARCO
+  MiniLM-L6 Q4_K reranker, five interleaved rounds
+  (`benchmark-results/2026-11-14-reranker-path-fix`): `scoreAll` p50 **0.977x** (447.6 -> 437.3 ms),
+  `scoreAll` p95 **0.681x** (642.9 -> 437.7 ms), `score()` p50 0.989x, cold load **1.001x**, scores
+  identical to nine decimal places. This replaces the padded batch that reached `main` with #440,
+  which measured **1.31x slower** than the sequential loop it replaced and 1.39x slower to load;
+  neither of those shipped.
 
 - **Opt-in: K-quant BERT projection weights pre-dequantized to F32 at load (#360, #452).**
   `-Dmodels.purejava.bert.preDequantizeKQuant=true` widens Q4_K/Q5_K/Q6_K **projection**
@@ -40,53 +80,12 @@ All notable changes to models are documented here.
   **1.77x slower** (222 -> 393 ms), **+12.2 MB** for that model's six Q4_K projections, and
   **scores move past the model's qualification tolerance** - up to 0.038 on the probe's six
   documents, ordering preserved, and the pinned ONNX equivalence test fails by 0.075 against its
-  0.05 tolerance - because F32
-  matmul on widened weights is different arithmetic from the quantized-activation K-quant matmul.
-  A qualified model's record is a claim about exact outputs, so this is selectable and not the
-  default. Never applied to the `token_embd`/`position_embd` tables (row lookups, not
-  multiplications), and never when a batched matrix kernel accepts the quantized type, so the
-  native `bert`/`nomic-bert` path keeps its quantized route whatever the property says.
-
-- **Tokenizer hot-path allocation reduction (#435, #437).**
-  `GgufTokenizer` no longer boxes token ids through `List<Integer>` on its encode paths, using a
-  growable `int[]` builder instead.
-
-- **Compact F16 KV cache storage for the Java path (#438).**
-  When `models.purejava.halfPrecisionKvCache` is enabled, `KvCache` now stores actual
-  F16 bit patterns in `short[]` instead of rounding through F16 and retaining them in
-  `float[]`. This halves the per-token KV memory footprint while preserving the existing
-  public interface: `key()`, `value()`, `keySlice()`, `valueSlice()`, and attention views
-  all widen on read. The default F32 path is unchanged (bit-identical). Wire format
-  remains big-endian FP32; export widens on the fly and import compresses when compact
-  mode is active. A new package-visible constructor `KvCache(int,int,int,int,boolean)`
-  enables testing compact mode regardless of the global system property.
-
-- **Batched BERT pair scoring for cross-encoder rerankers (#440).**
-  `RerankingModel.scoreAll` now delegates to a new `scoreBatch` default method that
-  implementations can override for batch throughput. `GgufRerankingModel` implements
-  batching: it tokenizes all query-document pairs, pads to the same length, and runs
-  one `BertForwardPass` forward pass over the entire batch. `BertForwardPass` gains
-  `encodeBatchCls` with per-document attention masking so padded positions receive zero
-  weight in softmax. On a synthetic 8-document batch this amortizes weight-cache
-  locality and reduces small-matrix overhead. The default `scoreBatch` fallback loops
-  over `score()` for implementations that do not opt in. Batch parity is verified
-  against sequential `score()` in the MiniLM-L6 integration test.
-
-- **F16 KV cache read-into avoids per-slot allocation (#447).**
-  `KvStorage` gains `readInto(int slot, float[] dst, int dstOffset, int length)`,
-  implemented by both `F32Store` and `F16Store`. `KvCache.attentionView()` now uses
-  `readInto` when building `AttentionSpan` objects in compact F16 mode, eliminating
-  `positionCount * 2` temporary `float[]` allocations per span. The F32 zero-copy path
-  via `rawFloatArray()` is unchanged.
-
-- **Reranker `scoreBatch` no longer synchronizes on the model instance (#448).**
-  `GgufRerankingModel.scoreBatch` is no longer `synchronized`; only `score()` and
-  `close()` retain instance-level locking. The `closed` flag is changed from `boolean`
-  to `AtomicBoolean` for visibility across threads. This allows concurrent batch
-  preparation (tokenization, padding, array layout) to overlap even though the
-  underlying `BertForwardPass.encodeBatchCls` still serializes the forward pass.
-  `RerankingModelConcurrentBatchTest` verifies no corruption or deadlock under
-  4-thread concurrent load.
+  0.05 tolerance - because F32 matmul on widened weights is different arithmetic from the
+  quantized-activation K-quant matmul. A qualified model's record is a claim about exact outputs,
+  so this is selectable and not the default. Never applied to the `token_embd`/`position_embd`
+  tables (row lookups, not multiplications), and never when a batched matrix kernel accepts the
+  quantized type, so the native `bert`/`nomic-bert` path keeps its quantized route whatever the
+  property says.
 
 ## [0.5.20] - 2026-11-12
 
