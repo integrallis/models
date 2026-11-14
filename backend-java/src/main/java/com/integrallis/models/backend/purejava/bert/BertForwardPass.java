@@ -374,6 +374,13 @@ public final class BertForwardPass implements SequenceEncoder {
       int docBase = doc * positionsPerDoc;
       int actualLength = lengths == null ? positionsPerDoc : lengths[doc];
       for (int position = 0; position < positionsPerDoc; position++) {
+        if (position >= actualLength) {
+          // A padded query row. Every key below is masked for it, so its softmax would have no
+          // finite input and threw on any batch of unequal lengths. Nothing reads its output:
+          // its attention row was zeroed above and the per-document mask hides it as a key in
+          // every later layer. Leave it at zero.
+          continue;
+        }
         int globalQueryOffset = (docBase + position) * dim;
         int scoreOffset = position * positionsPerDoc;
         for (int head = 0; head < config.numHeads(); head++) {
@@ -390,7 +397,7 @@ public final class BertForwardPass implements SequenceEncoder {
               scoreOffset);
           for (int keyPosition = 0; keyPosition < positionsPerDoc; keyPosition++) {
             scores[scoreOffset + keyPosition] *= scale;
-            if (keyPosition >= actualLength || position >= actualLength) {
+            if (keyPosition >= actualLength) {
               scores[scoreOffset + keyPosition] = Float.NEGATIVE_INFINITY;
             }
           }
