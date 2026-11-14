@@ -176,6 +176,14 @@ jobs:
           --no-daemon
           --stacktrace
 
+      - name: Run MS MARCO MiniLM reranker equivalence tests
+        working-directory: models
+        run: >
+          ./gradlew
+          :backend-java:msMarcoMiniLmRerankerIntegrationTest
+          --no-daemon
+          --stacktrace
+
       - name: Download pinned mxbai DeBERTa reranker
         working-directory: models
         run: scripts/download-mxbai-reranker-fixture.sh
