@@ -499,12 +499,26 @@ tasks.register("resolveAndLockAll") {
 
 tasks.register("verifyLockfiles") {
     group = "verification"
-    description = "Verify dependency lockfiles exist for every library module"
+    description =
+        "Verify every library module has a lockfile and that every lockfile pins the configured vectorsVersion"
     doLast {
+        // Existence alone let a vectors bump land with two lockfiles still on the old version; the
+        // fix then rode in on an unrelated perf commit (8daeeae1, #453). The pin is checked here.
+        val vectorsVersion =
+            providers.gradleProperty("vectorsVersion").orNull
+                ?: error("gradle.properties must declare vectorsVersion")
+        val pin = Regex("""com\.integrallis:vectors-[a-z-]+:([0-9][A-Za-z0-9.-]*)""")
+        val stale = mutableListOf<String>()
         libraryProjects.forEach { proj ->
             val lockfile = proj.file("gradle.lockfile")
             require(lockfile.isFile) { "Missing lockfile: ${lockfile.absolutePath}" }
-            println("  Lockfile: ${proj.name}")
+            val pinned = pin.findAll(lockfile.readText()).map { it.groupValues[1] }.toSet()
+            val wrong = pinned - vectorsVersion
+            if (wrong.isNotEmpty()) stale += "${proj.name}/gradle.lockfile pins vectors ${wrong.joinToString()} (expected $vectorsVersion)"
+            println("  Lockfile: ${proj.name}" + if (pinned.isEmpty()) "" else " (vectors ${pinned.joinToString()})")
+        }
+        if (stale.isNotEmpty()) {
+            throw GradleException("verifyLockfiles: ${stale.size} lockfile(s) do not pin vectorsVersion=$vectorsVersion:\n  " + stale.joinToString("\n  "))
         }
     }
 }
@@ -1974,6 +1988,86 @@ tasks.register("verifyDocumentation") {
     }
 }
 
+
+
+tasks.register("verifyPerformanceClaims") {
+    group = "verification"
+    description =
+        "Every Performance bullet in the current CHANGELOG section must cite a benchmark-results " +
+            "directory whose README is measured here and names the previous release tag"
+
+    doLast {
+        // Fail closed. A gate that "skips" when it cannot find what it needs is how an unmeasured
+        // "Measured improvement:" heading and a 1.31x regression described as a speedup both
+        // reached a release candidate (#452, #457). Everything this reads is in the tree.
+        val changelog = file("CHANGELOG.md")
+        require(changelog.isFile) { "CHANGELOG.md is missing" }
+        val lines = changelog.readLines()
+        val headings = lines.withIndex().filter { it.value.startsWith("## [") }
+        require(headings.size >= 2) {
+            "CHANGELOG.md needs a current section and a previous release section to compare against"
+        }
+        // The current section is the first versioned one; [Unreleased] is skipped when empty.
+        val sections = headings.filter { !it.value.startsWith("## [Unreleased]") }
+        require(sections.size >= 2) { "CHANGELOG.md needs two released sections" }
+        val current = sections[0]
+        val previous = sections[1]
+        val previousTag = "v" + previous.value.substringAfter("## [").substringBefore("]")
+        val sectionEnd = headings.firstOrNull { it.index > current.index }?.index ?: lines.size
+        val body = lines.subList(current.index, sectionEnd)
+        val perfStart = body.indexOfFirst { it.trim() == "### Performance" }
+        if (perfStart < 0) {
+            logger.lifecycle("verifyPerformanceClaims: ${current.value.trim()} has no Performance section")
+            return@doLast
+        }
+        val perfEnd = body.withIndex().firstOrNull { it.index > perfStart && it.value.startsWith("### ") }?.index ?: body.size
+        val perf = body.subList(perfStart + 1, perfEnd)
+        // One bullet = a "- " line plus its continuation lines.
+        val bullets = mutableListOf<StringBuilder>()
+        for (line in perf) {
+            if (line.startsWith("- ")) bullets += StringBuilder(line)
+            else if (bullets.isNotEmpty() && line.isNotBlank()) bullets.last().append(' ').append(line.trim())
+        }
+        require(bullets.isNotEmpty()) { "### Performance in ${current.value.trim()} has no bullets" }
+        val artifactReference = Regex("""benchmark-results/([A-Za-z0-9._-]+)""")
+        val failures = mutableListOf<String>()
+        for (bullet in bullets) {
+            val text = bullet.toString()
+            val title = text.removePrefix("- ").substringBefore(".**").removePrefix("**").take(90)
+            val references = artifactReference.findAll(text).map { it.groupValues[1] }.toSet()
+            if (references.isEmpty()) {
+                failures += "\"$title\": cites no benchmark-results/<dir> artifact"
+                continue
+            }
+            for (dir in references) {
+                val readme = file("benchmark-results/$dir/README.md")
+                when {
+                    !readme.isFile -> failures += "\"$title\": benchmark-results/$dir/README.md does not exist"
+                    !readme.readText().contains("Measured here") ->
+                        failures += "\"$title\": benchmark-results/$dir/README.md does not say it is measured here"
+                    !readme.readText().contains(previousTag) ->
+                        failures += "\"$title\": benchmark-results/$dir/README.md never names the previous release $previousTag; " +
+                            "a performance claim is measured against the released tag, interleaved, or it is not measured"
+                }
+            }
+        }
+        if (failures.isNotEmpty()) {
+            throw GradleException(
+                "verifyPerformanceClaims: ${failures.size} Performance bullet(s) in ${current.value.trim()} " +
+                    "are not backed by a measurement against $previousTag:\n  " + failures.joinToString("\n  ")
+            )
+        }
+        logger.lifecycle(
+            "verifyPerformanceClaims: ${bullets.size} Performance bullet(s) in ${current.value.trim()} each cite an " +
+                "artifact measured against $previousTag"
+        )
+    }
+}
+
+tasks.named("check") {
+    dependsOn("verifyLockfiles", "verifyPerformanceClaims")
+}
+
 tasks.register("complianceCheck") {
     group = "verification"
     description = "Run all compliance verification tasks"
@@ -1989,7 +2083,8 @@ tasks.register("complianceCheck") {
         "verifyGithubWorkflows",
         "verifyNotebooks",
         "verifyReleaseMetadata",
-        "verifyDocumentation"
+        "verifyDocumentation",
+        "verifyPerformanceClaims"
     )
 }
 

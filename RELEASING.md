@@ -32,8 +32,20 @@ can opt into it and read the gates.
    alone leaves the documentation package, native crate, and notebook defaults stale.
 2. Update `CHANGELOG.md` and open a release-preparation pull request.
 3. Merge only after the normal CI and integration workflows pass.
-4. Run **Actions → Release** with `dry_run` enabled.
-5. After validation succeeds, rerun with `dry_run` disabled.
+4. **Run the canaries on the release branch and read them.** Pushing `release/<version>` triggers
+   the **Reranker canary** workflow: the pinned MiniLM equivalence tests on the release build, and
+   the reranker experiment on the release build against the *previous release as published to
+   Maven Central*, interleaved on one runner, gated at a 1.15 ratio on cold load, `score()` and
+   `scoreAll`, with `scoreChecksum` required to equal the released artifact's. A red canary is a
+   release blocker until the regression is measured on the registered host class and either fixed
+   or stated in the CHANGELOG with its number. `./gradlew check` must also be green, which now
+   includes `verifyPerformanceClaims` (every Performance bullet cites an artifact measured against
+   the previous tag) and `verifyLockfiles` (every lockfile pins `vectorsVersion`). 0.5.21 reached
+   this step with a 1.31x `scoreAll` regression described as a speedup, a default-on change that
+   failed the model's own ONNX tolerance, and two lockfiles on the old vectors version; each of
+   these gates is the one that would have stopped it.
+5. Run **Actions → Release** with `dry_run` enabled.
+6. After validation succeeds, rerun with `dry_run` disabled.
 
 Publish and verify the configured Vectors version first. `complianceCheck` verifies the actual
 upstream JAR dependency manifests and stages every Models publication for independent Maven and
