@@ -30,10 +30,11 @@ final class BertWeights {
 
   /**
    * Opt-in: widen K-quant projection weights to F32 at load (#360). Default off, because it changes
-   * the scores a qualified reranker produces (measured: up to 0.038 on the MS MARCO MiniLM-L6
-   * probe, ordering preserved) and makes cold load 1.77x slower, in exchange for 1.33x faster warm
-   * scoring and +12.2 MB on that model. A pinned qualification record is a claim about exact
-   * outputs, so an arithmetic change is selectable, never the default - see {@link
+   * the scores a qualified reranker produces past its qualification tolerance (measured: up to
+   * 0.038 on the MS MARCO MiniLM-L6 probe, ordering preserved, and the pinned ONNX equivalence test
+   * fails by 0.075 against a 0.05 tolerance) and makes cold load 1.77x slower, in exchange for
+   * 1.33x faster warm scoring and +12.2 MB on that model. A pinned qualification record is a claim
+   * about exact outputs, so an arithmetic change is selectable, never the default - see {@link
    * #preDequantizes}.
    */
   static final String PRE_DEQUANTIZE_K_QUANT_PROPERTY = "models.purejava.bert.preDequantizeKQuant";

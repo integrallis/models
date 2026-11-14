@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.integrallis.models.backend.purejava.MsMarcoMiniLmRerankerIntegrationTest" tests="4" skipped="0" failures="1" errors="0" timestamp="2026-11-14T14:44:08.927Z" hostname="ip-172-31-9-66" time="5.214">
+  <properties/>
+  <testcase name="sentencePairTokensAndTypesMatchThePinnedReference()" classname="com.integrallis.models.backend.purejava.MsMarcoMiniLmRerankerIntegrationTest" time="0.314"/>
+  <testcase name="repeatedScoresAreDeterministicAndPairOrderMatters()" classname="com.integrallis.models.backend.purejava.MsMarcoMiniLmRerankerIntegrationTest" time="1.717"/>
+  <testcase name="correctedQuantizedScoresMatchTheOnnxScaleAndOrdering()" classname="com.integrallis.models.backend.purejava.MsMarcoMiniLmRerankerIntegrationTest" time="0.887">
+    <failure message="java.lang.AssertionError: &#10;Expecting actual:&#10;  -4.817265033721924&#10;to be close to:&#10;  -4.892&#10;by less than 0.05 but difference was 0.074734966278076.&#10;(a difference of exactly 0.05 being considered valid)" type="java.lang.AssertionError">java.lang.AssertionError: 
+Expecting actual:
+  -4.817265033721924
+to be close to:
+  -4.892
+by less than 0.05 but difference was 0.074734966278076.
+(a difference of exactly 0.05 being considered valid)
+	at com.integrallis.models.backend.purejava.MsMarcoMiniLmRerankerIntegrationTest.correctedQuantizedScoresMatchTheOnnxScaleAndOrdering(MsMarcoMiniLmRerankerIntegrationTest.java:87)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <testcase name="batchScoresMatchSequentialScores()" classname="com.integrallis.models.backend.purejava.MsMarcoMiniLmRerankerIntegrationTest" time="2.275"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Nov 14, 2026 2:44:09 PM com.integrallis.vectors.core.PanamaVectorUtilSupportProvider create
+INFO: vectors-core: Using Panama Vector API SIMD provider (vector bits: 256)
+Nov 14, 2026 2:44:09 PM com.integrallis.vectors.core.VectorizationProvider logActiveToggles
+INFO: vectors-core: provider=PanamaVectorUtilSupport panama=true maxBits=256 preferredBits=256 fastVectorFMA=true fastScalarFMA=true sve=false ggufParallel=true ggufParallelThreshold=1048576 ggufExecutor=countdown ggufThreads=8 ggufChunksPerThread=2 mappedKQuantLongOffsets=auto(q4=true,q5=false,q6=false) q4ShortPairwiseSupported=true q4UnsignedPairwiseSupported=true toggles=[(defaults — no -Dvectors.* overrides)]
+]]></system-err>
+</testsuite>

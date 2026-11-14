@@ -38,7 +38,9 @@ All notable changes to models are documented here.
   pinned MS MARCO MiniLM-L6 Q4_K reranker (`benchmark-results/2026-11-14-reranker-predequantize-ablation`):
   warm scoring **1.33x faster** (pair p50 79.9 -> 59.0 ms, batch p50 597 -> 450 ms), cold load
   **1.77x slower** (222 -> 393 ms), **+12.2 MB** for that model's six Q4_K projections, and
-  **scores move** - up to 0.038 on the probe's six documents, ordering preserved - because F32
+  **scores move past the model's qualification tolerance** - up to 0.038 on the probe's six
+  documents, ordering preserved, and the pinned ONNX equivalence test fails by 0.075 against its
+  0.05 tolerance - because F32
   matmul on widened weights is different arithmetic from the quantized-activation K-quant matmul.
   A qualified model's record is a claim about exact outputs, so this is selectable and not the
   default. Never applied to the `token_embd`/`position_embd` tables (row lookups, not
