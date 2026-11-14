@@ -6,7 +6,45 @@ All notable changes to models are documented here.
 
 ## [0.5.21] - 2026-11-14
 
+### Added
+
+- **`models-tinystruct` integration module.** Tinystruct and TypeSafe adapters for semantic
+  dispatch, chat, embedding and reranking: `ModelsTinystructChatModel`,
+  `ModelsTinystructEmbeddingModel`, `ModelsTinystructReranker`, `ModelsTypesafeClient` and
+  `ModelsTypesafeRuntime`, with routed variants. This is a **new published artifact** on Maven
+  Central, `com.integrallis:models-tinystruct`, alongside the existing integration modules.
+
+### Changed
+
+- **Vectors dependency upgraded to 0.1.35** (from 0.1.34), with every module lockfile updated.
+  Consumers resolving models transitively pick up that release, which is largely allocation
+  elimination across the HNSW, Vamana and collection search paths, and which also adds
+  `SearchResult.rawScoreOf()` / `SimilarityFunction.rawScoreOf()`, runtime-queryable dispatch
+  counters with per-route latency histograms, and an actionable error when the
+  `jdk.incubator.vector` module is missing.
+
+### Fixed
+
+- **Tokenizer no longer exposes its internal arrays (#436).** `GgufTokenizer` returned references
+  to internal state (SpotBugs `EI_EXPOSE_REP`), letting a caller mutate a tokenizer's data through
+  a returned array. Also corrects the BERT F32 projection path.
+
 ### Performance
+
+- **K-quant BERT projection weights pre-dequantized to F32 at load (#360, #452).**
+  `BertWeights` widens Q4_K/Q5_K/Q6_K **projection** weights to F32 when loading, because
+  on-the-fly K-quant dequantization in pure Java costs more per token than F32 dot products on
+  already-widened weights. This trades roughly **4x the memory of those weights** for that
+  latency, so it is applied only where it can pay: projections, never the `token_embd` and
+  `position_embd` tables, which are row lookups rather than multiplications and are the largest
+  tensors in the model; and only when no batched matrix kernel accepts the quantized form, so a
+  path with a native kernel keeps its quantized route and `BertForwardPass.project` keeps
+  deciding it. In practice this affects `GgufRerankingModel`, which installs no kernel. See #452
+  for the measurement status of the trade.
+
+- **Tokenizer hot-path allocation reduction (#435, #437).**
+  `GgufTokenizer` no longer boxes token ids through `List<Integer>` on its encode paths, using a
+  growable `int[]` builder instead.
 
 - **Compact F16 KV cache storage for the Java path (#438).**
   When `models.purejava.halfPrecisionKvCache` is enabled, `KvCache` now stores actual

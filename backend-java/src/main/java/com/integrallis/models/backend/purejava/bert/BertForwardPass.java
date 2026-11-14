@@ -81,7 +81,7 @@ public final class BertForwardPass implements SequenceEncoder {
   /** Loads an encoder that projects through the injected kernel where it is eligible. */
   public static BertForwardPass fromGgufFile(
       GgufFile file, BertConfig config, GgufBatchedMatrixKernel matrixKernel) {
-    return new BertForwardPass(config, BertWeights.load(file, config), matrixKernel);
+    return new BertForwardPass(config, BertWeights.load(file, config, matrixKernel), matrixKernel);
   }
 
   @Override
