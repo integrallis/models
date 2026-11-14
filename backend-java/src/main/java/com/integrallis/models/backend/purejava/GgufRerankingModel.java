@@ -106,30 +106,24 @@ public final class GgufRerankingModel implements RerankingModel {
       return List.of();
     }
     int batchSize = documents.size();
-    GgufTokenizer.TokenizedPair[] pairs = new GgufTokenizer.TokenizedPair[batchSize];
-    int maxLen = 0;
+    int[][] tokens = new int[batchSize][];
+    int[][] tokenTypes = new int[batchSize][];
     for (int i = 0; i < batchSize; i++) {
-      pairs[i] =
+      GgufTokenizer.TokenizedPair pair =
           tokenizer.encodePair(
               query,
               Objects.requireNonNull(documents.get(i), "documents must not contain null"),
               contextLength);
-      if (pairs[i].droppedTokens() > 0) {
+      if (pair.droppedTokens() > 0) {
         truncatedPairs.incrementAndGet();
-        droppedTokens.addAndGet(pairs[i].droppedTokens());
+        droppedTokens.addAndGet(pair.droppedTokens());
       }
-      maxLen = Math.max(maxLen, pairs[i].tokens().length);
+      tokens[i] = pair.tokens();
+      tokenTypes[i] = pair.tokenTypes();
     }
-    int[][] tokens = new int[batchSize][maxLen];
-    int[][] tokenTypes = new int[batchSize][maxLen];
-    int[] lengths = new int[batchSize];
-    for (int i = 0; i < batchSize; i++) {
-      int len = pairs[i].tokens().length;
-      lengths[i] = len;
-      System.arraycopy(pairs[i].tokens(), 0, tokens[i], 0, len);
-      System.arraycopy(pairs[i].tokenTypes(), 0, tokenTypes[i], 0, len);
-    }
-    float[][] clsVectors = encoder.encodeBatchCls(tokens, tokenTypes, lengths);
+    // Ragged rows go straight in. The encoder packs them end to end rather than padding to the
+    // longest, so no token of padding is ever projected, attended to or masked.
+    float[][] clsVectors = encoder.encodeBatchCls(tokens, tokenTypes);
     List<Double> scores = new ArrayList<>(batchSize);
     for (int i = 0; i < batchSize; i++) {
       double score = classifier.score(clsVectors[i]);

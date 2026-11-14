@@ -97,14 +97,17 @@ public final class GgufTokenizer implements Tokenizer {
    */
   private static final class TrieNode {
     int tokenId = -1; // -1 means no valid token ends here
-    final java.util.Map<String, TrieNode> children = new java.util.HashMap<>();
+    // Keyed by code point. The earlier String-per-character keys allocated a String for every
+    // character of every vocabulary token at construction and again for every character looked up,
+    // which was 43% of a model's cold load (#457) and bought nothing at the hot path.
+    final java.util.Map<Integer, TrieNode> children = new java.util.HashMap<>();
 
     void insert(String token, int id) {
       TrieNode node = this;
-      int[] cps = token.codePoints().toArray();
-      for (int cp : cps) {
-        String ch = new String(Character.toChars(cp));
-        node = node.children.computeIfAbsent(ch, k -> new TrieNode());
+      for (int i = 0; i < token.length(); ) {
+        int codePoint = token.codePointAt(i);
+        node = node.children.computeIfAbsent(codePoint, k -> new TrieNode());
+        i += Character.charCount(codePoint);
       }
       node.tokenId = id;
     }
@@ -939,16 +942,12 @@ public final class GgufTokenizer implements Tokenizer {
       int before = encoded.size();
       String candidate = "\u2581" + word;
       int[] cps = candidate.codePoints().toArray();
-      String[] chars = new String[cps.length];
-      for (int i = 0; i < cps.length; i++) {
-        chars[i] = new String(Character.toChars(cps[i]));
-      }
-      for (int start = 0; start < chars.length; ) {
+      for (int start = 0; start < cps.length; ) {
         TrieNode node = wordPieceTrie;
         int bestLen = 0;
         int bestId = -1;
-        for (int i = start; i < chars.length; i++) {
-          node = node.children.get(chars[i]);
+        for (int i = start; i < cps.length; i++) {
+          node = node.children.get(cps[i]);
           if (node == null) {
             break;
           }

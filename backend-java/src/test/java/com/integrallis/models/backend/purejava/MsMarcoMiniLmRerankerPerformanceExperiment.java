@@ -49,8 +49,15 @@ public final class MsMarcoMiniLmRerankerPerformanceExperiment {
     long loadStart = System.nanoTime();
     try (GgufRerankingModel model = GgufRerankingModel.load(artifact.path())) {
       long loadNanos = System.nanoTime() - loadStart;
+      // Warm every path this experiment times, through the call it times. scoreAll stopped being
+      // a loop over score() in #440, so warming through it alone left score() to compile inside
+      // the timed loop (#457): a warm-up must exercise the measured path, not a convenience API
+      // that may route elsewhere.
       for (int warmup = 0; warmup < warmups; warmup++) {
         model.scoreAll(QUERY, DOCUMENTS);
+        for (String document : DOCUMENTS) {
+          model.score(QUERY, document);
+        }
       }
 
       long[] pairNanos = new long[pairIterations];
