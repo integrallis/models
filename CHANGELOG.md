@@ -27,6 +27,22 @@ All notable changes to models are documented here.
   over `score()` for implementations that do not opt in. Batch parity is verified
   against sequential `score()` in the MiniLM-L6 integration test.
 
+- **F16 KV cache read-into avoids per-slot allocation (#447).**
+  `KvStorage` gains `readInto(int slot, float[] dst, int dstOffset, int length)`,
+  implemented by both `F32Store` and `F16Store`. `KvCache.attentionView()` now uses
+  `readInto` when building `AttentionSpan` objects in compact F16 mode, eliminating
+  `positionCount * 2` temporary `float[]` allocations per span. The F32 zero-copy path
+  via `rawFloatArray()` is unchanged.
+
+- **Reranker `scoreBatch` no longer synchronizes on the model instance (#448).**
+  `GgufRerankingModel.scoreBatch` is no longer `synchronized`; only `score()` and
+  `close()` retain instance-level locking. The `closed` flag is changed from `boolean`
+  to `AtomicBoolean` for visibility across threads. This allows concurrent batch
+  preparation (tokenization, padding, array layout) to overlap even though the
+  underlying `BertForwardPass.encodeBatchCls` still serializes the forward pass.
+  `RerankingModelConcurrentBatchTest` verifies no corruption or deadlock under
+  4-thread concurrent load.
+
 ## [0.5.20] - 2026-11-12
 
 ### Added

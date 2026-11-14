@@ -46,7 +46,8 @@ public final class GgufRerankingModel implements RerankingModel {
   private final BertForwardPass encoder;
   private final BertClassificationHead classifier;
   private final int contextLength;
-  private boolean closed;
+  private final java.util.concurrent.atomic.AtomicBoolean closed =
+      new java.util.concurrent.atomic.AtomicBoolean();
 
   private GgufRerankingModel(
       Arena arena,
@@ -97,7 +98,7 @@ public final class GgufRerankingModel implements RerankingModel {
   }
 
   @Override
-  public synchronized List<Double> scoreBatch(String query, List<String> documents) {
+  public List<Double> scoreBatch(String query, List<String> documents) {
     Objects.requireNonNull(query, "query");
     Objects.requireNonNull(documents, "documents");
     checkOpen();
@@ -161,14 +162,13 @@ public final class GgufRerankingModel implements RerankingModel {
 
   @Override
   public synchronized void close() {
-    if (!closed) {
-      closed = true;
+    if (closed.compareAndSet(false, true)) {
       arena.close();
     }
   }
 
   private void checkOpen() {
-    if (closed) {
+    if (closed.get()) {
       throw new IllegalStateException("reranking model is closed");
     }
   }
