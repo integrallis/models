@@ -40,11 +40,14 @@ public final class KvCache {
   private static final float[] EMPTY_FLOATS = new float[0];
   private static final boolean[] EMPTY_OCCUPANCY = new boolean[0];
 
-  // ---- Compact F16 storage abstraction (#408) ----
+  // ---- Compact F16 storage abstraction (#408, #447) ----
   private interface KvStorage {
     void store(int slot, float[] src, int srcOffset, int length);
 
     float[] read(int slot, int length);
+
+    /** Reads {@code length} elements from {@code slot} into {@code dst} at {@code dstOffset}. */
+    void readInto(int slot, float[] dst, int dstOffset, int length);
 
     void copyTo(int fromSlot, KvStorage dst, int dstSlot, int slotCount, int length);
 
@@ -75,6 +78,11 @@ public final class KvCache {
     @Override
     public float[] read(int slot, int length) {
       return Arrays.copyOfRange(data, slot * length, (slot + 1) * length);
+    }
+
+    @Override
+    public void readInto(int slot, float[] dst, int dstOffset, int length) {
+      System.arraycopy(data, slot * length, dst, dstOffset, length);
     }
 
     @Override
@@ -131,6 +139,14 @@ public final class KvCache {
       int base = slot * length;
       for (int i = 0; i < length; i++) result[i] = Float.float16ToFloat(data[base + i]);
       return result;
+    }
+
+    @Override
+    public void readInto(int slot, float[] dst, int dstOffset, int length) {
+      int base = slot * length;
+      for (int i = 0; i < length; i++) {
+        dst[dstOffset + i] = Float.float16ToFloat(data[base + i]);
+      }
     }
 
     @Override
@@ -1104,8 +1120,7 @@ public final class KvCache {
     int slots = numLayers * allocatedSequenceCapacity;
     float[] out = new float[slots * keyDim];
     for (int i = 0; i < slots; i++) {
-      float[] row = keys.read(i, keyDim);
-      System.arraycopy(row, 0, out, i * keyDim, keyDim);
+      keys.readInto(i, out, i * keyDim, keyDim);
     }
     return out;
   }
@@ -1116,8 +1131,7 @@ public final class KvCache {
     int slots = numLayers * allocatedSequenceCapacity;
     float[] out = new float[slots * valueDim];
     for (int i = 0; i < slots; i++) {
-      float[] row = values.read(i, valueDim);
-      System.arraycopy(row, 0, out, i * valueDim, valueDim);
+      values.readInto(i, out, i * valueDim, valueDim);
     }
     return out;
   }
@@ -1414,10 +1428,8 @@ public final class KvCache {
     float[] valBuf = new float[positionCount * valueDim];
     for (int p = 0; p < positionCount; p++) {
       int slot = layer * storageCapacity + firstLocalPosition + p;
-      float[] k = keyStore.read(slot, keyDim);
-      float[] v = valueStore.read(slot, valueDim);
-      System.arraycopy(k, 0, keyBuf, p * keyDim, keyDim);
-      System.arraycopy(v, 0, valBuf, p * valueDim, valueDim);
+      keyStore.readInto(slot, keyBuf, p * keyDim, keyDim);
+      valueStore.readInto(slot, valBuf, p * valueDim, valueDim);
     }
     return new AttentionSpan(firstPosition, positionCount, keyBuf, 0, valBuf, 0);
   }
