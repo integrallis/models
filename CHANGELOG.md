@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.21] - 2026-11-14
+
 ### Performance
 
 - **Compact F16 KV cache storage for the Java path (#438).**
