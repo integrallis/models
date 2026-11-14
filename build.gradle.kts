@@ -1974,6 +1974,105 @@ tasks.register("verifyDocumentation") {
     }
 }
 
+
+
+tasks.register("verifyPerformanceRegression") {
+    group = "verification"
+    description =
+        "Verifies that performance changes include a baseline measurement against the previous " +
+            "release tag. Fails if performance-sensitive files changed but no benchmark artifact " +
+            "with an interleaved baseline arm is found in benchmark-results/."
+
+    doLast {
+        fun execOrNull(vararg cmd: String): String? =
+            try {
+                val process = ProcessBuilder(*cmd).start()
+                val output = process.inputStream.bufferedReader().readText().trim()
+                process.waitFor()
+                if (process.exitValue() != 0) null else output
+            } catch (_: Exception) {
+                null
+            }
+
+        val previousTag = execOrNull("git", "describe", "--tags", "--abbrev=0")
+        if (previousTag == null) {
+            logger.lifecycle("No previous tag found; skipping performance regression check")
+            return@doLast
+        }
+
+        val changedFiles =
+            execOrNull("git", "diff", "--name-only", previousTag, "HEAD")
+                ?.lines()
+                ?.filter { it.isNotBlank() }
+                ?: run {
+                    logger.lifecycle("Could not determine changed files; skipping check")
+                    return@doLast
+                }
+
+        val perfSensitivePaths =
+            listOf(
+                "backend-java/src/main/java/com/integrallis/models/backend/purejava/bert/BertForwardPass.java",
+                "backend-java/src/main/java/com/integrallis/models/backend/purejava/GgufRerankingModel.java",
+                "backend-java/src/main/java/com/integrallis/models/backend/purejava/bert/BertWeights.java",
+                "backend-java/src/main/java/com/integrallis/models/backend/purejava/tokenizer/GgufTokenizer.java",
+                "backend-java/src/main/java/com/integrallis/models/backend/purejava/cache/KvCache.java",
+                "backend-java/src/main/java/com/integrallis/models/backend/purejava/ops/TensorOps.java",
+            )
+
+        val touchedPerfFiles =
+            changedFiles.filter { file ->
+                perfSensitivePaths.any { file.endsWith(it) || file.contains(it) }
+            }
+
+        if (touchedPerfFiles.isEmpty()) {
+            logger.lifecycle(
+                "No performance-sensitive files changed; skipping regression check"
+            )
+            return@doLast
+        }
+
+        logger.lifecycle(
+            "Performance-sensitive files changed: ${touchedPerfFiles.joinToString()}"
+        )
+
+        val benchmarkDir = file("benchmark-results")
+        if (!benchmarkDir.exists() || !benchmarkDir.isDirectory) {
+            throw GradleException(
+                "Performance-sensitive files changed but benchmark-results/ does not exist. " +
+                    "Changed: ${touchedPerfFiles.joinToString()}"
+            )
+        }
+
+        val hasBaseline =
+            benchmarkDir.walkTopDown().filter { it.isDirectory }.any { dir ->
+                val readme = File(dir, "README.md")
+                val results = File(dir, "RESULTS.md")
+                val jsons =
+                    dir.listFiles { f: File -> f.extension == "json" }?.toList()
+                        ?: emptyList()
+
+                (readme.exists() && readme.readText().contains(previousTag)) ||
+                    (results.exists() && results.readText().contains(previousTag)) ||
+                    jsons.any { it.readText().contains(previousTag) }
+            }
+
+        if (!hasBaseline) {
+            throw GradleException(
+                "Performance-sensitive files changed (${touchedPerfFiles.joinToString()}), " +
+                    "but no benchmark artifact with an interleaved baseline arm against " +
+                    "$previousTag found in benchmark-results/. " +
+                    "Every performance change must include a committed artifact whose derive " +
+                    "includes the previous release tag as a baseline."
+            )
+        }
+
+        logger.lifecycle(
+            "Performance regression check passed: baseline against $previousTag found " +
+                "in benchmark-results/"
+        )
+    }
+}
+
 tasks.register("complianceCheck") {
     group = "verification"
     description = "Run all compliance verification tasks"
@@ -1989,7 +2088,8 @@ tasks.register("complianceCheck") {
         "verifyGithubWorkflows",
         "verifyNotebooks",
         "verifyReleaseMetadata",
-        "verifyDocumentation"
+        "verifyDocumentation",
+        "verifyPerformanceRegression"
     )
 }
 
