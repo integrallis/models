@@ -154,9 +154,13 @@ class BertForwardPassRaggedBatchTest {
       float[] alone = pass.encodeCls(exactTokens[doc], exactTypes[doc]);
       assertThat(batched[doc]).hasSize(alone.length);
       for (int i = 0; i < alone.length; i++) {
-        assertThat(batched[doc][i])
-            .describedAs("document %s (length %s) element %s", doc, lengths[doc], i)
-            .isCloseTo(alone[i], org.assertj.core.data.Offset.offset(1.0e-4f));
+        // Exact, not close: the packed layout runs each row through the same operations as
+        // encoding it alone, so any difference is a layout bug, not rounding.
+        assertThat(Float.floatToIntBits(batched[doc][i]))
+            .describedAs(
+                "document %s (length %s) element %s: %s vs %s",
+                doc, lengths[doc], i, batched[doc][i], alone[i])
+            .isEqualTo(Float.floatToIntBits(alone[i]));
       }
     }
   }

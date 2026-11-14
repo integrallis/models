@@ -91,25 +91,6 @@ public final class GgufTokenizer implements Tokenizer {
     }
   }
 
-  /**
-   * Simple character trie for WordPiece longest-prefix matching without O(n²) substring
-   * allocations. Each node maps a single UTF-16 character to its child.
-   */
-  private static final class TrieNode {
-    int tokenId = -1; // -1 means no valid token ends here
-    final java.util.Map<String, TrieNode> children = new java.util.HashMap<>();
-
-    void insert(String token, int id) {
-      TrieNode node = this;
-      int[] cps = token.codePoints().toArray();
-      for (int cp : cps) {
-        String ch = new String(Character.toChars(cp));
-        node = node.children.computeIfAbsent(ch, k -> new TrieNode());
-      }
-      node.tokenId = id;
-    }
-  }
-
   private static final Set<String> END_OF_GENERATION_TOKEN_TEXTS =
       Set.of(
           "<|eot_id|>",
@@ -247,7 +228,6 @@ public final class GgufTokenizer implements Tokenizer {
   private final char[] byteToChar;
   private final int[] charToByte;
   private final boolean normalizeNfc;
-  private final TrieNode wordPieceTrie;
 
   private GgufTokenizer(
       String[] vocab,
@@ -305,15 +285,6 @@ public final class GgufTokenizer implements Tokenizer {
     this.normalizeNfc = normalizeNfc;
     this.byteToChar = buildBytesToUnicode();
     this.charToByte = buildUnicodeToBytes(byteToChar);
-    if (useWordPiece) {
-      TrieNode trie = new TrieNode();
-      for (Map.Entry<String, Integer> entry : tokenToId.entrySet()) {
-        trie.insert(entry.getKey(), entry.getValue());
-      }
-      this.wordPieceTrie = trie;
-    } else {
-      this.wordPieceTrie = null;
-    }
   }
 
   /**
@@ -934,36 +905,37 @@ public final class GgufTokenizer implements Tokenizer {
   }
 
   private int[] encodeWordPiece(String text) {
+    // Greedy longest-match against the vocabulary, as before #435/#437. The trie those commits
+    // introduced bought nothing measurable on the pinned reranker's hot path (pair p50 62.74 ->
+    // 62.40 ms) and cost 62 ms on every model load - 31 ms even keyed by code point - so it is
+    // gone (#457). Only the token-id builder from that work is kept: an int[] instead of boxing.
     IntArrayBuilder encoded = new IntArrayBuilder(text.length());
     for (String word : wordPieceWords(text)) {
       int before = encoded.size();
       String candidate = "\u2581" + word;
-      int[] cps = candidate.codePoints().toArray();
-      String[] chars = new String[cps.length];
-      for (int i = 0; i < cps.length; i++) {
-        chars[i] = new String(Character.toChars(cps[i]));
+      int[] boundaries =
+          candidate.codePoints().map(codePoint -> Character.charCount(codePoint)).toArray();
+      int[] offsets = new int[boundaries.length + 1];
+      for (int index = 0; index < boundaries.length; index++) {
+        offsets[index + 1] = offsets[index] + boundaries[index];
       }
-      for (int start = 0; start < chars.length; ) {
-        TrieNode node = wordPieceTrie;
-        int bestLen = 0;
-        int bestId = -1;
-        for (int i = start; i < chars.length; i++) {
-          node = node.children.get(chars[i]);
-          if (node == null) {
+      for (int start = 0; start < boundaries.length; ) {
+        Integer token = null;
+        int matchedEnd = -1;
+        for (int end = boundaries.length; end > start; end--) {
+          token = tokenToId.get(candidate.substring(offsets[start], offsets[end]));
+          if (token != null) {
+            matchedEnd = end;
             break;
           }
-          if (node.tokenId >= 0) {
-            bestLen = i - start + 1;
-            bestId = node.tokenId;
-          }
         }
-        if (bestId < 0) {
+        if (matchedEnd < 0) {
           encoded.removeLast(encoded.size() - before);
           encoded.add(unknownTokenId);
           break;
         }
-        encoded.add(bestId);
-        start += bestLen;
+        encoded.add(token);
+        start = matchedEnd;
       }
     }
     return encoded.toArray();

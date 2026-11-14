@@ -103,23 +103,21 @@ public final class BertForwardPass implements SequenceEncoder {
   }
 
   /**
-   * Processes multiple tokenized sequences in one BERT forward pass.
+   * Encodes several sequences in one forward pass and returns each one's CLS vector.
    *
-   * <p>Every inner array must have the same length; callers pad short sequences. The returned array
-   * has one CLS vector per document.
+   * <p>Rows may have different lengths. Nothing is padded: the sequences are laid end to end for
+   * the row-wise projections, which is where batching pays - each weight block is dequantized once
+   * for every token of every document - and attention runs per document over that document's own
+   * tokens, exactly as the single-sequence pass does. Every row therefore sees the arithmetic it
+   * would see alone, and there is no padded position for a mask to get wrong.
    */
   public synchronized float[][] encodeBatchCls(int[][] tokens, int[][] tokenTypes) {
     return encodeBatchCls(tokens, tokenTypes, null);
   }
 
   /**
-   * Processes multiple tokenized sequences in one BERT forward pass, with optional per-document
-   * attention masking for padded positions.
-   *
-   * <p>When {@code lengths} is non-null, positions at and beyond {@code lengths[doc]} within each
-   * document are masked in attention (their attention scores are set to a large negative so softmax
-   * yields zero weight). Padding tokens still participate in projections and receive embeddings;
-   * only attention is masked, matching standard BERT practice.
+   * As {@link #encodeBatchCls(int[][], int[][])}, reading only the first {@code lengths[i]} tokens
+   * of each row. Kept for callers that already hold padded rows; the padding is never computed on.
    */
   public synchronized float[][] encodeBatchCls(int[][] tokens, int[][] tokenTypes, int[] lengths) {
     Objects.requireNonNull(tokens, "tokens");
@@ -128,39 +126,45 @@ public final class BertForwardPass implements SequenceEncoder {
       throw new IllegalArgumentException("batch must not be empty");
     }
     int batchSize = tokens.length;
-    int positionsPerDoc = tokens[0].length;
-    if (positionsPerDoc == 0) {
-      throw new IllegalArgumentException("each sequence must have at least one token");
-    }
-    if (positionsPerDoc > config.contextLength()) {
+    if (tokenTypes.length != batchSize || (lengths != null && lengths.length != batchSize)) {
       throw new IllegalArgumentException(
-          "sequence length "
-              + positionsPerDoc
-              + " exceeds context length "
-              + config.contextLength());
+          "tokens, tokenTypes and lengths must have one row per sequence");
     }
+    int[] resolved = new int[batchSize];
     for (int i = 0; i < batchSize; i++) {
       if (tokens[i] == null || tokenTypes[i] == null) {
         throw new IllegalArgumentException("null sequence at index " + i);
       }
-      if (tokens[i].length != positionsPerDoc || tokenTypes[i].length != positionsPerDoc) {
+      if (tokenTypes[i].length != tokens[i].length) {
         throw new IllegalArgumentException(
-            "all sequences must have the same length "
-                + positionsPerDoc
-                + "; index "
+            "tokenTypes["
                 + i
-                + " differs");
+                + "] has "
+                + tokenTypes[i].length
+                + " entries for "
+                + tokens[i].length
+                + " tokens");
       }
-      if (lengths != null && (lengths[i] < 1 || lengths[i] > positionsPerDoc)) {
+      int length = lengths == null ? tokens[i].length : lengths[i];
+      if (length < 1 || length > tokens[i].length) {
         throw new IllegalArgumentException(
-            "lengths[" + i + "] must be in [1, " + positionsPerDoc + "]: " + lengths[i]);
+            "lengths[" + i + "] must be in [1, " + tokens[i].length + "]: " + length);
       }
+      if (length > config.contextLength()) {
+        throw new IllegalArgumentException(
+            "sequence length " + length + " exceeds context length " + config.contextLength());
+      }
+      resolved[i] = length;
     }
-    executeBatch(tokens, tokenTypes, batchSize, positionsPerDoc, lengths);
+    int[] starts = new int[batchSize + 1];
+    for (int i = 0; i < batchSize; i++) {
+      starts[i + 1] = Math.addExact(starts[i], resolved[i]);
+    }
+    executeBatch(tokens, tokenTypes, starts, resolved);
     int dim = config.embeddingDim();
     float[][] result = new float[batchSize][dim];
     for (int doc = 0; doc < batchSize; doc++) {
-      System.arraycopy(hidden, doc * positionsPerDoc * dim, result[doc], 0, dim);
+      System.arraycopy(hidden, starts[doc] * dim, result[doc], 0, dim);
     }
     return result;
   }
@@ -217,13 +221,13 @@ public final class BertForwardPass implements SequenceEncoder {
     }
   }
 
-  private void executeBatch(
-      int[][] tokens, int[][] tokenTypes, int batchSize, int positionsPerDoc, int[] lengths) {
+  private void executeBatch(int[][] tokens, int[][] tokenTypes, int[] starts, int[] lengths) {
     int dim = config.embeddingDim();
-    int totalPositions = Math.multiplyExact(batchSize, positionsPerDoc);
+    int batchSize = lengths.length;
+    int totalPositions = starts[batchSize];
     ensureCapacity(totalPositions);
     for (int doc = 0; doc < batchSize; doc++) {
-      for (int position = 0; position < positionsPerDoc; position++) {
+      for (int position = 0; position < lengths[doc]; position++) {
         int tokenType = tokenTypes[doc][position];
         if (tokenType < 0 || tokenType >= tokenTypeEmbeddings.length) {
           throw new IllegalArgumentException(
@@ -233,7 +237,7 @@ public final class BertForwardPass implements SequenceEncoder {
         if (!config.usesRotaryPositions()) {
           weights.positionEmbedding(position, positionEmbedding);
         }
-        int offset = (doc * positionsPerDoc + position) * dim;
+        int offset = (starts[doc] + position) * dim;
         for (int index = 0; index < dim; index++) {
           normalized[offset + index] =
               tokenEmbedding[index]
@@ -252,7 +256,7 @@ public final class BertForwardPass implements SequenceEncoder {
       }
     }
     for (int layerIndex = 0; layerIndex < config.numLayers(); layerIndex++) {
-      executeLayerBatched(weights.layer(layerIndex), batchSize, positionsPerDoc, lengths);
+      executeLayerBatched(weights.layer(layerIndex), starts, lengths);
     }
   }
 
@@ -311,10 +315,9 @@ public final class BertForwardPass implements SequenceEncoder {
    * Executes one BERT layer over a batch of {@code batchSize} documents each of length {@code
    * positionsPerDoc}. Total rows = {@code batchSize * positionsPerDoc}.
    */
-  private void executeLayerBatched(
-      BertWeights.Layer layer, int batchSize, int positionsPerDoc, int[] lengths) {
+  private void executeLayerBatched(BertWeights.Layer layer, int[] starts, int[] lengths) {
     int dim = config.embeddingDim();
-    int totalPositions = Math.multiplyExact(batchSize, positionsPerDoc);
+    int totalPositions = starts[lengths.length];
     int batchElements = totalPositions * dim;
     if (layer.queryKeyValue() == null) {
       project(queries, hidden, totalPositions, layer.query());
@@ -325,11 +328,11 @@ public final class BertForwardPass implements SequenceEncoder {
       addBias(values, totalPositions, dim, layer.valueBias());
     } else {
       project(queryKeyValues, hidden, totalPositions, layer.queryKeyValue());
-      splitQueryKeyValueBatched(batchSize, positionsPerDoc, dim);
-      applyRotaryPositionsBatched(batchSize, positionsPerDoc, dim);
+      splitQueryKeyValueBatched(totalPositions, dim);
+      applyRotaryPositionsBatched(starts, lengths, dim);
     }
 
-    attendBatched(batchSize, positionsPerDoc, lengths);
+    attendBatched(starts, lengths);
     project(attentionProjected, attention, totalPositions, layer.attentionOutput());
     addBias(attentionProjected, totalPositions, dim, layer.attentionOutputBias());
     for (int index = 0; index < batchElements; index++) {
@@ -364,61 +367,56 @@ public final class BertForwardPass implements SequenceEncoder {
         layer.outputNormBias());
   }
 
-  private void attendBatched(int batchSize, int positionsPerDoc, int[] lengths) {
+  /**
+   * Attention for every document in the packed batch, each over its own tokens only.
+   *
+   * <p>This is {@link #attend(int)} applied per document at that document's offset: the same dot
+   * products over the same keys, the same scale, the same softmax width, the same weighted sum. No
+   * position is padded, so no key is masked and no softmax row can be empty - the shape that threw
+   * in #455 cannot be constructed here.
+   */
+  private void attendBatched(int[] starts, int[] lengths) {
     int dim = config.embeddingDim();
     int headDim = config.headDim();
     float scale = (float) (1.0 / Math.sqrt(headDim));
-    int totalPositions = Math.multiplyExact(batchSize, positionsPerDoc);
-    Arrays.fill(attention, 0, totalPositions * dim, 0.0f);
-    for (int doc = 0; doc < batchSize; doc++) {
-      int docBase = doc * positionsPerDoc;
-      int actualLength = lengths == null ? positionsPerDoc : lengths[doc];
-      for (int position = 0; position < positionsPerDoc; position++) {
-        if (position >= actualLength) {
-          // A padded query row. Every key below is masked for it, so its softmax would have no
-          // finite input and threw on any batch of unequal lengths. Nothing reads its output:
-          // its attention row was zeroed above and the per-document mask hides it as a key in
-          // every later layer. Leave it at zero.
-          continue;
-        }
-        int globalQueryOffset = (docBase + position) * dim;
-        int scoreOffset = position * positionsPerDoc;
+    Arrays.fill(attention, 0, starts[lengths.length] * dim, 0.0f);
+    for (int doc = 0; doc < lengths.length; doc++) {
+      int base = starts[doc];
+      int length = lengths[doc];
+      for (int position = 0; position < length; position++) {
+        int scoreOffset = position * length;
         for (int head = 0; head < config.numHeads(); head++) {
           int headOffset = head * headDim;
           VectorUtil.batchDotProductExact(
               queries,
-              globalQueryOffset + headOffset,
+              (base + position) * dim + headOffset,
               keys,
-              docBase * dim + headOffset,
+              base * dim + headOffset,
               dim,
-              positionsPerDoc,
+              length,
               headDim,
               scores,
               scoreOffset);
-          for (int keyPosition = 0; keyPosition < positionsPerDoc; keyPosition++) {
+          for (int keyPosition = 0; keyPosition < length; keyPosition++) {
             scores[scoreOffset + keyPosition] *= scale;
-            if (keyPosition >= actualLength) {
-              scores[scoreOffset + keyPosition] = Float.NEGATIVE_INFINITY;
-            }
           }
-          TensorOps.softmax(scores, scoreOffset, positionsPerDoc);
+          TensorOps.softmax(scores, scoreOffset, length);
           VectorUtil.addWeightedRowsInPlace(
               attention,
-              globalQueryOffset + headOffset,
+              (base + position) * dim + headOffset,
               values,
-              docBase * dim + headOffset,
+              base * dim + headOffset,
               dim,
               scores,
               scoreOffset,
-              positionsPerDoc,
+              length,
               headDim);
         }
       }
     }
   }
 
-  private void splitQueryKeyValueBatched(int batchSize, int positionsPerDoc, int dim) {
-    int totalPositions = batchSize * positionsPerDoc;
+  private void splitQueryKeyValueBatched(int totalPositions, int dim) {
     for (int position = 0; position < totalPositions; position++) {
       int source = position * dim * 3;
       int target = position * dim;
@@ -428,13 +426,13 @@ public final class BertForwardPass implements SequenceEncoder {
     }
   }
 
-  private void applyRotaryPositionsBatched(int batchSize, int positionsPerDoc, int dim) {
+  private void applyRotaryPositionsBatched(int[] starts, int[] lengths, int dim) {
     int headDim = config.headDim();
-    for (int doc = 0; doc < batchSize; doc++) {
-      int docBase = doc * positionsPerDoc;
-      for (int position = 0; position < positionsPerDoc; position++) {
+    for (int doc = 0; doc < lengths.length; doc++) {
+      int base = starts[doc];
+      for (int position = 0; position < lengths[doc]; position++) {
         for (int head = 0; head < config.numHeads(); head++) {
-          int offset = (docBase + position) * dim + head * headDim;
+          int offset = (base + position) * dim + head * headDim;
           TensorOps.ropeNeox(queries, offset, position, headDim, config.ropeTheta());
           TensorOps.ropeNeox(keys, offset, position, headDim, config.ropeTheta());
         }

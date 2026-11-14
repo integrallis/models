@@ -97,3 +97,32 @@ suggestive of larger scratch buffers in the batched forward pass and not a measu
   next step is a diff read of `BertForwardPass` in `3b37bc3c` (the sequential `encodeCls` path
   changed, since `score()` slowed) and of `GgufTokenizer` construction in `63b46a83`.
 - Any other model or host. See the ablation directory's caveats; they apply unchanged.
+
+## Decisive run: the `score()` step was the harness, not the code — `runs-decisive/`
+
+The verdict above left open whether the sequential-path step at `3b37bc3c` was steady-state or an
+artefact of the experiment's warm-up, which from #440 onward exercised only the batched path. The
+test that separates them is equal warm-up for both arms: **`warmups=0`, 300 timed pair iterations**,
+released `v0.5.20` against `main` (`9db11325`, with #456 and #454), five interleaved rounds on the
+same host class.
+
+```
+warmups=0 pairIterations=300 batchIterations=20; runs V=5 A=5
+pairP50Millis    V-0520    80.38 [79.10..80.55]   A-main    79.22 [79.09..80.27]   A/V 0.986
+pairP95Millis    V-0520   100.49 [99.15..100.94]   A-main    99.03 [98.99..100.49]   A/V 0.985
+batchP50Millis   V-0520   448.93 [442.18..449.96]   A-main   587.06 [585.18..594.11]   A/V 1.308
+coldLoadMillis   V-0520   160.55 [155.54..166.03]   A-main   223.63 [222.16..232.76]   A/V 1.393
+scoreChecksum identical: True
+```
+
+**Correction to the verdict above.** `score()` on `main` is **not** slower than v0.5.20: 0.986x with
+equal warm-up. The 1.27x step at `W-440` in the bisect table was produced by the harness — v0.5.20's
+five `scoreAll` warm-ups ran `score()` thirty times before the timed loop; `main`'s ran it zero
+times, and sixty iterations never amortised the compilation. v0.5.20 itself reads 80.4 ms here with
+no warm-up against 62.7 ms with warm-up, which is the size of that effect. The profile-pollution
+hypothesis in the issue is therefore **not supported** and is withdrawn.
+
+**What stands, reproduced at zero warm-up:** `scoreAll` 1.308x slower (the batched path against
+the loop it replaced) and cold load 1.393x slower (the trie constructor). Numerics identical.
+
+The experiment now warms `score()` and `scoreAll()` explicitly, so this cannot recur in this harness.
