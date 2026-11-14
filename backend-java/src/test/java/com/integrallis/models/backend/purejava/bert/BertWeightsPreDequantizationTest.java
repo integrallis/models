@@ -64,9 +64,21 @@ class BertWeightsPreDequantizationTest {
   }
 
   @Test
+  void isOffUnlessOptedIn() {
+    // The default. Widening changes a qualified reranker's scores and slows cold load, so it is a
+    // choice a caller makes, never one made for them. Every other case below passes enabled = true.
+    assertThat(Boolean.getBoolean(BertWeights.PRE_DEQUANTIZE_K_QUANT_PROPERTY)).isFalse();
+    for (GgufTensorType type : GgufTensorType.values()) {
+      assertThat(BertWeights.preDequantizes(false, true, type, GgufBatchedMatrixKernel.none()))
+          .describedAs("disabled, projection, no kernel, %s", type)
+          .isFalse();
+    }
+  }
+
+  @Test
   void widensKQuantProjectionsOnlyWhenNoKernelTakesTheQuantizedForm() {
     for (GgufTensorType type : GgufTensorType.values()) {
-      assertThat(BertWeights.preDequantizes(true, type, GgufBatchedMatrixKernel.none()))
+      assertThat(BertWeights.preDequantizes(true, true, type, GgufBatchedMatrixKernel.none()))
           .describedAs("projection, no kernel, %s", type)
           .isEqualTo(K_QUANTS.contains(type));
     }
@@ -76,7 +88,7 @@ class BertWeightsPreDequantizationTest {
   void neverWidensWhenAKernelTakesTheQuantizedForm() {
     GgufBatchedMatrixKernel kernel = acceptsEverything();
     for (GgufTensorType type : GgufTensorType.values()) {
-      assertThat(BertWeights.preDequantizes(true, type, kernel))
+      assertThat(BertWeights.preDequantizes(true, true, type, kernel))
           .describedAs("projection, kernel accepts %s, so project() must choose the route", type)
           .isFalse();
     }
@@ -87,10 +99,10 @@ class BertWeightsPreDequantizationTest {
     // token_embd and position_embd reach matrix() with projection = false. They are the largest
     // tensors in the model and are read a row at a time, so widening them is cost without benefit.
     for (GgufTensorType type : GgufTensorType.values()) {
-      assertThat(BertWeights.preDequantizes(false, type, GgufBatchedMatrixKernel.none()))
+      assertThat(BertWeights.preDequantizes(true, false, type, GgufBatchedMatrixKernel.none()))
           .describedAs("table, no kernel, %s", type)
           .isFalse();
-      assertThat(BertWeights.preDequantizes(false, type, acceptsEverything()))
+      assertThat(BertWeights.preDequantizes(true, false, type, acceptsEverything()))
           .describedAs("table, kernel accepts %s", type)
           .isFalse();
     }
@@ -102,7 +114,7 @@ class BertWeightsPreDequantizationTest {
       if (K_QUANTS.contains(type)) {
         continue;
       }
-      assertThat(BertWeights.preDequantizes(true, type, GgufBatchedMatrixKernel.none()))
+      assertThat(BertWeights.preDequantizes(true, true, type, GgufBatchedMatrixKernel.none()))
           .describedAs("projection, no kernel, non-K-quant %s", type)
           .isFalse();
     }

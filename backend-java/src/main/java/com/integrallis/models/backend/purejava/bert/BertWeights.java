@@ -28,6 +28,19 @@ import java.util.Objects;
 /** Mapped BERT GGUF tensors plus the small F32 vectors decoded at load time. */
 final class BertWeights {
 
+  /**
+   * Opt-in: widen K-quant projection weights to F32 at load (#360). Default off, because it changes
+   * the scores a qualified reranker produces (measured: up to 0.038 on the MS MARCO MiniLM-L6
+   * probe, ordering preserved) and makes cold load 1.77x slower, in exchange for 1.33x faster warm
+   * scoring and +12.2 MB on that model. A pinned qualification record is a claim about exact
+   * outputs, so an arithmetic change is selectable, never the default - see {@link
+   * #preDequantizes}.
+   */
+  static final String PRE_DEQUANTIZE_K_QUANT_PROPERTY = "models.purejava.bert.preDequantizeKQuant";
+
+  private static final boolean PRE_DEQUANTIZE_K_QUANT =
+      Boolean.getBoolean(PRE_DEQUANTIZE_K_QUANT_PROPERTY);
+
   /** A row-major matrix stored in GGUF's [columns, rows] shape convention. */
   record Matrix(MemorySegment data, GgufTensorType type, int rows, int columns) {
     Matrix {
@@ -230,10 +243,15 @@ final class BertWeights {
   /**
    * Whether a tensor is widened to F32 at load rather than kept in its stored K-quant form.
    *
-   * <p>#360 made this trade - 4x the weight memory for per-token latency - because on-the-fly
-   * K-quant dequantization in pure Java is slower than F32 dot products on already-widened weights.
-   * It pays in a narrower set of cases than it first appears (#452), and both restrictions below
-   * are the difference between a trade and a straight loss:
+   * <p>#360 made this trade - roughly 7x the memory of those weights for per-token latency -
+   * because on-the-fly K-quant dequantization in pure Java is slower than F32 dot products on
+   * already-widened weights. Measured on the registered host class it is real: 1.33x faster warm
+   * scoring on the MS MARCO MiniLM-L6 reranker. It also costs 1.77x on cold load and <b>changes the
+   * scores</b>: F32 matmul on widened weights is different arithmetic from the quantized-activation
+   * K-quant matmul, not a reordering of it. That is why {@code enabled} is an explicit input and
+   * the property defaults to off - a qualified model's record is a claim about exact outputs. It
+   * pays in a narrower set of cases than it first appears (#452), and both restrictions below are
+   * the difference between a trade and a straight loss:
    *
    * <ul>
    *   <li><b>Projections only.</b> The tables - {@code token_embd} and {@code position_embd} - are
@@ -249,8 +267,12 @@ final class BertWeights {
    * </ul>
    */
   static boolean preDequantizes(
-      boolean projection, GgufTensorType type, GgufBatchedMatrixKernel matrixKernel) {
-    return projection
+      boolean enabled,
+      boolean projection,
+      GgufTensorType type,
+      GgufBatchedMatrixKernel matrixKernel) {
+    return enabled
+        && projection
         && !matrixKernel.supports(type)
         && (type == GgufTensorType.Q4_K
             || type == GgufTensorType.Q5_K
@@ -287,7 +309,7 @@ final class BertWeights {
       throw new IllegalArgumentException(
           name + " uses unsupported batched projection type " + tensor.type());
     }
-    if (preDequantizes(projection, tensor.type(), matrixKernel)) {
+    if (preDequantizes(PRE_DEQUANTIZE_K_QUANT, projection, tensor.type(), matrixKernel)) {
       float[] values = GgufTensorValues.toFloatArray(tensor);
       MemorySegment f32Data = MemorySegment.ofArray(values);
       return new Matrix(f32Data, GgufTensorType.F32, rows, columns);

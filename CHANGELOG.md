@@ -31,16 +31,19 @@ All notable changes to models are documented here.
 
 ### Performance
 
-- **K-quant BERT projection weights pre-dequantized to F32 at load (#360, #452).**
-  `BertWeights` widens Q4_K/Q5_K/Q6_K **projection** weights to F32 when loading, because
-  on-the-fly K-quant dequantization in pure Java costs more per token than F32 dot products on
-  already-widened weights. This trades roughly **4x the memory of those weights** for that
-  latency, so it is applied only where it can pay: projections, never the `token_embd` and
-  `position_embd` tables, which are row lookups rather than multiplications and are the largest
-  tensors in the model; and only when no batched matrix kernel accepts the quantized form, so a
-  path with a native kernel keeps its quantized route and `BertForwardPass.project` keeps
-  deciding it. In practice this affects `GgufRerankingModel`, which installs no kernel. See #452
-  for the measurement status of the trade.
+- **Opt-in: K-quant BERT projection weights pre-dequantized to F32 at load (#360, #452).**
+  `-Dmodels.purejava.bert.preDequantizeKQuant=true` widens Q4_K/Q5_K/Q6_K **projection**
+  weights to F32 when loading, so pure-Java scoring runs F32 dot products instead of
+  dequantizing on every token. **Default off.** Measured on the registered host class with the
+  pinned MS MARCO MiniLM-L6 Q4_K reranker (`benchmark-results/2026-11-14-reranker-predequantize-ablation`):
+  warm scoring **1.33x faster** (pair p50 79.9 -> 59.0 ms, batch p50 597 -> 450 ms), cold load
+  **1.77x slower** (222 -> 393 ms), **+12.2 MB** for that model's six Q4_K projections, and
+  **scores move** - up to 0.038 on the probe's six documents, ordering preserved - because F32
+  matmul on widened weights is different arithmetic from the quantized-activation K-quant matmul.
+  A qualified model's record is a claim about exact outputs, so this is selectable and not the
+  default. Never applied to the `token_embd`/`position_embd` tables (row lookups, not
+  multiplications), and never when a batched matrix kernel accepts the quantized type, so the
+  native `bert`/`nomic-bert` path keeps its quantized route whatever the property says.
 
 - **Tokenizer hot-path allocation reduction (#435, #437).**
   `GgufTokenizer` no longer boxes token ids through `List<Integer>` on its encode paths, using a
