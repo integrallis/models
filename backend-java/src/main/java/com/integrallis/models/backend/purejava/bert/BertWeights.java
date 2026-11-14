@@ -20,12 +20,27 @@ import com.integrallis.models.backend.purejava.gguf.GgufTensorData;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorType;
 import com.integrallis.models.backend.purejava.gguf.GgufTensorValues;
 import com.integrallis.models.backend.purejava.ops.TensorOps;
+import com.integrallis.models.backend.purejava.spi.GgufBatchedMatrixKernel;
 import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 import java.util.Objects;
 
 /** Mapped BERT GGUF tensors plus the small F32 vectors decoded at load time. */
 final class BertWeights {
+
+  /**
+   * Opt-in: widen K-quant projection weights to F32 at load (#360). Default off, because it changes
+   * the scores a qualified reranker produces past its qualification tolerance (measured: up to
+   * 0.038 on the MS MARCO MiniLM-L6 probe, ordering preserved, and the pinned ONNX equivalence test
+   * fails by 0.075 against a 0.05 tolerance) and makes cold load 1.77x slower, in exchange for
+   * 1.33x faster warm scoring and +12.2 MB on that model. A pinned qualification record is a claim
+   * about exact outputs, so an arithmetic change is selectable, never the default - see {@link
+   * #preDequantizes}.
+   */
+  static final String PRE_DEQUANTIZE_K_QUANT_PROPERTY = "models.purejava.bert.preDequantizeKQuant";
+
+  private static final boolean PRE_DEQUANTIZE_K_QUANT =
+      Boolean.getBoolean(PRE_DEQUANTIZE_K_QUANT_PROPERTY);
 
   /** A row-major matrix stored in GGUF's [columns, rows] shape convention. */
   record Matrix(MemorySegment data, GgufTensorType type, int rows, int columns) {
@@ -84,8 +99,19 @@ final class BertWeights {
 
   /** Loads and validates the tensor names and dimensions defined by the BERT GGUF convention. */
   static BertWeights load(GgufFile file, BertConfig config) {
+    return load(file, config, GgufBatchedMatrixKernel.none());
+  }
+
+  /**
+   * Loads the weights, deciding each projection's storage against the kernel that will consume it.
+   *
+   * <p>The kernel is needed here because #360's pre-dequantization is only ever a win where no
+   * kernel can take the quantized form: see {@link #matrix}.
+   */
+  static BertWeights load(GgufFile file, BertConfig config, GgufBatchedMatrixKernel matrixKernel) {
     Objects.requireNonNull(file, "file");
     Objects.requireNonNull(config, "config");
+    Objects.requireNonNull(matrixKernel, "matrixKernel");
     int dim = config.embeddingDim();
     Matrix tokenEmbeddings = table(file, "token_embd.weight", config.vocabSize(), dim);
     Matrix positionEmbeddings =
@@ -111,26 +137,31 @@ final class BertWeights {
       boolean nomic = config.usesRotaryPositions();
       layers[layer] =
           new Layer(
-              nomic ? null : projection(file, prefix + "attn_q.weight", dim, dim),
+              nomic ? null : projection(file, prefix + "attn_q.weight", dim, dim, matrixKernel),
               nomic ? zero(dim) : vector(file, prefix + "attn_q.bias", dim),
-              nomic ? null : projection(file, prefix + "attn_k.weight", dim, dim),
+              nomic ? null : projection(file, prefix + "attn_k.weight", dim, dim, matrixKernel),
               nomic ? zero(dim) : vector(file, prefix + "attn_k.bias", dim),
-              nomic ? null : projection(file, prefix + "attn_v.weight", dim, dim),
+              nomic ? null : projection(file, prefix + "attn_v.weight", dim, dim, matrixKernel),
               nomic ? zero(dim) : vector(file, prefix + "attn_v.bias", dim),
-              projection(file, prefix + "attn_output.weight", dim, dim),
+              projection(file, prefix + "attn_output.weight", dim, dim, matrixKernel),
               nomic ? zero(dim) : vector(file, prefix + "attn_output.bias", dim),
               vector(file, prefix + "attn_output_norm.weight", dim),
               vector(file, prefix + "attn_output_norm.bias", dim),
-              projection(file, prefix + "ffn_up.weight", config.hiddenDim(), dim),
+              projection(file, prefix + "ffn_up.weight", config.hiddenDim(), dim, matrixKernel),
               nomic
                   ? zero(config.hiddenDim())
                   : vector(file, prefix + "ffn_up.bias", config.hiddenDim()),
-              projection(file, prefix + "ffn_down.weight", dim, config.hiddenDim()),
+              projection(file, prefix + "ffn_down.weight", dim, config.hiddenDim(), matrixKernel),
               nomic ? zero(dim) : vector(file, prefix + "ffn_down.bias", dim),
               vector(file, prefix + "layer_output_norm.weight", dim),
               vector(file, prefix + "layer_output_norm.bias", dim),
-              nomic ? projection(file, prefix + "attn_qkv.weight", dim * 3, dim) : null,
-              nomic ? projection(file, prefix + "ffn_gate.weight", config.hiddenDim(), dim) : null);
+              nomic
+                  ? projection(file, prefix + "attn_qkv.weight", dim * 3, dim, matrixKernel)
+                  : null,
+              nomic
+                  ? projection(
+                      file, prefix + "ffn_gate.weight", config.hiddenDim(), dim, matrixKernel)
+                  : null);
     }
 
     return new BertWeights(
@@ -211,16 +242,61 @@ final class BertWeights {
     return new float[size];
   }
 
-  private static Matrix table(GgufFile file, String name, int rows, int columns) {
-    return matrix(file, name, rows, columns, false);
+  /**
+   * Whether a tensor is widened to F32 at load rather than kept in its stored K-quant form.
+   *
+   * <p>#360 made this trade - roughly 7x the memory of those weights for per-token latency -
+   * because on-the-fly K-quant dequantization in pure Java is slower than F32 dot products on
+   * already-widened weights. Measured on the registered host class it is real: 1.33x faster warm
+   * scoring on the MS MARCO MiniLM-L6 reranker. It also costs 1.77x on cold load and <b>changes the
+   * scores</b>: F32 matmul on widened weights is different arithmetic from the quantized-activation
+   * K-quant matmul, not a reordering of it. That is why {@code enabled} is an explicit input and
+   * the property defaults to off - a qualified model's record is a claim about exact outputs. It
+   * pays in a narrower set of cases than it first appears (#452), and both restrictions below are
+   * the difference between a trade and a straight loss:
+   *
+   * <ul>
+   *   <li><b>Projections only.</b> The tables - {@code token_embd} and {@code position_embd} - are
+   *       read one row at a time by lookup and never multiplied, so there is no per-token
+   *       whole-matrix dequantization to remove. Widening them spends the most memory in the model,
+   *       {@code vocabSize * dim}, to buy nothing.
+   *   <li><b>Only where no kernel takes the quantized form.</b> {@code BertForwardPass.project}
+   *       picks its route with {@code matrixKernel.isEligible(matrix.type(), ...)}. Widening first
+   *       would hand the kernel F32 and decide, at load time and invisibly, a route the kernel
+   *       exists to decide. {@code GgufRerankingModel} installs no kernel and is where this pays;
+   *       {@code PureJavaBackend}'s {@code bert} and {@code nomic-bert} families install a real one
+   *       and keep their quantized path.
+   * </ul>
+   */
+  static boolean preDequantizes(
+      boolean enabled,
+      boolean projection,
+      GgufTensorType type,
+      GgufBatchedMatrixKernel matrixKernel) {
+    return enabled
+        && projection
+        && !matrixKernel.supports(type)
+        && (type == GgufTensorType.Q4_K
+            || type == GgufTensorType.Q5_K
+            || type == GgufTensorType.Q6_K);
   }
 
-  private static Matrix projection(GgufFile file, String name, int rows, int columns) {
-    return matrix(file, name, rows, columns, true);
+  private static Matrix table(GgufFile file, String name, int rows, int columns) {
+    return matrix(file, name, rows, columns, false, GgufBatchedMatrixKernel.none());
+  }
+
+  private static Matrix projection(
+      GgufFile file, String name, int rows, int columns, GgufBatchedMatrixKernel matrixKernel) {
+    return matrix(file, name, rows, columns, true, matrixKernel);
   }
 
   private static Matrix matrix(
-      GgufFile file, String name, int rows, int columns, boolean projection) {
+      GgufFile file,
+      String name,
+      int rows,
+      int columns,
+      boolean projection,
+      GgufBatchedMatrixKernel matrixKernel) {
     GgufTensorData tensor = file.getTensor(name);
     long[] expected = {columns, rows};
     if (!Arrays.equals(tensor.shape(), expected)) {
@@ -235,12 +311,7 @@ final class BertWeights {
       throw new IllegalArgumentException(
           name + " uses unsupported batched projection type " + tensor.type());
     }
-    // #360: pre-dequantize K-quant weights to F32 for the BERT path when no native kernel
-    // is present. On-the-fly Q4_K dequantization in pure Java is slower than F32 dot products
-    // on pre-dequantized weights. Trading memory (4x weight size) for per-token latency.
-    if (tensor.type() == GgufTensorType.Q4_K
-        || tensor.type() == GgufTensorType.Q5_K
-        || tensor.type() == GgufTensorType.Q6_K) {
+    if (preDequantizes(PRE_DEQUANTIZE_K_QUANT, projection, tensor.type(), matrixKernel)) {
       float[] values = GgufTensorValues.toFloatArray(tensor);
       MemorySegment f32Data = MemorySegment.ofArray(values);
       return new Matrix(f32Data, GgufTensorType.F32, rows, columns);

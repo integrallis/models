@@ -6,7 +6,50 @@ All notable changes to models are documented here.
 
 ## [0.5.21] - 2026-11-14
 
+### Added
+
+- **`models-tinystruct` integration module.** Tinystruct and TypeSafe adapters for semantic
+  dispatch, chat, embedding and reranking: `ModelsTinystructChatModel`,
+  `ModelsTinystructEmbeddingModel`, `ModelsTinystructReranker`, `ModelsTypesafeClient` and
+  `ModelsTypesafeRuntime`, with routed variants. This is a **new published artifact** on Maven
+  Central, `com.integrallis:models-tinystruct`, alongside the existing integration modules.
+
+### Changed
+
+- **Vectors dependency upgraded to 0.1.35** (from 0.1.34), with every module lockfile updated.
+  Consumers resolving models transitively pick up that release, which is largely allocation
+  elimination across the HNSW, Vamana and collection search paths, and which also adds
+  `SearchResult.rawScoreOf()` / `SimilarityFunction.rawScoreOf()`, runtime-queryable dispatch
+  counters with per-route latency histograms, and an actionable error when the
+  `jdk.incubator.vector` module is missing.
+
+### Fixed
+
+- **Tokenizer no longer exposes its internal arrays (#436).** `GgufTokenizer` returned references
+  to internal state (SpotBugs `EI_EXPOSE_REP`), letting a caller mutate a tokenizer's data through
+  a returned array. Also corrects the BERT F32 projection path.
+
 ### Performance
+
+- **Opt-in: K-quant BERT projection weights pre-dequantized to F32 at load (#360, #452).**
+  `-Dmodels.purejava.bert.preDequantizeKQuant=true` widens Q4_K/Q5_K/Q6_K **projection**
+  weights to F32 when loading, so pure-Java scoring runs F32 dot products instead of
+  dequantizing on every token. **Default off.** Measured on the registered host class with the
+  pinned MS MARCO MiniLM-L6 Q4_K reranker (`benchmark-results/2026-11-14-reranker-predequantize-ablation`):
+  warm scoring **1.33x faster** (pair p50 79.9 -> 59.0 ms, batch p50 597 -> 450 ms), cold load
+  **1.77x slower** (222 -> 393 ms), **+12.2 MB** for that model's six Q4_K projections, and
+  **scores move past the model's qualification tolerance** - up to 0.038 on the probe's six
+  documents, ordering preserved, and the pinned ONNX equivalence test fails by 0.075 against its
+  0.05 tolerance - because F32
+  matmul on widened weights is different arithmetic from the quantized-activation K-quant matmul.
+  A qualified model's record is a claim about exact outputs, so this is selectable and not the
+  default. Never applied to the `token_embd`/`position_embd` tables (row lookups, not
+  multiplications), and never when a batched matrix kernel accepts the quantized type, so the
+  native `bert`/`nomic-bert` path keeps its quantized route whatever the property says.
+
+- **Tokenizer hot-path allocation reduction (#435, #437).**
+  `GgufTokenizer` no longer boxes token ids through `List<Integer>` on its encode paths, using a
+  growable `int[]` builder instead.
 
 - **Compact F16 KV cache storage for the Java path (#438).**
   When `models.purejava.halfPrecisionKvCache` is enabled, `KvCache` now stores actual
