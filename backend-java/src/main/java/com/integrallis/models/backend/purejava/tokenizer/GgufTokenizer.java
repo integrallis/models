@@ -91,28 +91,6 @@ public final class GgufTokenizer implements Tokenizer {
     }
   }
 
-  /**
-   * Simple character trie for WordPiece longest-prefix matching without O(n²) substring
-   * allocations. Each node maps a single UTF-16 character to its child.
-   */
-  private static final class TrieNode {
-    int tokenId = -1; // -1 means no valid token ends here
-    // Keyed by code point. The earlier String-per-character keys allocated a String for every
-    // character of every vocabulary token at construction and again for every character looked up,
-    // which was 43% of a model's cold load (#457) and bought nothing at the hot path.
-    final java.util.Map<Integer, TrieNode> children = new java.util.HashMap<>();
-
-    void insert(String token, int id) {
-      TrieNode node = this;
-      for (int i = 0; i < token.length(); ) {
-        int codePoint = token.codePointAt(i);
-        node = node.children.computeIfAbsent(codePoint, k -> new TrieNode());
-        i += Character.charCount(codePoint);
-      }
-      node.tokenId = id;
-    }
-  }
-
   private static final Set<String> END_OF_GENERATION_TOKEN_TEXTS =
       Set.of(
           "<|eot_id|>",
@@ -250,7 +228,6 @@ public final class GgufTokenizer implements Tokenizer {
   private final char[] byteToChar;
   private final int[] charToByte;
   private final boolean normalizeNfc;
-  private final TrieNode wordPieceTrie;
 
   private GgufTokenizer(
       String[] vocab,
@@ -308,15 +285,6 @@ public final class GgufTokenizer implements Tokenizer {
     this.normalizeNfc = normalizeNfc;
     this.byteToChar = buildBytesToUnicode();
     this.charToByte = buildUnicodeToBytes(byteToChar);
-    if (useWordPiece) {
-      TrieNode trie = new TrieNode();
-      for (Map.Entry<String, Integer> entry : tokenToId.entrySet()) {
-        trie.insert(entry.getKey(), entry.getValue());
-      }
-      this.wordPieceTrie = trie;
-    } else {
-      this.wordPieceTrie = null;
-    }
   }
 
   /**
@@ -937,32 +905,37 @@ public final class GgufTokenizer implements Tokenizer {
   }
 
   private int[] encodeWordPiece(String text) {
+    // Greedy longest-match against the vocabulary, as before #435/#437. The trie those commits
+    // introduced bought nothing measurable on the pinned reranker's hot path (pair p50 62.74 ->
+    // 62.40 ms) and cost 62 ms on every model load - 31 ms even keyed by code point - so it is
+    // gone (#457). Only the token-id builder from that work is kept: an int[] instead of boxing.
     IntArrayBuilder encoded = new IntArrayBuilder(text.length());
     for (String word : wordPieceWords(text)) {
       int before = encoded.size();
       String candidate = "\u2581" + word;
-      int[] cps = candidate.codePoints().toArray();
-      for (int start = 0; start < cps.length; ) {
-        TrieNode node = wordPieceTrie;
-        int bestLen = 0;
-        int bestId = -1;
-        for (int i = start; i < cps.length; i++) {
-          node = node.children.get(cps[i]);
-          if (node == null) {
+      int[] boundaries =
+          candidate.codePoints().map(codePoint -> Character.charCount(codePoint)).toArray();
+      int[] offsets = new int[boundaries.length + 1];
+      for (int index = 0; index < boundaries.length; index++) {
+        offsets[index + 1] = offsets[index] + boundaries[index];
+      }
+      for (int start = 0; start < boundaries.length; ) {
+        Integer token = null;
+        int matchedEnd = -1;
+        for (int end = boundaries.length; end > start; end--) {
+          token = tokenToId.get(candidate.substring(offsets[start], offsets[end]));
+          if (token != null) {
+            matchedEnd = end;
             break;
           }
-          if (node.tokenId >= 0) {
-            bestLen = i - start + 1;
-            bestId = node.tokenId;
-          }
         }
-        if (bestId < 0) {
+        if (matchedEnd < 0) {
           encoded.removeLast(encoded.size() - before);
           encoded.add(unknownTokenId);
           break;
         }
-        encoded.add(bestId);
-        start += bestLen;
+        encoded.add(token);
+        start = matchedEnd;
       }
     }
     return encoded.toArray();

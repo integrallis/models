@@ -1,0 +1,63 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/home/ubuntu/.gradle/wrapper/dists/gradle-9.4.1-all/eckclv9s5vi9exbmnyvpg2a3h/gradle-9.4.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+Welcome to Gradle 9.4.1!
+
+Here are the highlights of this release:
+ - Java 26 support
+ - Non-class-based JVM tests
+ - Enhanced console progress bar
+
+For more details see https://docs.gradle.org/9.4.1/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :models-api:compileJava UP-TO-DATE
+> Task :backend-java:compileJava UP-TO-DATE
+> Task :writeReleaseDependencyManifest UP-TO-DATE
+> Task :backend-java:processResources UP-TO-DATE
+> Task :backend-java:classes UP-TO-DATE
+> Task :backend-java:jar UP-TO-DATE
+> Task :models-backend-onnx:compileJava UP-TO-DATE
+> Task :backend-native:compileJava UP-TO-DATE
+> Task :models-runtime:compileJava UP-TO-DATE
+> Task :models-test:compileJava UP-TO-DATE
+> Task :backend-java:compileTestJava UP-TO-DATE
+> Task :backend-java:processTestResources UP-TO-DATE
+> Task :backend-java:testClasses UP-TO-DATE
+> Task :backend-native:processResources UP-TO-DATE
+> Task :backend-native:classes UP-TO-DATE
+> Task :backend-native:jar UP-TO-DATE
+> Task :models-api:processResources UP-TO-DATE
+> Task :models-api:classes UP-TO-DATE
+> Task :models-api:jar UP-TO-DATE
+> Task :models-backend-onnx:processResources UP-TO-DATE
+> Task :models-backend-onnx:classes UP-TO-DATE
+> Task :models-backend-onnx:jar UP-TO-DATE
+> Task :models-runtime:processResources UP-TO-DATE
+> Task :models-runtime:classes UP-TO-DATE
+> Task :models-runtime:jar UP-TO-DATE
+> Task :models-test:processResources NO-SOURCE
+> Task :models-test:classes UP-TO-DATE
+> Task :models-test:jar UP-TO-DATE
+
+> Task :backend-java:downloadMsMarcoMiniLmL6V2RerankerModel
+/home/ubuntu/.jvllm/models/ms-marco-MiniLM-L-6-v2-q4_k-imatrix-g7c-f7.gguf
+
+> Task :backend-java:msMarcoMiniLmRerankerIntegrationTest
+WARNING: Using incubator modules: jdk.incubator.vector
+
+MsMarcoMiniLmRerankerIntegrationTest > sentencePairTokensAndTypesMatchThePinnedReference() PASSED
+
+MsMarcoMiniLmRerankerIntegrationTest > repeatedScoresAreDeterministicAndPairOrderMatters() PASSED
+
+MsMarcoMiniLmRerankerIntegrationTest > correctedQuantizedScoresMatchTheOnnxScaleAndOrdering() PASSED
+
+MsMarcoMiniLmRerankerIntegrationTest > batchScoresMatchSequentialScores() PASSED
+
+BUILD SUCCESSFUL in 13s
+22 actionable tasks: 2 executed, 20 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.4.1/userguide/configuration_cache_enabling.html
