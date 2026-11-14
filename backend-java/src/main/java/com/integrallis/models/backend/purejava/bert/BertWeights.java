@@ -66,7 +66,8 @@ final class BertWeights {
   private final float[] inputNormBias;
   private final Layer[] layers;
 
-  private BertWeights(
+  /** Package-private so a test can drive the forward pass with weights it built itself. */
+  BertWeights(
       Matrix tokenEmbeddings,
       Matrix positionEmbeddings,
       Matrix tokenTypeEmbeddings,
