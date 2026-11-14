@@ -1,4 +1,8 @@
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.nio.file.Path
+import javax.inject.Inject
+import org.gradle.process.ExecOperations
 import java.util.Properties
 import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
@@ -1495,4 +1499,170 @@ tasks.register<JavaExec>("flintReferenceFixture") {
     classpath = sourceSets["test"].runtimeClasspath
     mainClass.set("com.integrallis.models.backend.purejava.FlintGgufRouteTest")
     args(layout.buildDirectory.dir("flint-reference").get().asFile.absolutePath)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Reranker canary: the shipped pure-Java reranker path, PR build against the last release.
+//
+// Two gates that reached a release candidate in 0.5.21 without tripping anything: a batched path
+// 1.31x slower than the loop it replaced, described in the changelog as a speedup (#457), and a
+// default-on arithmetic change that moved a qualified model's scores past its ONNX tolerance
+// (#452). Both are visible in one experiment run against the released artifact. This runs it on
+// every pull request: the PR classpath and the released backend-java resolved from Central, same
+// experiment class, interleaved so runner drift lands on both arms, medians over the rounds, and a
+// ratio gate - absolute numbers on a hosted runner mean nothing, ratios on the same runner in the
+// same minute mean a lot. It is a tripwire, not a measurement: a failure is a reason to measure on
+// the registered host class, never a number to publish.
+// ---------------------------------------------------------------------------------------------
+val canaryBaselineVersion: Provider<String> =
+    providers.gradleProperty("canary.baselineVersion").orElse(
+        providers.provider {
+            // The previous release is the second versioned heading of the changelog. Fail closed:
+            // a canary that skips when it cannot find its baseline is the hole it exists to close.
+            val headings =
+                rootProject.file("CHANGELOG.md").readLines()
+                    .filter { it.startsWith("## [") && !it.startsWith("## [Unreleased]") }
+            require(headings.size >= 2) { "CHANGELOG.md needs two released sections to pick a canary baseline" }
+            headings[1].substringAfter("## [").substringBefore("]")
+        },
+    )
+
+val rerankerCanaryBaseline: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = true
+    description = "The last released backend-java and its runtime dependencies, from Maven Central"
+}
+
+dependencies {
+    rerankerCanaryBaseline("com.integrallis:backend-java:${canaryBaselineVersion.get()}")
+}
+
+abstract class RerankerCanaryTask : DefaultTask() {
+    @get:Inject abstract val execOperations: ExecOperations
+    @get:Classpath abstract val candidateClasspath: ConfigurableFileCollection
+    @get:Classpath abstract val baselineClasspath: ConfigurableFileCollection
+    @get:Input abstract val baselineVersion: Property<String>
+    @get:Input abstract val rounds: Property<Int>
+    @get:Input abstract val maxRounds: Property<Int>
+    @get:Input abstract val maximumRatio: Property<Double>
+    @get:Input abstract val allowScoreChange: Property<Boolean>
+    @get:Input abstract val warmups: Property<Int>
+    @get:Input abstract val pairIterations: Property<Int>
+    @get:Input abstract val batchIterations: Property<Int>
+    @get:Input @get:Optional abstract val fixtureDirectory: Property<String>
+    @get:OutputFile abstract val summary: RegularFileProperty
+
+    private val gated = listOf("coldLoadMillis", "pairP50Millis", "batchP50Millis")
+    private val mainClass = "com.integrallis.models.backend.purejava.MsMarcoMiniLmRerankerPerformanceExperiment"
+
+    private fun run(arm: String, classpath: FileCollection, round: Int): Map<String, Double> {
+        val out = ByteArrayOutputStream()
+        val result =
+            execOperations.javaexec {
+                this.classpath = classpath
+                this.mainClass.set(this@RerankerCanaryTask.mainClass)
+                jvmArgs("--add-modules", "jdk.incubator.vector", "-Xmx2g")
+                fixtureDirectory.orNull?.let { systemProperty("models.fixtures.directory", it) }
+                args(warmups.get().toString(), pairIterations.get().toString(), batchIterations.get().toString())
+                standardOutput = out
+                isIgnoreExitValue = true
+            }
+        val text = out.toString(Charsets.UTF_8)
+        if (result.exitValue != 0) {
+            throw GradleException("reranker canary: $arm arm round $round exited ${result.exitValue}\n${text.takeLast(2000)}")
+        }
+        val values = mutableMapOf<String, Double>()
+        for (key in gated + "scoreChecksum") {
+            val match = Regex("\"$key\":\\s*(-?[0-9.]+(?:[eE]-?[0-9]+)?)").find(text)
+                ?: throw GradleException("reranker canary: $arm arm round $round printed no \"$key\"\n${text.takeLast(1500)}")
+            values[key] = match.groupValues[1].toDouble()
+        }
+        return values
+    }
+
+    private fun median(values: List<Double>): Double {
+        val sorted = values.sorted(); val n = sorted.size
+        return if (n % 2 == 1) sorted[n / 2] else (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0
+    }
+
+    @TaskAction
+    fun canary() {
+        val candidate = mutableListOf<Map<String, Double>>()
+        val baseline = mutableListOf<Map<String, Double>>()
+        fun ratioFailures(): List<String> =
+            gated.mapNotNull { key ->
+                val ratio = median(candidate.map { it.getValue(key) }) / median(baseline.map { it.getValue(key) })
+                if (ratio > maximumRatio.get()) key else null
+            }
+        var round = 0
+        while (round < rounds.get() || (round < maxRounds.get() && ratioFailures().isNotEmpty())) {
+            round++
+            // Interleaved, baseline first: whatever the runner is doing this minute hits both arms.
+            // A red after the planned rounds buys more rounds, not a verdict: a tripwire that fires
+            // on runner noise gets ignored, which is worse than no tripwire.
+            baseline += run("baseline ${baselineVersion.get()}", baselineClasspath, round)
+            candidate += run("candidate", candidateClasspath, round)
+        }
+        val roundsRun = round
+        val lines = mutableListOf<String>()
+        lines += "## Reranker canary: candidate vs released ${baselineVersion.get()}"
+        lines += ""
+        lines += "$roundsRun interleaved rounds (planned ${rounds.get()}, escalating to ${maxRounds.get()} on a red), medians; `warmups=${warmups.get()} pairIterations=${pairIterations.get()} batchIterations=${batchIterations.get()}`; gate ratio ≤ ${maximumRatio.get()}. A tripwire on this runner, not a measurement."
+        lines += ""
+        lines += "| metric | released ${baselineVersion.get()} | candidate | ratio | gate |"
+        lines += "| --- | --- | --- | --- | --- |"
+        val failures = mutableListOf<String>()
+        for (key in gated) {
+            val b = median(baseline.map { it.getValue(key) }); val c = median(candidate.map { it.getValue(key) })
+            val ratio = c / b
+            val verdict = if (ratio <= maximumRatio.get()) "ok" else "**FAIL**"
+            if (ratio > maximumRatio.get()) failures += "$key: candidate/released = ${"%.3f".format(ratio)} > ${maximumRatio.get()}"
+            lines += "| $key | ${"%.2f".format(b)} | ${"%.2f".format(c)} | ${"%.3f".format(ratio)} | $verdict |"
+        }
+        val baselineChecksums = baseline.map { "%.6f".format(it.getValue("scoreChecksum")) }.toSet()
+        val candidateChecksums = candidate.map { "%.6f".format(it.getValue("scoreChecksum")) }.toSet()
+        lines += ""
+        lines += "scoreChecksum: released ${baselineChecksums.joinToString()} · candidate ${candidateChecksums.joinToString()}"
+        if (baselineChecksums.size != 1 || candidateChecksums.size != 1) {
+            failures += "scoreChecksum is not deterministic across rounds (released $baselineChecksums, candidate $candidateChecksums)"
+        } else if (baselineChecksums != candidateChecksums) {
+            if (allowScoreChange.get()) {
+                lines += ""
+                lines += "**Scores differ from the released artifact** and the PR declares it (`-Pcanary.allowScoreChange=true`). A qualified model's record is a claim about exact outputs: this change must be opt-in or re-qualified, and the CHANGELOG must say which."
+            } else {
+                failures += "scoreChecksum differs from released ${baselineVersion.get()} (${baselineChecksums.first()} vs ${candidateChecksums.first()}). The reranker's numerics changed. If intended, pass -Pcanary.allowScoreChange=true and state in the CHANGELOG whether the change is opt-in or the model was re-qualified."
+            }
+        }
+        if (failures.isNotEmpty()) { lines += ""; lines += "### Failed"; failures.forEach { lines += "- $it" } }
+        val text = lines.joinToString("\n") + "\n"
+        summary.get().asFile.apply { parentFile.mkdirs(); writeText(text) }
+        System.getenv("GITHUB_STEP_SUMMARY")?.let { File(it).appendText(text) }
+        logger.lifecycle(text)
+        if (failures.isNotEmpty()) {
+            throw GradleException("reranker canary failed against released ${baselineVersion.get()}:\n  " + failures.joinToString("\n  ") + "\nThis is a tripwire on a shared runner. Measure on the registered host class before concluding anything, and do not merge on a red canary without that measurement.")
+        }
+    }
+}
+
+tasks.register<RerankerCanaryTask>("rerankerCanary") {
+    group = "verification"
+    description = "Run the pinned MiniLM reranker experiment on this build and on the last release, interleaved, and gate the ratio"
+    dependsOn(tasks.named("downloadMsMarcoMiniLmL6V2RerankerModel"), tasks.named("testClasses"))
+    candidateClasspath.from(sourceSets["test"].runtimeClasspath)
+    // Released jars first so they, not this build's main classes, answer for the runtime; the
+    // experiment class and the fixture registry come from this build's test output in both arms.
+    baselineClasspath.from(rerankerCanaryBaseline, sourceSets["test"].output)
+    baselineVersion.set(canaryBaselineVersion)
+    rounds.set(providers.gradleProperty("canary.rounds").map { it.toInt() }.orElse(3))
+    maxRounds.set(providers.gradleProperty("canary.maxRounds").map { it.toInt() }.orElse(6))
+    maximumRatio.set(providers.gradleProperty("canary.maximumRatio").map { it.toDouble() }.orElse(1.15))
+    allowScoreChange.set(providers.gradleProperty("canary.allowScoreChange").map { it.toBoolean() }.orElse(false))
+    warmups.set(providers.gradleProperty("canary.warmups").map { it.toInt() }.orElse(3))
+    pairIterations.set(providers.gradleProperty("canary.pairIterations").map { it.toInt() }.orElse(30))
+    batchIterations.set(providers.gradleProperty("canary.batchIterations").map { it.toInt() }.orElse(10))
+    // The script-level provider, named explicitly: inside this block the bare name is the task's own property.
+    fixtureDirectory.set(providers.systemProperty("models.fixtures.directory"))
+    summary.set(layout.buildDirectory.file("reports/reranker-canary/summary.md"))
+    outputs.upToDateWhen { false }
 }

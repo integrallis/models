@@ -15,6 +15,8 @@ The reviewer must verify each answer, not just read it.
 
 ## Performance checklist
 
+- [ ] The **Reranker canary** workflow is green on this PR, or its red is explained here with the measurement on the registered host class that supersedes it
+
 - [ ] Baseline measurement against previous release tag completed (`benchmark-results/`)
 - [ ] No CHANGELOG claim contradicts the measured result
 - [ ] Cold-load metrics measured for any change claiming allocation or memory reduction

@@ -1,0 +1,102 @@
+name: Reranker canary
+
+# The shipped pure-Java reranker path, this build against the last release, on every change that
+# can touch it. Two defects reached the 0.5.21 release candidate with every check green: a batched
+# path 1.31x slower than the loop it replaced, described in the CHANGELOG as a speedup (#457), and
+# a default-on arithmetic change that moved a qualified model's scores past its ONNX tolerance
+# (#452). One experiment run against the released artifact shows both. It runs here on the PR build
+# and on backend-java as published to Maven Central, interleaved on the same runner, and gates the
+# ratio - absolute numbers on a hosted runner mean nothing; ratios in the same minute mean a lot.
+# Red here is a reason to measure on the registered host class, never a number to publish.
+
+on:
+  push:
+    branches: [main, "release/**"]
+    paths:
+      - ".github/workflows/reranker-canary.yml"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradle/**"
+      - "models-api/**"
+      - "backend-java/**"
+      - "CHANGELOG.md"
+  pull_request:
+    branches: [main, "release/**"]
+    paths:
+      - ".github/workflows/reranker-canary.yml"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradle/**"
+      - "models-api/**"
+      - "backend-java/**"
+      - "CHANGELOG.md"
+  workflow_dispatch:
+    inputs:
+      baselineVersion:
+        description: "Released backend-java version to run as the baseline arm (default: the previous CHANGELOG release)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reranker-canary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  canary:
+    name: PR build vs released backend-java
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: models
+    steps:
+      - name: Checkout models
+        uses: actions/checkout@v5
+        with:
+          path: models
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+      - name: Warm the Gradle distribution
+        uses: ./models/.github/actions/warm-gradle
+        with:
+          working-directory: models
+      - name: Cache the pinned reranker fixture
+        uses: actions/cache@v5
+        with:
+          path: ~/.jvllm/models/ms-marco-MiniLM-L-6-v2-q4_k-imatrix-g7c-f7.gguf
+          # Keyed on the fixture's registered sha256, so a re-pin invalidates it.
+          key: reranker-canary-fixture-0752a92bc33289f3fe230d1a33cce471f1a7fe1c8d5a491ca7fff6b068b0fc83
+      - name: Quality canary - pinned equivalence tests on this build
+        # Tokens against the pinned reference, determinism, ONNX scale and ordering, and
+        # batch-equals-sequential, on the real model. These are the tests that would have failed
+        # on #455 and #452 and that CI never ran.
+        run: >
+          ./gradlew
+          :backend-java:msMarcoMiniLmRerankerIntegrationTest
+          --no-daemon
+          --stacktrace
+      - name: Performance canary - this build vs the released artifact, interleaved
+        run: >
+          ./gradlew
+          :backend-java:rerankerCanary
+          --no-daemon
+          --stacktrace
+          ${{ github.event.inputs.baselineVersion != '' && format('-Pcanary.baselineVersion={0}', github.event.inputs.baselineVersion) || '' }}
+      - name: Upload canary summary and reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reranker-canary-${{ github.run_id }}
+          path: |
+            models/backend-java/build/reports/reranker-canary/
+            models/backend-java/build/test-results/msMarcoMiniLmRerankerIntegrationTest/
+          if-no-files-found: ignore
