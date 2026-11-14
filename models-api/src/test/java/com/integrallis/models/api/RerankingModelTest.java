@@ -62,4 +62,10 @@ class RerankingModelTest {
     assertThat(ranked.get(1).originalIndex()).isEqualTo(2); // "bb"
     assertThat(ranked.get(2).originalIndex()).isEqualTo(1); // "a"
   }
+
+  @Test
+  void defaultTruncationReportIsZero() {
+    assertThat(DUMMY.truncationReport().truncatedPairs()).isEqualTo(0L);
+    assertThat(DUMMY.truncationReport().droppedTokens()).isEqualTo(0L);
+  }
 }

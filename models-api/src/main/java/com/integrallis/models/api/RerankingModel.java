@@ -93,4 +93,47 @@ public interface RerankingModel extends AutoCloseable {
   /** Default lifecycle is a no-op for models without owned mapped or native state. */
   @Override
   default void close() {}
+
+  /**
+   * How many pairs have been truncated and how many tokens dropped, since this model was opened.
+   *
+   * <p>Implementations that do not track truncation return zeroes. A non-zero count means at least
+   * one query–document pair did not fit the model's context window and was shortened before
+   * scoring; the scores for those pairs were computed on a prefix rather than the full text.
+   *
+   * @see TruncationPolicy
+   */
+  default TruncationReport truncationReport() {
+    return new TruncationReport(0, 0);
+  }
+
+  /** Cumulative truncation observed since the model was opened. */
+  record TruncationReport(long truncatedPairs, long droppedTokens) {}
+
+  /**
+   * How a reranker handles query–document pairs that exceed its context window.
+   *
+   * <p>The default for most implementations is {@link #LONGEST_FIRST}: drop tokens from the longer
+   * side until the pair fits. Callers that need guaranteed full-text scoring should select {@link
+   * #REFUSE} and catch the resulting exception.
+   */
+  enum TruncationPolicy {
+    /**
+     * Drop tokens from the longer side first until the pair fits the window. This is the standard
+     * BERT sentence-pair behaviour and the default for Models rerankers.
+     */
+    LONGEST_FIRST,
+
+    /**
+     * Throw if the pair does not fit the window. The caller receives an {@link
+     * IllegalArgumentException} with the actual and allowed token counts.
+     */
+    REFUSE,
+
+    /**
+     * Truncate the document side only, preserving the full query. If the query alone exceeds the
+     * window the behaviour falls back to {@link #LONGEST_FIRST} and a warning is logged.
+     */
+    DOCUMENT_FIRST
+  }
 }

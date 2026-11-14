@@ -59,6 +59,19 @@ public final class GgufTokenizer implements Tokenizer {
     }
   }
 
+  /** How to shorten a query–document pair that exceeds the model's context window. */
+  public enum TruncationPolicy {
+    /** Drop from the longer side first until the pair fits (standard BERT behaviour). */
+    LONGEST_FIRST,
+    /** Throw if the pair does not fit. */
+    REFUSE,
+    /**
+     * Drop from the document side first; fall back to longest-first if the query alone exceeds the
+     * budget.
+     */
+    DOCUMENT_FIRST
+  }
+
   /**
    * Resizable primitive int array to avoid {@code List<Integer>} autoboxing in hot tokenization
    * paths. Uses the same growth factor as {@code ArrayList} (1.5x) but keeps values unboxed.
@@ -825,16 +838,29 @@ public final class GgufTokenizer implements Tokenizer {
   }
 
   /**
-   * Encodes a BERT cross-encoder pair as {@code [CLS] first [SEP] second [SEP]}.
-   *
-   * <p>When the pair exceeds {@code maxTokens}, tokens are removed from the longer side first. This
-   * is the longest-first truncation used by the model's reference tokenizer. Segment id {@code 0}
-   * covers the first sentence and its separator; id {@code 1} covers the second sentence and its
-   * separator.
+   * Encodes a sentence pair with {@link TruncationPolicy#LONGEST_FIRST} truncation. This is the
+   * default BERT-style behaviour: if the combined length exceeds the budget, tokens are dropped
+   * from the longer side first.
    */
   public TokenizedPair encodePair(String first, String second, int maxTokens) {
+    return encodePair(first, second, maxTokens, TruncationPolicy.LONGEST_FIRST);
+  }
+
+  /**
+   * Encodes a sentence pair with an explicit truncation policy.
+   *
+   * <ul>
+   *   <li>{@code LONGEST_FIRST} — drop from the longer side until the pair fits.
+   *   <li>{@code REFUSE} — throw if the pair exceeds the window.
+   *   <li>{@code DOCUMENT_FIRST} — drop from the second (document) side first; if the query alone
+   *       exceeds the budget, fall back to {@code LONGEST_FIRST}.
+   * </ul>
+   */
+  public TokenizedPair encodePair(
+      String first, String second, int maxTokens, TruncationPolicy policy) {
     Objects.requireNonNull(first, "first");
     Objects.requireNonNull(second, "second");
+    Objects.requireNonNull(policy, "policy");
     if (!useWordPiece) {
       throw new IllegalStateException(
           "sentence-pair encoding currently requires a WordPiece model");
@@ -851,13 +877,37 @@ public final class GgufTokenizer implements Tokenizer {
     int secondLen = secondTokens.length;
     int total = firstLen + secondLen;
     int dropped = Math.max(0, total - contentBudget);
-    while (total > contentBudget) {
-      if (firstLen >= secondLen) {
-        firstLen--;
-      } else {
-        secondLen--;
-      }
-      total--;
+
+    switch (policy) {
+      case REFUSE:
+        if (total > contentBudget) {
+          throw new IllegalArgumentException(
+              "sentence pair exceeds window: " + total + " tokens (budget " + contentBudget + ")");
+        }
+        break;
+      case DOCUMENT_FIRST:
+        // Drop from the document (second) side first. If the query alone exceeds the budget,
+        // fall back to dropping from the query side as well.
+        while (total > contentBudget) {
+          if (secondLen > 0) {
+            secondLen--;
+          } else {
+            firstLen--;
+          }
+          total--;
+        }
+        break;
+      case LONGEST_FIRST:
+      default:
+        while (total > contentBudget) {
+          if (firstLen >= secondLen) {
+            firstLen--;
+          } else {
+            secondLen--;
+          }
+          total--;
+        }
+        break;
     }
 
     int length = firstLen + secondLen + 3;

@@ -51,6 +51,13 @@ public final class SafetensorsRerankingModel implements RerankingModel {
   }
 
   @Override
+  public RerankingModel.TruncationReport truncationReport() {
+    checkOpen();
+    DebertaV2Engine.TruncationReport report = engine.truncationReport();
+    return new RerankingModel.TruncationReport(report.truncatedPairs(), report.droppedTokens());
+  }
+
+  @Override
   public synchronized void close() {
     closed = true;
   }

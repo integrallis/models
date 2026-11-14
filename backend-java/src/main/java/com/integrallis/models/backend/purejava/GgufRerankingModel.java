@@ -46,7 +46,10 @@ public final class GgufRerankingModel implements RerankingModel {
   private final BertForwardPass encoder;
   private final BertClassificationHead classifier;
   private final int contextLength;
-  private boolean closed;
+  private final java.util.concurrent.atomic.AtomicBoolean closed =
+      new java.util.concurrent.atomic.AtomicBoolean();
+  private GgufTokenizer.TruncationPolicy truncationPolicy =
+      GgufTokenizer.TruncationPolicy.LONGEST_FIRST;
 
   private GgufRerankingModel(
       Arena arena,
@@ -88,7 +91,8 @@ public final class GgufRerankingModel implements RerankingModel {
     Objects.requireNonNull(query, "query");
     Objects.requireNonNull(document, "document");
     checkOpen();
-    GgufTokenizer.TokenizedPair pair = tokenizer.encodePair(query, document, contextLength);
+    GgufTokenizer.TokenizedPair pair =
+        tokenizer.encodePair(query, document, contextLength, truncationPolicy);
     if (pair.droppedTokens() > 0) {
       truncatedPairs.incrementAndGet();
       droppedTokens.addAndGet(pair.droppedTokens());
@@ -97,7 +101,7 @@ public final class GgufRerankingModel implements RerankingModel {
   }
 
   @Override
-  public synchronized List<Double> scoreBatch(String query, List<String> documents) {
+  public List<Double> scoreBatch(String query, List<String> documents) {
     Objects.requireNonNull(query, "query");
     Objects.requireNonNull(documents, "documents");
     checkOpen();
@@ -112,7 +116,8 @@ public final class GgufRerankingModel implements RerankingModel {
           tokenizer.encodePair(
               query,
               Objects.requireNonNull(documents.get(i), "documents must not contain null"),
-              contextLength);
+              contextLength,
+              truncationPolicy);
       if (pairs[i].droppedTokens() > 0) {
         truncatedPairs.incrementAndGet();
         droppedTokens.addAndGet(pairs[i].droppedTokens());
@@ -152,23 +157,34 @@ public final class GgufRerankingModel implements RerankingModel {
    * @param truncatedPairs pairs that did not fit the window
    * @param droppedTokens tokens removed across those pairs
    */
-  public record TruncationReport(long truncatedPairs, long droppedTokens) {}
+  @Override
+  public RerankingModel.TruncationReport truncationReport() {
+    return new RerankingModel.TruncationReport(truncatedPairs.get(), droppedTokens.get());
+  }
 
-  /** Returns the truncation seen so far. Never null; zeroed only by opening a new model. */
-  public TruncationReport truncationReport() {
-    return new TruncationReport(truncatedPairs.get(), droppedTokens.get());
+  /**
+   * Selects how pairs that exceed the context window are shortened. The default is {@link
+   * GgufTokenizer.TruncationPolicy#LONGEST_FIRST}. Changing the policy does not reset cumulative
+   * truncation counters.
+   */
+  public synchronized void setTruncationPolicy(GgufTokenizer.TruncationPolicy policy) {
+    this.truncationPolicy = Objects.requireNonNull(policy, "policy");
+  }
+
+  /** Returns the currently active truncation policy. */
+  public synchronized GgufTokenizer.TruncationPolicy truncationPolicy() {
+    return truncationPolicy;
   }
 
   @Override
   public synchronized void close() {
-    if (!closed) {
-      closed = true;
+    if (closed.compareAndSet(false, true)) {
       arena.close();
     }
   }
 
   private void checkOpen() {
-    if (closed) {
+    if (closed.get()) {
       throw new IllegalStateException("reranking model is closed");
     }
   }

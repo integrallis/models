@@ -411,6 +411,58 @@ class GgufTokenizerTest {
     }
 
     @Test
+    void refusePolicyThrowsWhenPairExceedsWindow() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createWordPieceMetadata());
+      assertThatThrownBy(
+              () ->
+                  tokenizer.encodePair(
+                      "transit api friendly",
+                      "transit api friendly",
+                      6,
+                      GgufTokenizer.TruncationPolicy.REFUSE))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("exceeds window");
+    }
+
+    @Test
+    void documentFirstPolicyTruncatesDocumentSide() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createWordPieceMetadata());
+      // "transit api friendly" (3) + "transit api" (2) = 5 content tokens; budget for
+      // 7-token window is 4. Longest-first drops from first side (3 >= 2), but
+      // document-first drops from second side.
+      GgufTokenizer.TokenizedPair pair =
+          tokenizer.encodePair(
+              "transit api friendly",
+              "transit api",
+              7,
+              GgufTokenizer.TruncationPolicy.DOCUMENT_FIRST);
+      assertThat(pair.droppedTokens()).isEqualTo(1);
+      assertThat(pair.tokens()).hasSize(7);
+      // Second side should be truncated: the document tokens after [SEP] should be fewer.
+      int documentTokenCount = 0;
+      for (int type : pair.tokenTypes()) {
+        if (type == 1) documentTokenCount++;
+      }
+      assertThat(documentTokenCount).isEqualTo(2); // one [SEP] + one document token
+    }
+
+    @Test
+    void defaultPolicyMatchesLongestFirst() {
+      GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createWordPieceMetadata());
+      GgufTokenizer.TokenizedPair explicit =
+          tokenizer.encodePair(
+              "transit api friendly",
+              "transit api",
+              7,
+              GgufTokenizer.TruncationPolicy.LONGEST_FIRST);
+      GgufTokenizer.TokenizedPair implicit =
+          tokenizer.encodePair("transit api friendly", "transit api", 7);
+      assertThat(explicit.tokens()).containsExactly(implicit.tokens());
+      assertThat(explicit.tokenTypes()).containsExactly(implicit.tokenTypes());
+      assertThat(explicit.droppedTokens()).isEqualTo(implicit.droppedTokens());
+    }
+
+    @Test
     void rejectsPairEncodingForNonWordPieceModels() {
       GgufTokenizer tokenizer = GgufTokenizer.fromMetadata(createTestMetadata());
 

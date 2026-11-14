@@ -27,6 +27,32 @@ All notable changes to models are documented here.
   over `score()` for implementations that do not opt in. Batch parity is verified
   against sequential `score()` in the MiniLM-L6 integration test.
 
+- **F16 KV cache read-into avoids per-slot allocation (#447).**
+  `KvStorage` gains `readInto(int slot, float[] dst, int dstOffset, int length)`,
+  implemented by both `F32Store` and `F16Store`. `KvCache.attentionView()` now uses
+  `readInto` when building `AttentionSpan` objects in compact F16 mode, eliminating
+  `positionCount * 2` temporary `float[]` allocations per span. The F32 zero-copy path
+  via `rawFloatArray()` is unchanged.
+
+- **Reranker `scoreBatch` no longer synchronizes on the model instance (#448).**
+  `GgufRerankingModel.scoreBatch` is no longer `synchronized`; only `score()` and
+  `close()` retain instance-level locking. The `closed` flag is changed from `boolean`
+  to `AtomicBoolean` for visibility across threads. This allows concurrent batch
+  preparation (tokenization, padding, array layout) to overlap even though the
+  underlying `BertForwardPass.encodeBatchCls` still serializes the forward pass.
+  `RerankingModelConcurrentBatchTest` verifies no corruption or deadlock under
+  4-thread concurrent load.
+
+- **Truncation reporting and explicit policies for rerankers (#362).**
+  `RerankingModel` gains `TruncationReport` and `truncationReport()`, exposing
+  cumulative truncated-pair and dropped-token counts uniformly across backends.
+  `GgufRerankingModel` and `SafetensorsRerankingModel` both implement the method.
+  `GgufTokenizer` adds `TruncationPolicy` with three modes:
+  `LONGEST_FIRST` (default, standard BERT), `REFUSE` (throw if pair exceeds window),
+  and `DOCUMENT_FIRST` (truncate document side before query side). `GgufRerankingModel`
+  exposes `setTruncationPolicy()` and `truncationPolicy()` for runtime configuration.
+  Default behavior is unchanged; new policies are opt-in.
+
 ## [0.5.20] - 2026-11-12
 
 ### Added
