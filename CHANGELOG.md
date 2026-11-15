@@ -4,6 +4,21 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.22] - 2026-11-14
+
+### Changed
+
+- **Vectors dependency upgraded to 0.1.36** (from 0.1.35), with every module lockfile updated.
+  0.1.36 restores k-means as the default IVF centroid trainer (0.1.35 had switched every IVF index
+  to e-means unmeasured; measured, it was 2–16% slower at matched recall on the audit corpus —
+  e-means stays available as `IvfBuildParams.withTrainer(CentroidTrainer.E_MEANS)`), fixes a
+  0.1.34 regression where a persistent recipe collection could not be created at a storage path
+  that did not exist yet, adds the upstream MIT notice for the FAISS e-means port, makes the
+  vectors recall gate uncacheable, repairs its benchmark-comparison tooling and records the 0.1.35
+  measurements in its CHANGELOG. None of it touches the GGUF kernels Models runs on: the
+  batched-matmul path measured 0.986–1.045× between vectors 0.1.34 and 0.1.35 and is unchanged in
+  0.1.36. The reranker canary's released baseline stays 0.5.21.
+
 ## [0.5.21] - 2026-11-14
 
 ### Added
