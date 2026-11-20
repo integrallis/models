@@ -47,6 +47,7 @@ import org.springframework.context.annotation.Configuration;
  * Exercises Craig Walls' ChatClient, customizer, memory, and tool wiring in a real Spring context.
  */
 @Tag("unit")
+@SuppressWarnings("removal")
 class SpringContextToolCallingIntegrationTest {
 
   @Test
