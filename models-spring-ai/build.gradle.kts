@@ -5,9 +5,27 @@ import java.nio.file.Path
 
 val springAiVersion = providers.gradleProperty("springAiVersion").getOrElse("2.0.0")
 
+sourceSets {
+    main {
+        java {
+            if (!springAiVersion.startsWith("2.1.")) {
+                exclude("**/decision/**")
+            }
+        }
+    }
+    test {
+        java {
+            if (!springAiVersion.startsWith("2.1.")) {
+                exclude("**/decision/**")
+            }
+        }
+    }
+}
+
 dependencies {
     api(project(":models-runtime"))
     api(project(":models-router"))
+    implementation(project(":models-decisions"))
 
     implementation("com.fasterxml.jackson.core:jackson-databind:${rootProject.extra["jacksonVersion"]}")
 
