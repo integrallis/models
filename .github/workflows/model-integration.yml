@@ -127,6 +127,13 @@ jobs:
         working-directory: models
         run: ./gradlew :backend-java:layaDecisionIntegrationTest --no-daemon --stacktrace
 
+      # The Spring AI DecisionModel adapter on a real model. Qwen3 1.7B is a llama-style family, so
+      # this is the one run that exercises a real shared KV prefix through the adapter; the unit
+      # tests use a scripted backend.
+      - name: Run the Spring AI DecisionModel adapter on Qwen3 1.7B
+        working-directory: models
+        run: ./gradlew :models-spring-ai:decisionModelIntegrationTest --no-daemon --stacktrace
+
       - name: Run EmbeddingGemma 2 text integration and oracle equivalence
         working-directory: models
         run: |
