@@ -21,6 +21,18 @@ All notable changes to models are documented here.
 
 ### Changed
 
+- **Vectors dependency upgraded to 0.1.45** (from 0.1.36), with every module lockfile updated.
+  Nine releases sit between the pins and none of them touches `vectors-core`, the one Vectors
+  module `backend-java` uses: its main and test sources are identical at the two tags, so the
+  GGUF kernels Models runs on are unchanged. What moved is in the modules behind the stores and
+  the adapters. `vectors-storage` and `vectors-db`: Azure Blob Storage as a durable tier, a
+  filesystem sandbox and a sync policy for the local backend, a listing that no longer fails on an
+  entry that vanishes mid-walk, and a supplied content hash that now survives the collection, which
+  introduces `metadata.bin` format version 2 for a collection holding a hash that cannot be derived
+  from stored text (a recipe collection is one); such a collection cannot be opened by Vectors
+  0.1.44 or earlier. `vectors-spring-ai`: Spring AI 2.1 `upsert` and query-vector search through
+  the framework's template methods, corrected in 0.1.45 after 0.1.44 had bypassed them. The
+  reranker canary's released baseline stays 0.5.22.
 - **`models-spring-ai` depends on `models-decisions`** (which brings nothing beyond `models-api`),
   and its jar carries one class compiled against Spring AI 2.1. The rest of the artifact is still
   compiled against the 2.0 baseline and still runs on 1.1.x and 2.0.x, where that class is never
