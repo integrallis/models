@@ -20,6 +20,7 @@ import com.integrallis.models.api.SharedInferencePrefix;
 import com.integrallis.models.api.SharedPrefixInferenceBackend;
 import com.integrallis.models.decisions.AnswerSpace;
 import com.integrallis.models.decisions.Choice;
+import com.integrallis.models.decisions.LetterDecisionEvaluator;
 import com.integrallis.models.decisions.LetterLogitScorer;
 import com.integrallis.models.decisions.Noul;
 import com.integrallis.models.decisions.Score;
@@ -267,31 +268,14 @@ public final class ModelsTypesafeClient implements TypesafeClient, AutoCloseable
   }
 
   private Verdict scoreVerdict(AnswerSpace space, float[] logits) {
-    List<String> labels = space.labels();
-    int[] letterTokens = new int[labels.size()];
-    for (int slot = 0; slot < labels.size(); slot++) {
-      int[] encoded = backend.tokenizer().encode(" " + (char) ('A' + slot));
-      if (encoded.length == 0) {
-        throw new IllegalStateException("Tokenizer produced no token for option letter " + slot);
-      }
-      letterTokens[slot] = encoded[encoded.length - 1];
-    }
-    return letterScorer.score(space, logits, letterTokens);
+    return letterScorer.score(
+        space, logits, LetterDecisionEvaluator.letterTokens(backend.tokenizer(), space.size()));
   }
 
+  // One definition of the lettered prompt, shared with every other caller that scores letters, so
+  // the same question is never worded two ways through two entry points.
   private static String renderQuestionSuffix(AnswerSpace space) {
-    List<String> labels = space.labels();
-    String criteriaBlock = LetterLogitScorer.renderCriteria(labels, space.criteria());
-    StringBuilder suffix = new StringBuilder();
-    if (!criteriaBlock.isEmpty()) {
-      suffix.append('\n').append(criteriaBlock);
-    }
-    suffix
-        .append('\n')
-        .append(space.question())
-        .append('\n')
-        .append(LetterLogitScorer.renderOptions(labels));
-    return suffix.toString();
+    return LetterDecisionEvaluator.questionSuffix(space);
   }
 
   private static Builder formatAnswer(String type, Verdict verdict) {

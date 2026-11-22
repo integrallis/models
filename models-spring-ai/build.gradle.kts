@@ -1,31 +1,55 @@
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.zip.ZipFile
 
 // models-spring-ai — Spring AI ChatModel + StreamingChatModel adapter
 
 val springAiVersion = providers.gradleProperty("springAiVersion").getOrElse("2.0.0")
 
-sourceSets {
-    main {
-        java {
-            if (!springAiVersion.startsWith("2.1.")) {
-                exclude("**/decision/**")
-            }
-        }
-    }
-    test {
-        java {
-            if (!springAiVersion.startsWith("2.1.")) {
-                exclude("**/decision/**")
-            }
-        }
-    }
+// --- API that only exists from Spring AI 2.1 (DecisionModel) -----------------------------------
+//
+// One artifact serves every supported Spring AI line, and the main source set is compiled against
+// the baseline above so it cannot bind to anything newer. A class that implements a 2.1-only
+// interface cannot be compiled against that baseline, so it lives in its own source set, compiled
+// against 2.1, and its classes are packed into the same jar. On an older line nothing references
+// them, so they are never loaded; this is how Spring Boot's own auto-configuration jar carries
+// integrations for libraries that may be absent.
+//
+// The version is fixed here, not taken from -PspringAiVersion: these sources need at least 2.1
+// whatever line the rest of the build is being tested against.
+val springAi21Version = providers.gradleProperty("springAi21Version").getOrElse("2.1.0")
+
+val springAi21: SourceSet by sourceSets.creating {
+    compileClasspath += sourceSets["main"].output
+    runtimeClasspath += sourceSets["main"].output
 }
+val springAi21Test: SourceSet by sourceSets.creating {
+    compileClasspath += sourceSets["main"].output + springAi21.output
+    runtimeClasspath += sourceSets["main"].output + springAi21.output
+}
+configurations[springAi21.implementationConfigurationName].extendsFrom(
+    configurations["implementation"],
+    configurations["api"],
+)
+// The test libraries, and backend-java for the real-model test, come from the ordinary test
+// configuration. That also brings the baseline Spring AI; requesting 2.1 beside it resolves upward.
+configurations[springAi21Test.implementationConfigurationName].extendsFrom(
+    configurations["testImplementation"],
+)
+configurations[springAi21Test.runtimeOnlyConfigurationName].extendsFrom(
+    configurations["testRuntimeOnly"],
+)
 
 dependencies {
     api(project(":models-runtime"))
     api(project(":models-router"))
+    // Used only by the Spring AI 2.1 DecisionModel adapter, but declared here so it reaches the
+    // published POM: the adapter's classes ship in this jar. It is the contracts-and-arithmetic
+    // tier and brings nothing beyond models-api.
     implementation(project(":models-decisions"))
+
+    add(springAi21.compileOnlyConfigurationName, "org.springframework.ai:spring-ai-model:$springAi21Version")
+    add(springAi21Test.implementationConfigurationName, "org.springframework.ai:spring-ai-model:$springAi21Version")
 
     implementation("com.fasterxml.jackson.core:jackson-databind:${rootProject.extra["jacksonVersion"]}")
 
@@ -244,3 +268,89 @@ tasks.register<Test>("gptOssSpringAiIntegrationTest") {
     maxParallelForks = 1
     maxHeapSize = "4g"
 }
+
+// --- Spring AI 2.1 source set: packaging and verification ----------------------------------------
+
+tasks.named<Jar>("jar") {
+    from(springAi21.output)
+}
+tasks.named<Jar>("sourcesJar") {
+    from(springAi21.allSource)
+}
+tasks.named<Javadoc>("javadoc") {
+    source(springAi21.allJava)
+    // 2.1 first: it is a superset for these sources, and the baseline jar has no DecisionModel.
+    classpath = springAi21.compileClasspath + classpath
+}
+
+val springAi21TestTask =
+    tasks.register<Test>("springAi21Test") {
+        description = "Tests the Spring AI 2.1 additions on Spring AI $springAi21Version"
+        group = "verification"
+        testClassesDirs = springAi21Test.output.classesDirs
+        classpath = springAi21Test.runtimeClasspath
+        // Like the module's ordinary test task: the real-model check is not part of `check`. It
+        // takes minutes on a real model and would otherwise run whenever a fixture happens to be
+        // on the machine. decisionModelIntegrationTest runs it.
+        useJUnitPlatform {
+            excludeTags("slow", "benchmark", "integration", "model-fixture")
+        }
+    }
+// The adapter merged in #466 was excluded from the default build, so the published jar would not
+// have contained it and nothing noticed. This fails the build if the class is not in the jar.
+val verifyDecisionAdapterInJar =
+    tasks.register("verifyDecisionAdapterInJar") {
+        description = "Fails unless the published jar contains the Spring AI 2.1 DecisionModel adapter"
+        group = "verification"
+        val archive = tasks.named<Jar>("jar").flatMap { it.archiveFile }
+        inputs.file(archive)
+        doLast {
+            val entry = "com/integrallis/models/spring/ai/decision/ModelsSpringAiDecisionModel.class"
+            ZipFile(archive.get().asFile).use { zip ->
+                if (zip.getEntry(entry) == null) {
+                    throw GradleException("${archive.get().asFile.name} does not contain $entry")
+                }
+            }
+        }
+    }
+tasks.named("check") {
+    dependsOn(springAi21TestTask, verifyDecisionAdapterInJar)
+}
+
+tasks.register<Test>("decisionModelIntegrationTest") {
+    description = "Run the Spring AI DecisionModel adapter end to end on the pinned Qwen3 1.7B artifact"
+    group = "verification"
+    testClassesDirs = springAi21Test.output.classesDirs
+    classpath = springAi21Test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.spring.ai.decision.RealModelDecisionIntegrationTest",
+        )
+    }
+    // Qwen3 1.7B is a llama-style family, so this is the run that exercises a real shared prefix.
+    // -Dmodels.fixtures.decisionModel=<file> points it at another fixture in the same directory.
+    systemProperty(
+        "models.fixtures.directory",
+        fixtureDirectory.orNull
+            ?: Path.of(System.getProperty("user.home"), ".jvllm", "models").toString(),
+    )
+    systemProperty(
+        "models.fixtures.decisionModel",
+        providers.systemProperty("models.fixtures.decisionModel").getOrElse("Qwen3-1.7B-Q8_0.gguf"),
+    )
+    dependsOn(project(":backend-java").tasks.named("downloadQwen317BQ80Model"))
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+}
+// The coverage gate has to see the adapter too, or the one class in this module that touches the
+// newest API would be the one class nothing measures.
+tasks.withType<JacocoReportBase>().configureEach {
+    dependsOn(springAi21TestTask)
+    executionData(springAi21TestTask.get())
+    sourceSets(springAi21)
+}
+

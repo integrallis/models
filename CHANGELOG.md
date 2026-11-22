@@ -4,6 +4,28 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **`ModelsSpringAiDecisionModel`: Spring AI 2.1's `DecisionModel` over a local backend.** Yes/no,
+  choice and score questions map onto `Noul`, `Choice` and `Score` with their criteria, and are
+  answered by reading the model's distribution over lettered options, so any set of options can
+  be asked. Several questions in one prompt share one read of the input when the model family can
+  share a KV prefix, and the response metadata says whether they did. Text, fields and
+  conversation inputs are supported; non-text parts are refused. Run end to end on Qwen3 1.7B
+  (shared prefix proven) and Qwen3.5 4B (no shared prefix); no accuracy or latency is claimed for
+  it. No auto-configuration yet. Single-session families such as LFM2 are not supported.
+- **`LetterDecisionEvaluator` in `models-decisions`.** The lettered-prompt decision path as one
+  class: the prompt layout, the letter tokens, and the shared-prefix orchestration.
+  `ModelsTypesafeClient` now builds its prompt through it, so the two entry points cannot word the
+  same question differently.
+
+### Changed
+
+- **`models-spring-ai` depends on `models-decisions`** (which brings nothing beyond `models-api`),
+  and its jar carries one class compiled against Spring AI 2.1. The rest of the artifact is still
+  compiled against the 2.0 baseline and still runs on 1.1.x and 2.0.x, where that class is never
+  loaded.
+
 ## [0.5.22] - 2026-11-14
 
 ### Changed

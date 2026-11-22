@@ -406,6 +406,63 @@ cross-encoder. It preserves document identity and metadata, attaches the model's
 only the highest-ranked documents. See xref:reranking.adoc[Reranking] for the complete example and
 qualification gate.
 
+== Decisions
+
+`ModelsSpringAiDecisionModel` implements Spring AI's `DecisionModel`, which answers typed questions
+about an input and returns probabilities instead of text. It needs Spring AI 2.1 or later; the class
+ships in the same `models-spring-ai` artifact and is never loaded on an earlier line.
+
+[source,java]
+----
+DecisionModel decisions = new ModelsSpringAiDecisionModel(backend, "qwen3.5-4b");
+
+DecisionResponse response = decisions.call(DecisionPrompt.builder()
+    .text(ticket)
+    .question("billedTwice", YesNoQuestion.of("Was the customer billed more than once?"))
+    .question("team", ChoiceQuestion.builder()
+        .text("Which team should handle this ticket?")
+        .option("billing", "charges, refunds and invoices")
+        .option("shipping", "delivery and tracking of physical goods")
+        .build())
+    .question("urgency", ScoreQuestion.of("How urgent is this?", "low", "medium", "high"))
+    .build());
+
+double yes = response.getYesNo("billedTwice").getProbability();
+String team = response.getChoice("team").getValue();
+double level = response.getScore("urgency").getValue();   // expected level, 0 to 2
+----
+
+The backend is a `SharedPrefixInferenceBackend`, for example `PureJavaBackend.load(path)`.
+
+Each question type maps onto one of this library's answer spaces, with its criteria:
+
+[cols="1,1,2"]
+|===
+|Spring AI question |Answer space |Answer
+
+|`YesNoQuestion` |`Noul` |`YesNoAnswer`: the probability of yes
+|`ChoiceQuestion` |`Choice` |`ChoiceAnswer`: the selected option and every option's probability
+|`ScoreQuestion` |`Score` |`ScoreAnswer`: each level's probability and the expected level
+|===
+
+Nothing is generated. The options are shown to the model as a lettered list and the answer is the
+model's distribution over the answer letters, so any set of options can be asked without training.
+The probabilities are that distribution, scaled by the adapter's temperature; they are not fitted
+to a dataset, and `getConfidence()` is how concentrated the distribution is, not how likely the
+answer is to be right. How good the answers are depends on the model.
+
+When one prompt carries several questions and the model family can share a KV prefix, the input is
+read once and each question forks it. The response metadata reports what happened under
+`state_prefills` and `shared_prefix_proven`. A family that cannot share a prefix reads the input
+once per question. A family limited to a single session, such as LFM2, is not supported.
+
+A text input is shown to the model as it is, a fields input as a JSON object, and a conversation as
+one `role: text` line per message. Only text is read: an image or other non-text part is refused.
+`DecisionPrompt` options are not consulted. Calls are serialized around the backend; if the same
+backend instance also serves another component, the application must serialize those too.
+
+There is no auto-configuration for it yet: declare the bean yourself.
+
 For auto-configuration, named-bean behavior, and combined Models/Vectors setup,
 continue with xref:spring-boot.adoc[Spring Boot]. For validation after
 retrieval, see xref:rag.adoc[RAG Validation].
