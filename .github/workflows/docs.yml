@@ -9,6 +9,8 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  # To list this run's artifacts in "Wait for the Pages artifact to be listed".
+  actions: read
 
 concurrency:
   group: pages
@@ -80,6 +82,32 @@ jobs:
         with:
           name: github-pages-${{ github.run_attempt }}
           path: models/docs/build/public
+
+      # deploy-pages looks the artifact up through the run's artifact listing exactly once, with no
+      # retry, and that listing lags the upload: on 2026-11-22 two deploys on main failed with
+      # "No artifacts named github-pages-1 were found for this workflow run" right after a
+      # successful upload, and both passed on re-run. Ask the same listing until it has the
+      # artifact, twice in a row, before handing over (the same guard vectors added on 2026-11-21).
+      - name: Wait for the Pages artifact to be listed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT: github-pages-${{ github.run_attempt }}
+        run: |
+          seen=0
+          for attempt in $(seq 1 60); do
+            count=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=$ARTIFACT" --jq '.total_count' || echo 0)
+            if [ "$count" -ge 1 ]; then
+              seen=$((seen + 1))
+              echo "attempt $attempt: listed ($seen in a row)"
+              [ "$seen" -ge 2 ] && exit 0
+            else
+              seen=0
+              echo "attempt $attempt: not listed yet"
+            fi
+            sleep 2
+          done
+          echo "::error::The $ARTIFACT artifact was uploaded but never appeared in the run's artifact listing."
+          exit 1
 
       - name: Deploy
         id: deployment
