@@ -122,13 +122,12 @@ final class DeterminismAuditCli {
    * the contract, which is most of them. An entry here is a specific, reviewable claim about one
    * artifact, and it is an error for one to be present and unnecessary.
    */
-  private static final Map<String, String> ACTIVATION_EXEMPT =
-      Map.of(
-          "huatuogpt-o1-7b-q4_k_m",
-          "trial 1 diverges from trials 2 and 3, which agree, reproducibly across three CPUs"
-              + " (AMD EPYC 7763, AMD EPYC 9V74, Intel Xeon), two JDKs (25.0.4.1, 25.0.5) and"
-              + " vector widths 128/256; green only against the unreleased StrictMath.exp branch"
-              + " that was rejected for costing JEVBench 76/120 -> 75/120 on x86");
+  private static final Map<String, String> ACTIVATION_EXEMPT = Map.of();
+
+  // No entry at present. huatuogpt-o1-7b-q4_k_m was listed from #306 (trial 1 diverging from
+  // trials 2 and 3 across three CPUs, two JDKs and vector widths 128/256) until 2026-11-22: the
+  // scheduled audits of 2026-11-02, 2026-11-09 and 2026-11-16 found it deterministic on every
+  // Panama variant, and the guard above failed each run on the stale entry, as it is meant to.
 
   /**
    * Whether activations go through the vector {@code EXP} intrinsic, which is the only route whose
