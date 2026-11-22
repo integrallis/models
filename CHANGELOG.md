@@ -4,6 +4,8 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+## [0.5.23] - 2026-11-22
+
 ### Added
 
 - **`ModelsSpringAiDecisionModel`: Spring AI 2.1's `DecisionModel` over a local backend.** Yes/no,
@@ -37,6 +39,20 @@ All notable changes to models are documented here.
   and its jar carries one class compiled against Spring AI 2.1. The rest of the artifact is still
   compiled against the 2.0 baseline and still runs on 1.1.x and 2.0.x, where that class is never
   loaded.
+- Vectors is pinned to 0.1.45 (see the entry above). No unreleased Vectors runtime change is
+  required.
+- `backend-cuda` remains opt-in and unchanged (only its lockfile moved since 0.5.20). Its last
+  recorded G1 result is exact-token parity on RTX 4090 at 31.26 tok/s; G4 passed at 6.184x against
+  a 3.00x gate.
+
+### Fixed
+
+- **The Pure-Java Determinism audit's stale exemption for HuatuoGPT-o1-7B Q4_K_M is removed
+  (#472).** The scheduled audit had been red on four of its five variants every Monday since
+  2026-11-02 on its own guard: the model, listed as activation-exempt since #306, came out
+  deterministic on every Panama variant three audits running. The exemption map is empty and the
+  guard stays. Dispatched after the merge, the audit is green on all five variants (run
+  45060998892).
 
 ## [0.5.22] - 2026-11-14
 
