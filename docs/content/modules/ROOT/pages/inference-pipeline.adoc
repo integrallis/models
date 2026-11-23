@@ -180,6 +180,58 @@ the actual K/V activations has been established. Conversation affinity can
 avoid unnecessary switches, while each model-specific session reports the
 prefix tokens it reused and wrote.
 
+== Reuse Prompt Prefixes Across Calls
+
+An agent replays its instructions, tool schemas and history on every turn, and often from several
+conversations at once. A pipeline built with `PromptPrefixCacheOptions` looks every prompt it is
+asked to generate from up against the prompts before it, forks the longest matching immutable
+key/value prefix, evaluates only the tokens that are new, and publishes the prompt for the calls
+that follow. The answers are the answers of the same prompt evaluated from scratch; what changes is
+how many prompt tokens the backend evaluates.
+
+[source,java]
+----
+import com.integrallis.models.backend.purejava.PureJavaBackend;
+import com.integrallis.models.runtime.InferencePipeline;
+import com.integrallis.models.runtime.PromptPrefixCacheOptions;
+
+try (var backend = PureJavaBackend.load(gguf);
+     var pipeline = new InferencePipeline(
+         backend, PromptPrefixCacheOptions.withMaximumBytes(2L << 30))) {
+
+    String first = pipeline.generate(systemAndTools + turnOne, options);
+    // the second turn carries the first answer back; only the new tokens are evaluated
+    String second = pipeline.generate(systemAndTools + turnOne + first + turnTwo, options);
+    // a second conversation with the same system prompt evaluates only its own turn
+    String other = pipeline.generate(systemAndTools + otherTurn, options);
+
+    var metrics = pipeline.promptPrefixCacheMetrics().orElseThrow();
+    System.out.println(metrics.reusedTokens() + " tokens served from the cache");
+}
+----
+
+What the cache does, exactly:
+
+* It publishes a prompt less its last token. The last token is the generation cue and is always
+  evaluated, because evaluating it is what yields the first logits; the published point is where the
+  next turn resumes.
+* A lookup finds the entry sharing the longest token prefix with the new prompt. A match that covers
+  an entry whole is used on any backend that shares prefixes. A match that stops inside an entry, a
+  second conversation diverging after the system prompt, needs a truncated view of the entry, which
+  only a backend with portable prefixes provides (`supportsPortablePromptPrefixes()`); on other
+  backends such a match is a miss, not a wrong hit.
+* Forks share storage; nothing is copied. `maximumBytes` bounds the bytes the entries report, least
+  recently used first. One entry larger than the budget is kept rather than refusing the request.
+  Dropping an entry drops the cache's reference only; a session forked from it keeps its storage
+  until it closes.
+* `promptPrefixCacheMetrics()` reports lookups, hits, misses, tokens reused, tokens evaluated,
+  insertions, evictions, entries and bytes held. A hit that reused few tokens is visible there.
+
+What it does not do yet: publish the state after the answer (the next turn evaluates the answer's
+tokens again), serve the batching scheduler's sessions, or keep entries across a restart. The
+pipeline refuses the option on a backend that cannot share prefixes, and the option is not
+combined with `ContinuousBatchingOptions`. It is off unless requested.
+
 == Discover Portable Prefix Support
 
 The portable-prefix API exchanges immutable computed prompt state between backends with

@@ -1057,6 +1057,33 @@ tasks.register<Test>("tinyBertStandardGgufIntegrationTest") {
     maxHeapSize = "1g"
 }
 
+tasks.register<Test>("promptPrefixCacheIntegrationTest") {
+    description =
+        "Run the prompt-prefix cache (#474) on a real model fixture: identical answers, prefill reuse printed"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("model-fixture")
+    }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.PromptPrefixCacheFixtureIntegrationTest",
+        )
+    }
+    systemProperty(
+        "models.fixtures.directory",
+        fixtureDirectory.orNull
+            ?: Path.of(System.getProperty("user.home"), ".jvllm", "models").toString(),
+    )
+    testLogging {
+        showStandardStreams = true
+    }
+    outputs.upToDateWhen { false }
+    maxParallelForks = 1
+    maxHeapSize = "4g"
+}
+
 tasks.register<Test>("qwen306BQ40IntegrationTest") {
     description = "Run the pinned Qwen3 0.6B Q4_0 pure-Java integration tests"
     group = "verification"
