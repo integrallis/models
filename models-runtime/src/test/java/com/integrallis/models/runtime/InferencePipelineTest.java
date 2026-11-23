@@ -946,6 +946,69 @@ class InferencePipelineTest {
     }
   }
 
+  /**
+   * The prompt-prefix cache (#474): a second prompt extending the first prefills only its suffix.
+   */
+  @Test
+  void thePromptPrefixCacheForksTheEarlierPromptAndPrefillsOnlyTheNewTokens() {
+    SessionBackend backend = new SessionBackend();
+    try (InferencePipeline pipeline =
+        new InferencePipeline(backend, PromptPrefixCacheOptions.withMaximumBytes(1L << 20))) {
+      pipeline.generate("abc", deterministicOptions());
+      // "ab" was published (the prompt less its generation cue); "c" was evaluated from it
+      assertThat(backend.prefillStartPositions()).containsExactly(List.of(0), List.of(2));
+      pipeline.generate("abcde", deterministicOptions());
+      // the hit forks "ab", evaluates "cd" to publish "abcd", then "e" from that
+      assertThat(backend.prefillStartPositions())
+          .containsExactly(List.of(0), List.of(2), List.of(2), List.of(4));
+      PromptPrefixCacheMetrics metrics = pipeline.promptPrefixCacheMetrics().orElseThrow();
+      assertThat(metrics.lookups()).isEqualTo(2);
+      assertThat(metrics.hits()).isEqualTo(1);
+      assertThat(metrics.reusedTokens()).isEqualTo(2);
+      assertThat(metrics.evaluatedTokens()).isEqualTo(3 + 3);
+      assertThat(pipeline.lastGenerationMetrics().promptCache())
+          .isEqualTo(new PromptCacheMetrics(true, 5, 4, 1));
+    }
+  }
+
+  /** Without truncated views a prompt that diverges inside an entry is a miss, not a wrong hit. */
+  @Test
+  void thePromptPrefixCacheMissesInsideAnEntryWhenTheBackendCannotTruncate() {
+    SessionBackend backend = new SessionBackend();
+    try (InferencePipeline pipeline =
+        new InferencePipeline(backend, PromptPrefixCacheOptions.withMaximumBytes(1L << 20))) {
+      pipeline.generate("abcd", deterministicOptions());
+      pipeline.generate("abxy", deterministicOptions());
+      PromptPrefixCacheMetrics metrics = pipeline.promptPrefixCacheMetrics().orElseThrow();
+      assertThat(metrics.hits()).isZero();
+      assertThat(metrics.entries()).isEqualTo(2);
+      assertThat(backend.prefillStartPositions())
+          .containsExactly(List.of(0), List.of(3), List.of(0), List.of(3));
+    }
+  }
+
+  @Test
+  void thePromptPrefixCacheRefusesABackendThatCannotSharePrefixes() {
+    assertThatThrownBy(
+            () ->
+                new InferencePipeline(
+                    new StubBackend(), PromptPrefixCacheOptions.withMaximumBytes(1L << 20)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("shares KV-cache prefixes");
+  }
+
+  @Test
+  void aOneTokenPromptBypassesThePromptPrefixCache() {
+    SessionBackend backend = new SessionBackend();
+    try (InferencePipeline pipeline =
+        new InferencePipeline(backend, PromptPrefixCacheOptions.withMaximumBytes(1L << 20))) {
+      pipeline.generate("a", deterministicOptions());
+      PromptPrefixCacheMetrics metrics = pipeline.promptPrefixCacheMetrics().orElseThrow();
+      assertThat(metrics.lookups()).isZero();
+      assertThat(backend.prefillStartPositions()).containsExactly(List.of(0));
+    }
+  }
+
   private static SamplingOptions deterministicOptions() {
     return SamplingOptions.builder().temperature(0.0f).maxTokens(1).build();
   }

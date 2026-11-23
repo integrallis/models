@@ -16,6 +16,21 @@ All notable changes to models are documented here.
   conversation inputs are supported; non-text parts are refused. Run end to end on Qwen3 1.7B
   (shared prefix proven) and Qwen3.5 4B (no shared prefix); no accuracy or latency is claimed for
   it. No auto-configuration yet. Single-session families such as LFM2 are not supported.
+- **`PromptPrefixCacheOptions`: an opt-in prompt-prefix cache on `InferencePipeline` (#474).**
+  Every `generate` call looks its prompt up against the prompts before it, forks the longest
+  matching immutable KV prefix, evaluates only the tokens that are new, and publishes the prompt
+  less its generation cue for the calls after it; a match that stops inside an entry uses a
+  truncated view where the backend has portable prefixes. Entries are dropped least recently used
+  when their reported bytes exceed the budget; `promptPrefixCacheMetrics()` reports lookups, hits,
+  tokens reused and evaluated, entries and bytes. On Qwen3 1.7B Q8_0, a three-turn conversation
+  and a sibling conversation sharing its system prompt produced the same greedy answers as cold
+  evaluation; turn two reused the 118 tokens of turn one's published prefix and evaluated its 43
+  new ones, turn three reused 160 and evaluated 41, and the sibling reused the 98 tokens of the
+  shared head and evaluated 18: 376 of 597 prompt tokens in all (`promptPrefixCacheIntegrationTest`).
+  No speed is claimed: the fixture test prints this machine's times as smoke, and the cost the
+  cache adds to a cold first turn is unmeasured until it runs on a quiet host. The cache is off unless requested, is not combined with continuous batching, and
+  publishes at the prompt end only, so an answer's tokens are evaluated again on the next turn.
+  The design follows the replay point of Inco's Splash engine.
 - **`LetterDecisionEvaluator` in `models-decisions`.** The lettered-prompt decision path as one
   class: the prompt layout, the letter tokens, and the shared-prefix orchestration.
   `ModelsTypesafeClient` now builds its prompt through it, so the two entry points cannot word the

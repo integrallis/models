@@ -24,6 +24,7 @@ import com.integrallis.models.api.InferenceContextWindow;
 import com.integrallis.models.api.InferenceSession;
 import com.integrallis.models.api.ModelMetadata;
 import com.integrallis.models.api.ModelPrompt;
+import com.integrallis.models.api.PortablePrefixInferenceBackend;
 import com.integrallis.models.api.RewindableInferenceBackend;
 import com.integrallis.models.api.SamplingOptions;
 import com.integrallis.models.api.SharedInferencePrefix;
@@ -55,6 +56,8 @@ public final class InferencePipeline
   private final InferenceBackend backend;
   private final GenerationLoop generationLoop;
   private final ContinuousBatchingScheduler continuousBatching;
+  private final PromptPrefixCache promptPrefixCache;
+  private GenerationMetrics lastPrefixCacheGeneration;
   private final Set<TextGenerationSession> generationSessions =
       Collections.newSetFromMap(new IdentityHashMap<>());
   private final AtomicBoolean closed = new AtomicBoolean();
@@ -64,6 +67,35 @@ public final class InferencePipeline
     this.backend = Objects.requireNonNull(backend, "backend");
     generationLoop = new GenerationLoop(backend);
     continuousBatching = null;
+    promptPrefixCache = null;
+  }
+
+  /**
+   * Creates a pipeline whose {@code generate} calls reuse earlier prompts' key/value prefixes
+   * automatically (#474).
+   *
+   * <p>Each call looks its prompt up against the prompts before it, forks the longest matching
+   * immutable prefix, evaluates only what is new, and publishes the prompt (less its last token,
+   * the generation cue) for the calls after it. Outputs are those of the same prompt evaluated from
+   * scratch. The backend must share KV-cache prefixes; one that cannot is refused here rather than
+   * silently prefilling everything.
+   */
+  public InferencePipeline(InferenceBackend backend, PromptPrefixCacheOptions cacheOptions) {
+    this.backend = Objects.requireNonNull(backend, "backend");
+    Objects.requireNonNull(cacheOptions, "cacheOptions");
+    generationLoop = new GenerationLoop(backend);
+    continuousBatching = null;
+    if (!(backend instanceof SharedPrefixInferenceBackend sharing)
+        || !sharing.supportsSharedPrefixes()) {
+      throw new IllegalArgumentException(
+          "the prompt-prefix cache needs a backend that shares KV-cache prefixes; "
+              + backend.name()
+              + " does not");
+    }
+    boolean truncatable =
+        backend instanceof PortablePrefixInferenceBackend portable
+            && portable.supportsPortablePrefixes();
+    promptPrefixCache = new PromptPrefixCache(cacheOptions, truncatable);
   }
 
   /**
@@ -82,6 +114,7 @@ public final class InferencePipeline
     continuousBatching =
         new ContinuousBatchingScheduler(
             batchBackend, backend, Objects.requireNonNull(batchingOptions, "batchingOptions"));
+    promptPrefixCache = null;
   }
 
   /** Returns immutable architecture metadata for the loaded model. */
@@ -126,7 +159,20 @@ public final class InferencePipeline
   public GenerationMetrics lastGenerationMetrics() {
     synchronized (backend) {
       requireOpen();
+      if (promptPrefixCache != null && lastPrefixCacheGeneration != null) {
+        return lastPrefixCacheGeneration;
+      }
       return generationLoop.lastGenerationMetrics();
+    }
+  }
+
+  /** What the prompt-prefix cache has done so far, or empty when the pipeline has none. */
+  public Optional<PromptPrefixCacheMetrics> promptPrefixCacheMetrics() {
+    synchronized (backend) {
+      requireOpen();
+      return promptPrefixCache == null
+          ? Optional.empty()
+          : Optional.of(promptPrefixCache.metrics());
     }
   }
 
@@ -555,6 +601,10 @@ public final class InferencePipeline
 
   @Override
   public String generate(String prompt, SamplingOptions options) {
+    if (promptPrefixCache != null) {
+      return generateThroughPrefixCache(
+          ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), options);
+    }
     synchronized (backend) {
       requireOpen();
       return generationLoop.generate(prompt, options);
@@ -563,6 +613,9 @@ public final class InferencePipeline
 
   @Override
   public String generate(ModelPrompt prompt, SamplingOptions options) {
+    if (promptPrefixCache != null) {
+      return generateThroughPrefixCache(prompt, options);
+    }
     synchronized (backend) {
       requireOpen();
       return generationLoop.generate(prompt, options);
@@ -571,6 +624,11 @@ public final class InferencePipeline
 
   @Override
   public void generate(String prompt, SamplingOptions options, TokenStream stream) {
+    if (promptPrefixCache != null) {
+      generateThroughPrefixCache(
+          ModelPrompt.text(Objects.requireNonNull(prompt, "prompt")), options, stream, null);
+      return;
+    }
     synchronized (backend) {
       requireOpen();
       generationLoop.generate(prompt, options, stream);
@@ -579,6 +637,10 @@ public final class InferencePipeline
 
   @Override
   public void generate(ModelPrompt prompt, SamplingOptions options, TokenStream stream) {
+    if (promptPrefixCache != null) {
+      generateThroughPrefixCache(prompt, options, stream, null);
+      return;
+    }
     synchronized (backend) {
       requireOpen();
       generationLoop.generate(prompt, options, stream);
@@ -588,10 +650,85 @@ public final class InferencePipeline
   @Override
   public void generate(
       ModelPrompt prompt, SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
+    if (promptPrefixCache != null) {
+      generateThroughPrefixCache(
+          prompt, options, stream, Objects.requireNonNull(constraint, "constraint"));
+      return;
+    }
     synchronized (backend) {
       requireOpen();
       generationLoop.generate(prompt, options, stream, constraint);
     }
+  }
+
+  private String generateThroughPrefixCache(ModelPrompt prompt, SamplingOptions options) {
+    Objects.requireNonNull(prompt, "prompt");
+    int[] tokens = tokenize(prompt);
+    // a one-token prompt has nothing before its generation cue to cache: a plain session, so the
+    // backend's default lineage is never touched by the cache path
+    try (TextGenerationSession fork =
+        tokens.length < 2 ? openGenerationSession() : forkThroughPrefixCache(tokens)) {
+      String text = fork.generate(prompt, options);
+      synchronized (backend) {
+        lastPrefixCacheGeneration = fork.lastGenerationMetrics();
+      }
+      return text;
+    }
+  }
+
+  private void generateThroughPrefixCache(
+      ModelPrompt prompt, SamplingOptions options, TokenStream stream, TokenConstraint constraint) {
+    Objects.requireNonNull(prompt, "prompt");
+    int[] tokens = tokenize(prompt);
+    try (TextGenerationSession fork =
+        tokens.length < 2 ? openGenerationSession() : forkThroughPrefixCache(tokens)) {
+      if (constraint == null) {
+        fork.generate(prompt, options, stream);
+      } else {
+        fork.generate(prompt, options, stream, constraint);
+      }
+      synchronized (backend) {
+        lastPrefixCacheGeneration = fork.lastGenerationMetrics();
+      }
+    }
+  }
+
+  /**
+   * A session positioned just before the prompt's last token, with everything before it served from
+   * the cache where the cache had it, and published for the prompts to come.
+   */
+  private TextGenerationSession forkThroughPrefixCache(int[] tokens) {
+    int[] replayPoint = java.util.Arrays.copyOf(tokens, tokens.length - 1);
+    Optional<PromptPrefixCache.Match> match;
+    synchronized (backend) {
+      requireOpen();
+      match = promptPrefixCache.lookup(tokens);
+    }
+    SharedPromptPrefix published;
+    if (match.isPresent()) {
+      SharedPromptPrefix base = match.get().entry();
+      if (!match.get().coversWholeEntry()) {
+        base = truncateSharedPromptPrefix(base, match.get().reusableTokens());
+      }
+      if (base.tokenCount() == replayPoint.length) {
+        published = base;
+      } else {
+        TextGenerationSession source = openGenerationSession(base);
+        try {
+          published = extendSharedTokenPrefix(source, replayPoint);
+        } catch (RuntimeException | Error failure) {
+          source.close();
+          throw failure;
+        }
+      }
+    } else {
+      published = prepareSharedTokenPrefix(replayPoint);
+    }
+    synchronized (backend) {
+      requireOpen();
+      promptPrefixCache.insert(published);
+    }
+    return openGenerationSession(published);
   }
 
   @Override
@@ -651,6 +788,9 @@ public final class InferencePipeline
       }
       sessionsToClose = Set.copyOf(generationSessions);
       generationSessions.clear();
+      if (promptPrefixCache != null) {
+        promptPrefixCache.clear();
+      }
     }
 
     Throwable closeFailure = null;
