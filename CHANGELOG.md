@@ -24,10 +24,11 @@ All notable changes to models are documented here.
   when their reported bytes exceed the budget; `promptPrefixCacheMetrics()` reports lookups, hits,
   tokens reused and evaluated, entries and bytes. On Qwen3 1.7B Q8_0, a three-turn conversation
   and a sibling conversation sharing its system prompt produced the same greedy answers as cold
-  evaluation; turns two and three reused every prompt token but the cue (160 of 161 and 200 of
-  201) and the sibling reused the shared head (115 of 116), 376 of 597 prompt tokens in all
-  (`promptPrefixCacheIntegrationTest`). No speed is claimed: the fixture test prints this machine's
-  times as smoke. The cache is off unless requested, is not combined with continuous batching, and
+  evaluation; turn two reused the 118 tokens of turn one's published prefix and evaluated its 43
+  new ones, turn three reused 160 and evaluated 41, and the sibling reused the 98 tokens of the
+  shared head and evaluated 18: 376 of 597 prompt tokens in all (`promptPrefixCacheIntegrationTest`).
+  No speed is claimed: the fixture test prints this machine's times as smoke, and the cost the
+  cache adds to a cold first turn is unmeasured until it runs on a quiet host. The cache is off unless requested, is not combined with continuous batching, and
   publishes at the prompt end only, so an answer's tokens are evaluated again on the next turn.
   The design follows the replay point of Inco's Splash engine.
 - **`LetterDecisionEvaluator` in `models-decisions`.** The lettered-prompt decision path as one

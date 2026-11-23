@@ -144,10 +144,13 @@ class PromptPrefixCacheFixtureIntegrationTest {
         .as("the cache changes when tokens are evaluated, never what they yield")
         .isEqualTo(cold);
     assertThat(cacheMetrics.hits()).isEqualTo(3);
-    // turns 2 and 3 extend the previous prompt: everything but the generation cue is reused
+    // turns 2 and 3 extend the previous prompt: what a hit reuses is the previous prompt's
+    // published prefix, the previous prompt less its generation cue; the turn's own tokens are new
     assertThat(reusedPerTurn.get(0)).isZero();
-    assertThat(reusedPerTurn.get(1)).isEqualTo((long) promptTokens.get(1) - 1);
-    assertThat(reusedPerTurn.get(2)).isEqualTo((long) promptTokens.get(2) - 1);
+    assertThat(reusedPerTurn.get(1)).isEqualTo((long) promptTokens.get(0) - 1);
+    assertThat(reusedPerTurn.get(2)).isEqualTo((long) promptTokens.get(1) - 1);
+    assertThat(evaluatedPerTurn.get(1))
+        .isEqualTo((long) promptTokens.get(1) - promptTokens.get(0) + 1);
     // the sibling conversation shares the system prompt and the user header, nothing after
     assertThat(reusedPerTurn.get(3)).isPositive().isLessThan((long) promptTokens.get(3) - 1);
     // the third turn replays two turns of history; its prefill-side time must be a fraction of cold
