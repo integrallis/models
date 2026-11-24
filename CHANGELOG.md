@@ -69,6 +69,25 @@ All notable changes to models are documented here.
   guard stays. Dispatched after the merge, the audit is green on all five variants (run
   45060998892).
 
+### Qualification and dependencies
+
+- **The 2026-11-08 reference-arithmetic attempt for LLaVA 1.5 7B is now in the record**, under
+  `experiments/vision-catalog-qualification/results/reference-full-2026-11-08/`. It was the only run
+  of runtime `78528c14` to exercise all eight backend gates, on the registered `m6a.4xlarge` EPYC
+  7R13 class with eight threads and 1024 context, one worker per quantization. The 2026-11-09
+  qualified run ran the six task gates against the F32 reference only, and the Milan README of that
+  day records that nothing under `results/` referenced this runtime. Both quantizations match the
+  fresh reference on all 80 cases and reproduce its dataset scores. Q4_K_S passes every gate.
+  Q4_K_M fails only `strongestReferencePerformance`: F16-reference decode on `textvqa-37476` at
+  1.1202 against the 1.10 ceiling, with its initial integration confirmation at 1.1219 and the
+  longer confirmation passing at 1.0500. The result is retained unchanged as a failure, as the
+  protocol requires. The published-0.5.18 admission already on main shows the same gate failing on
+  `vqav2-132415014` at 1.1028, and the 0.5.19 admission passing at a worst of 1.0016 after the F16
+  KV store change, so this record is the earlier of the two measurements before that change. No
+  gate, threshold or admission changes. The candidate's raw logs stayed in the fleet archive, now
+  past its deletion deadline; the committed subset is what survives, as for the sibling
+  `arithmetic-full-2026-11-08` record.
+
 ## [0.5.22] - 2026-11-14
 
 ### Changed
