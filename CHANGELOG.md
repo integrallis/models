@@ -6,6 +6,14 @@ All notable changes to models are documented here.
 
 ### Added
 
+- **Gated-fusion S1 ran on real weights and every gate passed.** On a Hetzner cpx62 at Models
+  `05cbefc6`, pure-Java backend, the Qwen2.5 Coder / Math / Instruct 1.5B members at Q4_K_M: G0
+  tokenizer identity (after removing the one key the converter adds and the official files lack,
+  recorded as a first-attempt FAIL), G4 scorers 1319/1319 and 500/500 on gold, G8 catch-up by one
+  prefill bit-identical to stepping (240 comparisons, worst max |Δlogit| 0.0), G1-gated 40/40
+  identities. `models.json` now carries the members' sha256 and byte counts, the llama.cpp commit
+  and the tokenizer identity hash; `RESULTS-LOG.md` and `evidence/s1-cpx62-2026-11-25/` hold the
+  reports. No accuracy, speed or survival claim follows; S2 is the pilot.
 - **`models-bench logit-fusion` gains the S1 gates of the gated-fusion protocol.** `gate g1-gated`
   checks, token for token at T = 0, that the runtime's gated backend equals the lead alone when the
   gate never fires and equals the every-token `FusionDecoder` reference when it always fires;
