@@ -21,12 +21,13 @@ sha256 and byte count in `models.json` **before any gate runs**, and commit that
 
 ## S1b. Gates, in order (each refuses to continue past a FAIL)
 
-Members are named lead first; `L`, `M`, `I` bind to the paths of the pinned files. The September
-datasets are reused by path (`../2026-09-17-logit-fusion-study/data`, prepared by its
-`prepare_fusion_data.py`).
+Members are named lead first; `L`, `M`, `I` bind to the paths of the pinned files. The datasets
+are the September study's: run its `prepare_fusion_data.py` (it pins every source by revision and
+sha256 in its `data-manifest.json`) into a local directory and point `DATA` at it; the prepared
+files are not committed.
 
 ```bash
-DATA=benchmark-results/2026-09-17-logit-fusion-study/data
+DATA=<directory prepare_fusion_data.py wrote>
 MEMBERS="L=$W/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf,M=$W/qwen2.5-math-1.5b-instruct-q4_k_m.gguf,I=$W/qwen2.5-1.5b-instruct-q4_k_m.gguf"
 COMMON=(--backend pure-java --context-length 4096 --thinking off --temperature 0)
 
