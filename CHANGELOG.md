@@ -6,6 +6,17 @@ All notable changes to models are documented here.
 
 ### Added
 
+- **`models-bench logit-fusion` gains the S1 gates of the gated-fusion protocol.** `gate g1-gated`
+  checks, token for token at T = 0, that the runtime's gated backend equals the lead alone when the
+  gate never fires and equals the every-token `FusionDecoder` reference when it always fires;
+  `gate g8` checks that an auxiliary catching up over `d` tokens in one prefill produces the same
+  logits as stepping them one forward at a time, per member, at `--deltas` (default 1,2,7,31)
+  within `--tolerance` (default 1e-3 per logit). Both write schema-v1 reports. The checks are pure
+  functions over members (`GatedGates`), proven on toy members, including one whose prefill drops
+  the delta's last token, which G8 catches. `benchmark-results/2026-11-25-gated-logit-fusion/`
+  gains `models.json` (repositories, revisions and files pinned; sha256 filled at S1),
+  `convert-math.sh` (the Math member from the official safetensors with llama.cpp v1.0.0, because
+  no official GGUF exists) and `REPRODUCE.md`. No gate has run on real weights yet.
 - **`FusedInferenceBackend`: several same-tokenizer models as one backend, with a gate.** The lead
   always steps; the auxiliaries are consulted only when an `EnsembleGate` says so (the shipped gate
   is `EntropyGate`, a threshold on the lead's Shannon entropy in nats; the published recipe's value

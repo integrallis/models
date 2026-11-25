@@ -90,6 +90,47 @@ final class GateCommands {
                       "member-threads",
                       "prompts",
                       "report")));
+      case "g1-gated" ->
+          g1Gated(
+              CliOptions.parse(
+                  args,
+                  2,
+                  withDecoding(
+                      "members",
+                      "backend",
+                      "models-revision",
+                      "report",
+                      "dataset",
+                      "data",
+                      "data-manifest",
+                      "scorer",
+                      "limit",
+                      "offset",
+                      "thinking",
+                      "context-length",
+                      "member-threads",
+                      "prompts")));
+      case "g8" ->
+          g8(
+              CliOptions.parse(
+                  args,
+                  2,
+                  withDecoding(
+                      "members",
+                      "backend",
+                      "models-revision",
+                      "report",
+                      "dataset",
+                      "data",
+                      "data-manifest",
+                      "scorer",
+                      "limit",
+                      "offset",
+                      "thinking",
+                      "context-length",
+                      "deltas",
+                      "tolerance",
+                      "prompts")));
       case "g3" -> g3(CliOptions.parse(args, 2, Set.of("reports", "report")));
       case "g4" ->
           g4(
@@ -280,6 +321,262 @@ final class GateCommands {
       } finally {
         executor.shutdownNow();
       }
+    }
+  }
+
+  /**
+   * G1-gated: the gated backend equals the lead alone when the gate never fires and equals the
+   * every-token {@link FusionDecoder#fuse} reference when it always fires, token for token at T =
+   * 0. The first member named is the lead.
+   */
+  int g1Gated(CliOptions options) throws IOException {
+    Path report = Path.of(options.required("report"));
+    String revision = FusionCli.modelsRevision(options);
+    FusionCli.LoadedData data = cli.loadData(options);
+    PromptBuilder prompts = cli.prompts(options);
+    DecodeSettings settings = FusionCli.settings(options);
+    if (!settings.greedy()) {
+      throw new IllegalArgumentException("G1-gated is defined at T = 0");
+    }
+    boolean thinking = FusionCli.thinking(options);
+    Map<String, Path> paths = options.members();
+    List<String> names = List.copyOf(paths.keySet());
+    if (names.size() < 2) {
+      throw new IllegalArgumentException("G1-gated needs a lead and at least one auxiliary");
+    }
+    long wall = System.nanoTime();
+    long cpu = FusionEnvironment.processCpuNanos();
+    try (PeakRss rss = new PeakRss();
+        MemberLoader loader =
+            MemberLoader.load(
+                paths,
+                names,
+                options.get("backend", "pure-java"),
+                FusionCli.contextLength(options, settings),
+                cli.mapper())) {
+      ExecutorService executor =
+          Executors.newFixedThreadPool(options.integer("member-threads", names.size()));
+      try {
+        List<FusionMember> members = names.stream().map(n -> loader.members().get(n)).toList();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        boolean pass = true;
+        for (DatasetItem item : data.selected()) {
+          int[] prompt =
+              members
+                  .getFirst()
+                  .tokenizer()
+                  .encode(prompts.render(data.kind(), data.extractor().id(), item, thinking));
+          GatedGates.Identity lead =
+              GatedGates.leadIdentity(members, GateCommands::backendOf, prompt, settings);
+          GatedGates.Identity every =
+              GatedGates.everyTokenIdentity(
+                  members, GateCommands::backendOf, prompt, settings, executor);
+          pass &= lead.identical() && every.identical();
+          rows.add(identityRow("lead", names.getFirst(), item, lead));
+          rows.add(identityRow("every-token", String.join("+", names), item, every));
+          cli.out()
+              .printf(
+                  "G1-gated %s lead=%s everyToken=%s tokens=%d/%d%n",
+                  item.id(),
+                  lead.identical(),
+                  every.identical(),
+                  lead.gated().length,
+                  every.gated().length);
+        }
+        Map<String, Object> summary =
+            FusionCli.map(
+                "pass",
+                pass,
+                "comparisons",
+                rows.size(),
+                "lead",
+                names.getFirst(),
+                "rule",
+                "poe",
+                "temperature",
+                0.0);
+        ReportModel.Config config =
+            FusionCli.emptyConfig(
+                loader.configs(),
+                data.config(),
+                loader.backend(),
+                FusionCli.map(
+                    "maxTokens",
+                    settings.maxTokens(),
+                    "thinking",
+                    thinking ? "on" : "off",
+                    "promptsSha256",
+                    prompts.sha256()));
+        cli.writeReport(
+            report,
+            cli.plainReport("gate-g1-gated", config, wall, cpu, rss, summary, rows, revision),
+            false);
+        return finish("G1-gated", pass, report, "comparisons=" + rows.size());
+      } finally {
+        executor.shutdownNow();
+      }
+    }
+  }
+
+  private static Map<String, Object> identityRow(
+      String check, String members, DatasetItem item, GatedGates.Identity identity) {
+    return FusionCli.map(
+        "check",
+        check,
+        "members",
+        members,
+        "id",
+        item.id(),
+        "identical",
+        identity.identical(),
+        "firstDivergence",
+        identity.firstDivergence(),
+        "referenceTokens",
+        identity.reference().length,
+        "gatedTokens",
+        identity.gated().length,
+        "referenceTokenIdsSha256",
+        Digests.sha256(Arrays.toString(identity.reference())),
+        "gatedTokenIdsSha256",
+        Digests.sha256(Arrays.toString(identity.gated())),
+        "referenceTokenIds",
+        identity.reference(),
+        "gatedTokenIds",
+        identity.gated());
+  }
+
+  private static com.integrallis.models.api.InferenceBackend backendOf(FusionMember member) {
+    if (!(member instanceof PipelineMember pipelineMember)) {
+      throw new IllegalStateException("gated gates need pipeline-backed members: " + member.name());
+    }
+    return pipelineMember.backend();
+  }
+
+  /**
+   * G8: catching up over {@code d} tokens by one prefill equals stepping them one forward at a
+   * time, within a tolerance per logit, for every member named, at d in {@code --deltas} (default
+   * 1,2,7,31). The continuation stepped is the first member's greedy output, so {@code
+   * --max-tokens} must be at least the largest delta.
+   */
+  int g8(CliOptions options) throws IOException {
+    Path report = Path.of(options.required("report"));
+    String revision = FusionCli.modelsRevision(options);
+    FusionCli.LoadedData data = cli.loadData(options);
+    PromptBuilder prompts = cli.prompts(options);
+    DecodeSettings settings = FusionCli.settings(options);
+    if (!settings.greedy()) {
+      throw new IllegalArgumentException("G8 is defined at T = 0");
+    }
+    boolean thinking = FusionCli.thinking(options);
+    double tolerance =
+        options.has("tolerance") ? Double.parseDouble(options.get("tolerance", "")) : 1e-3;
+    List<Integer> deltas =
+        Arrays.stream(options.get("deltas", "1,2,7,31").split(","))
+            .map(String::trim)
+            .map(Integer::parseInt)
+            .toList();
+    if (deltas.isEmpty() || deltas.stream().anyMatch(d -> d < 1)) {
+      throw new IllegalArgumentException("deltas must be positive integers");
+    }
+    if (settings.maxTokens() < deltas.stream().mapToInt(Integer::intValue).max().orElse(1)) {
+      throw new IllegalArgumentException("max-tokens must cover the largest delta");
+    }
+    Map<String, Path> paths = options.members();
+    List<String> names = List.copyOf(paths.keySet());
+    long wall = System.nanoTime();
+    long cpu = FusionEnvironment.processCpuNanos();
+    try (PeakRss rss = new PeakRss();
+        MemberLoader loader =
+            MemberLoader.load(
+                paths,
+                names,
+                options.get("backend", "pure-java"),
+                FusionCli.contextLength(options, settings),
+                cli.mapper())) {
+      List<FusionMember> members = names.stream().map(n -> loader.members().get(n)).toList();
+      List<Map<String, Object>> rows = new ArrayList<>();
+      boolean pass = true;
+      double worst = 0;
+      for (DatasetItem item : data.selected()) {
+        int[] prompt =
+            members
+                .getFirst()
+                .tokenizer()
+                .encode(prompts.render(data.kind(), data.extractor().id(), item, thinking));
+        int[] continuation = FusionDecoder.single(members.getFirst(), prompt, settings).tokens();
+        for (FusionMember member : members) {
+          for (int delta : deltas) {
+            if (delta > continuation.length) {
+              rows.add(
+                  FusionCli.map(
+                      "member",
+                      member.name(),
+                      "id",
+                      item.id(),
+                      "delta",
+                      delta,
+                      "skipped",
+                      "continuation shorter than delta: " + continuation.length));
+              continue;
+            }
+            GatedGates.CatchUp row =
+                GatedGates.catchUpEqualsStepping(member, prompt, continuation, delta, tolerance);
+            pass &= row.within();
+            worst = Math.max(worst, row.maxAbsDiff());
+            rows.add(
+                FusionCli.map(
+                    "member",
+                    row.member(),
+                    "id",
+                    item.id(),
+                    "delta",
+                    delta,
+                    "maxAbsDiff",
+                    row.maxAbsDiff(),
+                    "steppedArgmax",
+                    row.steppedArgmax(),
+                    "caughtUpArgmax",
+                    row.caughtUpArgmax(),
+                    "argmaxEqual",
+                    row.argmaxEqual(),
+                    "within",
+                    row.within()));
+            cli.out()
+                .printf(
+                    "G8 %s %s d=%d maxAbsDiff=%.3e argmaxEqual=%s%n",
+                    row.member(), item.id(), delta, row.maxAbsDiff(), row.argmaxEqual());
+          }
+        }
+      }
+      Map<String, Object> summary =
+          FusionCli.map(
+              "pass",
+              pass,
+              "comparisons",
+              rows.size(),
+              "tolerance",
+              tolerance,
+              "deltas",
+              deltas,
+              "worstMaxAbsDiff",
+              worst);
+      ReportModel.Config config =
+          FusionCli.emptyConfig(
+              loader.configs(),
+              data.config(),
+              loader.backend(),
+              FusionCli.map(
+                  "maxTokens",
+                  settings.maxTokens(),
+                  "thinking",
+                  thinking ? "on" : "off",
+                  "promptsSha256",
+                  prompts.sha256()));
+      cli.writeReport(
+          report,
+          cli.plainReport("gate-g8", config, wall, cpu, rss, summary, rows, revision),
+          false);
+      return finish("G8", pass, report, "comparisons=" + rows.size() + " worst=" + worst);
     }
   }
 

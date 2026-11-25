@@ -1,0 +1,131 @@
+{
+ "schemaVersion": 1,
+ "status": "skeleton: repositories, revisions and files pinned 2026-11-25 from the Hugging Face API; sha256 and sizeBytes are filled at S1 on the pilot host from the downloaded or converted bytes, before any gate runs",
+ "resolvedVia": "https://huggingface.co/api/models/<repo>?blobs=true (revision = the repo's main sha at resolution)",
+ "modelSets": {
+  "q4": [
+   "L-q4",
+   "M-q4",
+   "I-q4",
+   "BIG-q4",
+   "BIG3-q8"
+  ],
+  "q8": [
+   "L-q8",
+   "M-q8",
+   "I-q8",
+   "BIG-q4",
+   "BIG3-q8"
+  ]
+ },
+ "models": [
+  {
+   "key": "L-q4",
+   "role": "lead (G-article)",
+   "model": "Qwen2.5-Coder-1.5B-Instruct",
+   "quant": "Q4_K_M",
+   "repo": "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+   "revision": "f86cb2c1fa",
+   "file": "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+   "sha256": "pending-S1",
+   "sizeBytes": 1120000000,
+   "license": "apache-2.0",
+   "status": "official"
+  },
+  {
+   "key": "L-q8",
+   "role": "lead (G-article)",
+   "model": "Qwen2.5-Coder-1.5B-Instruct",
+   "quant": "Q8_0",
+   "repo": "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+   "revision": "f86cb2c1fa",
+   "file": "qwen2.5-coder-1.5b-instruct-q8_0.gguf",
+   "sha256": "pending-S1",
+   "sizeBytes": 1890000000,
+   "license": "apache-2.0",
+   "status": "official"
+  },
+  {
+   "key": "M-q4",
+   "role": "auxiliary",
+   "model": "Qwen2.5-Math-1.5B-Instruct",
+   "quant": "Q4_K_M",
+   "repo": "Qwen/Qwen2.5-Math-1.5B-Instruct",
+   "revision": "aafeb0fc6f",
+   "file": "qwen2.5-math-1.5b-instruct-q4_k_m.gguf",
+   "sha256": "pending-S1",
+   "sizeBytes": null,
+   "license": "apache-2.0",
+   "status": "converted: no official GGUF exists; convert-math.sh from the official safetensors at the pinned revision with llama.cpp v1.0.0 (2d8a3250)"
+  },
+  {
+   "key": "M-q8",
+   "role": "auxiliary",
+   "model": "Qwen2.5-Math-1.5B-Instruct",
+   "quant": "Q8_0",
+   "repo": "Qwen/Qwen2.5-Math-1.5B-Instruct",
+   "revision": "aafeb0fc6f",
+   "file": "qwen2.5-math-1.5b-instruct-q8_0.gguf",
+   "sha256": "pending-S1",
+   "sizeBytes": null,
+   "license": "apache-2.0",
+   "status": "converted (see M-q4)"
+  },
+  {
+   "key": "I-q4",
+   "role": "auxiliary",
+   "model": "Qwen2.5-1.5B-Instruct",
+   "quant": "Q4_K_M",
+   "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+   "revision": "91cad51170",
+   "file": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+   "sha256": "pending-S1",
+   "sizeBytes": 1120000000,
+   "license": "apache-2.0",
+   "status": "official"
+  },
+  {
+   "key": "I-q8",
+   "role": "auxiliary",
+   "model": "Qwen2.5-1.5B-Instruct",
+   "quant": "Q8_0",
+   "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+   "revision": "91cad51170",
+   "file": "qwen2.5-1.5b-instruct-q8_0.gguf",
+   "sha256": "pending-S1",
+   "sizeBytes": 1890000000,
+   "license": "apache-2.0",
+   "status": "official"
+  },
+  {
+   "key": "BIG-q4",
+   "role": "memory-matched control",
+   "model": "Qwen2.5-7B-Instruct",
+   "quant": "Q4_K_M",
+   "repo": "Qwen/Qwen2.5-7B-Instruct-GGUF",
+   "revision": "bb5d59e06d",
+   "file": "qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf + -00002-of-00002.gguf",
+   "sha256": "pending-S1",
+   "sizeBytes": null,
+   "license": "apache-2.0",
+   "status": "official, two shards"
+  },
+  {
+   "key": "BIG3-q8",
+   "role": "lower-bracket control",
+   "model": "Qwen2.5-3B-Instruct",
+   "quant": "Q8_0",
+   "repo": "Qwen/Qwen2.5-3B-Instruct-GGUF",
+   "revision": "7dabda4d13",
+   "file": "qwen2.5-3b-instruct-q8_0.gguf",
+   "sha256": "pending-S1",
+   "sizeBytes": 3620000000,
+   "license": "qwen-research (read from the card at S1; excluded from the practical claim if it is not permissive)",
+   "status": "official"
+  }
+ ],
+ "notes": [
+  "sizeBytes values that are set are the API's rounded sizes from 2026-11-25 and are replaced by the downloaded byte counts at S1.",
+  "The tokenizer identity hash of L, M and I (gate G0) is recorded here at S1 as tokenizerIdentitySha256."
+ ]
+}
