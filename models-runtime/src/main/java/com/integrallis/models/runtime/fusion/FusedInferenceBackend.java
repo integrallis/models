@@ -29,14 +29,14 @@ import java.util.function.Consumer;
  * Several same-tokenizer models presented as one backend: a lead that always steps, and auxiliaries
  * consulted only when an {@link EnsembleGate} says so.
  *
- * <p>Every member keeps its own weights and its own KV cache; nothing is shared physically. Per
- * step the lead runs, its distribution's entropy is read, and if the gate does not fire the lead's
- * logits are returned untouched, so a gate that never fires makes this backend the lead alone. If
- * the gate fires, each auxiliary catches up over the tokens it has not yet seen in one {@link
- * InferenceBackend#prefill(int[], int)} call, the batched prompt path, and the members'
- * distributions are combined under the recipe's {@link FusionRule}. The combined scores are
- * returned in place of logits: the sampler's {@code softmax(s / T)} over them is the fused
- * distribution.
+ * <p>Every member keeps its own weights and its own KV cache; nothing is shared physically (a
+ * hybrid by recipe, not by shared structure). Per step the lead runs, its distribution's entropy is
+ * read, and if the gate does not fire the lead's logits are returned untouched, so a gate that
+ * never fires makes this backend the lead alone. If the gate fires, each auxiliary catches up over
+ * the tokens it has not yet seen in one {@link InferenceBackend#prefill(int[], int)} call, the
+ * batched prompt path, and the members' distributions are combined under the recipe's {@link
+ * FusionRule}. The combined scores are returned in place of logits: the sampler's {@code softmax(s
+ * / T)} over them is the fused distribution.
  *
  * <p>This is the production form of the token-level fusion the {@code models-bench logit-fusion}
  * study measured every-token in September 2026, with the gate that study listed as its first
