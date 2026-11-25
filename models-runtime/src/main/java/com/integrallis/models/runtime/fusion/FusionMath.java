@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.integrallis.models.bench.fusion;
+package com.integrallis.models.runtime.fusion;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -157,6 +157,36 @@ public final class FusionMath {
       }
     }
     return entropy;
+  }
+
+  /**
+   * Shannon entropy in nats of {@code softmax(logits)}, in one pass and without materialising the
+   * log-probability vector: {@code H = log Σ e^(l−m) − Σ e^(l−m)(l−m) / Σ e^(l−m)} with {@code m}
+   * the maximum logit.
+   */
+  public static double entropyOfLogits(float[] logits) {
+    Objects.requireNonNull(logits, "logits");
+    if (logits.length == 0) {
+      throw new IllegalArgumentException("logits must not be empty");
+    }
+    float max = Float.NEGATIVE_INFINITY;
+    for (float logit : logits) {
+      if (!Float.isFinite(logit)) {
+        throw new IllegalArgumentException("logits must be finite");
+      }
+      if (logit > max) {
+        max = logit;
+      }
+    }
+    double sum = 0;
+    double weighted = 0;
+    for (float logit : logits) {
+      double shifted = logit - max;
+      double exp = Math.exp(shifted);
+      sum += exp;
+      weighted += exp * shifted;
+    }
+    return Math.log(sum) - weighted / sum;
   }
 
   /** {@code KL(p || q)} in nats for normalized log-probability vectors. */

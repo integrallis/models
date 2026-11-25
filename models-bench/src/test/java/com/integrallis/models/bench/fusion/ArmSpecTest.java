@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
+import com.integrallis.models.runtime.fusion.FusionRule;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -101,5 +102,34 @@ class ArmSpecTest {
     assertThat(tuned.canonical()).isEqualTo("fuse:A+B+C:poe:tuned");
     assertThat(ArmSpec.parse("fuse:A+B:article:0.5,0.5").canonical())
         .isEqualTo("fuse:A+B:article:0.5,0.5");
+  }
+
+  @Test
+  void parsesGatedArmsWithLeadFirstAndAThresholdInNats() {
+    ArmSpec article = ArmSpec.parse("gated:L+M+I:poe:0.55,0.25,0.20:0.65");
+    assertThat(article.kind()).isEqualTo(ArmSpec.Kind.GATED);
+    assertThat(article.members()).containsExactly("L", "M", "I");
+    assertThat(article.rule()).isEqualTo(FusionRule.POE);
+    assertThat(article.gateThreshold()).isEqualTo(0.65);
+    assertThat(article.canonical()).isEqualTo("gated:L+M+I:poe:0.55,0.25,0.2:0.65");
+    assertThat(article.requiresFrozen()).isFalse();
+
+    ArmSpec never = ArmSpec.parse("gated:L+M:mixture:uniform:inf");
+    assertThat(never.gateThreshold()).isEqualTo(Double.POSITIVE_INFINITY);
+    assertThat(never.canonical()).isEqualTo("gated:L+M:mixture:uniform:inf");
+
+    ArmSpec tuned = ArmSpec.parse("gated:L+M+I:poe:tuned:1.0");
+    assertThat(tuned.requiresFrozen()).isTrue();
+    assertThat(ArmSpec.parse("member:L").gateThreshold()).isNull();
+
+    assertThatThrownBy(() -> ArmSpec.parse("gated:L+M:poe:uniform"))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> ArmSpec.parse("gated:L+M:poe:uniform:-1"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("non-negative");
+    assertThatThrownBy(() -> ArmSpec.parse("gated:L+M:poe:uniform:warm"))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> ArmSpec.parse("gated:L:poe:uniform:0.5"))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }

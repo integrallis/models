@@ -4,6 +4,37 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **`FusedInferenceBackend`: several same-tokenizer models as one backend, with a gate.** The lead
+  always steps; the auxiliaries are consulted only when an `EnsembleGate` says so (the shipped gate
+  is `EntropyGate`, a threshold on the lead's Shannon entropy in nats; the published recipe's value
+  is 0.65). When consulted, each auxiliary catches up over the tokens it has not seen in one
+  `prefill` call, the batched prompt path, and the members' distributions are combined under a
+  `FusionRecipe` (`FusionRule.POE`, `MIXTURE` or the raw-logit `ARTICLE` rule, weights on the
+  simplex). A gate that never fires returns the lead's own logits, so the backend is then the lead
+  alone. Members keep their own weights and KV; nothing is shared physically, so this is a
+  composition, not a hybrid. Rewinding needs every member rewindable. `FusionMetrics` counts steps,
+  consultations, catch-up tokens and time per role; a `FusionStep` trace reports each step.
+  Measured on toy members only so far: a never-firing gate equals the lead token for token, an
+  always-firing gate equals the September 2026 every-token `FusionDecoder` reference token for
+  token, and auxiliaries catch up over exactly the unseen delta. No accuracy or speed is claimed;
+  `benchmark-results/2026-11-25-gated-logit-fusion/PREREGISTRATION.md` is the frozen protocol for
+  measuring both.
+- **`models-bench logit-fusion` gains a `gated:` arm** (`gated:<lead+aux..>:<rule>:<weights>:<nats|inf>`)
+  that drives the runtime's fused backend through the bench's own single-member loop and records
+  the gate's counts in each item's `aggregations` (`gate.steps`, `gate.consulted`,
+  `gate.consultRate`, `gate.catchUpTokens`, `gate.leadMillis`, `gate.auxiliaryMillis`,
+  `gate.fusionMillis`), so what the study measures is what a composition would ship.
+
+### Changed
+
+- **`FusionMath` and `FusionRule` moved from `models-bench` to `models-runtime`**
+  (`com.integrallis.models.runtime.fusion`), unchanged in behaviour, so the runtime backend and the
+  bench share one implementation. `FusionMath.entropyOfLogits` is new: the entropy of
+  `softmax(logits)` in one pass without materialising the log-probability vector.
+
+
 ## [0.5.23] - 2026-11-22
 
 ### Added

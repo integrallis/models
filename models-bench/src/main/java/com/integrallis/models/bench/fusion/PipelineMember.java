@@ -54,6 +54,11 @@ final class PipelineMember implements FusionMember {
     return pipeline;
   }
 
+  /** The backend this member drives; a gated arm composes these under one fused backend. */
+  InferenceBackend backend() {
+    return backend;
+  }
+
   @Override
   public void reset() {
     pipeline.resetContext();

@@ -16,6 +16,8 @@
 package com.integrallis.models.bench.fusion;
 
 import com.integrallis.models.runtime.Sampler;
+import com.integrallis.models.runtime.fusion.FusionMath;
+import com.integrallis.models.runtime.fusion.FusionRule;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
