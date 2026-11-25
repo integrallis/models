@@ -285,3 +285,14 @@ Sources: the article (Level Up Coding, 2026-10-19, "I Fused 3 Tiny Local Models 
 Limits (Without Weight Merging)"); SAFE, arXiv 2510.15346 (ICLR 2026); UniTE, arXiv 2410.03777 (ICLR
 2025); agreement-based ensembling, arXiv 2502.21265; this repository's
 `benchmark-results/2026-09-17-logit-fusion-study/` and `benchmark-results/2026-10-21-speculative-ceiling/`.
+
+## Amendment 1 (2026-11-25, before any gate, pilot or test-set run; no threshold changes)
+
+**Catalog category.** The owner decided that "hybrid" is the generic catalog category and that the
+hybrids published so far are one *recipe* (an activated LoRA over a shared physical KV prefix).
+Other recipes join the category without sharing architecture or KV, and recipes are named. Gated
+logit fusion is therefore a **hybrid by recipe**; the sentence "Composition, not hybrid" under *The
+technique under test* describes the mechanism (members share no KV), not the catalog kind. Stage S8
+reads: in ModelJars, a named recipe (`gated-logit-fusion`) under the hybrid category, with members,
+roles, weights, gate and rule assembled at open time; a catalog entry for the article's recipe only
+on the practical claim. Nothing else in this protocol changes.

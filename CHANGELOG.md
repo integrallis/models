@@ -13,8 +13,9 @@ All notable changes to models are documented here.
   `prefill` call, the batched prompt path, and the members' distributions are combined under a
   `FusionRecipe` (`FusionRule.POE`, `MIXTURE` or the raw-logit `ARTICLE` rule, weights on the
   simplex). A gate that never fires returns the lead's own logits, so the backend is then the lead
-  alone. Members keep their own weights and KV; nothing is shared physically, so this is a
-  composition, not a hybrid. Rewinding needs every member rewindable. `FusionMetrics` counts steps,
+  alone. Members keep their own weights and KV; nothing is shared physically. It is the runtime
+  form of a hybrid recipe (`gated-logit-fusion`) that shares no architecture with the activated-LoRA
+  recipe. Rewinding needs every member rewindable. `FusionMetrics` counts steps,
   consultations, catch-up tokens and time per role; a `FusionStep` trace reports each step.
   Measured on toy members only so far: a never-firing gate equals the lead token for token, an
   always-firing gate equals the September 2026 every-token `FusionDecoder` reference token for
