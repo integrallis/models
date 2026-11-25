@@ -20,6 +20,11 @@ import com.integrallis.models.api.Tokenizer;
 import com.integrallis.models.bench.fusion.ReportModel.CandidateScore;
 import com.integrallis.models.bench.fusion.ReportModel.Item;
 import com.integrallis.models.bench.fusion.ReportModel.Output;
+import com.integrallis.models.runtime.fusion.EntropyGate;
+import com.integrallis.models.runtime.fusion.FusedInferenceBackend;
+import com.integrallis.models.runtime.fusion.FusionMetrics;
+import com.integrallis.models.runtime.fusion.FusionRecipe;
+import com.integrallis.models.runtime.fusion.FusionRule;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -193,6 +198,35 @@ final class ArmRunner {
                   context.executor());
           outputs.add(toOutput("fused", null, result, members.getFirst().tokenizer(), labels));
           prediction = outputs.getFirst().statedAnswer();
+        }
+        case GATED -> {
+          List<PipelineMember> loaded = new ArrayList<>();
+          for (String name : arm.members()) {
+            if (!(member(name) instanceof PipelineMember pipelineMember)) {
+              throw new IllegalStateException("gated arms need pipeline-backed members: " + name);
+            }
+            loaded.add(pipelineMember);
+          }
+          FusedInferenceBackend fused =
+              new FusedInferenceBackend(
+                  loaded.stream().map(PipelineMember::backend).toList(),
+                  new FusionRecipe(
+                      arm.rule(), resolution.weights(), new EntropyGate(arm.gateThreshold())));
+          PipelineMember gated = new PipelineMember("gated", fused);
+          int[] tokens = gated.tokenizer().encode(prompt);
+          promptTokens = tokens.length;
+          DecodeResult result = FusionDecoder.single(gated, tokens, context.settings());
+          outputs.add(toOutput("gated", null, result, gated.tokenizer(), labels));
+          prediction = outputs.getFirst().statedAnswer();
+          FusionMetrics metrics = fused.metrics();
+          aggregations.put("gate.steps", Long.toString(metrics.steps()));
+          aggregations.put("gate.consulted", Long.toString(metrics.consulted()));
+          aggregations.put("gate.consultRate", Double.toString(metrics.consultRate()));
+          aggregations.put("gate.catchUpTokens", Long.toString(metrics.catchUpTokens()));
+          aggregations.put("gate.leadMillis", Long.toString(metrics.leadNanos() / 1_000_000));
+          aggregations.put(
+              "gate.auxiliaryMillis", Long.toString(metrics.auxiliaryNanos() / 1_000_000));
+          aggregations.put("gate.fusionMillis", Long.toString(metrics.fusionNanos() / 1_000_000));
         }
         case SELF_CONSISTENCY -> {
           FusionMember member = member(arm.members().getFirst());

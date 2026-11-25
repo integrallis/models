@@ -17,6 +17,8 @@ package com.integrallis.models.bench.fusion;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.integrallis.models.runtime.fusion.FusionMath;
+import com.integrallis.models.runtime.fusion.FusionRule;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

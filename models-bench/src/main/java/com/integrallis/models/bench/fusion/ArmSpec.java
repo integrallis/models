@@ -15,6 +15,8 @@
  */
 package com.integrallis.models.bench.fusion;
 
+import com.integrallis.models.runtime.fusion.FusionMath;
+import com.integrallis.models.runtime.fusion.FusionRule;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -26,6 +28,8 @@ import java.util.stream.Collectors;
  * One study arm, parsed from its command-line spec string.
  *
  * <p>Grammar: {@code member:<m>}, {@code fuse:<m1+m2..>:<rule>:<uniform|tuned|w1,w2..>}, {@code
+ * gated:<lead+aux..>:<rule>:<uniform|tuned|w1,w2..>:<nats|inf>} (the lead first; the auxiliaries
+ * are consulted where the lead's entropy reaches the threshold), {@code
  * vote|vote-consist|vote-conf:<m1+m2..>:<tieBreak>}, {@code sc:<m>:<k>}, {@code
  * rerank:<m1+m2..>:<uniform|tuned|w1,w2..>}.
  */
@@ -36,12 +40,26 @@ public record ArmSpec(
     WeightMode weightMode,
     double[] explicitWeights,
     String tieBreakMember,
-    int samples) {
+    int samples,
+    Double gateThreshold) {
+
+  /** An arm without a gate (every kind but {@link Kind#GATED}). */
+  public ArmSpec(
+      Kind kind,
+      List<String> members,
+      FusionRule rule,
+      WeightMode weightMode,
+      double[] explicitWeights,
+      String tieBreakMember,
+      int samples) {
+    this(kind, members, rule, weightMode, explicitWeights, tieBreakMember, samples, null);
+  }
 
   /** Arm families. */
   public enum Kind {
     MEMBER("member"),
     FUSE("fuse"),
+    GATED("gated"),
     VOTE("vote"),
     VOTE_CONSIST("vote-consist"),
     VOTE_CONF("vote-conf"),
@@ -104,6 +122,15 @@ public record ArmSpec(
         FusionRule rule = FusionRule.parse(parts[2]);
         WeightChoice weights = weights(spec, parts[3], names.size());
         yield new ArmSpec(Kind.FUSE, names, rule, weights.mode(), weights.values(), null, 1);
+      }
+      case "gated" -> {
+        requireParts(spec, parts, 5);
+        List<String> names = members(spec, parts[1], 2);
+        FusionRule rule = FusionRule.parse(parts[2]);
+        WeightChoice weights = weights(spec, parts[3], names.size());
+        double threshold = gateThreshold(spec, parts[4]);
+        yield new ArmSpec(
+            Kind.GATED, names, rule, weights.mode(), weights.values(), null, 1, threshold);
       }
       case "vote", "vote-consist", "vote-conf" -> {
         requireParts(spec, parts, 3);
@@ -211,10 +238,33 @@ public record ArmSpec(
     return switch (kind) {
       case MEMBER -> "member:" + names;
       case FUSE -> "fuse:" + names + ":" + rule.id() + ":" + weightText();
+      case GATED -> "gated:" + names + ":" + rule.id() + ":" + weightText() + ":" + thresholdText();
       case VOTE, VOTE_CONSIST, VOTE_CONF -> kind.id() + ":" + names + ":" + tieBreakMember;
       case SELF_CONSISTENCY -> "sc:" + names + ":" + samples;
       case RERANK -> "rerank:" + names + ":" + weightText();
     };
+  }
+
+  private String thresholdText() {
+    return gateThreshold.isInfinite() ? "inf" : Double.toString(gateThreshold);
+  }
+
+  /** Entropy threshold in nats: a non-negative number, or {@code inf} to never consult. */
+  private static double gateThreshold(String spec, String text) {
+    if ("inf".equals(text)) {
+      return Double.POSITIVE_INFINITY;
+    }
+    double value;
+    try {
+      value = Double.parseDouble(text);
+    } catch (NumberFormatException failure) {
+      throw new IllegalArgumentException(
+          "gate threshold must be a number of nats or inf: " + spec, failure);
+    }
+    if (Double.isNaN(value) || value < 0) {
+      throw new IllegalArgumentException("gate threshold must be non-negative: " + spec);
+    }
+    return value;
   }
 
   private String weightText() {

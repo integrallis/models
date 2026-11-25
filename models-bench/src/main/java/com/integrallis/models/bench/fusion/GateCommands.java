@@ -17,6 +17,8 @@ package com.integrallis.models.bench.fusion;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.integrallis.models.bench.fusion.ReportModel.MemberConfig;
+import com.integrallis.models.runtime.fusion.FusionMath;
+import com.integrallis.models.runtime.fusion.FusionRule;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;

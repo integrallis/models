@@ -313,7 +313,7 @@ public final class FusionCli {
               + arm.canonical()
               + " requires --frozen and --frozen-sha256 (tuned before any test run)");
     }
-    if (thinking && arm.kind() == ArmSpec.Kind.FUSE) {
+    if (thinking && (arm.kind() == ArmSpec.Kind.FUSE || arm.kind() == ArmSpec.Kind.GATED)) {
       out.println("WARNING the protocol runs fused decoding arms with thinking off only");
     }
 
@@ -394,7 +394,9 @@ public final class FusionCli {
                 arm.kind().id(),
                 arm.members(),
                 arm.rule() == null ? null : arm.rule().id(),
-                arm.kind() == ArmSpec.Kind.FUSE || arm.kind() == ArmSpec.Kind.RERANK
+                arm.kind() == ArmSpec.Kind.FUSE
+                        || arm.kind() == ArmSpec.Kind.GATED
+                        || arm.kind() == ArmSpec.Kind.RERANK
                     ? Arrays.stream(resolution.weights()).boxed().toList()
                     : null,
                 resolution.weightSource(),

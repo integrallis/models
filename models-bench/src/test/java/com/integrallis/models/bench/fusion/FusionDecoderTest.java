@@ -17,6 +17,8 @@ package com.integrallis.models.bench.fusion;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.integrallis.models.runtime.fusion.FusionMath;
+import com.integrallis.models.runtime.fusion.FusionRule;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;

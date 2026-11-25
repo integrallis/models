@@ -25,6 +25,8 @@ import com.integrallis.models.backend.purejava.gguf.GgufMetadata;
 import com.integrallis.models.backend.purejava.gguf.GgufMetadataValue;
 import com.integrallis.models.backend.purejava.gguf.GgufValueType;
 import com.integrallis.models.bench.fusion.ReportModel.Item;
+import com.integrallis.models.runtime.fusion.FusionMath;
+import com.integrallis.models.runtime.fusion.FusionRule;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.ByteBuffer;
