@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "status": "skeleton: repositories, revisions and files pinned 2026-11-25 from the Hugging Face API; sha256 and sizeBytes are filled at S1 on the pilot host from the downloaded or converted bytes, before any gate runs",
+ "status": "pinned at S1 (2026-11-25, box fusion-s1 cpx62): sha256 and byte counts below are the downloaded or converted files' own; entries still marked pending-S1 were not needed by S1 and are pinned when first used",
  "resolvedVia": "https://huggingface.co/api/models/<repo>?blobs=true (revision = the repo's main sha at resolution)",
  "modelSets": {
   "q4": [
@@ -27,8 +27,8 @@
    "repo": "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
    "revision": "f86cb2c1fa",
    "file": "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
-   "sha256": "pending-S1",
-   "sizeBytes": 1120000000,
+   "sha256": "cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046",
+   "sizeBytes": 1117320768,
    "license": "apache-2.0",
    "status": "official"
   },
@@ -53,10 +53,10 @@
    "repo": "Qwen/Qwen2.5-Math-1.5B-Instruct",
    "revision": "aafeb0fc6f",
    "file": "qwen2.5-math-1.5b-instruct-q4_k_m.gguf",
-   "sha256": "pending-S1",
-   "sizeBytes": null,
+   "sha256": "d56f5bb25b426e5eedbbbac082daaeab46d668bca3a8a6f8bcc7f588b5a336e2",
+   "sizeBytes": 986047968,
    "license": "apache-2.0",
-   "status": "converted: no official GGUF exists; convert-math.sh from the official safetensors at the pinned revision with llama.cpp v1.0.0 (2d8a3250)"
+   "status": "converted on the S1 box from the official safetensors at the pinned revision with llama.cpp v1.0.0 (b1b770d90), then tokenizer.ggml.add_eos_token removed to match the official files (gate G0 attempt 1); sha256 is of the resulting file"
   },
   {
    "key": "M-q8",
@@ -66,10 +66,10 @@
    "repo": "Qwen/Qwen2.5-Math-1.5B-Instruct",
    "revision": "aafeb0fc6f",
    "file": "qwen2.5-math-1.5b-instruct-q8_0.gguf",
-   "sha256": "pending-S1",
-   "sizeBytes": null,
+   "sha256": "662687cfc6079719dd5d685c1e9c272716b0d392621c6ca99083fed443048ccd",
+   "sizeBytes": 1646572512,
    "license": "apache-2.0",
-   "status": "converted (see M-q4)"
+   "status": "converted on the S1 box from the official safetensors at the pinned revision with llama.cpp v1.0.0 (b1b770d90), then tokenizer.ggml.add_eos_token removed to match the official files (gate G0 attempt 1); sha256 is of the resulting file"
   },
   {
    "key": "I-q4",
@@ -79,8 +79,8 @@
    "repo": "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
    "revision": "91cad51170",
    "file": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
-   "sha256": "pending-S1",
-   "sizeBytes": 1120000000,
+   "sha256": "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
+   "sizeBytes": 1117320736,
    "license": "apache-2.0",
    "status": "official"
   },
@@ -127,5 +127,11 @@
  "notes": [
   "sizeBytes values that are set are the API's rounded sizes from 2026-11-25 and are replaced by the downloaded byte counts at S1.",
   "The tokenizer identity hash of L, M and I (gate G0) is recorded here at S1 as tokenizerIdentitySha256."
- ]
+ ],
+ "llamaCppForConversion": {
+  "tag": "v1.0.0",
+  "commit": "b1b770d90d94cad9e9ea5b993bdbc383a522fb28",
+  "postProcess": "gguf_new_metadata --remove-metadata tokenizer.ggml.add_eos_token (see convert-math.sh)"
+ },
+ "tokenizerIdentitySha256": "d1764205b2748f345803edf2173a2b82a5eed2da0a50e85852bcc3da45e6777d"
 }

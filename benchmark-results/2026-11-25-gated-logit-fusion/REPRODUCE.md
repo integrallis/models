@@ -12,6 +12,15 @@ CLI=models-bench/build/install/models-bench/bin/models-bench
 Provenance labels follow the working agreement: **[measured]** here, **[read]** from a document,
 **[believed]** an estimate awaiting measurement.
 
+## S1 host prerequisites (learned on the first box, 2026-11-25)
+
+A fresh Ubuntu 24.04 host needs, before any Models Gradle task: JDK 25, cmake and build-essential,
+`uv`, and rustup with the repository's stable toolchain **plus** `nightly-2026-09-17` with the
+`rust-src`, `llvm-bitcode-linker` and `llvm-tools` components and the `nvptx64-nvidia-cuda` target,
+because `:models-bench:installDist` builds `:backend-cuda:compilePtx` even on a host with no GPU.
+`convert-math.sh` runs its Python steps through a `uv` virtual environment when `uv` is present
+(the host has no system pip).
+
 ## S1a. Pin the weights
 
 `models.json` names every file by repository, revision and name. The official GGUFs download from
