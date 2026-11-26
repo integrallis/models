@@ -177,6 +177,48 @@ Streaming has the same ordering and error semantics described in
 xref:spring-ai.adoc#streaming-chat[Spring AI streaming]. Blocking model
 inference runs off the Reactor subscriber thread.
 
+== Typed Decisions (Spring AI 2.1)
+
+On Spring AI 2.1 or later the starter can also contribute a Spring AI `DecisionModel`, answered by
+`ModelsSpringAiDecisionModel` over the same backend as the chat model. It is off unless asked for:
+
+[source,properties]
+----
+integrallis.models.decision.enabled=true
+----
+
+[source,java]
+----
+@Autowired DecisionModel decisions;
+
+DecisionResponse answer = decisions.call(ticketText, Map.of(
+    "billedTwice", YesNoQuestion.of("Was the customer billed more than once?"),
+    "team", ChoiceQuestion.builder()
+        .text("Which team should handle this ticket?")
+        .option("billing", "charges, refunds and invoices")
+        .option("shipping", "delivery and tracking")
+        .build()));
+----
+
+[cols="2,1,4"]
+|===
+| Property | Default | Meaning
+
+| `integrallis.models.decision.enabled` | `false` | Contribute the `DecisionModel` bean (`modelsDecisionModel`).
+| `integrallis.models.decision.backend` | none | Name of the `InferenceBackend` bean to answer with. Without it, the application's single backend (or its `@Primary` one, or the `integrallis.models.catalog-model` one) is used, the same as the chat model.
+| `integrallis.models.decision.model-name` | the backend's name | Name reported in response metadata and observations.
+| `integrallis.models.decision.temperature` | `1.0` | Positive temperature applied across the answer letters.
+|===
+
+A `DecisionModel` the application declares is kept. With the property set and no usable backend
+(none, several with no primary and no name, a name that is not a bean, or a backend that is not a
+`SharedPrefixInferenceBackend`) the context fails to start with the reason, rather than starting
+without the bean. On Spring AI 1.1 or 2.0 the property changes nothing: the configuration is guarded
+by class name and never loaded. The probabilities are the model's distribution over the answer
+letters, as described in xref:spring-ai.adoc#_decisions[Spring AI: Decisions]; they are not
+calibrated against a dataset. The decision model and the chat model each serialize their own calls
+over the backend, not each other's.
+
 == Add Vectors for RAG
 
 Add the Vectors starter to expose a standard Spring AI `VectorStore` beside the

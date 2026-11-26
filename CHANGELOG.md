@@ -6,6 +6,22 @@ All notable changes to models are documented here.
 
 ### Added
 
+- **`DecisionModel` auto-configuration in `models-spring-boot-starter` (#463).** On Spring AI 2.1
+  or later, `integrallis.models.decision.enabled=true` contributes `modelsDecisionModel`, a
+  `ModelsSpringAiDecisionModel` over the same `InferenceBackend` as the chat model (the single or
+  `@Primary` one, or the `integrallis.models.catalog-model` one), or over the bean named by
+  `integrallis.models.decision.backend`; `model-name` and `temperature` (default 1.0) configure it.
+  An application `DecisionModel` is kept. A request that cannot be met (no backend, several with
+  no choice, an unknown name, a backend that is not a `SharedPrefixInferenceBackend`, a
+  non-positive temperature) fails startup with the reason. The configuration lives in a source set
+  compiled against Spring AI 2.1 and packed into the starter jar, guarded by class name, so on 1.1
+  and 2.0 it is never loaded; a test imports it from the jar's `AutoConfiguration.imports` the way
+  Boot does and checks both outcomes on whatever line the build runs. The jar's
+  `spring-configuration-metadata.json` now merges both source sets' properties, and a build check
+  fails if the class, its imports entry or its metadata is missing. Through Boot on Qwen3 1.7B Q8_0
+  the auto-configured bean returns the same probabilities as the adapter constructed directly on
+  the same backend (`decisionAutoConfigurationIntegrationTest`). The Spring AI 2.1.0 compatibility
+  cell now runs both modules' 2.1 test source sets.
 - **Gated-fusion S1 ran on real weights and every gate passed.** On a Hetzner cpx62 at Models
   `05cbefc6`, pure-Java backend, the Qwen2.5 Coder / Math / Instruct 1.5B members at Q4_K_M: G0
   tokenizer identity (after removing the one key the converter adds and the official files lack,

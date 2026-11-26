@@ -461,7 +461,8 @@ one `role: text` line per message. Only text is read: an image or other non-text
 `DecisionPrompt` options are not consulted. Calls are serialized around the backend; if the same
 backend instance also serves another component, the application must serialize those too.
 
-There is no auto-configuration for it yet: declare the bean yourself.
+With `models-spring-boot-starter`, `integrallis.models.decision.enabled=true` contributes this bean
+over the chat model's backend; see xref:spring-boot.adoc#_typed_decisions_spring_ai_2_1[Spring Boot: Typed Decisions].
 
 For auto-configuration, named-bean behavior, and combined Models/Vectors setup,
 continue with xref:spring-boot.adoc[Spring Boot]. For validation after
