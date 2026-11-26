@@ -74,6 +74,21 @@ jobs:
           -PspringFrameworkVersion=${{ matrix.spring_framework }}
           -PmicrometerObservationVersion=${{ matrix.micrometer }}
           --write-locks --console=plain
+      # The 2.1-only additions (the DecisionModel adapter and its auto-configuration) live in their
+      # own source sets, which the ordinary test tasks do not run. Run them on the line they need.
+      - name: Test the Spring AI 2.1 additions
+        if: matrix.spring_ai == '2.1.0'
+        run: >
+          ./gradlew
+          :models-spring-ai:springAi21Test
+          :models-spring-boot-starter:springAi21Test
+          :models-spring-ai:verifyDecisionAdapterInJar
+          :models-spring-boot-starter:verifyDecisionAutoConfigurationInJar
+          -PspringAiVersion=${{ matrix.spring_ai }}
+          -PspringBootVersion=${{ matrix.spring_boot }}
+          -PspringFrameworkVersion=${{ matrix.spring_framework }}
+          -PmicrometerObservationVersion=${{ matrix.micrometer }}
+          --write-locks --console=plain
 
   langchain4j:
     name: LangChain4j ${{ matrix.version }}

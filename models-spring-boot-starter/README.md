@@ -70,6 +70,16 @@ It is **prototype-scoped**, so each injection point gets its own builder and one
 cannot leak into another's. A `ChatClient.Builder` the application or another auto-configuration
 supplies is left alone, and nothing is registered when there is no local chat model.
 
+## `DecisionModel` (Spring AI 2.1)
+
+On Spring AI 2.1 or later, `integrallis.models.decision.enabled=true` contributes a Spring AI
+`DecisionModel` (bean `modelsDecisionModel`, a `ModelsSpringAiDecisionModel`) over the chat model's
+backend. `integrallis.models.decision.backend` names a different `InferenceBackend` bean,
+`integrallis.models.decision.model-name` sets the reported name and
+`integrallis.models.decision.temperature` (default `1.0`) the temperature across the answer letters.
+An application `DecisionModel` wins; a request the starter cannot meet fails startup with the
+reason. On Spring AI 1.1 and 2.0 the property has no effect.
+
 For local RAG, add `com.integrallis:vectors-spring-boot-starter:0.1.45` and provide a Spring AI
 `EmbeddingModel`. Vectors contributes `JavaVectorsVectorStore` while this starter contributes the
 local chat model. Both starters are verified together on Spring AI 1.1 and 2.0.
