@@ -1257,6 +1257,20 @@ public final class PureJavaBackend
     return ((LlamaDecoder) decoder).prefillEmbeddings(embeddings, startPosition);
   }
 
+  /**
+   * Consumes projected image rows into one session, so an image can be part of a frozen, forked or
+   * portable prefix (#425). Row by row; see {@link
+   * com.integrallis.models.backend.purejava.llama.LlamaForwardPass#prefillEmbeddings(
+   * com.integrallis.models.backend.purejava.llama.LlamaForwardPass.Session, float[], int)}.
+   */
+  public float[] prefillEmbeddings(
+      InferenceSession session, float[] embeddings, int startPosition) {
+    PureJavaInferenceSession state = requireOpen(session);
+    if (!supportsEmbeddingInput())
+      throw new UnsupportedOperationException("Image input requires a Llama decoder");
+    return ((LlamaDecoder) decoder).prefillEmbeddings(state.delegate, embeddings, startPosition);
+  }
+
   @Override
   public float[] forward(int token, int position) {
     checkOpen();
@@ -1418,8 +1432,10 @@ public final class PureJavaBackend
     if (decoder.supportsActivatedBranch())
       return PortablePrefixCapabilities.unsupported(
           PortablePrefixCapabilities.Status.ACTIVATED_STATE_UNSUPPORTED);
-    // #425: serialization exists but full continuation path is not yet independently tested.
-    // Remove this block after exact-donor/receiver tests pass for native attention prefixes.
+    // A session prefix never holds native attention state (the kernel serves only the default
+    // sequence; sessions run on the Java cache), but a kernel can still change session arithmetic
+    // (its rotary recurrence is part of the fingerprint), so only kernels that declare themselves
+    // portable are admitted (#425).
     if (!batchedAttentionKernel.supportsPortableState())
       return PortablePrefixCapabilities.unsupported(
           PortablePrefixCapabilities.Status.ATTENTION_STATE_UNSUPPORTED);
@@ -1467,12 +1483,8 @@ public final class PureJavaBackend
     checkOpen();
     if (!supportsPortablePrefixes())
       throw new UnsupportedOperationException("model cannot transfer KV prefixes");
-    long bytes = Math.addExact(32L, decoder.portablePrefixBytes(tokenCount));
-    if (batchedAttentionKernel.supportsPortableState()) {
-      bytes = Math.addExact(bytes, Integer.BYTES);
-      bytes = Math.addExact(bytes, batchedAttentionKernel.retainedStateBytes());
-    }
-    return bytes;
+    // Identity, the attention-state length field (always zero, see writePrefix), the decoder state.
+    return Math.addExact(32L + Integer.BYTES, decoder.portablePrefixBytes(tokenCount));
   }
 
   @Override
@@ -1488,17 +1500,13 @@ public final class PureJavaBackend
     var owned = requirePrefix(prefix);
     // Fixed-size identity avoids peer-controlled string allocation on import.
     output.write(java.util.HexFormat.of().parseHex(portablePrefixFingerprint()));
-    // Native attention state length (0 when absent) precedes optional retained state.
-    if (batchedAttentionKernel.supportsPortableState()) {
-      // Reserve space for the length field, then write the actual state.
-      long stateBytes = batchedAttentionKernel.retainedStateBytes();
-      if (stateBytes > Integer.MAX_VALUE)
-        throw new IOException("native attention state exceeds transfer limit");
-      output.writeInt((int) stateBytes);
-      if (stateBytes > 0) batchedAttentionKernel.writeRetainedState(output);
-    } else {
-      output.writeInt(0);
-    }
+    // The wire format keeps a native-attention length field, and it is always zero. The batched
+    // attention kernel serves only the default sequence; a session prefix lives entirely in the
+    // Java
+    // KV cache. The kernel's retained store is the default sequence's, not this prefix's: exporting
+    // it would ship unrelated state, and importing it would overwrite a receiver's live default
+    // sequence (#425).
+    output.writeInt(0);
     decoder.writePrefix(owned.delegate, tokenCount, output);
   }
 
@@ -1514,11 +1522,12 @@ public final class PureJavaBackend
       throw new IOException("incompatible model or KV execution identity");
     }
     int attentionLength = input.readInt();
-    if (attentionLength < 0) throw new IOException("invalid native attention state length");
-    if (batchedAttentionKernel.supportsPortableState()) {
-      if (attentionLength > 0) batchedAttentionKernel.readRetainedState(input);
-    } else if (attentionLength > 0) {
-      throw new IOException("unexpected native attention state for non-native backend");
+    if (attentionLength != 0) {
+      // Never applied: see writePrefix. Refused before any of it is read or the receiver touched.
+      throw new IOException(
+          "invalid native attention state length "
+              + attentionLength
+              + ": a session prefix carries no native attention state");
     }
     return new PureJavaSharedPrefix(this, decoder.readPrefix(input, tokenCount, maxBytes - 36));
   }

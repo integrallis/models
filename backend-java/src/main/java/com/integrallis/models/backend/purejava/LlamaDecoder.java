@@ -93,6 +93,10 @@ final class LlamaDecoder implements PureJavaDecoder {
     return forwardPass.prefillEmbeddings(embeddings, startPosition);
   }
 
+  float[] prefillEmbeddings(Session session, float[] embeddings, int startPosition) {
+    return forwardPass.prefillEmbeddings(requireSession(session), embeddings, startPosition);
+  }
+
   @Override
   public float[] prefill(int[] tokens, int startPosition) {
     return forwardPass.prefill(tokens, startPosition);

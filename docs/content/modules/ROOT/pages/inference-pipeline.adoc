@@ -259,12 +259,14 @@ other configurations: unsupported decoder state, unavailable model identity, act
 state, attention-kernel state that does not support portable serialization, or a matrix kernel
 that has not opted in for its current state and arithmetic.
 
-Attention kernels that implement `BatchedCausalAttentionKernel` and advertise
-`supportsPortableState()` now serialize and restore their retained KV store
-through the same wire format. `NativeCausalAttention` supports this for
-models with multi-head attention (heads == kv_heads); grouped-query attention
-remains unsupported for the native attention path. Rust/FFM also requires an
-identified native library. A backend without the portable SPI reports
+A portable prefix is session state, and sessions run on the Java KV cache: the batched
+attention kernel serves only a backend's default sequence. A prefix therefore carries no native
+attention state; the wire format's attention-length field is always zero, and an import that
+carries any is refused before the receiver is touched. (Releases 0.5.20 to 0.5.23 bundled the
+kernel's default-sequence store with a session prefix and overwrote the receiver's on import; that
+is fixed.) Attention kernels are still admitted only when they advertise `supportsPortableState()`,
+because a kernel can change session arithmetic, and the kernel is bound by the fingerprint.
+Rust/FFM also requires an identified native library. A backend without the portable SPI reports
 `BACKEND_UNSUPPORTED`. These are capability reports, not peer-compatibility
 decisions or model qualification verdicts. The current codec and eligibility
 limits are unchanged.

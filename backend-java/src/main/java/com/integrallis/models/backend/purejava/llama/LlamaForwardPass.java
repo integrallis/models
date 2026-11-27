@@ -793,6 +793,51 @@ public final class LlamaForwardPass {
     return result.clone();
   }
 
+  /**
+   * Consumes projected image rows into one session, one row per position, through the same per-row
+   * step the session's tokens take; returns stable final logits.
+   *
+   * <p>Rows are stored in the session's own KV cache, so the result can be frozen, forked and made
+   * portable like any token prefix (#425). This path is row by row: it is exact against itself and
+   * against another backend on the same path, and is not claimed bit-identical to the default
+   * sequence's batched image prefill. A session with an activated adapter is refused, because an
+   * adapter invocation is defined over tokens.
+   */
+  public float[] prefillEmbeddings(Session session, float[] embeddings, int startPosition) {
+    requireSession(session);
+    Objects.requireNonNull(embeddings, "embeddings");
+    if (session.adapterActive) {
+      throw new IllegalStateException("image rows cannot enter an activated-adapter session");
+    }
+    int dim = config.embeddingDim();
+    if (embeddings.length == 0 || embeddings.length % dim != 0) {
+      throw new IllegalArgumentException("embeddings must contain complete nonempty rows");
+    }
+    int rows = embeddings.length / dim;
+    if (startPosition != session.nextPosition || rows > session.cache.maxSeqLen() - startPosition) {
+      throw new IllegalArgumentException("image positions must be contiguous and fit the context");
+    }
+    for (float value : embeddings) {
+      if (!Float.isFinite(value)) throw new IllegalArgumentException("nonfinite embedding");
+    }
+    float[] result = null;
+    for (int row = 0; row < rows; row++) {
+      boolean last = row == rows - 1;
+      result =
+          forwardSequenceInternal(
+              0,
+              startPosition + row,
+              last ? Head.LOGITS : Head.NONE,
+              session.cache,
+              session.nextPosition,
+              false,
+              embeddings,
+              row * dim);
+      session.nextPosition++;
+    }
+    return result.clone();
+  }
+
   private int validateEmbeddingRows(float[] embeddings, int startPosition, int dim) {
     if (embeddings.length == 0 || embeddings.length % dim != 0) {
       throw new IllegalArgumentException("embeddings must contain complete nonempty rows");

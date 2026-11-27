@@ -1693,3 +1693,25 @@ tasks.register<RerankerCanaryTask>("rerankerCanary") {
     summary.set(layout.buildDirectory.file("reports/reranker-canary/summary.md"))
     outputs.upToDateWhen { false }
 }
+
+// #425: a LLaVA 1.5 7B text-and-image prefix moved between two independently loaded backends,
+// against the donor and against recomputation. Needs the pinned catalog files (second-state
+// Llava-v1.5-7B-GGUF @ ffb5e9a1): -Dmodels.fixtures.llavaText=<Q4_K_M gguf>
+// -Dmodels.fixtures.llavaProjector=<mmproj f16 gguf>.
+tasks.register<Test>("llavaPortablePrefixIntegrationTest") {
+    description = "Moves a LLaVA 1.5 7B text-and-image prefix between independent backends (#425)"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform { includeTags("model-fixture") }
+    filter {
+        includeTestsMatching(
+            "com.integrallis.models.backend.purejava.LlavaRealModelPortablePrefixIntegrationTest"
+        )
+    }
+    listOf("models.fixtures.llavaText", "models.fixtures.llavaProjector").forEach { key ->
+        providers.systemProperty(key).orNull?.let { systemProperty(key, it) }
+    }
+    maxHeapSize = "8g"
+    testLogging { showStandardStreams = true }
+}

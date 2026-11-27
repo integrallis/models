@@ -41,6 +41,37 @@ rejected before consuming decoder state. Close releases both mapped models. The 
 input uses the existing transformer graph and KV cache, without a duplicate decoder implementation. Image rows use the existing batched prefill engine,
 including chunk boundaries and the final single-row tail.
 
+## Prefixes that hold images
+
+`LlavaBackend` also offers sessions whose content is recorded as it is read, so a prompt holding
+text and images can be frozen once, forked, and moved to another backend:
+
+```java
+InferenceSession session = llava.openSession();
+llava.prefill(session, before, 0);
+llava.prefillImage(session, png, before.length);
+llava.prefill(session, after, before.length + llava.imageTokenCount());
+LlavaBackend.LlavaPrefix prefix = llava.freezePrefix(session);
+llava.writePrefix(prefix, out);
+
+// On another backend, with the content it is itself about to continue from:
+MultimodalContent expected = MultimodalContent.builder()
+    .tokens(before).image(png, receiver.imageTokenCount()).tokens(after).build();
+LlavaBackend.LlavaPrefix imported = receiver.readPrefix(in, maxBytes, expected);
+InferenceSession continuation = receiver.fork(imported);
+```
+
+- An image is identified by the SHA-256 of its encoded bytes; placeholder tokens are not identity.
+  The import is refused on any difference in tokens or images, and names the first one.
+- `portablePrefixFingerprint()` binds the text model and its KV execution identity, the projector
+  file, the preprocessing and projection code, and the image token layout; a different projector is
+  refused.
+- `LlavaBackend` does not implement the generic portable-prefix interface on purpose: its import
+  cannot be told which image the receiver holds.
+- Session image prefill is row by row. It is exact against itself and across backends on the same
+  path, and is not claimed bit-identical to the default sequence's batched image prefill, so a
+  prefix is compared with a recomputation on the session path.
+
 ## Supported profile
 
 The loader deliberately accepts the converted, fixed-resolution **23-block CLIP + two-layer MLP**
