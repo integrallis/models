@@ -4,6 +4,33 @@ All notable changes to models are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A portable session prefix no longer carries native attention state (#425).** The batched
+  attention kernel serves only a backend's default sequence; sessions run on the Java KV cache.
+  Since 0.5.20 `writePrefix` bundled the kernel's retained store (the default sequence's) with a
+  session prefix, and `readPrefix` wrote it over the receiver's live default-sequence store. Export
+  now writes a zero attention length, import refuses any other value before touching the receiver,
+  and `portablePrefixBytes` no longer counts the store. `PortablePrefixAttentionOwnershipTest`
+  reproduces the defect without the native library (a kernel that retains state and records
+  exports and imports) and fails on the previous code.
+
+### Added
+
+- **Prefixes that hold images move between LLaVA backends, bound to their content (#425).**
+  `PureJavaBackend.prefillEmbeddings(InferenceSession, ...)` reads projected image rows into a
+  session (row by row, so the result can be frozen and forked); `LlavaBackend` gains sessions that
+  record their content, `freezePrefix`, `fork`, `writePrefix` and `readPrefix(input, maxBytes,
+  expected)`, and `MultimodalContent`, the ordered token runs and image digests a prefix holds.
+  An import is refused unless it holds exactly the content the receiver expects, so a different
+  image behind identical placeholders is caught; the fingerprint binds the text model, the
+  projector file, the preprocessing and projection code and the image layout. Content reads are
+  bounded before allocation. Tests on a synthetic projector and two independently loaded backends:
+  text-image-text-image-text prefixes continue exactly as the donor and as a recomputation, the
+  images measurably change the logits, a changed image, changed tokens, a tampered digest, a
+  different projector, a wrong format and an over-budget payload are each refused, and closing a
+  fork, freezing a session and foreign-backend use behave as documented.
+
 ### Added
 
 - **Gated-fusion S1 ran on real weights and every gate passed.** On a Hetzner cpx62 at Models
